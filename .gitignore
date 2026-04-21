@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Editors
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.history/
+.idea/
+*.iml
+
+# AI workflow runtime logs
+.ai/mcp-server.log
+.ai/sessions.json
+
+# Node
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.npm
+.eslintcache
+.env
+.env.local
+.env.*.local
+coverage/
+

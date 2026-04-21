@@ -1,0 +1,27 @@
+{
+  "roles": {
+    "plan": {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "medium"
+    },
+    "implement": {
+      "agent": "codex",
+      "model": "gpt-5.4"
+    },
+    "review": {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "medium"
+    }
+  },
+  "defaults": {
+    "claude": {
+      "permission_mode": "acceptEdits"
+    },
+    "codex": {
+      "sandbox": "workspace-write",
+      "network_access": true
+    }
+  }
+}
