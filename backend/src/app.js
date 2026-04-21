@@ -14,7 +14,7 @@ export function createApp(options = {}) {
   });
 
   app.use("/api/auth", authRoutes(options));
-  app.use("/api/lists", listRoutes);
+  app.use("/api/lists", listRoutes(options));
   app.use("/api/entries", entryRoutes);
   app.use("/api/sharing", sharingRoutes);
 

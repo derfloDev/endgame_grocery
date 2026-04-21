@@ -7,6 +7,7 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 - `frontend` contains the Vite + React application shell.
 - `backend` contains the Express API scaffold and database wiring placeholders.
 - Authentication now includes backend register/login endpoints plus protected frontend routes for `/`, `/lists/:id`, `/login`, and `/register`.
+- List management now includes authenticated list CRUD endpoints and an overview UI for create, rename, delete, and shared-list indicators.
 - `.ai` contains the planning, review, and handoff artifacts used by the role workflow.
 
 ## Getting started
@@ -35,6 +36,14 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 - `POST /api/auth/register` creates a user with `email`, `password`, and `display_name`.
 - `POST /api/auth/login` returns a JWT access token.
 - The frontend stores the token in `localStorage` and redirects unauthenticated access to `/login`.
+
+## List workflow
+
+- `GET /api/lists` returns all lists the current user owns or can access through sharing, with `is_owner` and `owner_name`.
+- `POST /api/lists` creates a new owned list.
+- `PATCH /api/lists/:id` renames a list for the owner only.
+- `DELETE /api/lists/:id` deletes a list for the owner only.
+- The overview screen supports create, rename, delete, and navigation into protected list routes.
 
 ## AI workflow
 

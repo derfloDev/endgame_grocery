@@ -39,10 +39,17 @@ describe("authentication shell", () => {
   });
 
   it("submits the login form and shows the protected overview", async () => {
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ token: createFakeJwt("user-123") })
-    });
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: createFakeJwt("user-123") })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+        })
+      });
 
     renderApp(["/login"]);
 
@@ -59,7 +66,7 @@ describe("authentication shell", () => {
       );
     });
 
-    expect(await screen.findByText("Your lists will appear here in T-004.")).toBeTruthy();
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
   });
 
   it("submits the register form", async () => {
@@ -71,6 +78,10 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ token: createFakeJwt("user-1") })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ lists: [] })
       });
 
     renderApp(["/register"]);
@@ -90,7 +101,55 @@ describe("authentication shell", () => {
       );
     });
 
-    expect(await screen.findByText("Your lists will appear here in T-004.")).toBeTruthy();
+    expect(await screen.findByText("No lists yet. Create one to get started.")).toBeTruthy();
+  });
+
+  it("creates, renames, and deletes a list from the overview", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ lists: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          list: { id: "list-1", name: "Weekend groceries", owner_name: "Demo User", is_owner: true }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          list: { id: "list-1", name: "Renamed list", owner_name: "Demo User", is_owner: true }
+        })
+      })
+      .mockResolvedValueOnce({
+        status: 204
+      });
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("No lists yet. Create one to get started.")).toBeTruthy();
+
+    await userEvent.type(screen.getByLabelText("New list"), "Weekend groceries");
+    await userEvent.click(screen.getByRole("button", { name: "Create list" }));
+
+    expect(await screen.findByText("Weekend groceries")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename" }));
+    const renameInput = screen.getByLabelText("Rename list");
+    await userEvent.clear(renameInput);
+    await userEvent.type(renameInput, "Renamed list");
+    await userEvent.click(screen.getByRole("button", { name: "Save name" }));
+
+    expect(await screen.findByText("Renamed list")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Renamed list")).toBeNull();
+    });
   });
 });
 

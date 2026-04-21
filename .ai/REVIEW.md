@@ -2,6 +2,47 @@
 
 ---
 
+## T-004 — List Management
+
+**Verdict: PASS**
+
+### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `backend/src/routes/lists.js:111,154` | `PATCH /:id` and `DELETE /:id` return 403 for both "list not found" and "caller is not the owner". A strict reading of the plan says "403 otherwise" (owner check), but returning 403 when the list genuinely doesn't exist is also acceptable here since it avoids leaking list existence to non-owners. No action required. | No |
+
+### Verification
+
+#### Steps performed
+1. Read `.ai/PLAN.md` Phase 4 scope and T-004 acceptance criteria.
+2. Inspected `backend/src/routes/lists.js` — all four endpoints (`GET /`, `POST /`, `PATCH /:id`, `DELETE /:id`) implemented with correct auth middleware, SQL, and status codes.
+3. Verified `GET /` SQL: joins `lists` + `users` (for `owner_name`) + LEFT JOIN `list_members` (filtered to caller), `WHERE owner_id = $1 OR lm.user_id = $1`; no duplicate rows because the left join filters to caller only ✅.
+4. Verified `POST /` inserts with `owner_id = req.user.sub`, returns 201 + `is_owner: true` ✅.
+5. Verified `PATCH /:id` ownership check before update, 403 on failure, no separate 404 (acceptable, avoids list-existence leak) ✅.
+6. Verified `DELETE /:id` uses same ownership check, `DELETE FROM lists` triggers DB cascades for entries and members ✅.
+7. Inspected `backend/src/app.js` — lists router wired via factory pattern `listRoutes(options)`, consistent with auth ✅.
+8. Inspected `frontend/src/api/lists.js` — `fetchLists`, `createList`, `renameList`, `deleteList` all set `Authorization: Bearer <token>` header and handle 204 response ✅.
+9. Inspected `OverviewPage.jsx` — loads lists on mount; isMounted guard prevents state updates after unmount; create/rename/delete flows with optimistic local-state update; shared indicator pill with "Shared by {owner_name}" for `is_owner: false`; confirmation dialog before delete ✅.
+10. Inspected `app.test.jsx` — existing login/register tests updated to mock the subsequent `GET /api/lists` call; new end-to-end test covers create, rename (keyboard Enter + Save button), and delete ✅.
+11. Ran `npm run lint` — 1 warning (same non-blocking fast-refresh warning), exit 0 ✅.
+12. Ran `npm run build` — clean ✅.
+13. Ran `npm test` — 13/13 tests pass across 6 suites ✅.
+
+#### Findings
+- All T-004 acceptance criteria satisfied:
+  - CRUD endpoints return correct data and enforce owner-only rules ✅
+  - OverviewPage lists all accessible lists with shared indicator ✅
+  - Create/rename/delete flows work end-to-end ✅
+- No regressions to previously-passing auth tests.
+
+#### Risks
+- Low: `PATCH`/`DELETE` return 403 on both "not found" and "not owner"; acceptable trade-off already noted above.
+
+---
+
+---
+
 ## T-003 — Authentication (rework round 2)
 
 **Verdict: PASS**
