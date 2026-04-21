@@ -20,7 +20,7 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | Project Scaffold | ready_for_implement | npm workspaces initialised; `npm run build` and `npm run lint` pass on empty scaffold; docker-compose.yml starts PostgreSQL; `.env.example` present | n/a | implement |
+| T-001 | Project Scaffold | done | npm workspaces initialised; `npm run build` and `npm run lint` pass on empty scaffold; docker-compose.yml starts PostgreSQL; `.env.example` present | `npm install`; `npm run lint`; `npm run build`; `npm test` | none |
 | T-002 | Database Schema & Migrations | ready_for_implement | All four tables created via `node-pg-migrate`; `npm run migrate` runs cleanly on fresh DB; seed script inserts demo data without errors | n/a | implement |
 | T-003 | Authentication | ready_for_implement | Register and login endpoints return correct status codes; JWT verified by middleware; LoginPage and RegisterPage render and submit; ProtectedRoute redirects unauthenticated users | n/a | implement |
 | T-004 | List Management | ready_for_implement | CRUD endpoints return correct data and enforce owner-only rules; OverviewPage lists all accessible lists with shared indicator; create/rename/delete flows work end-to-end | n/a | implement |
