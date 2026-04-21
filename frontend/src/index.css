@@ -271,9 +271,32 @@ p {
   font-size: 1.35rem;
 }
 
+.detail-title,
+.member-name {
+  margin: 0;
+}
+
 .link-button {
   display: inline-flex;
   align-items: center;
+}
+
+.sharing-panel {
+  border: 1px solid rgba(19, 34, 56, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 1.25rem;
+}
+
+.member-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid rgba(19, 34, 56, 0.1);
+  border-radius: 18px;
+  background: white;
+  padding: 1rem;
 }
 
 .destructive-button {
@@ -301,5 +324,10 @@ p {
 
   h1 {
     font-size: clamp(1.9rem, 11vw, 3rem);
+  }
+
+  .member-card {
+    align-items: start;
+    flex-direction: column;
   }
 }

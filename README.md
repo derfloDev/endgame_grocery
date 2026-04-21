@@ -53,6 +53,13 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 - `DELETE /api/lists/:id/entries/:entryId` removes an entry from the list.
 - The list detail screen groups open and done entries separately, supports Enter-to-add with immediate refocus, toggles status inline, and allows edit/delete actions.
 
+## Sharing workflow
+
+- `GET /api/lists/:id/members` returns the owner plus all shared members for an owned list.
+- `POST /api/lists/:id/members` shares a list with another registered user by email and returns 404 for unknown users or 409 when access already exists.
+- `DELETE /api/lists/:id/members/:userId` revokes a shared member while preventing the owner from removing themselves.
+- The list detail screen exposes a sharing panel for owners, and the overview marks shared lists with a badge plus the owner name.
+
 ## AI workflow
 
 This project uses the persistent planner/implementer/reviewer workflow defined in `AGENTS.md`.

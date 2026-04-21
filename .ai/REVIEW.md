@@ -2,6 +2,57 @@
 
 ---
 
+## T-006 — List Sharing
+
+**Verdict: PASS**
+
+### Findings
+
+No findings. Implementation matches the plan exactly.
+
+### Verification
+
+#### Steps performed
+1. Read `.ai/PLAN.md` Phase 6 scope and T-006 acceptance criteria.
+2. Inspected `backend/src/routes/sharing.js`:
+   - `GET /` — owner-only via `getOwnedList`; returns owner row first (synthesised from list metadata), then members from `list_members` ordered by `joined_at ASC` ✅
+   - `POST /` — owner-only; looks up user by case-insensitive email; 404 on not found; 409 if target is the owner or already a member; 201 + member object on success ✅
+   - `DELETE /:uid` — owner-only; 400 if attempting to remove the owner; 404 if member not found; 204 on success ✅
+   - `Router({ mergeParams: true })` used to access `:id` from parent ✅
+3. Verified `backend/src/app.js` — sharing router mounted at `/api/lists/:id/members` (replacing the old stub) ✅
+4. Inspected `frontend/src/api/sharing.js` — `fetchListMembers`, `shareListWithMember`, `revokeListMember` all include `Authorization: Bearer` header; 204 handled ✅
+5. Inspected `frontend/src/pages/ListDetailPage.jsx`:
+   - On mount: owner loads members via `fetchListMembers`; non-owner skips member fetch ✅
+   - "Manage sharing" button visible only for `list.is_owner` ✅
+   - Share panel: email input with inline `shareError` display; member list with per-member Revoke button (hidden for owner row) ✅
+   - `handleShareSubmit` adds new member to local state on success; clears input ✅
+   - `handleRevokeMember` removes member from local state on 204 ✅
+   - Owner/member tooltip on detail page header pill ✅
+6. Inspected `frontend/src/pages/OverviewPage.jsx`:
+   - Shared-list badge: `className="pill shared-pill"` with `title="Owned by {owner_name}"` for `is_owner: false` ✅
+   - "Owned by {owner_name}" muted text below badge in overview card ✅
+7. Inspected `frontend/src/app.test.jsx`:
+   - New test: "shows a shared badge in the overview with the owner name" ✅
+   - New test: "shares a list from detail and revokes a member" (open panel → type email → Add member → verify Alex appears → Revoke → verify Alex gone) ✅
+   - Existing entry test updated to mock the member fetch (third `fetch` call after lists + entries) ✅
+8. Ran `npm run lint` — 1 warning (same non-blocking fast-refresh warning), exit 0 ✅
+9. Ran `npm run build` — clean ✅
+10. Ran `npm test` — 23/23 tests pass across 8 suites ✅
+
+#### Findings
+All T-006 acceptance criteria satisfied:
+- Owner can share by email — 404/409 handled ✅
+- Recipient sees list in overview with shared badge ✅
+- Owner can revoke access ✅
+- Shared badge with owner name visible in overview ✅
+
+#### Risks
+None.
+
+---
+
+---
+
 ## T-005 — Entry Management
 
 **Verdict: PASS**

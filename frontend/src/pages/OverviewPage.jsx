@@ -141,9 +141,13 @@ export default function OverviewPage() {
               <div className="stack">
                 <div className="overview-header">
                   <div className="stack tight-stack">
-                    <span className={`pill ${list.is_owner ? "" : "shared-pill"}`}>
-                      {list.is_owner ? "Owner" : `Shared by ${list.owner_name}`}
+                    <span
+                      className={`pill ${list.is_owner ? "" : "shared-pill"}`}
+                      title={list.is_owner ? "You own this list." : `Owned by ${list.owner_name}`}
+                    >
+                      {list.is_owner ? "Owner" : "Shared list"}
                     </span>
+                    {!list.is_owner ? <p className="muted-text">Owned by {list.owner_name}</p> : null}
                     {editingId === list.id ? (
                       <div className="stack tight-stack">
                         <label className="visually-hidden" htmlFor={`rename-${list.id}`}>
@@ -211,7 +215,7 @@ export default function OverviewPage() {
                       </button>
                     </>
                   ) : (
-                    <p className="muted-text">Shared lists are visible here with their owner.</p>
+                    <p className="muted-text">Shared lists stay editable here, with the owner shown above.</p>
                   )}
                 </div>
               </div>

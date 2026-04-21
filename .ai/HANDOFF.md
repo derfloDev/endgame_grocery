@@ -4,6 +4,51 @@ Append-only role handoff log. Each role adds one entry when its step is complete
 
 ---
 
+### T-006 — implement — 2026-04-21T15:47:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Created the final list sharing task commit and marked T-006 done after review passed |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, backend/src/app.js, backend/src/routes/sharing.js, backend/src/sharing.test.js, frontend/src/api/sharing.js, frontend/src/app.test.jsx, frontend/src/index.css, frontend/src/pages/ListDetailPage.jsx, frontend/src/pages/OverviewPage.jsx |
+| Validation | Reused reviewer verification: `npm run lint` ✅ (1 non-blocking warning); `npm run build` ✅; `npm test` ✅ |
+| Commit | final task commit created via `commit_task` |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | none |
+
+---
+
+### T-006 — review — 2026-04-21T17:49:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-006; all sharing acceptance criteria met — share by email (404/409), revoke, shared badge with owner name in overview, sharing panel in detail — 23/23 tests pass — PASS first round |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` ✅ (1 non-blocking warning); `npm run build` ✅; `npm test` ✅ (23 tests pass) |
+| Commit | n/a (review role) |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-04-21T15:44:50Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Implemented owner-managed list sharing endpoints and a list detail sharing panel with share-by-email and revoke flows |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, backend/src/app.js, backend/src/routes/sharing.js, backend/src/sharing.test.js, frontend/src/api/sharing.js, frontend/src/app.test.jsx, frontend/src/index.css, frontend/src/pages/ListDetailPage.jsx, frontend/src/pages/OverviewPage.jsx |
+| Validation | `npm run lint` passed with one non-blocking React fast-refresh warning for `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed |
+| Commit | pending |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | review |
+
+---
+
 ### T-005 — implement — 2026-04-21T15:01:00Z
 
 | Field | Value |

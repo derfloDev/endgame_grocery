@@ -1,44 +1,75 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { createEntry, deleteEntry, fetchEntries, updateEntry } from "../api/entries";
+import { fetchLists } from "../api/lists";
+import { fetchListMembers, revokeListMember, shareListWithMember } from "../api/sharing";
 import { useAuth } from "../context/AuthContext";
 
 export default function ListDetailPage() {
   const { id } = useParams();
   const { token } = useAuth();
   const inputRef = useRef(null);
+  const [list, setList] = useState(null);
   const [entries, setEntries] = useState([]);
+  const [members, setMembers] = useState([]);
   const [newEntryText, setNewEntryText] = useState("");
+  const [shareEmail, setShareEmail] = useState("");
   const [editingId, setEditingId] = useState("");
   const [editingText, setEditingText] = useState("");
-  const [error, setError] = useState("");
+  const [entryError, setEntryError] = useState("");
+  const [shareError, setShareError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isSharingOpen, setIsSharingOpen] = useState(false);
+  const [isSharingLoading, setIsSharingLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadEntries() {
-      setError("");
+    async function loadListDetail() {
+      setEntryError("");
+      setShareError("");
       setIsLoading(true);
 
       try {
-        const result = await fetchEntries(id, token);
+        const [listsResult, entriesResult] = await Promise.all([fetchLists(token), fetchEntries(id, token)]);
+        const activeList = (listsResult.lists ?? []).find((candidate) => candidate.id === id);
 
         if (isMounted) {
-          setEntries(result.entries ?? []);
+          if (!activeList) {
+            setEntryError("You no longer have access to this list.");
+            setList(null);
+            setEntries([]);
+            setMembers([]);
+            return;
+          }
+
+          setList(activeList);
+          setEntries(entriesResult.entries ?? []);
+        }
+
+        if (activeList?.is_owner) {
+          setIsSharingLoading(true);
+          const membersResult = await fetchListMembers(id, token);
+
+          if (isMounted) {
+            setMembers(membersResult.members ?? []);
+          }
+        } else if (isMounted) {
+          setMembers([]);
         }
       } catch (loadError) {
         if (isMounted) {
-          setError(loadError.message);
+          setEntryError(loadError.message);
         }
       } finally {
         if (isMounted) {
           setIsLoading(false);
+          setIsSharingLoading(false);
         }
       }
     }
 
-    void loadEntries();
+    void loadListDetail();
 
     return () => {
       isMounted = false;
@@ -53,19 +84,19 @@ export default function ListDetailPage() {
     }
 
     try {
-      setError("");
+      setEntryError("");
       const result = await createEntry(id, token, { text: newEntryText });
       setEntries((currentEntries) => sortEntries([...currentEntries, result.entry]));
       setNewEntryText("");
       inputRef.current?.focus();
     } catch (submitError) {
-      setError(submitError.message);
+      setEntryError(submitError.message);
     }
   }
 
   async function toggleStatus(entry) {
     try {
-      setError("");
+      setEntryError("");
       const result = await updateEntry(id, entry.id, token, {
         status: entry.status === "open" ? "done" : "open"
       });
@@ -77,7 +108,7 @@ export default function ListDetailPage() {
         )
       );
     } catch (submitError) {
-      setError(submitError.message);
+      setEntryError(submitError.message);
     }
   }
 
@@ -92,7 +123,7 @@ export default function ListDetailPage() {
     }
 
     try {
-      setError("");
+      setEntryError("");
       const result = await updateEntry(id, entryId, token, { text: editingText });
       setEntries((currentEntries) =>
         sortEntries(
@@ -104,17 +135,44 @@ export default function ListDetailPage() {
       setEditingId("");
       setEditingText("");
     } catch (submitError) {
-      setError(submitError.message);
+      setEntryError(submitError.message);
     }
   }
 
   async function handleDeleteEntry(entryId) {
     try {
-      setError("");
+      setEntryError("");
       await deleteEntry(id, entryId, token);
       setEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
     } catch (submitError) {
-      setError(submitError.message);
+      setEntryError(submitError.message);
+    }
+  }
+
+  async function handleShareSubmit(event) {
+    event.preventDefault();
+
+    if (!shareEmail.trim()) {
+      return;
+    }
+
+    try {
+      setShareError("");
+      const result = await shareListWithMember(id, token, { email: shareEmail });
+      setMembers((currentMembers) => [...currentMembers, result.member]);
+      setShareEmail("");
+    } catch (submitError) {
+      setShareError(submitError.message);
+    }
+  }
+
+  async function handleRevokeMember(memberId) {
+    try {
+      setShareError("");
+      await revokeListMember(id, memberId, token);
+      setMembers((currentMembers) => currentMembers.filter((member) => member.user_id !== memberId));
+    } catch (submitError) {
+      setShareError(submitError.message);
     }
   }
 
@@ -125,13 +183,94 @@ export default function ListDetailPage() {
     <div className="stack">
       <div className="overview-header">
         <div className="stack tight-stack">
-          <span className="pill">Protected detail route</span>
-          <p>List detail view for <strong>{id}</strong>.</p>
+          <span
+            className={`pill ${list?.is_owner ? "" : "shared-pill"}`}
+            title={list?.is_owner ? "You own this list." : `Owned by ${list?.owner_name ?? "another member"}`}
+          >
+            {list?.is_owner ? "Owner" : "Shared list"}
+          </span>
+          <h1 className="detail-title">{list?.name ?? "List detail"}</h1>
+          <p>
+            {list?.is_owner
+              ? "You can add entries and manage members from this view."
+              : `Shared by ${list?.owner_name ?? "another member"}. You can edit entries, but only the owner can manage access.`}
+          </p>
         </div>
-        <Link className="button-secondary link-button" to="/">
-          Back to lists
-        </Link>
+        <div className="button-row">
+          {list?.is_owner ? (
+            <button
+              className="button-secondary"
+              type="button"
+              onClick={() => setIsSharingOpen((currentValue) => !currentValue)}
+            >
+              {isSharingOpen ? "Hide sharing" : "Manage sharing"}
+            </button>
+          ) : null}
+          <Link className="button-secondary link-button" to="/">
+            Back to lists
+          </Link>
+        </div>
       </div>
+
+      {list?.is_owner && isSharingOpen ? (
+        <section className="sharing-panel stack">
+          <div className="overview-header">
+            <div className="stack tight-stack">
+              <h2 className="card-title">Share list</h2>
+              <p>Add another registered user by email, then revoke access here if needed.</p>
+            </div>
+            <span className="pill shared-pill">{members.length} access entries</span>
+          </div>
+
+          <form className="auth-form compact-form" onSubmit={handleShareSubmit}>
+            <div className="field">
+              <label htmlFor="share-email">Share with email</label>
+              <input
+                id="share-email"
+                name="email"
+                placeholder="alex@example.com"
+                value={shareEmail}
+                onChange={(event) => setShareEmail(event.target.value)}
+              />
+            </div>
+            <div className="button-row">
+              <button className="button-primary" type="submit">
+                Add member
+              </button>
+            </div>
+          </form>
+
+          {shareError ? <p className="error-banner">{shareError}</p> : null}
+          {isSharingLoading ? <p>Loading members...</p> : null}
+
+          {!isSharingLoading ? (
+            <div className="stack">
+              {members.map((member) => (
+                <article key={member.user_id} className="member-card">
+                  <div className="stack tight-stack">
+                    <div className="button-row">
+                      <h3 className="member-name">{member.display_name}</h3>
+                      <span className={`pill ${member.is_owner ? "" : "shared-pill"}`}>
+                        {member.is_owner ? "Owner" : "Member"}
+                      </span>
+                    </div>
+                    <p>{member.email}</p>
+                  </div>
+                  {!member.is_owner ? (
+                    <button
+                      className="button-secondary destructive-button"
+                      type="button"
+                      onClick={() => void handleRevokeMember(member.user_id)}
+                    >
+                      Revoke
+                    </button>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <form className="auth-form compact-form" onSubmit={handleCreateEntry}>
         <div className="field">
@@ -152,7 +291,7 @@ export default function ListDetailPage() {
         </div>
       </form>
 
-      {error ? <p className="error-banner">{error}</p> : null}
+      {entryError ? <p className="error-banner">{entryError}</p> : null}
       {isLoading ? <p>Loading entries...</p> : null}
 
       {!isLoading ? (

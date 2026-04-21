@@ -152,15 +152,51 @@ describe("authentication shell", () => {
     });
   });
 
+  it("shows a shared badge in the overview with the owner name", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-2"));
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        lists: [{ id: "list-2", name: "BBQ party", owner_name: "Alex", is_owner: false }]
+      })
+    });
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("BBQ party")).toBeTruthy();
+    expect(screen.getByText("Shared list").getAttribute("title")).toBe("Owned by Alex");
+    expect(screen.getByText("Owned by Alex")).toBeTruthy();
+  });
+
   it("adds, toggles, edits, and deletes entries in list detail", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
+          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
           entries: [
             { id: "entry-1", text: "Milk", status: "open", created_at: "2026-04-21T00:00:00Z" },
             { id: "entry-2", text: "Bread", status: "done", created_at: "2026-04-21T00:01:00Z" }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          members: [
+            {
+              user_id: "user-1",
+              display_name: "Demo User",
+              email: "demo@example.com",
+              joined_at: "2026-04-21T00:00:00Z",
+              is_owner: true
+            }
           ]
         })
       })
@@ -211,6 +247,70 @@ describe("authentication shell", () => {
 
     await waitFor(() => {
       expect(screen.queryByText("Ground coffee")).toBeNull();
+    });
+  });
+
+  it("shares a list from detail and revokes a member", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          entries: []
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          members: [
+            {
+              user_id: "user-1",
+              display_name: "Demo User",
+              email: "demo@example.com",
+              joined_at: "2026-04-21T00:00:00Z",
+              is_owner: true
+            }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          member: {
+            user_id: "user-2",
+            display_name: "Alex",
+            email: "alex@example.com",
+            joined_at: "2026-04-21T01:00:00Z",
+            is_owner: false
+          }
+        })
+      })
+      .mockResolvedValueOnce({
+        status: 204
+      });
+
+    renderApp(["/lists/list-1"]);
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Manage sharing" }));
+    expect(await screen.findByRole("heading", { name: "Share list" })).toBeTruthy();
+
+    await userEvent.type(screen.getByLabelText("Share with email"), "alex@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Add member" }));
+
+    expect(await screen.findByText("Alex")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Revoke" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Alex")).toBeNull();
     });
   });
 });
