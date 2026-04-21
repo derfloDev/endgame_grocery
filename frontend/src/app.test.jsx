@@ -151,6 +151,68 @@ describe("authentication shell", () => {
       expect(screen.queryByText("Renamed list")).toBeNull();
     });
   });
+
+  it("adds, toggles, edits, and deletes entries in list detail", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          entries: [
+            { id: "entry-1", text: "Milk", status: "open", created_at: "2026-04-21T00:00:00Z" },
+            { id: "entry-2", text: "Bread", status: "done", created_at: "2026-04-21T00:01:00Z" }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          entry: { id: "entry-3", text: "Coffee", status: "open", created_at: "2026-04-21T00:02:00Z" }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          entry: { id: "entry-1", text: "Milk", status: "done", created_at: "2026-04-21T00:00:00Z" }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          entry: { id: "entry-3", text: "Ground coffee", status: "open", created_at: "2026-04-21T00:02:00Z" }
+        })
+      })
+      .mockResolvedValueOnce({
+        status: 204
+      });
+
+    renderApp(["/lists/list-1"]);
+
+    expect(await screen.findByText("Milk")).toBeTruthy();
+    expect(screen.getByText("Bread")).toBeTruthy();
+
+    await userEvent.type(screen.getByLabelText("Add item"), "Coffee");
+    await userEvent.keyboard("{Enter}");
+
+    expect(await screen.findByText("Coffee")).toBeTruthy();
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Done" })[0]);
+    expect(await screen.findAllByText("Milk")).toHaveLength(1);
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    const editInput = screen.getByLabelText("Edit entry");
+    await userEvent.clear(editInput);
+    await userEvent.type(editInput, "Ground coffee");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Ground coffee")).toBeTruthy();
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Ground coffee")).toBeNull();
+    });
+  });
 });
 
 function createFakeJwt(sub) {

@@ -45,6 +45,14 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 - `DELETE /api/lists/:id` deletes a list for the owner only.
 - The overview screen supports create, rename, delete, and navigation into protected list routes.
 
+## Entry workflow
+
+- `GET /api/lists/:id/entries` returns all entries for any accessible list, ordered with open items first.
+- `POST /api/lists/:id/entries` adds a new entry with `status = open`.
+- `PATCH /api/lists/:id/entries/:entryId` updates entry text and/or status and refreshes `updated_at`.
+- `DELETE /api/lists/:id/entries/:entryId` removes an entry from the list.
+- The list detail screen groups open and done entries separately, supports Enter-to-add with immediate refocus, toggles status inline, and allows edit/delete actions.
+
 ## AI workflow
 
 This project uses the persistent planner/implementer/reviewer workflow defined in `AGENTS.md`.

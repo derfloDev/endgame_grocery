@@ -2,6 +2,57 @@
 
 ---
 
+## T-005 — Entry Management
+
+**Verdict: PASS**
+
+### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `backend/src/routes/entries.js:52` | `ORDER BY status ASC, created_at ASC` returns "done" entries before "open" entries because "done" < "open" alphabetically. The plan comment says "(open first)". No functional impact — the frontend splits entries by status client-side and the `sortEntries` helper always places open items first regardless of server ordering. | No |
+
+### Verification
+
+#### Steps performed
+1. Read `.ai/PLAN.md` Phase 5 scope and T-005 acceptance criteria.
+2. Inspected `backend/src/routes/entries.js`:
+   - `createEntryRouter` uses `Router({ mergeParams: true })` to access `req.params.id` from the parent route ✅
+   - `ensureListAccess` checks both owner and member access before every operation ✅
+   - `GET /` returns entries ordered by status/created_at; membership enforced ✅
+   - `POST /` inserts with `status = 'open'`, 201 response ✅
+   - `PATCH /:entryId` validates status enum (`open`/`done`); uses `COALESCE` to allow partial updates (text-only or status-only); returns 404 if entry not found ✅
+   - `DELETE /:entryId` returns 404 if entry not found, 204 on success ✅
+3. Inspected `backend/src/app.js` — entries mounted at correct path `/api/lists/:id/entries` (previously stubbed at wrong path) ✅
+4. Inspected `frontend/src/api/entries.js` — all four functions include `Authorization: Bearer` header; 204 handled ✅
+5. Inspected `frontend/src/pages/ListDetailPage.jsx`:
+   - `inputRef` assigned to text field; `inputRef.current?.focus()` called after successful entry creation — Enter-key refocus ✅
+   - Two sections: "Open items" (top) and "Done items" (bottom) ✅
+   - `sortEntries` helper: open first, then by `created_at` ASC; called after every mutation ✅
+   - Toggle via `updateEntry` with flipped status; re-sorts after update ✅
+   - Inline text edit with Enter-to-save ✅
+   - Delete with optimistic local removal ✅
+   - `isMounted` guard on initial load ✅
+6. Inspected `app.test.jsx` — new end-to-end test covers: load entries, add via Enter key, toggle status, inline edit, delete.
+7. Ran `npm run lint` — 1 warning (same non-blocking fast-refresh warning), exit 0 ✅
+8. Ran `npm run build` — clean ✅
+9. Ran `npm test` — 17/17 tests pass across 7 suites ✅
+
+#### Findings
+- All T-005 acceptance criteria satisfied:
+  - CRUD endpoints enforce membership (owner or member via `ensureListAccess`) ✅
+  - `ListDetailPage` shows open and done sections ✅
+  - Enter-key input refocuses immediately (via `inputRef.current?.focus()`) ✅
+  - Toggling status moves entry to correct section (client-side `sortEntries` + section filter) ✅
+- No regressions to any prior tests.
+
+#### Risks
+- Low: Backend ordering note (finding #1) — no runtime impact.
+
+---
+
+---
+
 ## T-004 — List Management
 
 **Verdict: PASS**

@@ -15,7 +15,7 @@ export function createApp(options = {}) {
 
   app.use("/api/auth", authRoutes(options));
   app.use("/api/lists", listRoutes(options));
-  app.use("/api/entries", entryRoutes);
+  app.use("/api/lists/:id/entries", entryRoutes(options));
   app.use("/api/sharing", sharingRoutes);
 
   app.use((error, _req, res, _next) => {

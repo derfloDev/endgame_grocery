@@ -4,6 +4,51 @@ Append-only role handoff log. Each role adds one entry when its step is complete
 
 ---
 
+### T-005 — implement — 2026-04-21T15:01:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Created the final entry management task commit and marked T-005 done after review passed |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, backend/src/app.js, backend/src/entries.test.js, backend/src/routes/entries.js, frontend/src/api/entries.js, frontend/src/app.test.jsx, frontend/src/index.css, frontend/src/pages/ListDetailPage.jsx |
+| Validation | Reused reviewer verification: `npm run lint` ✅ (1 non-blocking warning); `npm run build` ✅; `npm test` ✅ |
+| Commit | final task commit created via `commit_task` |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | none |
+
+---
+
+### T-005 — review — 2026-04-21T17:03:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005; all entry management acceptance criteria met, mergeParams routing correct, Enter-refocus and section layout verified, 17/17 tests pass — PASS first round |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` ✅ (1 non-blocking warning); `npm run build` ✅; `npm test` ✅ (17 tests pass) |
+| Commit | n/a (review role) |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — implement — 2026-04-21T14:58:33Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Implemented membership-checked entry CRUD endpoints and a list detail UI with open/done sections, Enter-to-add, toggle, edit, and delete flows |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, backend/src/app.js, backend/src/entries.test.js, backend/src/routes/entries.js, frontend/src/api/entries.js, frontend/src/app.test.jsx, frontend/src/index.css, frontend/src/pages/ListDetailPage.jsx |
+| Validation | `npm run lint` passed with one non-blocking React fast-refresh warning for `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed |
+| Commit | pending |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | review |
+
+---
+
 ### T-004 — implement — 2026-04-21T14:55:00Z
 
 | Field | Value |
