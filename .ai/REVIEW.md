@@ -2,6 +2,80 @@
 
 ---
 
+## T-003 — Authentication (rework round 2)
+
+**Verdict: PASS**
+
+### Summary of rework
+The required fix is correctly applied:
+- **Finding #1 (major)** — `backend/src/app.js:21` now declares `(error, _req, res, _next)` with 4 parameters. Express will correctly route unhandled errors to this handler. `void _next` silences the no-unused-vars linting rule cleanly. ✅
+- ESLint config gained `"react/prop-types": "off"` — valid quality-of-life addition for a TypeScript-free project, no impact on correctness.
+
+No regressions. All previously-passing tests continue to pass.
+
+### Verification
+
+#### Steps performed
+1. Re-read `.ai/REVIEW.md` round-1 required fix as a checklist.
+2. Inspected `backend/src/app.js` — error handler now has 4 parameters ✅.
+3. Confirmed `backend/src/routes/auth.js` and `backend/src/middleware/auth.js` unchanged.
+4. Confirmed `eslint.config.js` change (`react/prop-types: off`) is benign.
+5. Ran `npm run lint` — 1 warning (same non-blocking fast-refresh warning as before), exit 0 ✅.
+6. Ran `npm run build` — clean ✅.
+7. Ran `npm test` — 8/8 tests pass across 5 suites ✅.
+
+#### Risks
+None beyond the previously-noted nit (fast-refresh warning in `AuthContext.jsx`).
+
+---
+
+## T-003 — Authentication (round 1)
+
+**Verdict: FAIL**
+
+### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | major | `backend/src/app.js:21` | **Express error handler has 3 parameters instead of 4 — it will never fire.** Express identifies error-handling middleware by a function's declared argument count. A function `(error, _req, res) => {}` has `length === 3` so Express treats it as a regular request handler, not an error handler. When any route calls `next(error)` (e.g. DB down, unhandled exception), the handler is bypassed and Express falls through to its default handler, which may expose stack traces in production. The fix is to add the `next` parameter: `(error, _req, res, _next) => {}`. | Yes |
+| 2 | nit | `frontend/src/context/AuthContext.jsx:77` | `useAuth` is exported alongside `AuthProvider` from the same file, triggering the `react-refresh/only-export-components` warning. Not a blocker (rule set to `warn`; lint exits 0), but splitting the hook into a separate file would silence it cleanly. | No |
+
+### Required Fixes
+
+1. **(major)** Add a fourth `_next` parameter to the error handler in `backend/src/app.js` so Express recognises it as an error-handling middleware:
+   ```js
+   app.use((error, _req, res, _next) => {
+     console.error(error);
+     res.status(500).json({ error: "Internal server error." });
+   });
+   ```
+
+### Verification
+
+#### Steps performed
+1. Read `.ai/PLAN.md` Phase 3 scope and T-003 acceptance criteria.
+2. Inspected all new/changed files: `backend/src/routes/auth.js`, `backend/src/middleware/auth.js`, `backend/src/app.js`, `backend/src/env.js`, `backend/src/auth.test.js`, `frontend/src/api/auth.js`, `frontend/src/context/AuthContext.jsx`, `frontend/src/components/ProtectedRoute.jsx`, `frontend/src/pages/LoginPage.jsx`, `frontend/src/pages/RegisterPage.jsx`, `frontend/src/App.jsx`, `frontend/src/main.jsx`, `frontend/src/app.test.jsx`, `frontend/package.json`.
+3. Verified T-001 carry-forward fix: `requireAuth` no longer calls `next()` after response — correct factory pattern used ✅.
+4. Cross-checked backend auth routes against plan: `POST /api/auth/register` → 201 + user object ✅; 400 on missing fields ✅; 409 on duplicate email (pg error code 23505) ✅. `POST /api/auth/login` → 200 + JWT ✅; 401 on unknown email ✅; 401 on wrong password ✅.
+5. Checked JWT payload uses `{ sub: userId }` ✅; `jwtExpiresIn` added to `getConfig()` ✅; email normalised to lowercase on insert and lookup ✅.
+6. Reviewed `AuthContext`: token in localStorage, `user`, `login()`, `logout()`, `register()` all exposed ✅. `register()` auto-logs in after successful registration ✅. `parseJwtSubject` decodes `sub` from token client-side ✅.
+7. Verified `ProtectedRoute` redirects to `/login` with `state.from` for post-login redirect ✅.
+8. Verified React Router routes: `/login`, `/register`, `/`, `/lists/:id` ✅. Wildcard `*` → `/` ✅.
+9. Inspected `app.js` error handler — 3 parameters, will never be called as error handler (finding #1).
+10. Ran `npm run lint` — 1 warning (non-blocking, pre-noted in evidence), exit 0.
+11. Ran `npm run build` — clean.
+12. Ran `npm test` — 8 tests across 5 suites, all pass (3 frontend auth shell tests, 4 backend auth/middleware tests, 1 getConfig, 1 migration export, 2 seed data).
+
+#### Findings
+- All acceptance criteria are met at the functional level (register/login endpoints, JWT middleware, LoginPage/RegisterPage render and submit, ProtectedRoute redirect).
+- The broken error handler (finding #1) is a latent production risk: `next(error)` calls in auth routes — DB down, pool null, unexpected exceptions — will bypass the intended handler and expose Express's default error response. Must be fixed before shipping.
+
+#### Risks
+- **Medium**: Without the error handler, unhandled backend errors could expose stack traces or response inconsistency in production.
+- **Low**: The fast-refresh warning in `AuthContext.jsx` has no runtime impact.
+
+---
+
 ## T-002 — Database Schema & Migrations (rework round 2)
 
 **Verdict: PASS**

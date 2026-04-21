@@ -6,6 +6,7 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 
 - `frontend` contains the Vite + React application shell.
 - `backend` contains the Express API scaffold and database wiring placeholders.
+- Authentication now includes backend register/login endpoints plus protected frontend routes for `/`, `/lists/:id`, `/login`, and `/register`.
 - `.ai` contains the planning, review, and handoff artifacts used by the role workflow.
 
 ## Getting started
@@ -16,6 +17,7 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 4. Apply the database schema with `npm run migrate`.
 5. Seed demo data with `npm run db:seed`.
 6. Run the apps with `npm run dev`.
+7. Open the frontend and register a user, or log in with the seeded demo account after a successful seed run.
 
 ## Validation
 
@@ -27,6 +29,12 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 
 - `npm run migrate` applies the PostgreSQL schema from `backend/src/db/migrations`.
 - `npm run db:seed` inserts one demo user, one demo list, and starter entries for local development.
+
+## Authentication workflow
+
+- `POST /api/auth/register` creates a user with `email`, `password`, and `display_name`.
+- `POST /api/auth/login` returns a JWT access token.
+- The frontend stores the token in `localStorage` and redirects unauthenticated access to `/login`.
 
 ## AI workflow
 

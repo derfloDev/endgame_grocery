@@ -4,6 +4,81 @@ Append-only role handoff log. Each role adds one entry when its step is complete
 
 ---
 
+### T-003 — implement — 2026-04-21T14:38:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Squashed the authentication task into its final commit and marked T-003 done after review passed |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md |
+| Validation | Reused reviewer verification: `npm run lint` ✅ (1 non-blocking warning); `npm run build` ✅; `npm test` ✅ |
+| Commit | final task commit created via `commit_task` |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | none |
+
+---
+
+### T-003 — review — 2026-04-21T16:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Re-reviewed T-003 rework; 4-argument error handler fix confirmed correct; all validations pass with no regressions |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` ✅ (1 non-blocking warning); `npm run build` ✅; `npm test` ✅ (8 tests pass) |
+| Commit | n/a (review role) |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-21T14:32:48Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Addressed the authentication review finding by restoring the Express 4-argument error handler and revalidating the auth slice |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, backend/package.json, backend/src/app.js, backend/src/auth.test.js, backend/src/env.js, backend/src/middleware/auth.js, backend/src/routes/auth.js, eslint.config.js, frontend/package.json, frontend/src/App.jsx, frontend/src/api/auth.js, frontend/src/app.test.jsx, frontend/src/components/ProtectedRoute.jsx, frontend/src/context/AuthContext.jsx, frontend/src/index.css, frontend/src/main.jsx, frontend/src/pages/ListDetailPage.jsx, frontend/src/pages/LoginPage.jsx, frontend/src/pages/OverviewPage.jsx, frontend/src/pages/RegisterPage.jsx, package-lock.json |
+| Validation | `npm run lint` passed with one non-blocking React fast-refresh warning for `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed |
+| Commit | pending |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | review |
+
+---
+
+### T-003 — review — 2026-04-21T16:32:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003; all auth acceptance criteria met and 8/8 tests pass, but the Express error handler has only 3 parameters and will never fire — must be fixed before shipping |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` ✅ (1 non-blocking warning); `npm run build` ✅; `npm test` ✅ (8 tests pass) |
+| Commit | n/a (review role) |
+| Verdict | FAIL |
+| Blocking Findings | 1. `backend/src/app.js:21` — error handler declared with 3 args; Express requires exactly 4 to recognise it as an error handler; `next(error)` calls bypass it entirely. |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-21T14:26:28Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Implemented JWT-backed authentication on the backend and protected login/register routing with persisted auth state on the frontend |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, backend/package.json, backend/src/app.js, backend/src/auth.test.js, backend/src/env.js, backend/src/middleware/auth.js, backend/src/routes/auth.js, eslint.config.js, frontend/package.json, frontend/src/App.jsx, frontend/src/api/auth.js, frontend/src/app.test.jsx, frontend/src/components/ProtectedRoute.jsx, frontend/src/context/AuthContext.jsx, frontend/src/index.css, frontend/src/main.jsx, frontend/src/pages/ListDetailPage.jsx, frontend/src/pages/LoginPage.jsx, frontend/src/pages/OverviewPage.jsx, frontend/src/pages/RegisterPage.jsx, package-lock.json |
+| Validation | `npm install` completed; `npm run lint` passed with one non-blocking React fast-refresh warning for `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed |
+| Commit | pending |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | review |
+
+---
+
 ### T-002 — implement — 2026-04-21T14:16:00Z
 
 | Field | Value |

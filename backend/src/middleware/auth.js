@@ -1,4 +1,24 @@
-export function requireAuth(_req, res, next) {
-  res.status(501).json({ error: "Authentication middleware is not implemented yet." });
-  next();
+import jwt from "jsonwebtoken";
+import { getConfig } from "../env.js";
+
+export function createRequireAuth({ jwtLib = jwt, config = getConfig() } = {}) {
+  return function requireAuth(req, res, next) {
+    const header = req.headers.authorization;
+
+    if (!header?.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Authentication token is required." });
+      return;
+    }
+
+    const token = header.slice("Bearer ".length);
+
+    try {
+      req.user = jwtLib.verify(token, config.jwtSecret);
+      next();
+    } catch {
+      res.status(401).json({ error: "Authentication token is invalid." });
+    }
+  };
 }
+
+export const requireAuth = createRequireAuth();

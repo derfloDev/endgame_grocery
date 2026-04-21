@@ -1,17 +1,36 @@
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute";
 import { APP_TITLE } from "./app.constants";
+import ListDetailPage from "./pages/ListDetailPage";
+import LoginPage from "./pages/LoginPage";
+import OverviewPage from "./pages/OverviewPage";
+import RegisterPage from "./pages/RegisterPage";
 import "./index.css";
 
 export default function App() {
   return (
-    <main className="app-shell">
-      <section className="hero-card">
-        <p className="eyebrow">Project scaffold</p>
-        <h1>{APP_TITLE}</h1>
-        <p>
-          Frontend and backend workspaces are wired up. Authentication, lists, entries, and offline
-          support land in follow-up tasks.
-        </p>
-      </section>
-    </main>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route element={<ProtectedLayout />}>
+        <Route path="/" element={<OverviewPage />} />
+        <Route path="/lists/:id" element={<ListDetailPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+function ProtectedLayout() {
+  return (
+    <ProtectedRoute>
+      <main className="app-shell">
+        <section className="hero-card">
+          <p className="eyebrow">Shared household planning</p>
+          <h1>{APP_TITLE}</h1>
+          <Outlet />
+        </section>
+      </main>
+    </ProtectedRoute>
   );
 }

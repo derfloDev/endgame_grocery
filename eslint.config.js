@@ -42,6 +42,7 @@ export default [
       ...js.configs.recommended.rules,
       ...react.configs.flat.recommended.rules,
       ...reactHooks.configs.recommended.rules,
+      "react/prop-types": "off",
       "react-refresh/only-export-components": [
         "warn",
         {
