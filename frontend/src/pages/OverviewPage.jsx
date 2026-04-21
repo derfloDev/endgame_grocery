@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { createTemporaryId } from "../api/client";
+import { writeCachedResource } from "../api/offlineStore";
 import { createList, deleteList, fetchLists, renameList } from "../api/lists";
 import { useAuth } from "../context/AuthContext";
+import { useOfflineQueue } from "../hooks/useOfflineQueue";
+
+const LISTS_CACHE_KEY = "lists";
 
 export default function OverviewPage() {
   const { logout, token, user } = useAuth();
+  const { syncVersion } = useOfflineQueue();
   const [lists, setLists] = useState([]);
   const [newListName, setNewListName] = useState("");
   const [error, setError] = useState("");
@@ -41,7 +47,18 @@ export default function OverviewPage() {
     return () => {
       isMounted = false;
     };
-  }, [token]);
+  }, [syncVersion, token]);
+
+  async function updateLists(updater) {
+    let nextLists = [];
+
+    setLists((currentLists) => {
+      nextLists = updater(currentLists);
+      return nextLists;
+    });
+
+    await writeCachedResource(LISTS_CACHE_KEY, { lists: nextLists });
+  }
 
   async function handleCreateList(event) {
     event.preventDefault();
@@ -52,8 +69,20 @@ export default function OverviewPage() {
 
     try {
       setError("");
-      const result = await createList(token, { name: newListName });
-      setLists((currentLists) => [...currentLists, result.list]);
+
+      const temporaryList = {
+        id: createTemporaryId("list"),
+        name: newListName.trim(),
+        owner_name: "You",
+        is_owner: true,
+        is_pending_sync: true
+      };
+      const result = await createList(token, { name: newListName }, { tempId: temporaryList.id });
+
+      await updateLists((currentLists) => [
+        ...currentLists,
+        result?.queued ? temporaryList : result.list
+      ]);
       setNewListName("");
     } catch (submitError) {
       setError(submitError.message);
@@ -73,8 +102,16 @@ export default function OverviewPage() {
     try {
       setError("");
       const result = await renameList(token, listId, { name: editingName });
-      setLists((currentLists) =>
-        currentLists.map((list) => (list.id === listId ? { ...list, ...result.list } : list))
+
+      await updateLists((currentLists) =>
+        currentLists.map((list) =>
+          list.id === listId
+            ? {
+                ...list,
+                ...(result?.queued ? { name: editingName.trim(), is_pending_sync: true } : result.list)
+              }
+            : list
+        )
       );
       setEditingId("");
       setEditingName("");
@@ -91,7 +128,7 @@ export default function OverviewPage() {
     try {
       setError("");
       await deleteList(token, listId);
-      setLists((currentLists) => currentLists.filter((list) => list.id !== listId));
+      await updateLists((currentLists) => currentLists.filter((list) => list.id !== listId));
     } catch (submitError) {
       setError(submitError.message);
     }
@@ -141,12 +178,15 @@ export default function OverviewPage() {
               <div className="stack">
                 <div className="overview-header">
                   <div className="stack tight-stack">
-                    <span
-                      className={`pill ${list.is_owner ? "" : "shared-pill"}`}
-                      title={list.is_owner ? "You own this list." : `Owned by ${list.owner_name}`}
-                    >
-                      {list.is_owner ? "Owner" : "Shared list"}
-                    </span>
+                    <div className="button-row">
+                      <span
+                        className={`pill ${list.is_owner ? "" : "shared-pill"}`}
+                        title={list.is_owner ? "You own this list." : `Owned by ${list.owner_name}`}
+                      >
+                        {list.is_owner ? "Owner" : "Shared list"}
+                      </span>
+                      {list.is_pending_sync ? <span className="pill shared-pill">Queued</span> : null}
+                    </div>
                     {!list.is_owner ? <p className="muted-text">Owned by {list.owner_name}</p> : null}
                     {editingId === list.id ? (
                       <div className="stack tight-stack">

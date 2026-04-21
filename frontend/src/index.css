@@ -177,6 +177,18 @@ p {
   padding: 0.85rem 1rem;
 }
 
+.offline-banner {
+  border-radius: 14px;
+  background: rgba(19, 34, 56, 0.08);
+  color: #132238;
+  padding: 0.85rem 1rem;
+}
+
+.offline-banner-error {
+  background: rgba(188, 48, 48, 0.1);
+  color: #8f1f1f;
+}
+
 .overview-header {
   display: flex;
   justify-content: space-between;
@@ -259,6 +271,7 @@ p {
 
 .entry-text {
   font-size: 1.05rem;
+  margin: 0;
 }
 
 .entry-text-done {

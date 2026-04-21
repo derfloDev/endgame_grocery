@@ -1,41 +1,40 @@
-async function sendListRequest(path, token, options = {}) {
-  const response = await fetch(`/api/lists${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers ?? {})
-    }
+import { createCacheKey, sendJsonRequest } from "./client";
+
+const LISTS_CACHE_KEY = createCacheKey("lists");
+
+function sendListRequest(path, token, options = {}) {
+  const method = options.method ?? "GET";
+
+  return sendJsonRequest(`/api/lists${path}`, {
+    method,
+    token,
+    payload: options.payload,
+    cacheKey: method === "GET" ? LISTS_CACHE_KEY : "",
+    offlineFallbackMessage: "Offline list data is unavailable.",
+    queueable: method !== "GET",
+    queueMeta: options.queueMeta ?? null
   });
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(data.error ?? "List request failed.");
-  }
-
-  return data;
 }
 
 export function fetchLists(token) {
   return sendListRequest("", token);
 }
 
-export function createList(token, payload) {
+export function createList(token, payload, options = {}) {
   return sendListRequest("", token, {
     method: "POST",
-    body: JSON.stringify(payload)
+    payload,
+    queueMeta: {
+      resourceType: "list",
+      tempId: options.tempId ?? ""
+    }
   });
 }
 
 export function renameList(token, listId, payload) {
   return sendListRequest(`/${listId}`, token, {
     method: "PATCH",
-    body: JSON.stringify(payload)
+    payload
   });
 }
 

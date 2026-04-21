@@ -1,24 +1,20 @@
-async function sendSharingRequest(listId, token, path = "", options = {}) {
-  const response = await fetch(`/api/lists/${listId}/members${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers ?? {})
-    }
+import { createCacheKey, sendJsonRequest } from "./client";
+
+function createMembersCacheKey(listId) {
+  return createCacheKey("members", listId);
+}
+
+function sendSharingRequest(listId, token, path = "", options = {}) {
+  const method = options.method ?? "GET";
+
+  return sendJsonRequest(`/api/lists/${listId}/members${path}`, {
+    method,
+    token,
+    payload: options.payload,
+    cacheKey: method === "GET" ? createMembersCacheKey(listId) : "",
+    offlineFallbackMessage: "Offline sharing data is unavailable.",
+    queueable: method !== "GET"
   });
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(data.error ?? "Sharing request failed.");
-  }
-
-  return data;
 }
 
 export function fetchListMembers(listId, token) {
@@ -28,7 +24,7 @@ export function fetchListMembers(listId, token) {
 export function shareListWithMember(listId, token, payload) {
   return sendSharingRequest(listId, token, "", {
     method: "POST",
-    body: JSON.stringify(payload)
+    payload
   });
 }
 

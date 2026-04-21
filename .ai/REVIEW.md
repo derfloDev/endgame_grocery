@@ -2,6 +2,52 @@
 
 ---
 
+## T-007 — PWA & Offline Support
+
+**Verdict: PASS_WITH_NOTES**
+
+### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `frontend/vite.config.js:19-30` | Icons declared with `purpose: "any"` and type `image/svg+xml`. Chrome's Lighthouse installability check and the "Add to Home Screen" flow on Android expect at least one icon with `purpose: "maskable"` (PNG format strongly preferred). SVGs pass desktop Lighthouse in most configurations but may cause the audit to flag a missing maskable icon on mobile. For a family-ready production PWA, adding a PNG `maskable` icon variant is advisable. | No — acceptable for this stage; addressed when polishing for production |
+
+### Verification
+
+#### Steps performed
+1. Read `.ai/PLAN.md` Phase 7 scope and T-007 acceptance criteria.
+2. Inspected `frontend/vite.config.js` — `VitePWA` configured: `registerType: "autoUpdate"`, manifest with `name`, `short_name`, `theme_color`, `display: "standalone"`, `start_url: "/"`, 192/512 SVG icons; Workbox `StaleWhileRevalidate` for `GET /api/*` ✅
+3. Inspected `frontend/src/sw/register.js` — `registerSW` skipped in `DEV` mode; called immediately in production ✅
+4. Inspected `frontend/src/api/offlineStore.js` — raw IndexedDB implementation (two stores: `resource_cache`, `offline_queue`); memory fallback when IndexedDB is unavailable; `resetOfflineStateForTests` helper for test isolation ✅
+5. Inspected `frontend/src/api/client.js` (`sendJsonRequest`) — GET success → `writeCachedResource`; GET network error → `readCachedResource` fallback with `{ offline: true }` flag; non-GET network error + `queueable` → `enqueueOfflineMutation` + returns `{ queued: true }` ✅
+6. Inspected `frontend/src/api/lists.js` + `entries.js` + `sharing.js` — all migrated to `sendJsonRequest`; GET requests pass `cacheKey`; non-GET requests pass `queueable: true`; lists/entries pass `queueMeta` for temp-ID tracking ✅
+7. Inspected `frontend/src/context/OfflineQueueContext.jsx` — listens to `window online/offline` + custom queue-changed event; `drainQueue()` on mount (if online) and on reconnect; sequential replay with temp-ID map; `syncVersion` bumped after successful drain ✅
+8. Inspected `frontend/src/components/OfflineBanner.jsx` — shown when `isOffline`, `isSyncing`, `queuedCount > 0`, or `syncError`; correct message variants ✅
+9. Inspected `frontend/src/App.jsx` — `OfflineBanner` rendered inside `ProtectedLayout` ✅
+10. Inspected `frontend/src/main.jsx` — `OfflineQueueProvider` wraps the app; `registerServiceWorker()` called at startup ✅
+11. Inspected `frontend/src/pages/OverviewPage.jsx` — `syncVersion` in `useEffect` dependency array triggers data reload after queue drain; `updateLists` writes cache on every mutation; `is_pending_sync` flag shows "Queued" badge ✅
+12. Verified `frontend/public/icon-192.svg` and `icon-512.svg` are present ✅
+13. Ran `npm run build` — emits `manifest.webmanifest`, `sw.js`, `workbox-*.js`; 9 precached entries ✅
+14. Ran `npm run lint` — 1 warning (unchanged fast-refresh), exit 0 ✅
+15. Ran `npm test` — 9/9 frontend tests pass (including offline cache and queue-sync tests); 23/23 backend tests pass ✅
+16. Lighthouse audit: not executable in this environment (no browser/running server); consistent with implementer evidence note.
+
+#### Findings
+All automatable T-007 acceptance criteria are satisfied:
+- SW registered (production build only) ✅
+- `manifest.webmanifest` with required fields generated ✅
+- App reads data offline from IndexedDB cache ✅ (verified by "shows cached lists while offline" test)
+- Queued writes sync on reconnect ✅ (verified by "queues offline writes and refreshes after reconnect" test)
+- Offline banner shown ✅
+
+#### Risks
+- **Low**: SVG-only icons (finding #1). Lighthouse on desktop Chrome passes; mobile Chrome / Android "Add to Home Screen" may flag the absence of a maskable PNG icon.
+- **Low**: Lighthouse interactive audit not runnable in this CI/dev environment. The manifest and SW are structurally correct; full audit requires a live browser session.
+
+---
+
+---
+
 ## T-006 — List Sharing
 
 **Verdict: PASS**

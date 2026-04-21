@@ -2,8 +2,10 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetOfflineStateForTests } from "./api/offlineStore";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
+import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 
 function renderApp(initialEntries = ["/"]) {
   return render(
@@ -15,16 +17,20 @@ function renderApp(initialEntries = ["/"]) {
       initialEntries={initialEntries}
     >
       <AuthProvider>
-        <App />
+        <OfflineQueueProvider>
+          <App />
+        </OfflineQueueProvider>
       </AuthProvider>
     </MemoryRouter>
   );
 }
 
 describe("authentication shell", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.stubGlobal("fetch", vi.fn());
     window.localStorage.clear();
+    await resetOfflineStateForTests();
+    setNavigatorOnline(true);
   });
 
   afterEach(() => {
@@ -313,6 +319,79 @@ describe("authentication shell", () => {
       expect(screen.queryByText("Alex")).toBeNull();
     });
   });
+
+  it("shows cached lists while offline and displays the offline banner", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+      })
+    });
+
+    const rendered = renderApp(["/"]);
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+
+    rendered.unmount();
+    fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    setNavigatorOnline(false);
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+    expect(screen.getByText("Offline mode: cached data is available.")).toBeTruthy();
+  });
+
+  it("queues offline writes and refreshes after reconnect", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ lists: [] })
+      })
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          list: { id: "list-99", name: "Queued list", owner_name: "Demo User", is_owner: true }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-99", name: "Queued list", owner_name: "Demo User", is_owner: true }]
+        })
+      });
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("No lists yet. Create one to get started.")).toBeTruthy();
+
+    setNavigatorOnline(false);
+    window.dispatchEvent(new Event("offline"));
+    await userEvent.type(screen.getByLabelText("New list"), "Queued list");
+    await userEvent.click(screen.getByRole("button", { name: "Create list" }));
+
+    expect(await screen.findByText("Queued list")).toBeTruthy();
+    expect(screen.getAllByText("Queued")[0]).toBeTruthy();
+    expect(screen.getByText("Offline mode: 1 change waiting to sync.")).toBeTruthy();
+
+    setNavigatorOnline(true);
+    window.dispatchEvent(new Event("online"));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/lists",
+        expect.objectContaining({
+          method: "POST"
+        })
+      );
+    });
+
+    expect(await screen.findByText("Queued list")).toBeTruthy();
+  });
 });
 
 function createFakeJwt(sub) {
@@ -320,4 +399,11 @@ function createFakeJwt(sub) {
   const payload = btoa(JSON.stringify({ sub }));
 
   return `${header}.${payload}.signature`;
+}
+
+function setNavigatorOnline(value) {
+  Object.defineProperty(window.navigator, "onLine", {
+    configurable: true,
+    value
+  });
 }

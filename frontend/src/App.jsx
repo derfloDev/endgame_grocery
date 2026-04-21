@@ -1,4 +1,5 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import OfflineBanner from "./components/OfflineBanner";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { APP_TITLE } from "./app.constants";
 import ListDetailPage from "./pages/ListDetailPage";
@@ -28,6 +29,7 @@ function ProtectedLayout() {
         <section className="hero-card">
           <p className="eyebrow">Shared household planning</p>
           <h1>{APP_TITLE}</h1>
+          <OfflineBanner />
           <Outlet />
         </section>
       </main>

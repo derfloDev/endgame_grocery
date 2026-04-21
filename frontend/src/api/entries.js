@@ -1,41 +1,42 @@
-async function sendEntryRequest(listId, token, path = "", options = {}) {
-  const response = await fetch(`/api/lists/${listId}/entries${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers ?? {})
-    }
+import { createCacheKey, sendJsonRequest } from "./client";
+
+function createEntriesCacheKey(listId) {
+  return createCacheKey("entries", listId);
+}
+
+function sendEntryRequest(listId, token, path = "", options = {}) {
+  const method = options.method ?? "GET";
+
+  return sendJsonRequest(`/api/lists/${listId}/entries${path}`, {
+    method,
+    token,
+    payload: options.payload,
+    cacheKey: method === "GET" ? createEntriesCacheKey(listId) : "",
+    offlineFallbackMessage: "Offline entry data is unavailable.",
+    queueable: method !== "GET",
+    queueMeta: options.queueMeta ?? null
   });
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(data.error ?? "Entry request failed.");
-  }
-
-  return data;
 }
 
 export function fetchEntries(listId, token) {
   return sendEntryRequest(listId, token);
 }
 
-export function createEntry(listId, token, payload) {
+export function createEntry(listId, token, payload, options = {}) {
   return sendEntryRequest(listId, token, "", {
     method: "POST",
-    body: JSON.stringify(payload)
+    payload,
+    queueMeta: {
+      resourceType: "entry",
+      tempId: options.tempId ?? ""
+    }
   });
 }
 
 export function updateEntry(listId, entryId, token, payload) {
   return sendEntryRequest(listId, token, `/${entryId}`, {
     method: "PATCH",
-    body: JSON.stringify(payload)
+    payload
   });
 }
 

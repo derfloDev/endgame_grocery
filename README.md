@@ -60,6 +60,13 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 - `DELETE /api/lists/:id/members/:userId` revokes a shared member while preventing the owner from removing themselves.
 - The list detail screen exposes a sharing panel for owners, and the overview marks shared lists with a badge plus the owner name.
 
+## PWA and offline workflow
+
+- The frontend now registers a production service worker through `vite-plugin-pwa` and ships an installable standalone manifest with app icons.
+- Successful list, entry, and sharing reads are mirrored into IndexedDB so overview and detail screens can render when the network is unavailable.
+- Failed write requests caused by network loss are queued locally and replayed in order when the browser comes back online.
+- The protected shell shows an offline banner so cached-read mode and queued-sync state stay visible during outages.
+
 ## AI workflow
 
 This project uses the persistent planner/implementer/reviewer workflow defined in `AGENTS.md`.

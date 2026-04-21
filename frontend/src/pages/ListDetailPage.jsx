@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { createTemporaryId } from "../api/client";
 import { createEntry, deleteEntry, fetchEntries, updateEntry } from "../api/entries";
+import { writeCachedResource } from "../api/offlineStore";
 import { fetchLists } from "../api/lists";
 import { fetchListMembers, revokeListMember, shareListWithMember } from "../api/sharing";
 import { useAuth } from "../context/AuthContext";
+import { useOfflineQueue } from "../hooks/useOfflineQueue";
 
 export default function ListDetailPage() {
   const { id } = useParams();
   const { token } = useAuth();
+  const { syncVersion } = useOfflineQueue();
   const inputRef = useRef(null);
   const [list, setList] = useState(null);
   const [entries, setEntries] = useState([]);
@@ -74,7 +78,29 @@ export default function ListDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [id, token]);
+  }, [id, syncVersion, token]);
+
+  async function updateEntries(updater) {
+    let nextEntries = [];
+
+    setEntries((currentEntries) => {
+      nextEntries = updater(currentEntries);
+      return nextEntries;
+    });
+
+    await writeCachedResource(`entries:${id}`, { entries: nextEntries });
+  }
+
+  async function updateMembers(updater) {
+    let nextMembers = [];
+
+    setMembers((currentMembers) => {
+      nextMembers = updater(currentMembers);
+      return nextMembers;
+    });
+
+    await writeCachedResource(`members:${id}`, { members: nextMembers });
+  }
 
   async function handleCreateEntry(event) {
     event.preventDefault();
@@ -85,8 +111,19 @@ export default function ListDetailPage() {
 
     try {
       setEntryError("");
-      const result = await createEntry(id, token, { text: newEntryText });
-      setEntries((currentEntries) => sortEntries([...currentEntries, result.entry]));
+
+      const temporaryEntry = {
+        id: createTemporaryId("entry"),
+        text: newEntryText.trim(),
+        status: "open",
+        created_at: new Date().toISOString(),
+        is_pending_sync: true
+      };
+      const result = await createEntry(id, token, { text: newEntryText }, { tempId: temporaryEntry.id });
+
+      await updateEntries((currentEntries) =>
+        sortEntries([...currentEntries, result?.queued ? temporaryEntry : result.entry])
+      );
       setNewEntryText("");
       inputRef.current?.focus();
     } catch (submitError) {
@@ -97,13 +134,20 @@ export default function ListDetailPage() {
   async function toggleStatus(entry) {
     try {
       setEntryError("");
+      const nextStatus = entry.status === "open" ? "done" : "open";
       const result = await updateEntry(id, entry.id, token, {
-        status: entry.status === "open" ? "done" : "open"
+        status: nextStatus
       });
-      setEntries((currentEntries) =>
+
+      await updateEntries((currentEntries) =>
         sortEntries(
           currentEntries.map((currentEntry) =>
-            currentEntry.id === entry.id ? { ...currentEntry, ...result.entry } : currentEntry
+            currentEntry.id === entry.id
+              ? {
+                  ...currentEntry,
+                  ...(result?.queued ? { status: nextStatus, is_pending_sync: true } : result.entry)
+                }
+              : currentEntry
           )
         )
       );
@@ -125,10 +169,16 @@ export default function ListDetailPage() {
     try {
       setEntryError("");
       const result = await updateEntry(id, entryId, token, { text: editingText });
-      setEntries((currentEntries) =>
+
+      await updateEntries((currentEntries) =>
         sortEntries(
           currentEntries.map((currentEntry) =>
-            currentEntry.id === entryId ? { ...currentEntry, ...result.entry } : currentEntry
+            currentEntry.id === entryId
+              ? {
+                  ...currentEntry,
+                  ...(result?.queued ? { text: editingText.trim(), is_pending_sync: true } : result.entry)
+                }
+              : currentEntry
           )
         )
       );
@@ -143,7 +193,7 @@ export default function ListDetailPage() {
     try {
       setEntryError("");
       await deleteEntry(id, entryId, token);
-      setEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
+      await updateEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
     } catch (submitError) {
       setEntryError(submitError.message);
     }
@@ -159,7 +209,19 @@ export default function ListDetailPage() {
     try {
       setShareError("");
       const result = await shareListWithMember(id, token, { email: shareEmail });
-      setMembers((currentMembers) => [...currentMembers, result.member]);
+
+      await updateMembers((currentMembers) => [
+        ...currentMembers,
+        result?.queued
+          ? {
+              user_id: createTemporaryId("member"),
+              display_name: shareEmail.trim(),
+              email: shareEmail.trim(),
+              is_owner: false,
+              is_pending_sync: true
+            }
+          : result.member
+      ]);
       setShareEmail("");
     } catch (submitError) {
       setShareError(submitError.message);
@@ -170,7 +232,7 @@ export default function ListDetailPage() {
     try {
       setShareError("");
       await revokeListMember(id, memberId, token);
-      setMembers((currentMembers) => currentMembers.filter((member) => member.user_id !== memberId));
+      await updateMembers((currentMembers) => currentMembers.filter((member) => member.user_id !== memberId));
     } catch (submitError) {
       setShareError(submitError.message);
     }
@@ -183,12 +245,15 @@ export default function ListDetailPage() {
     <div className="stack">
       <div className="overview-header">
         <div className="stack tight-stack">
-          <span
-            className={`pill ${list?.is_owner ? "" : "shared-pill"}`}
-            title={list?.is_owner ? "You own this list." : `Owned by ${list?.owner_name ?? "another member"}`}
-          >
-            {list?.is_owner ? "Owner" : "Shared list"}
-          </span>
+          <div className="button-row">
+            <span
+              className={`pill ${list?.is_owner ? "" : "shared-pill"}`}
+              title={list?.is_owner ? "You own this list." : `Owned by ${list?.owner_name ?? "another member"}`}
+            >
+              {list?.is_owner ? "Owner" : "Shared list"}
+            </span>
+            {list?.is_pending_sync ? <span className="pill shared-pill">Queued</span> : null}
+          </div>
           <h1 className="detail-title">{list?.name ?? "List detail"}</h1>
           <p>
             {list?.is_owner
@@ -253,6 +318,7 @@ export default function ListDetailPage() {
                       <span className={`pill ${member.is_owner ? "" : "shared-pill"}`}>
                         {member.is_owner ? "Owner" : "Member"}
                       </span>
+                      {member.is_pending_sync ? <span className="pill shared-pill">Queued</span> : null}
                     </div>
                     <p>{member.email}</p>
                   </div>
@@ -381,7 +447,10 @@ function EntryCard({
             />
           </>
         ) : (
-          <p className={`entry-text ${entry.status === "done" ? "entry-text-done" : ""}`}>{entry.text}</p>
+          <div className="button-row">
+            <p className={`entry-text ${entry.status === "done" ? "entry-text-done" : ""}`}>{entry.text}</p>
+            {entry.is_pending_sync ? <span className="pill shared-pill">Queued</span> : null}
+          </div>
         )}
       </div>
       <div className="button-row">

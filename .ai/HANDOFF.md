@@ -4,6 +4,51 @@ Append-only role handoff log. Each role adds one entry when its step is complete
 
 ---
 
+### T-007 — implement — 2026-04-21T16:42:10Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Created the final PWA and offline support task commit and marked T-007 done after review passed |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, frontend/index.html, frontend/public/icon-192.svg, frontend/public/icon-512.svg, frontend/src/App.jsx, frontend/src/api/auth.js, frontend/src/api/client.js, frontend/src/api/entries.js, frontend/src/api/lists.js, frontend/src/api/offlineStore.js, frontend/src/api/sharing.js, frontend/src/app.test.jsx, frontend/src/components/OfflineBanner.jsx, frontend/src/context/OfflineQueueContext.jsx, frontend/src/context/offlineQueueContextValue.js, frontend/src/hooks/useOfflineQueue.js, frontend/src/index.css, frontend/src/main.jsx, frontend/src/pages/ListDetailPage.jsx, frontend/src/pages/OverviewPage.jsx, frontend/src/sw/register.js, frontend/vite.config.js |
+| Validation | Reused reviewer verification: `npm run lint` ✅ (1 non-blocking warning); `npm run build` ✅ (emits manifest.webmanifest, sw.js, workbox-*.js); `npm test` ✅ (32 tests pass) |
+| Commit | final task commit created via `commit_task` |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | none |
+
+---
+
+### T-007 — review — 2026-04-21T18:11:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-007; SW + manifest generated in build, IndexedDB offline cache + queue drain verified by tests, offline banner wired, all 32 tests pass — PASS_WITH_NOTES (SVG-only icons, Lighthouse not runnable in environment) |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` ✅ (1 non-blocking warning); `npm run build` ✅ (emits manifest.webmanifest, sw.js, workbox-*.js); `npm test` ✅ (9 frontend + 23 backend = 32 tests pass) |
+| Commit | n/a (review role) |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-007 — implement — 2026-04-21T16:04:59Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Implemented PWA manifest and service worker registration plus IndexedDB-backed offline reads, queued write replay, and an offline status banner |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, frontend/index.html, frontend/public/icon-192.svg, frontend/public/icon-512.svg, frontend/src/App.jsx, frontend/src/api/auth.js, frontend/src/api/client.js, frontend/src/api/entries.js, frontend/src/api/lists.js, frontend/src/api/offlineStore.js, frontend/src/api/sharing.js, frontend/src/app.test.jsx, frontend/src/components/OfflineBanner.jsx, frontend/src/context/OfflineQueueContext.jsx, frontend/src/context/offlineQueueContextValue.js, frontend/src/hooks/useOfflineQueue.js, frontend/src/index.css, frontend/src/main.jsx, frontend/src/pages/ListDetailPage.jsx, frontend/src/pages/OverviewPage.jsx, frontend/src/sw/register.js, frontend/vite.config.js |
+| Validation | `npm run lint` passed with one non-blocking React fast-refresh warning for `frontend/src/context/AuthContext.jsx`; `npm run build` passed and emitted `manifest.webmanifest` plus `sw.js`; `npm test` passed |
+| Commit | pending |
+| Verdict | n/a |
+| Blocking Findings | Lighthouse audit was not run in this environment; manifest and service worker generation were verified through the production build output |
+| Next Role | review |
+
+---
+
 ### T-006 — implement — 2026-04-21T15:47:55Z
 
 | Field | Value |
