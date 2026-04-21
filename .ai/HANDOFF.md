@@ -4,6 +4,81 @@ Append-only role handoff log. Each role adds one entry when its step is complete
 
 ---
 
+### T-002 — implement — 2026-04-21T14:16:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Squashed the database schema task into its final commit and marked T-002 done after review passed |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md |
+| Validation | Reused reviewer verification: `npm run lint` ✅; `npm run build` ✅; `npm test` ✅ |
+| Commit | final task commit created via `commit_task` |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | none |
+
+---
+
+### T-002 — review — 2026-04-21T16:13:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Re-reviewed T-002 rework; both required fixes confirmed correct — pool lifecycle fixed with pool.end(), node-pg-migrate moved to dependencies; all validations pass |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` ✅; `npm run build` ✅; `npm test` ✅ (4 tests pass) |
+| Commit | n/a (review role) |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-21T14:10:49Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Addressed review findings by fixing the seed pool lifecycle and moving `node-pg-migrate` into runtime dependencies |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, backend/package.json, backend/src/db/client.js, backend/src/db/migrations.test.js, backend/src/db/migrations/1713895200000_create_core_tables.js, backend/src/db/seed-data.js, backend/src/db/seed-data.test.js, backend/src/db/seed.js, package-lock.json, package.json |
+| Validation | `npm install` completed; `npm run lint` passed; `npm run build` passed; `npm test` passed; direct `node src/db/seed.js` no longer hangs and exits when PostgreSQL is unavailable; live `npm run migrate` remains blocked because `localhost:5432` is unavailable and `docker` is not installed in this environment |
+| Commit | pending |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-04-21T16:07:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002; migration schema is correct and all automated checks pass, but seed script has a major pool-leak bug (hangs forever) and node-pg-migrate is misplaced in devDependencies |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` ✅; `npm run build` ✅; `npm test` ✅ (4 tests pass) |
+| Commit | n/a (review role) |
+| Verdict | FAIL |
+| Blocking Findings | 1. Pool leak in seed.js — closePool() is a no-op because createPool() does not populate the module-level singleton; seed process hangs. 2. node-pg-migrate in devDependencies — breaks migrate in prod/CI installs. |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-21T14:02:57Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added PostgreSQL migrations, seed scripts, root DB commands, and local setup documentation for the shared schema workflow |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, backend/package.json, backend/src/db/client.js, backend/src/db/migrations.test.js, backend/src/db/migrations/1713895200000_create_core_tables.js, backend/src/db/seed-data.js, backend/src/db/seed-data.test.js, backend/src/db/seed.js, package-lock.json, package.json |
+| Validation | `npm install` completed; `npm run lint` passed; `npm run build` passed; `npm test` passed; `npm run migrate` reached PostgreSQL connection step but failed with `ECONNREFUSED` because `localhost:5432` is unavailable; `npm run db:seed` is blocked by the same missing local PostgreSQL service; `docker compose up -d` could not run because `docker` is not installed in this environment |
+| Commit | pending |
+| Verdict | n/a |
+| Blocking Findings | none |
+| Next Role | review |
+
+---
+
 ### T-001 — implement — 2026-04-21T13:56:00Z
 
 | Field | Value |

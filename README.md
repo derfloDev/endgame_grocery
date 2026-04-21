@@ -13,13 +13,20 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 1. Copy `.env.example` to `.env`.
 2. Start PostgreSQL with `docker compose up -d`.
 3. Install dependencies with `npm install`.
-4. Run the apps with `npm run dev`.
+4. Apply the database schema with `npm run migrate`.
+5. Seed demo data with `npm run db:seed`.
+6. Run the apps with `npm run dev`.
 
 ## Validation
 
 - `npm run lint`
 - `npm run build`
 - `npm test`
+
+## Database workflow
+
+- `npm run migrate` applies the PostgreSQL schema from `backend/src/db/migrations`.
+- `npm run db:seed` inserts one demo user, one demo list, and starter entries for local development.
 
 ## AI workflow
 

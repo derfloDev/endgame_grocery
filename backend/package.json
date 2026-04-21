@@ -7,13 +7,16 @@
     "dev": "nodemon src/index.js",
     "build": "node --check src/index.js",
     "lint": "eslint .",
-    "test": "node --test"
+    "test": "node --test",
+    "migrate": "node-pg-migrate up --migrations-dir src/db/migrations",
+    "db:seed": "node src/db/seed.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "node-pg-migrate": "^7.9.1",
     "pg": "^8.14.1"
   },
   "devDependencies": {
