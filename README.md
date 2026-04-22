@@ -38,7 +38,7 @@ docker compose up -d
 npm run migrate
 ```
 
-This creates the tables used by authentication, grocery lists, entries, and sharing.
+This command loads environment variables from the project-root `.env` file automatically, then creates the tables used by authentication, grocery lists, entries, and sharing.
 
 ### 5. Optionally load demo data
 

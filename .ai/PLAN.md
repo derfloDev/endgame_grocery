@@ -2,45 +2,48 @@
 
 Status: **ready_for_implement**
 
-Goal: Create a root `README.md` that documents the full local development setup so developers can get the project running without trial and error.
+Goal: Fix `npm run migrate` so it loads `.env` automatically without requiring the developer to set `DATABASE_URL` manually in the shell.
 
-## Background
+## Root Cause
 
-There is currently no `README.md`. The missing local setup documentation caused a silent runtime failure: `DATABASE_URL` was never set, `getPool()` returned `null`, and registration threw "Database connection is not configured." A clear setup guide prevents this class of problem.
+`node-pg-migrate` is a CLI tool that does not load `.env` files. The app's `dotenv.config()` call in `backend/src/env.js` only runs when the Express app starts — not during `npm run migrate`. `DATABASE_URL` is therefore `undefined` at migration time, causing the SASL authentication error ("client password must be a string").
+
+`db:seed` is **not** affected: `seed.js` imports `client.js` → `env.js` → `dotenv.config()`, so dotenv loads automatically for that script.
 
 ## Scope
 
-Create `README.md` at the project root covering:
+- Update the `migrate` script in `backend/package.json` to pre-load `.env` using Node's native `--env-file` flag (available since Node 20.6.0; project runs on 20.11.0).
+- Point directly at the ESM binary `node_modules/node-pg-migrate/bin/node-pg-migrate.mjs` to bypass the platform CMD wrapper.
+- Update `README.md` to remove any note suggesting manual env-var export before `npm run migrate` (if present), since the script now handles it automatically.
 
-1. **Prerequisites** — Node.js, Docker / Docker Compose
-2. **Environment setup** — copy `.env.example` → `.env`, note `JWT_SECRET` must be changed for production
-3. **Database** — `docker-compose up -d` to start PostgreSQL, `npm run migrate` to run migrations
-4. **Optional seed data** — `npm run db:seed`
-5. **Development** — `npm run dev` (starts frontend + backend concurrently)
-6. **Validation** — `npm run lint`, `npm run build`, `npm test`
-7. **Available npm scripts** — table listing all root-level scripts
+No new dependencies are required.
 
 ## Acceptance Criteria
 
-1. `README.md` exists at the project root.
-2. Following only the README steps, a developer can run `npm run dev` and reach a working registration page.
-3. `npm run lint` passes (README is not linted, but no other files are touched that could break it).
-4. `npm run build` passes.
+1. `npm run migrate` completes successfully with only a `.env` file present (no manual shell export needed).
+2. `npm run lint` passes.
+3. `npm run build` passes.
 
 ## Implementation Phases
 
-### Phase 1 — Write README.md
+### Phase 1 — Fix the migrate script
 
-**File**: `README.md` (new, project root)
+**File**: `backend/package.json`
 
-Sections (in order):
-- Project title + one-line description
-- Prerequisites
-- Local setup (env → database → migrate → dev)
-- Available scripts table
-- Tech stack summary (React frontend, Node/Express backend, PostgreSQL)
+Change:
+```json
+"migrate": "node-pg-migrate up --migrations-dir src/db/migrations"
+```
+To:
+```json
+"migrate": "node --env-file=../.env node_modules/node-pg-migrate/bin/node-pg-migrate.mjs up --migrations-dir src/db/migrations"
+```
 
-No source files are modified.
+### Phase 2 — Update README if needed
+
+**File**: `README.md`
+
+If the README contains any instruction to manually export `DATABASE_URL` before running `npm run migrate`, remove or replace that note to reflect that the script now loads `.env` automatically.
 
 ## Validation
 

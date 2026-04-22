@@ -71,3 +71,40 @@ Reviewed: 2026-04-22
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-04-22
+
+#### Findings
+
+1. **nit** — `backend/src/db/migrations/1713895200000_create_core_tables.cjs` + `backend/src/db/migrations.test.js`: Migration file renamed from `.js` to `.cjs` and test updated accordingly. This is out of explicit plan scope (plan listed only `backend/package.json` and `README.md`), but is a necessary supporting change — without it, `node-pg-migrate` running under an ESM package (`"type": "module"`) would try to load `.js` migrations as ESM, breaking the `module.exports`-style exports. The change is correct and required for the fix to work end-to-end.
+
+#### Verification
+##### Steps
+1. Read `backend/package.json` — confirmed migrate script is `node --env-file=../.env ../node_modules/node-pg-migrate/bin/node-pg-migrate.mjs up --migrations-dir src/db/migrations`. Uses correct `../` prefix to reach root `node_modules` from the `backend/` working directory. ✅
+2. ESM binary path `../node_modules/node-pg-migrate/bin/node-pg-migrate.mjs` bypasses the Windows CMD wrapper. ✅
+3. Read `README.md` step 4 — now reads "This command loads environment variables from the project-root `.env` file automatically…" — no manual export instruction present. ✅
+4. Read `backend/src/db/migrations/1713895200000_create_core_tables.cjs` — valid CommonJS (`module.exports = { shorthands, up, down }`), exports `up` and `down` functions. ✅
+5. Read `backend/src/db/migrations.test.js` — uses `pathToFileURL` to dynamically import the `.cjs` file; asserts both `up` and `down` are functions. ✅
+6. Ran `npm run lint` — 0 errors, 1 pre-existing warning. ✅
+7. Ran `npm run build` — success. ✅
+8. Ran `npm test` — 9 frontend + 23 backend tests pass, including `exports up and down migration functions`. ✅
+
+##### Findings
+- All checks pass. The `.cjs` migration conversion is out of literal plan scope but is the correct supporting change for the fix to work end-to-end.
+
+##### Risks
+- Low. The `--env-file` flag requires Node ≥ 20.6.0; project targets Node 22.x per README, which satisfies this requirement.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

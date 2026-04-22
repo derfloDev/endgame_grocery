@@ -122,3 +122,53 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — plan — 2026-04-22T00:02:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned fix for `npm run migrate` to auto-load `.env` via Node's native `--env-file` flag, eliminating the SASL auth error caused by undefined DATABASE_URL. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-003 — review — 2026-04-22T11:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Verified migrate script auto-loads `.env` via `--env-file`, migration CJS conversion is correct, README updated accurately; all lint, build, and test checks passed. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-22T09:41:13Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Updated the backend migrate script to load the root `.env` automatically and made the migration file CommonJS-compatible so `node-pg-migrate` can execute it reliably. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `backend/package.json`, `backend/src/db/migrations.test.js`, `backend/src/db/migrations/1713895200000_create_core_tables.cjs` |
+| Validation | `npm run migrate` passed with only `.env`; `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed |
+| Commit | `58ecf6f fix(backend): load .env automatically for migrations` |
+| Next Role | review |
+
+---
+
+### T-003 — implement — 2026-04-22T09:45:21Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Finalized the reviewed migration task by updating the board to done and folding the task artifacts into the release-note-ready commit. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `backend/package.json`, `backend/src/db/migrations.test.js`, `backend/src/db/migrations/1713895200000_create_core_tables.cjs` |
+| Validation | Reused reviewed results: `npm run migrate` passed with only `.env`; `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed |
+| Commit | `PENDING` |
+| Next Role | none |
+
+---
