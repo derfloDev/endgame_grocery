@@ -26,6 +26,8 @@ cp .env.example .env
 
 The backend requires a valid `DATABASE_URL` before registration, login, or list APIs can work. `JWT_SECRET` is fine for local development, but you must replace it with a strong secret outside local use.
 
+Backend commands that read configuration, including `npm run dev` and `npm run db:seed`, load this project-root `.env` file automatically even when npm starts them from the `backend/` workspace directory.
+
 ### 3. Start PostgreSQL
 
 ```bash

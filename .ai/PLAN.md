@@ -2,50 +2,57 @@
 
 Status: **ready_for_implement**
 
-Goal: Fix `npm run migrate` so it loads `.env` automatically without requiring the developer to set `DATABASE_URL` manually in the shell.
+Goal: Fix the backend dev server so `DATABASE_URL` is loaded from the root `.env` file automatically, regardless of working directory.
 
 ## Root Cause
 
-`node-pg-migrate` is a CLI tool that does not load `.env` files. The app's `dotenv.config()` call in `backend/src/env.js` only runs when the Express app starts — not during `npm run migrate`. `DATABASE_URL` is therefore `undefined` at migration time, causing the SASL authentication error ("client password must be a string").
+`dotenv.config()` in `backend/src/env.js` uses the default path resolution: it looks for `.env` in `process.cwd()`. When the backend is launched via `npm run dev --workspace backend` (or `concurrently`), the CWD is `backend/`, but the `.env` file lives in the project root. As a result `DATABASE_URL` is `undefined`, `createPool()` returns `null`, and every auth route fails with "Database connection is not configured."
 
-`db:seed` is **not** affected: `seed.js` imports `client.js` → `env.js` → `dotenv.config()`, so dotenv loads automatically for that script.
+The same CWD mismatch affects `db:seed` (which also imports `env.js`), though it was not reported separately.
 
 ## Scope
 
-- Update the `migrate` script in `backend/package.json` to pre-load `.env` using Node's native `--env-file` flag (available since Node 20.6.0; project runs on 20.11.0).
-- Point directly at the ESM binary `node_modules/node-pg-migrate/bin/node-pg-migrate.mjs` to bypass the platform CMD wrapper.
-- Update `README.md` to remove any note suggesting manual env-var export before `npm run migrate` (if present), since the script now handles it automatically.
-
-No new dependencies are required.
+- Update `dotenv.config()` in `backend/src/env.js` to resolve `.env` relative to the module file (`import.meta.url`), not `process.cwd()`. This makes the load path CWD-independent.
+- No changes to `backend/package.json` scripts are required.
+- No new dependencies are required.
 
 ## Acceptance Criteria
 
-1. `npm run migrate` completes successfully with only a `.env` file present (no manual shell export needed).
+1. Starting the dev server (`npm run dev`) and sending `POST /api/auth/register` with valid body returns `201` (no "Database connection is not configured" error in the logs).
 2. `npm run lint` passes.
 3. `npm run build` passes.
+4. `npm test` passes.
 
 ## Implementation Phases
 
-### Phase 1 — Fix the migrate script
+### Phase 1 — Fix dotenv path resolution in `env.js`
 
-**File**: `backend/package.json`
+**File**: `backend/src/env.js`
 
-Change:
-```json
-"migrate": "node-pg-migrate up --migrations-dir src/db/migrations"
+Replace the bare `dotenv.config()` call with one that resolves `.env` relative to the module file:
+
+```js
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+
+export function getConfig() {
+  return {
+    databaseUrl: process.env.DATABASE_URL ?? "",
+    jwtSecret: process.env.JWT_SECRET ?? "",
+    port: Number(process.env.PORT ?? 4000),
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d"
+  };
+}
 ```
-To:
-```json
-"migrate": "node --env-file=../.env node_modules/node-pg-migrate/bin/node-pg-migrate.mjs up --migrations-dir src/db/migrations"
-```
 
-### Phase 2 — Update README if needed
-
-**File**: `README.md`
-
-If the README contains any instruction to manually export `DATABASE_URL` before running `npm run migrate`, remove or replace that note to reflect that the script now loads `.env` automatically.
+`backend/src/env.js` is located at `backend/src/env.js`. Two levels up (`../../`) resolves to the project root where `.env` lives.
 
 ## Validation
 
 - `npm run lint`
 - `npm run build`
+- `npm test`

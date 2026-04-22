@@ -172,3 +172,53 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — plan — 2026-04-22T12:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Identified CWD mismatch as root cause of DATABASE_URL not loading in dev server; planned fix to resolve dotenv path relative to `import.meta.url` in `backend/src/env.js`. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-22T09:59:05Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Made backend env loading resolve the project-root `.env` from `backend/src/env.js`, added a regression test for CWD-independent loading, and updated the README to document the backend workspace behavior. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `backend/src/env.js`, `backend/src/env.test.js` |
+| Validation | `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed outside the sandbox after rerunning with elevated permissions because Node's test runner hits `spawn EPERM` in the sandbox; live Docker-backed dev verification was not run because `docker` is unavailable in this environment |
+| Commit | `PENDING fix(backend): load backend config from the project root .env` |
+| Next Role | review |
+
+---
+
+### T-004 — review — 2026-04-22T12:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Verified dotenv path-resolution fix and CWD-independence regression test; all lint, build, and test checks passed with no regressions. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-22T10:02:57Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Finalized the reviewed backend env-loading task by marking the board done and preparing the release-note-ready commit with the env fix, regression test, and documentation updates. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `backend/src/env.js`, `backend/src/env.test.js` |
+| Validation | Reused reviewed results: `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed (24 backend tests, including the new CWD-independence test) |
+| Commit | `PENDING fix(backend): load backend config from the project root .env` |
+| Next Role | none |
+
+---

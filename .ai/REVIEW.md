@@ -108,3 +108,35 @@ Reviewed: 2026-04-22
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-04-22
+
+#### Findings
+- No issues found. Implementation matches the plan exactly.
+
+#### Verification
+##### Steps
+1. Read `backend/src/env.js` — confirmed `dotenv.config()` now resolves `.env` via `path.resolve(envModuleDir, "../../.env")` where `envModuleDir` is derived from `import.meta.url`. Two levels up from `backend/src/` is the project root. ✅
+2. Read `backend/src/env.test.js` — confirmed new test `"loads DATABASE_URL from the project root .env regardless of cwd"` creates a temp fixture tree mirroring the `backend/src/env.js` depth, changes CWD to the fixture `backend/` dir, dynamically imports the copied module, and asserts the fixture `.env` values are loaded. Env vars and CWD are restored in `finally`. ✅
+3. Confirmed `node:path` and `node:url` module specifiers are used (cleaner than the plan's unscoped imports — no functional difference). ✅
+4. Read `README.md` diff — a sentence added under the env setup section documenting that backend commands load the root `.env` automatically. ✅
+5. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unchanged). ✅
+6. Ran `npm run build` — success, 54 modules transformed. ✅
+7. Ran `npm test` — 9 frontend + 24 backend tests pass. The new `getConfig` suite passes both subtests including the CWD-independence case. ✅
+
+##### Findings
+- All validation commands pass with no regressions. New test covers the exact acceptance criterion (CWD-independent `.env` loading).
+
+##### Risks
+- None. The change is confined to `env.js` path resolution; no new dependencies, no script changes.
+
+#### Verdict
+`PASS`

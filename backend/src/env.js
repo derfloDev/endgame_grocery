@@ -1,6 +1,12 @@
 import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-dotenv.config();
+const envModuleDir = path.dirname(fileURLToPath(import.meta.url));
+const envFilePath = path.resolve(envModuleDir, "../../.env");
+
+// Resolve the workspace root `.env` from this module so backend scripts do not depend on process.cwd().
+dotenv.config({ path: envFilePath });
 
 export function getConfig() {
   return {
