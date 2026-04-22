@@ -72,3 +72,53 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — plan — 2026-04-22T00:01:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned root README.md covering local dev setup (env, Docker DB, migrations, dev server) to prevent silent DB-not-configured failures. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-22T09:26:21Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Rewrote the root README into a complete local development setup guide with prerequisites, environment setup, Docker database steps, scripts, and validation guidance. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md` |
+| Validation | `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed |
+| Commit | `PENDING` |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-04-22T11:20:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Verified README covers all plan-specified sections accurately; all lint and build checks passed with no regressions. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-22T09:30:46Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Finalized the reviewed README task by updating the board to done and folding the task artifacts into the release-note-ready commit. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md` |
+| Validation | Reused reviewed results: `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed |
+| Commit | `6ba1fc7 docs(readme): document the full local development setup` |
+| Next Role | none |
+
+---

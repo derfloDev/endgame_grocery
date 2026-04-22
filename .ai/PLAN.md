@@ -2,42 +2,47 @@
 
 Status: **ready_for_implement**
 
-Goal: Fix the 404 error on registration by adding the missing Vite dev-server proxy for `/api` requests.
+Goal: Create a root `README.md` that documents the full local development setup so developers can get the project running without trial and error.
 
-## Root Cause
+## Background
 
-`frontend/vite.config.js` has no `server.proxy` entry. During development the frontend Vite dev server (default port 5173) receives `POST /api/auth/register` but has no route for it → 404. The backend (port 4000) never receives the request.
+There is currently no `README.md`. The missing local setup documentation caused a silent runtime failure: `DATABASE_URL` was never set, `getPool()` returned `null`, and registration threw "Database connection is not configured." A clear setup guide prevents this class of problem.
 
 ## Scope
 
-- Add a `server.proxy` block to `frontend/vite.config.js` that forwards every `/api` request to `http://localhost:4000`.
+Create `README.md` at the project root covering:
+
+1. **Prerequisites** — Node.js, Docker / Docker Compose
+2. **Environment setup** — copy `.env.example` → `.env`, note `JWT_SECRET` must be changed for production
+3. **Database** — `docker-compose up -d` to start PostgreSQL, `npm run migrate` to run migrations
+4. **Optional seed data** — `npm run db:seed`
+5. **Development** — `npm run dev` (starts frontend + backend concurrently)
+6. **Validation** — `npm run lint`, `npm run build`, `npm test`
+7. **Available npm scripts** — table listing all root-level scripts
 
 ## Acceptance Criteria
 
-1. `POST /api/auth/register` from the frontend dev server reaches the backend and returns 201.
-2. `npm run lint` passes.
-3. `npm run build` passes.
+1. `README.md` exists at the project root.
+2. Following only the README steps, a developer can run `npm run dev` and reach a working registration page.
+3. `npm run lint` passes (README is not linted, but no other files are touched that could break it).
+4. `npm run build` passes.
 
 ## Implementation Phases
 
-### Phase 1 — Fix Vite proxy config
+### Phase 1 — Write README.md
 
-**File**: `frontend/vite.config.js`
+**File**: `README.md` (new, project root)
 
-Add `server.proxy` inside `defineConfig`:
+Sections (in order):
+- Project title + one-line description
+- Prerequisites
+- Local setup (env → database → migrate → dev)
+- Available scripts table
+- Tech stack summary (React frontend, Node/Express backend, PostgreSQL)
 
-```js
-server: {
-  proxy: {
-    "/api": "http://localhost:4000"
-  }
-}
-```
-
-No other files need to change; the backend routes are already correct.
+No source files are modified.
 
 ## Validation
 
 - `npm run lint`
 - `npm run build`
-- `npm test`

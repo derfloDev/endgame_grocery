@@ -21,3 +21,4 @@ Command expectations:
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
 | T-001 | Add Vite dev-server proxy so `/api` requests reach the backend | done | `POST /api/auth/register` returns 201 in dev; `npm run lint` and `npm run build` pass | `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed | none |
+| T-002 | Create root `README.md` with full local development setup guide | done | `README.md` exists at project root; covers env setup, Docker DB, migrations, and `npm run dev`; `npm run lint` and `npm run build` pass | `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed | none |
