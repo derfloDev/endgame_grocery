@@ -173,6 +173,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-005 — plan — 2026-04-22T12:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned Playwright E2E test suite for registration and login flows; 5 scenarios covering happy paths and error states against the full stack (browser + Vite + Express + PostgreSQL). |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
 ### T-004 — plan — 2026-04-22T12:00:00Z
 
 | Field | Value |
@@ -219,6 +230,45 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `backend/src/env.js`, `backend/src/env.test.js` |
 | Validation | Reused reviewed results: `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed (24 backend tests, including the new CWD-independence test) |
 | Commit | `PENDING fix(backend): load backend config from the project root .env` |
+| Next Role | none |
+
+---
+
+### T-005 — implement — 2026-04-22T10:48:45Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added Playwright end-to-end coverage for registration and login, wired the root E2E tooling, documented the workflow, and ignored Playwright run artifacts. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `.gitignore`, `README.md`, `e2e/auth.spec.js`, `package-lock.json`, `package.json`, `playwright.config.js` |
+| Validation | `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npx playwright install chromium` succeeded; `npm run e2e` passed all 5 Playwright auth scenarios against the full stack |
+| Commit | `PENDING test(e2e): verify registration and login flows against the full stack` |
+| Next Role | review |
+
+---
+
+### T-005 — review — 2026-04-22T12:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Verified all 5 Playwright E2E scenarios, config, .gitignore, and README; lint, build, and unit/integration tests passed; live E2E re-run not feasible without Docker but code review plus implementer evidence confirm all scenarios correct. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — implement — 2026-04-22T11:02:01Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Finalized the reviewed Playwright auth E2E task by marking the board done and preparing the release-note-ready commit with the new test suite, tooling, docs, and task artifacts. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `.gitignore`, `README.md`, `e2e/auth.spec.js`, `package-lock.json`, `package.json`, `playwright.config.js` |
+| Validation | Reused reviewed results: `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm run e2e` passed all 5 Playwright auth scenarios against the full stack after `npx playwright install chromium` |
+| Commit | `PENDING test(e2e): verify registration and login flows against the full stack` |
 | Next Role | none |
 
 ---

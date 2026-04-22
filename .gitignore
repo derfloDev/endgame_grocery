@@ -29,4 +29,5 @@ build/
 .env.local
 .env.*.local
 coverage/
-
+playwright-report/
+test-results/

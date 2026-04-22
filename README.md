@@ -75,6 +75,24 @@ Run these checks before merging changes:
 - `npm run build`
 - `npm test`
 
+## E2E Tests
+
+Playwright E2E coverage exercises the registration and login flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first.
+
+Install the Chromium browser once:
+
+```bash
+npx playwright install chromium
+```
+
+Run the suite with:
+
+```bash
+npm run e2e
+```
+
+The Playwright config reuses an already-running frontend or backend dev server when `CI` is not set. If neither server is running, Playwright starts `npm run dev --workspace backend` and `npm run dev --workspace frontend` automatically and waits for the health checks before running the browser scenarios.
+
 ## Available Scripts
 
 | Script | Purpose |
@@ -83,6 +101,7 @@ Run these checks before merging changes:
 | `npm run build` | Builds the frontend production bundle and checks the backend entrypoint syntax. |
 | `npm run lint` | Runs ESLint across all workspaces. |
 | `npm test` | Runs frontend and backend test suites. |
+| `npm run e2e` | Runs Playwright end-to-end tests against the full local stack. |
 | `npm run migrate` | Applies backend PostgreSQL migrations. |
 | `npm run db:seed` | Inserts demo data for local development. |
 

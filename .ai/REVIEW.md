@@ -140,3 +140,48 @@ Reviewed: 2026-04-22
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-04-22
+
+#### Findings
+
+1. **nit** — `e2e/auth.spec.js` line 6: `uniqueEmail()` adds both a timestamp and a random suffix (`Math.random().toString(36).slice(2,8)`). This exceeds the plan's timestamp-only spec but is strictly better — it avoids the (rare) collision when two test runs start within the same millisecond. Correct as-is.
+
+#### Verification
+
+##### Steps
+
+1. Read `playwright.config.js` — matches plan exactly: `testDir: "./e2e"`, `timeout: 30_000`, `retries: CI ? 2 : 0`, `reporter: "list"`, `baseURL: "http://localhost:5173"`, `headless: true`, `screenshot: "only-on-failure"`, `video: "retain-on-failure"`, one `chromium` project, two `webServer` entries (backend health at `/api/health`, frontend at `5173`), `reuseExistingServer: !process.env.CI`. ✅
+2. Read `e2e/auth.spec.js` — all 5 plan scenarios implemented:
+   - R-1: navigate to `/register`, fill form, click "Create account", assert URL `/` and "No lists yet." text. ✅
+   - R-2: register once, clear cookies+storage, re-register same email, assert "An account with that email already exists." banner and URL stays `/register`. ✅
+   - L-1: `registerByApi` via `request.post("/api/auth/register")` in test body, then browser login, assert redirect to `/`. ✅
+   - L-2: pre-register via API, submit wrong password, assert "Invalid email or password." banner and URL stays `/login`. ✅
+   - L-3: submit unknown email, assert "Invalid email or password." banner. ✅
+3. Confirmed `package.json` — `"e2e": "playwright test"` script added, `"@playwright/test": "^1.44.0"` in `devDependencies`. ✅
+4. Confirmed `.gitignore` — `playwright-report/` and `test-results/` appended (both standard Playwright output dirs). ✅
+5. Confirmed `README.md` — "E2E Tests" section added documenting: Postgres prerequisite, `npx playwright install chromium`, `npm run e2e`, and `reuseExistingServer` behaviour; `npm run e2e` row added to the scripts table. ✅
+6. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unchanged). ✅
+7. Ran `npm run build` — success, 54 modules transformed. ✅
+8. Ran `npm test` (unit/integration) — 9 frontend + 24 backend tests pass, no regressions. ✅
+9. Verified Playwright Chromium binaries are installed (`LOCALAPPDATA/ms-playwright/chromium-*` present). ✅
+10. `npm run e2e` — not re-run in review environment: Docker/PostgreSQL unavailable. Relied on code-level verification (all scenarios implement the plan correctly) and implementer's confirmed run (all 5 scenarios passed against the full stack).
+
+##### Findings
+- All required plan items are present and correctly implemented.
+- Unit/integration tests continue to pass with no regressions.
+- The live E2E re-run was not feasible in this review environment due to missing Docker; the implementer's evidence plus code review provide sufficient confidence.
+
+##### Risks
+- Low. The E2E tests are additive and do not modify any production code. The `reuseExistingServer` behaviour is correctly guarded on `!process.env.CI`.
+
+#### Verdict
+`PASS_WITH_NOTES`
