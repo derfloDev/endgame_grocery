@@ -1,6 +1,6 @@
-export const shorthands = undefined;
+const shorthands = undefined;
 
-export function up(pgm) {
+function up(pgm) {
   pgm.createExtension("pgcrypto", {
     ifNotExists: true
   });
@@ -114,9 +114,15 @@ export function up(pgm) {
   });
 }
 
-export function down(pgm) {
+function down(pgm) {
   pgm.dropTable("entries");
   pgm.dropTable("list_members");
   pgm.dropTable("lists");
   pgm.dropTable("users");
 }
+
+module.exports = {
+  shorthands,
+  up,
+  down
+};

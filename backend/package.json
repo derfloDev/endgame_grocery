@@ -8,7 +8,7 @@
     "build": "node --check src/index.js",
     "lint": "eslint .",
     "test": "node --test",
-    "migrate": "node-pg-migrate up --migrations-dir src/db/migrations",
+    "migrate": "node --env-file=../.env ../node_modules/node-pg-migrate/bin/node-pg-migrate.mjs up --migrations-dir src/db/migrations",
     "db:seed": "node src/db/seed.js"
   },
   "dependencies": {

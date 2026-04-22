@@ -50,30 +50,29 @@
   - appends a handoff entry to `.ai/HANDOFF.md`
   - performs review plus verification, including E2E and exploratory checks when appropriate
   - never edits code
-- Implement Mode:
+- Implement Mode (`next_task`):
   - waits for explicit user start signal
   - implements `.ai/PLAN.md`
-  - updates tests
+  - writes or updates tests for each changed behaviour before writing implementation code
   - updates affected documentation and code comments whenever behavior, interfaces, or workflows change
-  - stages task-specific `.ai/` artifact changes with the task commit when applicable
-  - stages files with `git add -A`
-  - commits with a Conventional Commit message
+  - writes the final Conventional Commit message into the HANDOFF entry `Commit` field
+  - does not `git commit`
   - updates `.ai/TASKS.md` status to `ready_for_review`
-  - appends a handoff entry to `.ai/HANDOFF.md` including commit hash
+  - appends a handoff entry to `.ai/HANDOFF.md`
   - must not invent requirements
 - Implement Mode (`commit_task` after review):
   - only for tasks in `ready_to_commit`
-  - stages `.ai/` artifact changes and includes them in the squashed commit
-  - squashes WIP commits into one Conventional Commit with a release-note-ready subject
+  - reads the commit message from the task's `next_task` HANDOFF entry
   - updates `.ai/TASKS.md` status to `done`
-  - appends a handoff entry to `.ai/HANDOFF.md` including commit hash
+  - appends a handoff entry to `.ai/HANDOFF.md`
+  - runs `git add -A && git commit -m "<message>"`
 - Implement Mode (rework after rejection):
   - reads `.ai/REVIEW.md` findings as a checklist
   - addresses every finding marked as required fix
   - re-runs validations
-  - stages and commits with a Conventional Commit referencing the rework
+  - does not `git commit`
   - updates `.ai/TASKS.md` status from `changes_requested` to `ready_for_review`
-  - appends a handoff entry to `.ai/HANDOFF.md` including commit hash
+  - appends a handoff entry to `.ai/HANDOFF.md`
 
 ## AI Operating Mode
 - Mode is selected by the launcher prompt/context:
@@ -163,15 +162,17 @@ Use these text commands inside the already-running role sessions.
   - `commit_task [TASK_ID]`
     - implementer only
     - target a task in `ready_to_commit`
-    - stage all `.ai/` artifact changes (`.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `ROADMAP.md`, etc.) as part of the squash
-    - squash WIP commits into a single Conventional Commit describing the user-visible outcome
-    - update the task to `done`
+    - read the commit message from the task's `next_task` HANDOFF entry `Commit` field
+    - update `.ai/TASKS.md` to `done`
+    - append a `commit_task` HANDOFF entry
+    - run `git add -A && git commit -m "<message>"`
     - if the supplied task is not ready to commit, report its current status and abort
   - `aide cycle end [VERSION]`
     - verify all tasks are `done`
     - if the completion condition is not met, report the blocking task states and abort
     - if no version is supplied, ask the user for it before proceeding
-    - close the cycle with a `chore(ai): close cycle` commit and a `Release-As: x.y.z` footer
+    - append a closing entry to `.ai/HANDOFF.md` (`### Cycle closed — <version> — <UTC timestamp>`)
+    - stage and commit with `chore(ai): close cycle` and a `Release-As: x.y.z` footer
     - then run `aide pr` to update the PR
   - `status_cycle [TASK_ID]`
     - return deterministic task status, current owner role, and next recommended action
@@ -192,8 +193,7 @@ Use these text commands inside the already-running role sessions.
 - Commit behavior by role:
   - `plan` role never commits.
   - `review` role never commits.
-  - `implement` role must stage all changes and create a Conventional Commit after validations pass.
-  - `.ai/` artifact changes produced by a task are staged and committed as part of that task's Conventional Commit via `commit_task`.
+  - `implement` role does not commit during `next_task` or `rework_task`. The single task commit is created by `commit_task` after review approval.
   - `aide cycle end` commits the cycle-close artifacts with a `Release-As: x.y.z` footer and can be followed by `aide pr`.
 - Conventional Commit subjects must be release-note ready: describe the user-visible change or outcome, not just the implementation mechanism.
 - Prefer subjects in the form `<type>(<scope>): <user-facing change>`; if the subject alone would be too vague in release notes, add a short body summarizing the key changes.

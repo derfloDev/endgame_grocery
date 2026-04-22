@@ -5,7 +5,7 @@ import path from "node:path";
 
 describe("database migrations", () => {
   it("exports up and down migration functions", async () => {
-    const migrationPath = path.resolve("src/db/migrations/1713895200000_create_core_tables.js");
+    const migrationPath = path.resolve("src/db/migrations/1713895200000_create_core_tables.cjs");
     const migration = await import(pathToFileURL(migrationPath));
 
     assert.equal(typeof migration.up, "function");
