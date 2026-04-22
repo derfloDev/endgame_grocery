@@ -20,6 +20,8 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 6. Run the apps with `npm run dev`.
 7. Open the frontend and register a user, or log in with the seeded demo account after a successful seed run.
 
+During local development, the frontend Vite dev server proxies `/api` requests to `http://localhost:4000`, so the backend must be running for register, login, and list requests to succeed from the browser.
+
 ## Validation
 
 - `npm run lint`
