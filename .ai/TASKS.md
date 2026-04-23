@@ -20,4 +20,5 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
+| T-001 | Integrate logo PNG as PWA icon and README header | done | icon-192.png and icon-512.png in frontend/public; SVG icons removed; vite.config.js and index.html updated; README shows logo image; lint and build pass | icon dimensions verified with Node PNG header read; npm run lint PASS with existing react-refresh warning; npm run build PASS; review PASS | none |
+| T-002 | Dockerize: single image with nginx + Node.js via supervisord | ready_for_implement | Dockerfile builds; docker-compose.example.yml starts app+postgres; /api/health returns ok through nginx; SPA fallback works; env.js loads .env conditionally; README Docker section added; lint and build pass | n/a | implement |

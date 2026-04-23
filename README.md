@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="endgame_grocery_logo.png" alt="Endgame Grocery" width="180" />
+</p>
+
 # endgame_grocery
 
 Shared grocery list monorepo with a React frontend, an Express backend, and PostgreSQL persistence.
