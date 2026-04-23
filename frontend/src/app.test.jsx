@@ -75,6 +75,36 @@ describe("authentication shell", () => {
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
   });
 
+  it("renders bottom navigation only inside the protected app shell", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ lists: [] })
+    });
+
+    const rendered = renderApp(["/"]);
+
+    expect(await screen.findByLabelText("Primary navigation")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Lists" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Search" })).toBeTruthy();
+
+    rendered.unmount();
+    window.localStorage.clear();
+
+    renderApp(["/login"]);
+
+    expect(screen.queryByLabelText("Primary navigation")).toBeNull();
+  });
+
+  it("renders the protected search route without crashing", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+
+    renderApp(["/search"]);
+
+    expect(await screen.findByLabelText("Search page")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Search" }).getAttribute("aria-current")).toBe("page");
+  });
+
   it("submits the register form", async () => {
     fetch
       .mockResolvedValueOnce({

@@ -166,6 +166,7 @@ Version bumps follow Conventional Commits: `feat` creates a minor release, `fix`
 
 ## Feature Overview
 
+- The protected React app uses a dark Endgame-themed shell with bottom navigation for Lists and Search.
 - Authentication supports register and login flows backed by JWT access tokens.
 - Lists support create, rename, delete, ownership, and shared-access visibility.
 - Entries support add, edit, toggle, and delete actions with open and done grouping.
