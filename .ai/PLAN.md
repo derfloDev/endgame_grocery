@@ -390,6 +390,228 @@ Registry (`ghcr.io/derfloDev/endgame-grocery`) rather than built locally.
 
 ---
 
+---
+
+## T-004 — CI/CD Pipeline (GitHub Actions + Release Please)
+
+### Scope
+Two GitHub Actions workflows: `ci.yml` runs lint, build, unit tests, and E2E on every push
+and PR; `release-please.yml` manages semantic versioning, changelog, and Docker image
+publishing on `main`.
+
+### Acceptance Criteria
+1. `.github/workflows/ci.yml` exists and defines three jobs: `lint-and-build`, `unit-test`, `e2e`.
+2. `e2e` job uses a PostgreSQL 16 service container; creates `.env`; runs `npm run migrate`; installs Chromium; runs `npm run e2e`; uploads `test-results/` as artefact on failure.
+3. All three CI jobs are gated with `concurrency` to cancel superseded runs on the same branch.
+4. `.github/workflows/release-please.yml` exists; `release-please` job uses `google-github-actions/release-please-action@v4` with `release-type: node`.
+5. `docker-publish` job in `release-please.yml` runs only when `release_created` output is `true`; pushes `ghcr.io/derfloDev/endgame-grocery:<version>` and `:latest` to GHCR using `GITHUB_TOKEN`.
+6. `package.json` root has `"version": "0.1.0"`.
+7. `README.md` shows a CI badge and has a short CI/CD workflow section.
+8. `npm run lint` passes.
+
+### Key design decisions
+
+**Playwright webServer in CI**
+`playwright.config.js` already sets `reuseExistingServer: !process.env.CI`. In CI Playwright
+starts both dev servers automatically via its `webServer` config — no manual start step needed.
+The backend dev server needs `DATABASE_URL` in env at startup, which is provided by the `.env`
+file created in the workflow.
+
+**`.env` creation in CI**
+`npm run migrate` uses `node --env-file=../.env` and fails if the file is absent. The e2e job
+creates the file from fixed test values before running migrate:
+
+```bash
+printf 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/endgame_grocery\nJWT_SECRET=ci-test-secret\nPORT=4000\n' > .env
+```
+
+**GITHUB_TOKEN permissions for Release Please (private repo)**
+The `release-please.yml` workflow must declare:
+```yaml
+permissions:
+  contents: write
+  pull-requests: write
+```
+The `docker-publish` job must declare:
+```yaml
+permissions:
+  contents: read
+  packages: write
+```
+
+### Implementation steps
+
+**Step 1 — `package.json` root — add version**
+
+```diff
+ {
+   "name": "endgame-grocery",
+   "private": true,
++  "version": "0.1.0",
+   "type": "module",
+```
+
+**Step 2 — `.github/workflows/ci.yml`**
+
+```yaml
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  e2e:
+    needs: [lint-and-build, unit-test]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: endgame_grocery
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Create environment file
+        run: |
+          printf 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/endgame_grocery\nJWT_SECRET=ci-test-secret\nPORT=4000\n' > .env
+      - name: Run database migrations
+        run: npm run migrate
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+      - name: Run E2E tests
+        run: npm run e2e
+      - name: Upload test artefacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: test-results/
+          retention-days: 7
+```
+
+**Step 3 — `.github/workflows/release-please.yml`**
+
+```yaml
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        id: release
+        with:
+          release-type: node
+
+  docker-publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/derfloDev/endgame-grocery
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.release-please.outputs.tag_name }}
+            type=raw,value=latest
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+```
+
+**Step 4 — `README.md` — CI badge + CI/CD section**
+
+Add CI badge directly below the logo image:
+```markdown
+<p align="center">
+  <img src="https://github.com/DerFloDev/endgame_grocery/actions/workflows/ci.yml/badge.svg" alt="CI" />
+</p>
+```
+
+Add a new `## CI/CD` section (after the `## Available Scripts` section) that explains:
+- CI runs lint, build, unit tests, and E2E on every push and PR
+- Release Please creates a release PR on `main`; merging it triggers a GitHub Release and pushes the Docker image to `ghcr.io/derfloDev/endgame-grocery`
+- Versioning follows Conventional Commits (feat → minor, fix → patch, feat! → major)
+
+### Files changed
+`.github/workflows/ci.yml` (new), `.github/workflows/release-please.yml` (new),
+`package.json`, `README.md`
+
+---
+
 ## Validation (all tasks)
 
 ```

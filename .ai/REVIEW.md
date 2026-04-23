@@ -111,3 +111,42 @@ Reviewed: 2026-04-23
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004 — CI/CD Pipeline (GitHub Actions + Release Please)
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-23
+
+#### Findings
+
+- **nit** — `ci.yml` lines 14–16, 29–31, 44–46: per-job `concurrency` blocks are redundant alongside the top-level workflow `concurrency` block (lines 7–9). The workflow-level block already cancels all jobs on the same branch. No functional impact.
+- **nit** — `release-please.yml` line 30: `if: ${{ needs.release-please.outputs.release_created == 'true' }}` uses explicit string comparison rather than the plan's truthy check. This is the GitHub-recommended pattern for output booleans — a minor improvement. No change required.
+
+#### Verification
+##### Steps
+1. Confirmed `.github/workflows/ci.yml` exists with exactly three jobs: `lint-and-build`, `unit-test`, `e2e`.
+2. Verified `e2e` job: postgres:16 service with health-cmd, `.env` file creation, `npm run migrate`, `npx playwright install chromium --with-deps`, `npm run e2e`, artifact upload on failure with 7-day retention.
+3. Verified workflow-level `concurrency` with `cancel-in-progress: true` covers all three jobs.
+4. Confirmed `.github/workflows/release-please.yml` with `release-please` job using `google-github-actions/release-please-action@v4`, `release-type: node`.
+5. Confirmed `docker-publish` job: gated on `release_created == 'true'`; `packages: write` permission; `GITHUB_TOKEN` for GHCR login; `docker/metadata-action@v5` with semver + `latest` tags; `docker/build-push-action@v5`.
+6. Verified `release-please.yml` top-level permissions: `contents: write`, `pull-requests: write`. `docker-publish` job-level override: `contents: read`, `packages: write`.
+7. Verified `concurrency: cancel-in-progress: false` in `release-please.yml` — correct, prevents release jobs from being killed mid-run.
+8. Confirmed `package.json` `"version": "0.1.0"`.
+9. Verified README: CI badge appears after logo image and before `# endgame_grocery` heading; `## CI/CD` section placed after `## Available Scripts`.
+10. Confirmed backend unit tests use mock pool objects — `unit-test` job correctly requires no live postgres.
+11. Ran `npm run lint` — PASS (1 pre-existing warning, 0 errors).
+##### Findings
+- All 8 acceptance criteria fully verified.
+##### Risks
+- Low: `release-please-action@v4`, `docker/login-action@v3`, `docker/metadata-action@v5`, `docker/build-push-action@v5` are pinned to major version tags, not SHA digests. A future supply-chain hardening pass should pin to SHAs.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

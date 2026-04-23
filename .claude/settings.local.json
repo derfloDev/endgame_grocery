@@ -19,7 +19,8 @@
       "Bash(npm test:*)",
       "Bash(git:*)",
       "mcp__aide__*",
-      "Bash(ls *)"
+      "Bash(ls *)",
+      "Bash(grep -rn \"describe\\\\|postgres\\\\|DATABASE_URL\\\\|supertest\" C:/develop/endgame_grocery/backend/src/*.test.js)"
     ]
   }
 }

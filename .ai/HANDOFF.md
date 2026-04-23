@@ -169,3 +169,52 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — plan — 2026-04-23T14:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned CI/CD pipeline: ci.yml (lint+build+unit-test+e2e with postgres service), release-please.yml (Release Please + GHCR Docker publish on release), package.json version field, README badge and CI/CD section |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Next Role | implement |
+
+---
+
+### T-004 — review — 2026-04-23T14:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 CI/CD: all 8 acceptance criteria verified; ci.yml and release-please.yml structurally correct; lint PASS; backend unit tests use mock pools so no postgres needed in unit-test job |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-23T13:58:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added GitHub Actions CI, Release Please, GHCR Docker publishing, package version metadata, and README CI/CD documentation |
+| Files Changed | .github/workflows/ci.yml, .github/workflows/release-please.yml, package.json, package-lock.json, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` PASS with existing react-refresh warning in frontend/src/context/AuthContext.jsx; `npm run build` PASS; static workflow checks PASS; `git diff --check` PASS |
+| Commit | `ci(github): add CI and release publishing workflows` |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-04-23T14:05:09Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-004 CI/CD workflow changes |
+| Files Changed | .github/workflows/ci.yml, .github/workflows/release-please.yml, package.json, package-lock.json, README.md, .ai/TASKS.md, .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, ROADMAP.md |
+| Validation | Review PASS recorded in .ai/HANDOFF.md |
+| Commit | `ci(github): add CI and release publishing workflows` |
+| Next Role | none |
+
+---

@@ -2,6 +2,10 @@
   <img src="endgame_grocery_logo.png" alt="Endgame Grocery" width="180" />
 </p>
 
+<p align="center">
+  <img src="https://github.com/DerFloDev/endgame_grocery/actions/workflows/ci.yml/badge.svg" alt="CI" />
+</p>
+
 # endgame_grocery
 
 Shared grocery list monorepo with a React frontend, an Express backend, and PostgreSQL persistence.
@@ -138,6 +142,14 @@ The Playwright config reuses an already-running frontend or backend dev server w
 | `npm run e2e` | Runs Playwright end-to-end tests against the full local stack. |
 | `npm run migrate` | Applies backend PostgreSQL migrations. |
 | `npm run db:seed` | Inserts demo data for local development. |
+
+## CI/CD
+
+GitHub Actions runs lint, build, unit tests, and Playwright E2E tests on every push and pull request. The E2E job provisions PostgreSQL, writes CI test environment variables, applies migrations, installs Chromium, and uploads Playwright artifacts when a run fails.
+
+Release Please runs on `main` and opens release PRs based on Conventional Commits. Merging a release PR creates a GitHub Release and publishes Docker images to `ghcr.io/derfloDev/endgame-grocery` with the release version tag and `latest`.
+
+Version bumps follow Conventional Commits: `feat` creates a minor release, `fix` creates a patch release, and breaking changes create a major release.
 
 ## Workspace Layout
 
