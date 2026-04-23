@@ -120,3 +120,52 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — plan — 2026-04-23T13:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned removal of build: block from docker-compose.example.yml in favour of pulling ghcr.io/derfloDev/endgame-grocery:latest; README Docker section updated accordingly |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Next Role | implement |
+
+---
+
+### T-003 — review — 2026-04-23T14:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 registry image switch: all 4 acceptance criteria verified, build block removed, GHCR image reference correct, README updated, lint PASS |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-23T13:37:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Switched the example Compose deployment from local image builds to the GHCR-published image and updated Docker deployment docs |
+| Files Changed | docker-compose.example.yml, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` PASS with existing react-refresh warning in frontend/src/context/AuthContext.jsx; `npm run build` PASS |
+| Commit | `docs(deployment): use the published image in example compose` |
+| Next Role | review |
+
+---
+
+### T-003 — implement — 2026-04-23T13:43:38Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-003 registry image Compose update |
+| Files Changed | docker-compose.example.yml, README.md, .ai/TASKS.md, .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md |
+| Validation | Review PASS recorded in .ai/HANDOFF.md |
+| Commit | `docs(deployment): use the published image in example compose` |
+| Next Role | none |
+
+---

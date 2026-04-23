@@ -85,10 +85,10 @@ Copy the example file and replace every `change-me` value before deploying:
 
 ```bash
 cp docker-compose.example.yml docker-compose.yml
-docker compose up --build
+docker compose up -d
 ```
 
-The app listens on `http://localhost:80`. Nginx serves the built React app, proxies `/api/*` requests to the Node.js backend inside the same container, and returns the SPA `index.html` for deep-link routes. Database migrations run automatically when the app container starts.
+Compose pulls the app image from `ghcr.io/derfloDev/endgame-grocery`. The app listens on `http://localhost:80`. Nginx serves the built React app, proxies `/api/*` requests to the Node.js backend inside the same container, and returns the SPA `index.html` for deep-link routes. Database migrations run automatically when the app container starts.
 
 The repository's checked-in `docker-compose.yml` is intentionally kept for local development and starts PostgreSQL only.
 

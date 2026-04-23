@@ -338,7 +338,59 @@ section with:
 
 ---
 
-## Validation (both tasks)
+---
+
+## T-003 — Switch example Compose to registry image
+
+### Scope
+`docker-compose.example.yml` currently has a `build:` block that builds the image from source.
+Users who want a ready-to-run deployment should pull a pre-built image from a registry instead.
+
+### Acceptance Criteria
+1. `docker-compose.example.yml` — `build:` block is removed entirely.
+2. `image:` is set to `ghcr.io/derfloDev/endgame-grocery:latest`.
+3. `README.md` Docker Deployment section — `docker compose up --build` is replaced with
+   `docker compose up -d`; a note explains that the image is pulled from
+   `ghcr.io/derfloDev/endgame-grocery`.
+4. `npm run lint` passes.
+
+### Implementation steps
+
+**`docker-compose.example.yml`**
+
+```diff
+ services:
+   app:
+-    build:
+-      context: .
+-      dockerfile: Dockerfile
+-    image: endgame-grocery:latest
++    image: ghcr.io/derfloDev/endgame-grocery:latest
+```
+
+**`README.md` — Docker Deployment section**
+
+Replace:
+```bash
+cp docker-compose.example.yml docker-compose.yml
+docker compose up --build
+```
+
+With:
+```bash
+cp docker-compose.example.yml docker-compose.yml
+docker compose up -d
+```
+
+Update the surrounding prose to reflect that the image is pulled from the GitHub Container
+Registry (`ghcr.io/derfloDev/endgame-grocery`) rather than built locally.
+
+### Files changed
+`docker-compose.example.yml`, `README.md`
+
+---
+
+## Validation (all tasks)
 
 ```
 npm run lint

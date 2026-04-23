@@ -2,10 +2,7 @@
 # Copy to docker-compose.yml and replace all "change-me" values before use.
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: endgame-grocery:latest
+    image: ghcr.io/derfloDev/endgame-grocery:latest
     ports:
       - "80:80"
     environment:

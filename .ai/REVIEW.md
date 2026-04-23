@@ -77,3 +77,37 @@ Reviewed: 2026-04-23
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-003 — Switch example Compose to registry image
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-23
+
+#### Findings
+
+- **nit** — `docker-compose.example.yml` / `README.md`: image reference `ghcr.io/derfloDev/endgame-grocery:latest` uses mixed-case username. GHCR enforces lowercase namespaces per OCI spec; Docker clients typically canonicalize to lowercase on pull, so this is likely to work transparently in practice. The value matches the plan exactly — this is a plan-level note, not an implementer deviation. No change required.
+
+#### Verification
+##### Steps
+1. Ran `git diff HEAD` for both changed files; verified changes are precisely scoped to T-003 (no unintended side effects).
+2. Confirmed `build:` block (context + dockerfile) is removed from `docker-compose.example.yml`.
+3. Confirmed `image:` is set to `ghcr.io/derfloDev/endgame-grocery:latest` (matches plan AC2 exactly).
+4. Confirmed README: `docker compose up --build` replaced with `docker compose up -d`.
+5. Confirmed README prose references `ghcr.io/derfloDev/endgame-grocery` for pull-based workflow.
+6. Ran `npm run lint` — PASS (1 pre-existing warning, 0 errors).
+7. Confirmed only 2 files changed: `docker-compose.example.yml`, `README.md` — exactly as planned.
+##### Findings
+- All 4 acceptance criteria verified. Changes are minimal and correctly scoped.
+##### Risks
+- Very low: mixed-case GHCR namespace is noted above; Docker client normalization makes this unlikely to be a live issue.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
