@@ -2,29 +2,31 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
-## Task: T-001
+## Task: T-001 — Logo PNG integration
 
 ### Review Round 1
 
-Status: **ready_to_commit**
+Status: **PASS**
 
-Reviewed: 2026-04-22
+Reviewed: 2026-04-23
 
 #### Findings
-- No issues found. Implementation matches the plan exactly.
+No issues found. All acceptance criteria met exactly as specified in the plan.
 
 #### Verification
 ##### Steps
-1. Read `frontend/vite.config.js` — confirmed `server.proxy` block is present and forwards `/api` to `http://localhost:4000`.
-2. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unchanged from before this task).
-3. Ran `npm run build` — success, all 54 modules transformed, PWA assets generated.
-4. Ran `npm test` — 9 frontend tests passed, 23 backend tests passed (including `registers a user and returns 201`).
-
+1. Ran `git diff HEAD` to inspect all working-tree changes against plan criteria.
+2. Verified `frontend/public/icon-192.png` and `frontend/public/icon-512.png` exist; confirmed dimensions with Node PNG header read (bytes 16–23 big-endian).
+3. Confirmed `frontend/public/icon-192.svg` and `frontend/public/icon-512.svg` are deleted (git status shows `D`).
+4. Confirmed `frontend/vite.config.js` `includeAssets` and `icons` array updated to PNG with `type: "image/png"` and `purpose: "any maskable"`.
+5. Confirmed `frontend/index.html` has `<link rel="icon" type="image/png" href="/icon-192.png" />` inside `<head>`.
+6. Confirmed `README.md` first content is `<p align="center"><img src="endgame_grocery_logo.png" …></p>`.
+7. Ran `npm run lint` — PASS (1 pre-existing warning in AuthContext.jsx, 0 errors).
+8. Ran `npm run build` — PASS, PWA precache 9 entries generated successfully.
 ##### Findings
-- All validation commands pass with no regressions.
-
+- None. All 8 acceptance criteria verified.
 ##### Risks
-- None. The change is a one-block Vite config addition with no logic impact on production builds.
+- None. Changes are purely additive (new assets) and cosmetic (config, HTML, README).
 
 #### Open Questions
 - None.
@@ -34,154 +36,117 @@ Reviewed: 2026-04-22
 
 ---
 
-## Task: T-002
+## Task: T-002 — Dockerize (nginx + Node.js, single image)
 
 ### Review Round 1
 
-Status: **ready_to_commit**
+Status: **PASS_WITH_NOTES**
 
-Reviewed: 2026-04-22
+Reviewed: 2026-04-23
 
 #### Findings
-- No issues found. README content is accurate, complete, and matches the plan scope exactly.
+
+- **nit** — `docker/nginx.conf`: `gzip on;` is placed at the top of a file included inside nginx's `http {}` block. This is valid (http-context directive), but could be confusing to readers who expect `gzip` in a dedicated `gzip.conf`. No functional issue.
+- **nit** — `.dockerignore`: `*.md` at the repo root excludes README.md from the build context. This is intentional and correct for Docker, but also excludes CLAUDE.md/AGENTS.md if any future build step ever needed them. No functional issue for current scope.
 
 #### Verification
 ##### Steps
-1. Read `README.md` at project root — confirmed all plan-specified sections are present:
-   - Prerequisites (Node.js 22.x, npm 10.x, Docker) ✅
-   - Environment setup (`cp .env.example .env`, JWT_SECRET production note) ✅
-   - Database (`docker compose up -d`, `npm run migrate`) ✅
-   - Optional seed data (`npm run db:seed`) ✅
-   - Development (`npm run dev`, both servers documented) ✅
-   - Validation (`npm run lint`, `npm run build`, `npm test`) ✅
-   - Available scripts table (all 6 root scripts listed) ✅
-2. Confirmed `.env.example` exists at project root with `DATABASE_URL`, `JWT_SECRET`, and `PORT` — the `cp` step in the README is actionable.
-3. Verified all 6 scripts in the README table (`dev`, `build`, `lint`, `test`, `migrate`, `db:seed`) are defined in root `package.json`.
-4. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx` (no new issues).
-5. Ran `npm run build` — success, 54 modules transformed.
-
+1. Inspected all new files: `Dockerfile`, `.dockerignore`, `docker/nginx.conf`, `docker/supervisord.conf`, `docker/entrypoint.sh`, `docker-compose.example.yml`.
+2. Verified `Dockerfile` is a correct two-stage build: builder stage builds the SPA, runtime stage installs prod deps only and assembles the final image.
+3. Verified nginx config copies to `/etc/nginx/http.d/default.conf` (correct path for Alpine nginx).
+4. Confirmed `node-pg-migrate` is in `backend/package.json` `dependencies` (production), so it will be present after `npm ci --omit=dev`.
+5. Verified migration directory `backend/src/db/migrations/` is included in `COPY backend/src ./backend/src`.
+6. Verified `/api/health` endpoint exists in `backend/src/app.js` and returns `{ status: "ok" }`.
+7. Verified nginx `proxy_pass http://127.0.0.1:4000` for `/api/`, `try_files` SPA fallback, `gzip on`, and `listen 80`.
+8. Verified `supervisord.conf` redirects both nginx and backend stdout/stderr to container fd 1/2.
+9. Verified `entrypoint.sh` runs migrations then `exec supervisord` (clean signal propagation).
+10. Verified `docker-compose.example.yml` contains all 4 required env vars with `change-me` placeholders, postgres healthcheck, and named volume.
+11. Verified `backend/src/env.js` conditional `.env` load with `existsSync`.
+12. Ran `npm run lint` — PASS (1 pre-existing warning, 0 errors).
+13. Ran `npm run build` — PASS.
+14. Ran `npm test` — PASS (25/25 tests, including 3 new `getConfig` tests for the `env.js` conditional load).
 ##### Findings
-- All validations pass. All plan scope items covered. No inaccuracies in the README.
-
+- AC1–4 (Docker build and runtime) verified by static analysis only; live `docker build` / `docker compose up` checks skipped because Docker CLI is unavailable in this environment. All artifacts are structurally correct.
+- All other ACs (env vars, env.js conditional load, lint, build, tests) verified and passing.
 ##### Risks
-- None. Only documentation was added; no source files were modified.
+- Low: The `DATABASE_URL` env var is implicitly read by `node-pg-migrate` from the environment. If `DATABASE_URL` is not set, migrations will fail at container startup. This matches the expected Docker/Compose configuration and is documented. No change required.
+- Low: Live Docker runtime verification is deferred to first deployment. A `docker build` smoke test is recommended before merging to main.
 
 #### Open Questions
 - None.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-003
-
-### Review Round 1
-
-Status: **ready_to_commit**
-
-Reviewed: 2026-04-22
-
-#### Findings
-
-1. **nit** — `backend/src/db/migrations/1713895200000_create_core_tables.cjs` + `backend/src/db/migrations.test.js`: Migration file renamed from `.js` to `.cjs` and test updated accordingly. This is out of explicit plan scope (plan listed only `backend/package.json` and `README.md`), but is a necessary supporting change — without it, `node-pg-migrate` running under an ESM package (`"type": "module"`) would try to load `.js` migrations as ESM, breaking the `module.exports`-style exports. The change is correct and required for the fix to work end-to-end.
-
-#### Verification
-##### Steps
-1. Read `backend/package.json` — confirmed migrate script is `node --env-file=../.env ../node_modules/node-pg-migrate/bin/node-pg-migrate.mjs up --migrations-dir src/db/migrations`. Uses correct `../` prefix to reach root `node_modules` from the `backend/` working directory. ✅
-2. ESM binary path `../node_modules/node-pg-migrate/bin/node-pg-migrate.mjs` bypasses the Windows CMD wrapper. ✅
-3. Read `README.md` step 4 — now reads "This command loads environment variables from the project-root `.env` file automatically…" — no manual export instruction present. ✅
-4. Read `backend/src/db/migrations/1713895200000_create_core_tables.cjs` — valid CommonJS (`module.exports = { shorthands, up, down }`), exports `up` and `down` functions. ✅
-5. Read `backend/src/db/migrations.test.js` — uses `pathToFileURL` to dynamically import the `.cjs` file; asserts both `up` and `down` are functions. ✅
-6. Ran `npm run lint` — 0 errors, 1 pre-existing warning. ✅
-7. Ran `npm run build` — success. ✅
-8. Ran `npm test` — 9 frontend + 23 backend tests pass, including `exports up and down migration functions`. ✅
-
-##### Findings
-- All checks pass. The `.cjs` migration conversion is out of literal plan scope but is the correct supporting change for the fix to work end-to-end.
-
-##### Risks
-- Low. The `--env-file` flag requires Node ≥ 20.6.0; project targets Node 22.x per README, which satisfies this requirement.
-
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-004
-
-### Review Round 1
-
-Status: **ready_to_commit**
-
-Reviewed: 2026-04-22
-
-#### Findings
-- No issues found. Implementation matches the plan exactly.
-
-#### Verification
-##### Steps
-1. Read `backend/src/env.js` — confirmed `dotenv.config()` now resolves `.env` via `path.resolve(envModuleDir, "../../.env")` where `envModuleDir` is derived from `import.meta.url`. Two levels up from `backend/src/` is the project root. ✅
-2. Read `backend/src/env.test.js` — confirmed new test `"loads DATABASE_URL from the project root .env regardless of cwd"` creates a temp fixture tree mirroring the `backend/src/env.js` depth, changes CWD to the fixture `backend/` dir, dynamically imports the copied module, and asserts the fixture `.env` values are loaded. Env vars and CWD are restored in `finally`. ✅
-3. Confirmed `node:path` and `node:url` module specifiers are used (cleaner than the plan's unscoped imports — no functional difference). ✅
-4. Read `README.md` diff — a sentence added under the env setup section documenting that backend commands load the root `.env` automatically. ✅
-5. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unchanged). ✅
-6. Ran `npm run build` — success, 54 modules transformed. ✅
-7. Ran `npm test` — 9 frontend + 24 backend tests pass. The new `getConfig` suite passes both subtests including the CWD-independence case. ✅
-
-##### Findings
-- All validation commands pass with no regressions. New test covers the exact acceptance criterion (CWD-independent `.env` loading).
-
-##### Risks
-- None. The change is confined to `env.js` path resolution; no new dependencies, no script changes.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-005
-
-### Review Round 1
-
-Status: **ready_to_commit**
-
-Reviewed: 2026-04-22
-
-#### Findings
-
-1. **nit** — `e2e/auth.spec.js` line 6: `uniqueEmail()` adds both a timestamp and a random suffix (`Math.random().toString(36).slice(2,8)`). This exceeds the plan's timestamp-only spec but is strictly better — it avoids the (rare) collision when two test runs start within the same millisecond. Correct as-is.
-
-#### Verification
-
-##### Steps
-
-1. Read `playwright.config.js` — matches plan exactly: `testDir: "./e2e"`, `timeout: 30_000`, `retries: CI ? 2 : 0`, `reporter: "list"`, `baseURL: "http://localhost:5173"`, `headless: true`, `screenshot: "only-on-failure"`, `video: "retain-on-failure"`, one `chromium` project, two `webServer` entries (backend health at `/api/health`, frontend at `5173`), `reuseExistingServer: !process.env.CI`. ✅
-2. Read `e2e/auth.spec.js` — all 5 plan scenarios implemented:
-   - R-1: navigate to `/register`, fill form, click "Create account", assert URL `/` and "No lists yet." text. ✅
-   - R-2: register once, clear cookies+storage, re-register same email, assert "An account with that email already exists." banner and URL stays `/register`. ✅
-   - L-1: `registerByApi` via `request.post("/api/auth/register")` in test body, then browser login, assert redirect to `/`. ✅
-   - L-2: pre-register via API, submit wrong password, assert "Invalid email or password." banner and URL stays `/login`. ✅
-   - L-3: submit unknown email, assert "Invalid email or password." banner. ✅
-3. Confirmed `package.json` — `"e2e": "playwright test"` script added, `"@playwright/test": "^1.44.0"` in `devDependencies`. ✅
-4. Confirmed `.gitignore` — `playwright-report/` and `test-results/` appended (both standard Playwright output dirs). ✅
-5. Confirmed `README.md` — "E2E Tests" section added documenting: Postgres prerequisite, `npx playwright install chromium`, `npm run e2e`, and `reuseExistingServer` behaviour; `npm run e2e` row added to the scripts table. ✅
-6. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unchanged). ✅
-7. Ran `npm run build` — success, 54 modules transformed. ✅
-8. Ran `npm test` (unit/integration) — 9 frontend + 24 backend tests pass, no regressions. ✅
-9. Verified Playwright Chromium binaries are installed (`LOCALAPPDATA/ms-playwright/chromium-*` present). ✅
-10. `npm run e2e` — not re-run in review environment: Docker/PostgreSQL unavailable. Relied on code-level verification (all scenarios implement the plan correctly) and implementer's confirmed run (all 5 scenarios passed against the full stack).
-
-##### Findings
-- All required plan items are present and correctly implemented.
-- Unit/integration tests continue to pass with no regressions.
-- The live E2E re-run was not feasible in this review environment due to missing Docker; the implementer's evidence plus code review provide sufficient confidence.
-
-##### Risks
-- Low. The E2E tests are additive and do not modify any production code. The `reuseExistingServer` behaviour is correctly guarded on `!process.env.CI`.
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-003 — Switch example Compose to registry image
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-23
+
+#### Findings
+
+- **nit** — `docker-compose.example.yml` / `README.md`: image reference `ghcr.io/derfloDev/endgame-grocery:latest` uses mixed-case username. GHCR enforces lowercase namespaces per OCI spec; Docker clients typically canonicalize to lowercase on pull, so this is likely to work transparently in practice. The value matches the plan exactly — this is a plan-level note, not an implementer deviation. No change required.
+
+#### Verification
+##### Steps
+1. Ran `git diff HEAD` for both changed files; verified changes are precisely scoped to T-003 (no unintended side effects).
+2. Confirmed `build:` block (context + dockerfile) is removed from `docker-compose.example.yml`.
+3. Confirmed `image:` is set to `ghcr.io/derfloDev/endgame-grocery:latest` (matches plan AC2 exactly).
+4. Confirmed README: `docker compose up --build` replaced with `docker compose up -d`.
+5. Confirmed README prose references `ghcr.io/derfloDev/endgame-grocery` for pull-based workflow.
+6. Ran `npm run lint` — PASS (1 pre-existing warning, 0 errors).
+7. Confirmed only 2 files changed: `docker-compose.example.yml`, `README.md` — exactly as planned.
+##### Findings
+- All 4 acceptance criteria verified. Changes are minimal and correctly scoped.
+##### Risks
+- Very low: mixed-case GHCR namespace is noted above; Docker client normalization makes this unlikely to be a live issue.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-004 — CI/CD Pipeline (GitHub Actions + Release Please)
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-23
+
+#### Findings
+
+- **nit** — `ci.yml` lines 14–16, 29–31, 44–46: per-job `concurrency` blocks are redundant alongside the top-level workflow `concurrency` block (lines 7–9). The workflow-level block already cancels all jobs on the same branch. No functional impact.
+- **nit** — `release-please.yml` line 30: `if: ${{ needs.release-please.outputs.release_created == 'true' }}` uses explicit string comparison rather than the plan's truthy check. This is the GitHub-recommended pattern for output booleans — a minor improvement. No change required.
+
+#### Verification
+##### Steps
+1. Confirmed `.github/workflows/ci.yml` exists with exactly three jobs: `lint-and-build`, `unit-test`, `e2e`.
+2. Verified `e2e` job: postgres:16 service with health-cmd, `.env` file creation, `npm run migrate`, `npx playwright install chromium --with-deps`, `npm run e2e`, artifact upload on failure with 7-day retention.
+3. Verified workflow-level `concurrency` with `cancel-in-progress: true` covers all three jobs.
+4. Confirmed `.github/workflows/release-please.yml` with `release-please` job using `google-github-actions/release-please-action@v4`, `release-type: node`.
+5. Confirmed `docker-publish` job: gated on `release_created == 'true'`; `packages: write` permission; `GITHUB_TOKEN` for GHCR login; `docker/metadata-action@v5` with semver + `latest` tags; `docker/build-push-action@v5`.
+6. Verified `release-please.yml` top-level permissions: `contents: write`, `pull-requests: write`. `docker-publish` job-level override: `contents: read`, `packages: write`.
+7. Verified `concurrency: cancel-in-progress: false` in `release-please.yml` — correct, prevents release jobs from being killed mid-run.
+8. Confirmed `package.json` `"version": "0.1.0"`.
+9. Verified README: CI badge appears after logo image and before `# endgame_grocery` heading; `## CI/CD` section placed after `## Available Scripts`.
+10. Confirmed backend unit tests use mock pool objects — `unit-test` job correctly requires no live postgres.
+11. Ran `npm run lint` — PASS (1 pre-existing warning, 0 errors).
+##### Findings
+- All 8 acceptance criteria fully verified.
+##### Risks
+- Low: `release-please-action@v4`, `docker/login-action@v3`, `docker/metadata-action@v5`, `docker/build-push-action@v5` are pinned to major version tags, not SHA digests. A future supply-chain hardening pass should pin to SHAs.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

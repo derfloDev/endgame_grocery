@@ -23,270 +23,207 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
-### T-001 — plan — 2026-04-22T00:00:00Z
+### T-001 — plan — 2026-04-23T12:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Identified missing Vite dev-server proxy as root cause of 404 on registration; wrote plan and task. |
-| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Summary | Planned logo integration: generate PNG icons from endgame_grocery_logo.png, replace SVG placeholders, update PWA manifest and index.html, add logo to README |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-04-22T09:15:04Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Added a Vite dev-server proxy for `/api` requests and documented the backend requirement for local development. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `README.md`, `frontend/vite.config.js` |
-| Validation | `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed |
-| Commit | `0a3554f fix(frontend): proxy dev API requests to the backend` |
-| Next Role | review |
-
----
-
-### T-001 — review — 2026-04-22T11:16:30Z
+### T-002 — plan — 2026-04-23T12:30:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Verified Vite proxy config change; all lint, build, and test checks passed with no regressions. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Summary | Planned Docker single-image deployment: nginx + Node.js via supervisord, multi-stage Dockerfile, example docker-compose, conditional env.js .env loading, README Docker section |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Next Role | implement |
+
+---
+
+### T-001 — review — 2026-04-23T14:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-001 logo integration: all 8 acceptance criteria verified, lint PASS, build PASS, PNG dimensions confirmed 192x192 and 512x512 |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-04-22T09:18:03Z
+### T-001 — implement — 2026-04-23T11:17:59Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Finalized the reviewed Vite proxy task by updating the board to done and squashing task artifacts into the release-note-ready commit. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `frontend/vite.config.js` |
-| Validation | Reused reviewed results: `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed |
-| Commit | `5ead6d0 fix(frontend): route dev API requests to the backend` |
-| Next Role | none |
-
----
-
-### T-002 — plan — 2026-04-22T00:01:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Planned root README.md covering local dev setup (env, Docker DB, migrations, dev server) to prevent silent DB-not-configured failures. |
-| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Next Role | implement |
-
----
-
-### T-002 — implement — 2026-04-22T09:26:21Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Rewrote the root README into a complete local development setup guide with prerequisites, environment setup, Docker database steps, scripts, and validation guidance. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md` |
-| Validation | `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed |
-| Commit | `PENDING` |
+| Summary | Replaced placeholder SVG PWA icons with PNGs generated from the product logo and added the logo header to README |
+| Files Changed | README.md, frontend/index.html, frontend/vite.config.js, frontend/public/icon-192.png, frontend/public/icon-512.png, frontend/public/icon-192.svg, frontend/public/icon-512.svg, endgame_grocery_logo.png, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `node -e "...PNG header..."` verified 192x192 and 512x512; `npm run lint` PASS with existing react-refresh warning in frontend/src/context/AuthContext.jsx; `npm run build` PASS |
+| Commit | `feat(frontend): use the product logo for app icons and README` |
 | Next Role | review |
 
 ---
 
-### T-002 — review — 2026-04-22T11:20:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Verified README covers all plan-specified sections accurately; all lint and build checks passed with no regressions. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Verdict | PASS |
-| Blocking Findings | none |
-| Next Role | implement |
-
----
-
-### T-002 — implement — 2026-04-22T09:30:46Z
+### T-001 — implement — 2026-04-23T11:55:12Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Finalized the reviewed README task by updating the board to done and folding the task artifacts into the release-note-ready commit. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md` |
-| Validation | Reused reviewed results: `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed |
-| Commit | `6ba1fc7 docs(readme): document the full local development setup` |
+| Summary | Committed reviewed T-001 logo integration changes |
+| Files Changed | README.md, frontend/index.html, frontend/vite.config.js, frontend/public/icon-192.png, frontend/public/icon-512.png, frontend/public/icon-192.svg, frontend/public/icon-512.svg, endgame_grocery_logo.png, .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md |
+| Validation | Review PASS recorded in .ai/HANDOFF.md |
+| Commit | `feat(frontend): use the product logo for app icons and README` |
 | Next Role | none |
 
 ---
 
-### T-003 — plan — 2026-04-22T00:02:00Z
+### T-002 — review — 2026-04-23T14:15:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Planned fix for `npm run migrate` to auto-load `.env` via Node's native `--env-file` flag, eliminating the SASL auth error caused by undefined DATABASE_URL. |
-| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Next Role | implement |
-
----
-
-### T-003 — review — 2026-04-22T11:45:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Verified migrate script auto-loads `.env` via `--env-file`, migration CJS conversion is correct, README updated accurately; all lint, build, and test checks passed. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Verdict | PASS |
-| Blocking Findings | none |
-| Next Role | implement |
-
----
-
-### T-003 — implement — 2026-04-22T09:41:13Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Updated the backend migrate script to load the root `.env` automatically and made the migration file CommonJS-compatible so `node-pg-migrate` can execute it reliably. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `backend/package.json`, `backend/src/db/migrations.test.js`, `backend/src/db/migrations/1713895200000_create_core_tables.cjs` |
-| Validation | `npm run migrate` passed with only `.env`; `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed |
-| Commit | `58ecf6f fix(backend): load .env automatically for migrations` |
-| Next Role | review |
-
----
-
-### T-003 — implement — 2026-04-22T09:45:21Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Finalized the reviewed migration task by updating the board to done and folding the task artifacts into the release-note-ready commit. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `backend/package.json`, `backend/src/db/migrations.test.js`, `backend/src/db/migrations/1713895200000_create_core_tables.cjs` |
-| Validation | Reused reviewed results: `npm run migrate` passed with only `.env`; `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed |
-| Commit | `PENDING` |
-| Next Role | none |
-
----
-
-### T-005 — plan — 2026-04-22T12:30:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Planned Playwright E2E test suite for registration and login flows; 5 scenarios covering happy paths and error states against the full stack (browser + Vite + Express + PostgreSQL). |
-| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Next Role | implement |
-
----
-
-### T-004 — plan — 2026-04-22T12:00:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Identified CWD mismatch as root cause of DATABASE_URL not loading in dev server; planned fix to resolve dotenv path relative to `import.meta.url` in `backend/src/env.js`. |
-| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Next Role | implement |
-
----
-
-### T-004 — implement — 2026-04-22T09:59:05Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Made backend env loading resolve the project-root `.env` from `backend/src/env.js`, added a regression test for CWD-independent loading, and updated the README to document the backend workspace behavior. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `backend/src/env.js`, `backend/src/env.test.js` |
-| Validation | `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed outside the sandbox after rerunning with elevated permissions because Node's test runner hits `spawn EPERM` in the sandbox; live Docker-backed dev verification was not run because `docker` is unavailable in this environment |
-| Commit | `PENDING fix(backend): load backend config from the project root .env` |
-| Next Role | review |
-
----
-
-### T-004 — review — 2026-04-22T12:10:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Verified dotenv path-resolution fix and CWD-independence regression test; all lint, build, and test checks passed with no regressions. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Verdict | PASS |
-| Blocking Findings | none |
-| Next Role | implement |
-
----
-
-### T-004 — implement — 2026-04-22T10:02:57Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Finalized the reviewed backend env-loading task by marking the board done and preparing the release-note-ready commit with the env fix, regression test, and documentation updates. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `backend/src/env.js`, `backend/src/env.test.js` |
-| Validation | Reused reviewed results: `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm test` passed (24 backend tests, including the new CWD-independence test) |
-| Commit | `PENDING fix(backend): load backend config from the project root .env` |
-| Next Role | none |
-
----
-
-### T-005 — implement — 2026-04-22T10:48:45Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Added Playwright end-to-end coverage for registration and login, wired the root E2E tooling, documented the workflow, and ignored Playwright run artifacts. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `.gitignore`, `README.md`, `e2e/auth.spec.js`, `package-lock.json`, `package.json`, `playwright.config.js` |
-| Validation | `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npx playwright install chromium` succeeded; `npm run e2e` passed all 5 Playwright auth scenarios against the full stack |
-| Commit | `PENDING test(e2e): verify registration and login flows against the full stack` |
-| Next Role | review |
-
----
-
-### T-005 — review — 2026-04-22T12:55:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Verified all 5 Playwright E2E scenarios, config, .gitignore, and README; lint, build, and unit/integration tests passed; live E2E re-run not feasible without Docker but code review plus implementer evidence confirm all scenarios correct. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Summary | Reviewed T-002 Docker deployment: all static ACs verified, lint/build/test PASS (25/25); live Docker build deferred (CLI unavailable); PASS_WITH_NOTES |
 | Verdict | PASS_WITH_NOTES |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-005 — implement — 2026-04-22T11:02:01Z
+### T-002 — implement — 2026-04-23T13:27:14Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Finalized the reviewed Playwright auth E2E task by marking the board done and preparing the release-note-ready commit with the new test suite, tooling, docs, and task artifacts. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `.gitignore`, `README.md`, `e2e/auth.spec.js`, `package-lock.json`, `package.json`, `playwright.config.js` |
-| Validation | Reused reviewed results: `npm run lint` passed with one existing warning in `frontend/src/context/AuthContext.jsx`; `npm run build` passed; `npm run e2e` passed all 5 Playwright auth scenarios against the full stack after `npx playwright install chromium` |
-| Commit | `PENDING test(e2e): verify registration and login flows against the full stack` |
+| Summary | Added a production Docker image with nginx, supervisord, automatic migrations, example Compose deployment, conditional env loading, and README deployment docs |
+| Files Changed | Dockerfile, .dockerignore, docker/nginx.conf, docker/supervisord.conf, docker/entrypoint.sh, docker-compose.example.yml, backend/src/env.js, backend/src/env.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run test --workspace backend -- src/env.test.js` initially failed before implementation and passed after; `npm run lint` PASS with existing react-refresh warning in frontend/src/context/AuthContext.jsx; `npm run build` PASS; `npm test` PASS; static Docker artifact checks PASS; Docker CLI unavailable, so docker build/compose runtime checks were not run |
+| Commit | `feat(deployment): add Docker deployment for the full stack` |
+| Next Role | review |
+
+---
+
+### T-002 — implement — 2026-04-23T13:33:40Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-002 Docker deployment changes |
+| Files Changed | Dockerfile, .dockerignore, docker/nginx.conf, docker/supervisord.conf, docker/entrypoint.sh, docker-compose.example.yml, backend/src/env.js, backend/src/env.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md |
+| Validation | Review PASS_WITH_NOTES recorded in .ai/HANDOFF.md |
+| Commit | `feat(deployment): add Docker deployment for the full stack` |
 | Next Role | none |
 
 ---
 
-### Cycle closed — fix/registration — 2026-04-22T11:04:27Z
+### T-003 — plan — 2026-04-23T13:00:00Z
 
 | Field | Value |
 |-------|-------|
-| Summary | All tasks done; cycle closed |
-| Version | fix/registration |
+| Agent | claude |
+| Summary | Planned removal of build: block from docker-compose.example.yml in favour of pulling ghcr.io/derfloDev/endgame-grocery:latest; README Docker section updated accordingly |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Next Role | implement |
 
 ---
 
-### Cycle closed — fix/registration — 2026-04-22T11:05:57Z
+### T-003 — review — 2026-04-23T14:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 registry image switch: all 4 acceptance criteria verified, build block removed, GHCR image reference correct, README updated, lint PASS |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-23T13:37:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Switched the example Compose deployment from local image builds to the GHCR-published image and updated Docker deployment docs |
+| Files Changed | docker-compose.example.yml, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` PASS with existing react-refresh warning in frontend/src/context/AuthContext.jsx; `npm run build` PASS |
+| Commit | `docs(deployment): use the published image in example compose` |
+| Next Role | review |
+
+---
+
+### T-003 — implement — 2026-04-23T13:43:38Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-003 registry image Compose update |
+| Files Changed | docker-compose.example.yml, README.md, .ai/TASKS.md, .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md |
+| Validation | Review PASS recorded in .ai/HANDOFF.md |
+| Commit | `docs(deployment): use the published image in example compose` |
+| Next Role | none |
+
+---
+
+### T-004 — plan — 2026-04-23T14:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned CI/CD pipeline: ci.yml (lint+build+unit-test+e2e with postgres service), release-please.yml (Release Please + GHCR Docker publish on release), package.json version field, README badge and CI/CD section |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Next Role | implement |
+
+---
+
+### T-004 — review — 2026-04-23T14:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 CI/CD: all 8 acceptance criteria verified; ci.yml and release-please.yml structurally correct; lint PASS; backend unit tests use mock pools so no postgres needed in unit-test job |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-23T13:58:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added GitHub Actions CI, Release Please, GHCR Docker publishing, package version metadata, and README CI/CD documentation |
+| Files Changed | .github/workflows/ci.yml, .github/workflows/release-please.yml, package.json, package-lock.json, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` PASS with existing react-refresh warning in frontend/src/context/AuthContext.jsx; `npm run build` PASS; static workflow checks PASS; `git diff --check` PASS |
+| Commit | `ci(github): add CI and release publishing workflows` |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-04-23T14:05:09Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-004 CI/CD workflow changes |
+| Files Changed | .github/workflows/ci.yml, .github/workflows/release-please.yml, package.json, package-lock.json, README.md, .ai/TASKS.md, .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, ROADMAP.md |
+| Validation | Review PASS recorded in .ai/HANDOFF.md |
+| Commit | `ci(github): add CI and release publishing workflows` |
+| Next Role | none |
+
+---
+
+### Cycle closed — chore/dockerize — 2026-04-23T14:06:10Z
 
 | Field | Value |
 |-------|-------|
 | Summary | All tasks done; cycle closed |
-| Version | fix/registration |
+| Version | chore/dockerize |
 
 ---

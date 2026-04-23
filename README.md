@@ -1,3 +1,11 @@
+<p align="center">
+  <img src="endgame_grocery_logo.png" alt="Endgame Grocery" width="180" />
+</p>
+
+<p align="center">
+  <img src="https://github.com/DerFloDev/endgame_grocery/actions/workflows/ci.yml/badge.svg" alt="CI" />
+</p>
+
 # endgame_grocery
 
 Shared grocery list monorepo with a React frontend, an Express backend, and PostgreSQL persistence.
@@ -67,6 +75,36 @@ During local development, the frontend Vite server proxies `/api` requests to `h
 
 Open `http://localhost:5173/register` and create an account. If the environment file, database container, and migrations are in place, the registration request should succeed and the app should redirect into the protected grocery list UI.
 
+## Docker Deployment
+
+Use the example Compose file when you want to run the production-style single app container with PostgreSQL.
+
+### Prerequisites
+
+- Docker Desktop or Docker Engine with Docker Compose support
+
+### Start the stack
+
+Copy the example file and replace every `change-me` value before deploying:
+
+```bash
+cp docker-compose.example.yml docker-compose.yml
+docker compose up -d
+```
+
+Compose pulls the app image from `ghcr.io/derfloDev/endgame-grocery`. The app listens on `http://localhost:80`. Nginx serves the built React app, proxies `/api/*` requests to the Node.js backend inside the same container, and returns the SPA `index.html` for deep-link routes. Database migrations run automatically when the app container starts.
+
+The repository's checked-in `docker-compose.yml` is intentionally kept for local development and starts PostgreSQL only.
+
+### Environment variables
+
+| Variable | Purpose | Example |
+| --- | --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string used by migrations and the backend. | `postgres://postgres:change-me@postgres:5432/endgame_grocery` |
+| `JWT_SECRET` | Secret used to sign authentication tokens. Replace with a strong random value. | `change-me-strong-random-value` |
+| `PORT` | Internal backend port that nginx proxies to. | `4000` |
+| `JWT_EXPIRES_IN` | JWT lifetime accepted by the backend. | `7d` |
+
 ## Validation
 
 Run these checks before merging changes:
@@ -104,6 +142,14 @@ The Playwright config reuses an already-running frontend or backend dev server w
 | `npm run e2e` | Runs Playwright end-to-end tests against the full local stack. |
 | `npm run migrate` | Applies backend PostgreSQL migrations. |
 | `npm run db:seed` | Inserts demo data for local development. |
+
+## CI/CD
+
+GitHub Actions runs lint, build, unit tests, and Playwright E2E tests on every push and pull request. The E2E job provisions PostgreSQL, writes CI test environment variables, applies migrations, installs Chromium, and uploads Playwright artifacts when a run fails.
+
+Release Please runs on `main` and opens release PRs based on Conventional Commits. Merging a release PR creates a GitHub Release and publishes Docker images to `ghcr.io/derfloDev/endgame-grocery` with the release version tag and `latest`.
+
+Version bumps follow Conventional Commits: `feat` creates a minor release, `fix` creates a patch release, and breaking changes create a major release.
 
 ## Workspace Layout
 
