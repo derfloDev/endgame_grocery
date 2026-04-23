@@ -1,0 +1,37 @@
+# Example full-stack deployment.
+# Copy to docker-compose.yml and replace all "change-me" values before use.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: endgame-grocery:latest
+    ports:
+      - "80:80"
+    environment:
+      DATABASE_URL: postgres://postgres:change-me@postgres:5432/endgame_grocery
+      JWT_SECRET: change-me-strong-random-value
+      PORT: 4000
+      JWT_EXPIRES_IN: 7d
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: endgame_grocery
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: change-me
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

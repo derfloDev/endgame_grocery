@@ -82,3 +82,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-04-23T14:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 Docker deployment: all static ACs verified, lint/build/test PASS (25/25); live Docker build deferred (CLI unavailable); PASS_WITH_NOTES |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-23T13:27:14Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added a production Docker image with nginx, supervisord, automatic migrations, example Compose deployment, conditional env loading, and README deployment docs |
+| Files Changed | Dockerfile, .dockerignore, docker/nginx.conf, docker/supervisord.conf, docker/entrypoint.sh, docker-compose.example.yml, backend/src/env.js, backend/src/env.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run test --workspace backend -- src/env.test.js` initially failed before implementation and passed after; `npm run lint` PASS with existing react-refresh warning in frontend/src/context/AuthContext.jsx; `npm run build` PASS; `npm test` PASS; static Docker artifact checks PASS; Docker CLI unavailable, so docker build/compose runtime checks were not run |
+| Commit | `feat(deployment): add Docker deployment for the full stack` |
+| Next Role | review |
+
+---
+
+### T-002 — implement — 2026-04-23T13:33:40Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-002 Docker deployment changes |
+| Files Changed | Dockerfile, .dockerignore, docker/nginx.conf, docker/supervisord.conf, docker/entrypoint.sh, docker-compose.example.yml, backend/src/env.js, backend/src/env.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md |
+| Validation | Review PASS_WITH_NOTES recorded in .ai/HANDOFF.md |
+| Commit | `feat(deployment): add Docker deployment for the full stack` |
+| Next Role | none |
+
+---

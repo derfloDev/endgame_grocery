@@ -71,6 +71,36 @@ During local development, the frontend Vite server proxies `/api` requests to `h
 
 Open `http://localhost:5173/register` and create an account. If the environment file, database container, and migrations are in place, the registration request should succeed and the app should redirect into the protected grocery list UI.
 
+## Docker Deployment
+
+Use the example Compose file when you want to run the production-style single app container with PostgreSQL.
+
+### Prerequisites
+
+- Docker Desktop or Docker Engine with Docker Compose support
+
+### Start the stack
+
+Copy the example file and replace every `change-me` value before deploying:
+
+```bash
+cp docker-compose.example.yml docker-compose.yml
+docker compose up --build
+```
+
+The app listens on `http://localhost:80`. Nginx serves the built React app, proxies `/api/*` requests to the Node.js backend inside the same container, and returns the SPA `index.html` for deep-link routes. Database migrations run automatically when the app container starts.
+
+The repository's checked-in `docker-compose.yml` is intentionally kept for local development and starts PostgreSQL only.
+
+### Environment variables
+
+| Variable | Purpose | Example |
+| --- | --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string used by migrations and the backend. | `postgres://postgres:change-me@postgres:5432/endgame_grocery` |
+| `JWT_SECRET` | Secret used to sign authentication tokens. Replace with a strong random value. | `change-me-strong-random-value` |
+| `PORT` | Internal backend port that nginx proxies to. | `4000` |
+| `JWT_EXPIRES_IN` | JWT lifetime accepted by the backend. | `7d` |
+
 ## Validation
 
 Run these checks before merging changes:

@@ -1,0 +1,10 @@
+node_modules
+**/node_modules
+.env
+frontend/dist
+backend/dist
+test-results
+.ai
+e2e
+*.md
+.git
