@@ -272,3 +272,63 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | implement |
 
 ---
+
+### T-008 — plan — 2026-04-24T17:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned 4 Playwright E2E tests for shopping list CRUD flows (create list, add item, delete via swipe, mark done) plus a fix for broken auth.spec.js assertions from the T-004 redesign |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-009 — plan — 2026-04-24T17:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned spacing-scale tokens (--space-1 through --space-12) in tokens.css and 11 targeted spacing fixes in index.css to resolve full-app audit findings; Tailwind evaluated and rejected for this cycle in favour of Option B (spacing tokens + CSS fixes) |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-008 — review — 2026-04-24T17:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-008 shopping list CRUD E2E tests; all 4 new list tests and all 5 auth tests pass; auth.spec.js assertions correctly fixed; all validations pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-008 — IMPLEMENT — 2026-04-24T15:42:10.8218950Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added Playwright end-to-end coverage for shopping-list CRUD flows and aligned the auth overview assertions with the redesigned empty state copy. |
+| Files Changed | README.md, .ai/TASKS.md, .ai/HANDOFF.md, e2e/auth.spec.js, e2e/lists.spec.js |
+| Validation | `npm run lint` passed with the existing AuthContext Fast Refresh warning; `npm run e2e` passed all 9 tests; `npm run build` passed; `npm test` passed. |
+| Commit | `test(e2e): add shopping list CRUD end-to-end tests` |
+| Next Role | review |
+
+---
+
+### T-008 — commit_task — 2026-04-24T15:58:58.4118736Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-008 done after review approval and committed the reviewed Playwright shopping-list CRUD coverage. |
+| Files Changed | .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, e2e/auth.spec.js, e2e/lists.spec.js |
+| Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run lint`, `npm run e2e`, `npm run build`, and `npm test`. |
+| Commit | `test(e2e): add shopping list CRUD end-to-end tests` |
+| Next Role | implement |
+
+---

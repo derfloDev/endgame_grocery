@@ -1305,6 +1305,263 @@ import ShareListSheet from '../components/ShareListSheet';
 
 ---
 
+## T-008 — E2E Tests: Shopping List CRUD
+
+### Objective
+Add four Playwright end-to-end tests covering the core shopping-list flows: create list, add item, delete item (swipe), and mark item as done. Also fix two existing `auth.spec.js` assertions that reference old overview copy removed in T-004.
+
+### Files to change / create
+
+| File | Action |
+|------|--------|
+| `e2e/lists.spec.js` | **NEW** — 4 shopping list E2E tests |
+| `e2e/auth.spec.js` | Fix 2 broken `getByText("No lists yet…")` assertions |
+
+### Context: available selectors (no component changes needed)
+
+| Element | Locator |
+|---------|---------|
+| FAB (overview + detail) | `getByRole("button", { name: "Add" })` — `aria-label="Add"` already set |
+| NewListSheet input | `getByLabel("New list")` — `<label htmlFor="new-list-sheet-name">New list</label>` |
+| NewListSheet submit | `getByRole("button", { name: "Create list" })` |
+| AddItemSheet input | `getByLabel("Add item")` — `<label htmlFor="add-item-sheet-text">Add item</label>` |
+| AddItemSheet submit | `getByRole("button", { name: "Add Item" })` |
+| Toggle-done button | `getByRole("button", { name: "Mark {text} done" })` — dynamic aria-label |
+| Toggle-open button | `getByRole("button", { name: "Mark {text} open" })` |
+| Entry row (normal) | `.entry-row` — also has `data-testid="entry-row-{id}"` |
+| Entry row (done) | `.entry-row.entry-row-done` |
+| Done text | `.entry-row-text-done` containing the item text |
+| Auth token key | `"endgame_grocery.auth_token"` in `localStorage` |
+
+### auth.spec.js fix
+
+Two tests check for the old combined overview copy string that no longer exists after T-004:
+
+```js
+// OLD — fails: EmptyState renders title and body in separate elements
+await expect(page.getByText("No lists yet. Create one to get started.")).toBeVisible();
+
+// NEW — matches the EmptyState title element
+await expect(page.getByText("No lists yet")).toBeVisible();
+```
+
+Both occurrences (in the "registers a new user" test and the "logs in an existing user" test) must be updated.
+
+### lists.spec.js — full implementation
+
+```js
+import { expect, test } from "@playwright/test";
+
+const STORAGE_KEY = "endgame_grocery.auth_token";
+const TEST_PASSWORD = "password123";
+
+function uniqueEmail(prefix) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}@e2e.test`;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Register a user via API, log in via API, inject the JWT into localStorage
+ * and navigate to the overview. Returns the token for subsequent API calls.
+ */
+async function setupLoggedInUser(page, request) {
+  const email = uniqueEmail("lists");
+
+  const regRes = await request.post("/api/auth/register", {
+    data: { display_name: "List Tester", email, password: TEST_PASSWORD }
+  });
+  expect(regRes.ok()).toBeTruthy();
+
+  const loginRes = await request.post("/api/auth/login", {
+    data: { email, password: TEST_PASSWORD }
+  });
+  expect(loginRes.ok()).toBeTruthy();
+  const { token } = await loginRes.json();
+
+  // Navigate to the app origin first, inject the token, then reload
+  // so the AuthProvider reads it and renders the protected overview.
+  await page.goto("/");
+  await page.evaluate(
+    ({ key, value }) => localStorage.setItem(key, value),
+    { key: STORAGE_KEY, value: token }
+  );
+  await page.goto("/");
+  await page.waitForURL("/");
+
+  return { token };
+}
+
+/** Create a shopping list via API. Returns the created list object. */
+async function createListByApi(request, token, name) {
+  const res = await request.post("/api/lists", {
+    data: { name },
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  expect(res.ok()).toBeTruthy();
+  return (await res.json()).list;
+}
+
+/** Create an entry on a list via API. Returns the created entry object. */
+async function createEntryByApi(request, token, listId, text) {
+  const res = await request.post(`/api/lists/${listId}/entries`, {
+    data: { text },
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  expect(res.ok()).toBeTruthy();
+  return (await res.json()).entry;
+}
+
+/**
+ * Simulate a left swipe on the entry row containing `entryText` by dispatching
+ * synthetic TouchEvents. The swipe distance (95 px) exceeds the 80 px delete
+ * threshold in EntryRow's handleTouchEnd.
+ */
+async function swipeEntryLeft(page, entryText) {
+  const row = page.locator(".entry-row").filter({ hasText: entryText });
+  const box = await row.boundingBox();
+
+  await row.evaluate(
+    (el, { sx, ex, y }) => {
+      const makeTouch = (x) =>
+        new Touch({
+          identifier: 1,
+          target: el,
+          clientX: x,
+          clientY: y,
+          radiusX: 1,
+          radiusY: 1,
+          rotationAngle: 0,
+          force: 1
+        });
+
+      el.dispatchEvent(
+        new TouchEvent("touchstart", {
+          bubbles: true,
+          cancelable: true,
+          touches: [makeTouch(sx)],
+          changedTouches: [makeTouch(sx)]
+        })
+      );
+      el.dispatchEvent(
+        new TouchEvent("touchmove", {
+          bubbles: true,
+          cancelable: true,
+          touches: [makeTouch(ex)],
+          changedTouches: [makeTouch(ex)]
+        })
+      );
+      el.dispatchEvent(
+        new TouchEvent("touchend", {
+          bubbles: true,
+          cancelable: true,
+          touches: [],
+          changedTouches: [makeTouch(ex)]
+        })
+      );
+    },
+    {
+      sx: box.x + box.width - 20,  // start near right edge
+      ex: box.x + box.width - 115, // end 95 px to the left (> 80 px threshold)
+      y: box.y + box.height / 2
+    }
+  );
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+test.describe("shopping lists", () => {
+
+  test("creates a new shopping list", async ({ page, request }) => {
+    await setupLoggedInUser(page, request);
+
+    const listName = `Mission ${Date.now()}`;
+
+    // Open NewListSheet via FAB
+    await page.getByRole("button", { name: "Add" }).click();
+    await expect(page.getByText("New List")).toBeVisible();
+
+    // Fill name and submit
+    await page.getByLabel("New list").fill(listName);
+    await page.getByRole("button", { name: "Create list" }).click();
+
+    // List card with the new name appears on the overview
+    await expect(page.getByText(listName)).toBeVisible();
+  });
+
+  test("adds an item to a shopping list", async ({ page, request }) => {
+    const { token } = await setupLoggedInUser(page, request);
+    const list = await createListByApi(request, token, "Avengers Pantry");
+
+    await page.goto(`/lists/${list.id}`);
+
+    const itemText = `Mjolnir ${Date.now()}`;
+
+    // Open AddItemSheet via FAB
+    await page.getByRole("button", { name: "Add" }).click();
+    await expect(page.getByText("Add Item")).toBeVisible();
+
+    await page.getByLabel("Add item").fill(itemText);
+    await page.getByRole("button", { name: "Add Item" }).click();
+
+    // Entry row with the item text appears
+    await expect(page.getByText(itemText)).toBeVisible();
+  });
+
+  test("deletes an item from a shopping list via swipe", async ({ page, request }) => {
+    const { token } = await setupLoggedInUser(page, request);
+    const list = await createListByApi(request, token, "Quantum Realm Groceries");
+    const itemText = `Pym Particles ${Date.now()}`;
+    await createEntryByApi(request, token, list.id, itemText);
+
+    await page.goto(`/lists/${list.id}`);
+
+    // Entry is visible before deletion
+    await expect(page.getByText(itemText)).toBeVisible();
+
+    // Swipe left past the 80 px threshold to trigger deletion
+    await swipeEntryLeft(page, itemText);
+
+    // Entry is no longer rendered
+    await expect(page.getByText(itemText)).not.toBeVisible();
+  });
+
+  test("marks an item as done in a shopping list", async ({ page, request }) => {
+    const { token } = await setupLoggedInUser(page, request);
+    const list = await createListByApi(request, token, "Endgame Checklist");
+    const itemText = `Infinity Stone ${Date.now()}`;
+    await createEntryByApi(request, token, list.id, itemText);
+
+    await page.goto(`/lists/${list.id}`);
+
+    // Toggle button starts with "Mark … done" label (item is open)
+    const toggleBtn = page.getByRole("button", { name: `Mark ${itemText} done` });
+    await expect(toggleBtn).toBeVisible();
+
+    await toggleBtn.click();
+
+    // Label flips to "open" → item is in done state
+    await expect(
+      page.getByRole("button", { name: `Mark ${itemText} open` })
+    ).toBeVisible();
+
+    // Text has the done (strikethrough) class applied
+    await expect(
+      page.locator(".entry-row-text-done", { hasText: itemText })
+    ).toBeVisible();
+  });
+
+});
+```
+
+### Validation
+- `npm run e2e` — all 9 tests pass (5 existing auth + 4 new lists)
+
+### Commit message
+`test(e2e): add shopping list CRUD end-to-end tests`
+
+---
+
 ## Cross-cutting notes
 
 ### OfflineBanner
@@ -1315,3 +1572,57 @@ The smoke test renders `<App />`. After T-001 the `BottomNav` uses `useLocation`
 
 ### Existing light-theme CSS classes
 Old classes (`.button-primary`, `.button-secondary`, `.field`, `.pill`, etc.) in `index.css` may be left as non-conflicting stubs until all pages are fully migrated. They will be visually overridden once all pages switch to `eg-*` classes.
+
+---
+
+## T-009 — Spacing-scale tokens & consistency fixes
+
+### Objective
+Introduce a formal 4-px-based spacing scale in `tokens.css` and fix eleven specific spacing inconsistencies found in the full-app audit. No layout changes — only padding, margin, gap, and border-radius corrections.
+
+Approach chosen: **Option B** — add spacing custom properties to `tokens.css` and update the specific properties in `index.css`. Tailwind was evaluated but rejected for this cycle due to migration cost across 20+ JSX files and complex neon gradient arbitrary-value requirements.
+
+### Files to change
+
+| File | Action |
+|------|--------|
+| `frontend/src/styles/tokens.css` | Add `--space-*` scale |
+| `frontend/src/index.css` | Fix 11 spacing properties |
+
+### tokens.css — spacing scale to append inside `:root`
+
+```css
+  /* Spacing scale (4px base grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+```
+
+### index.css — 11 targeted fixes
+
+| Selector | Property | Old value | New value | Rationale |
+|----------|----------|-----------|-----------|-----------|
+| `.loading-state` | `padding` | `16px` | `0` | LoadingState is already centered via flex parent; padding creates asymmetric gap |
+| `.bottom-sheet` | `padding` | `20px 20px 48px` | `var(--space-5) var(--space-4) var(--space-12)` | Align horizontal padding to 16px grid; 48px bottom keeps FAB clearance |
+| `.list-card-name` | `margin-bottom` | `10px` | `var(--space-2)` | 8px matches 4px grid |
+| `.member-row` | `padding` | `10px 0` | `var(--space-3) 0` | 12px matches 4px grid |
+| `.list-option-row` | `padding` | `14px 12px` | `var(--space-3)` | Uniform 12px all sides for touch target |
+| `.overview-toggle` | `padding` | `0 16px 14px` | `0 var(--space-4) var(--space-3)` | Bottom drops to 12px grid value |
+| `.share-sheet-members-label` | `padding` | `8px 0 6px` | `var(--space-2) 0` | Symmetric 8px top/bottom |
+| `.entry-row-edit-actions` | `margin-top` | `4px` | `0` | Parent `.entry-row-edit` already has `gap: 12px`; the extra 4px pushes total to 16px inconsistently |
+| `.auth-logo` | `border-radius` | `10px` | `var(--radius-md)` | Use token instead of magic number |
+| `.overview-logo` | `border-radius` | `10px` | `var(--radius-md)` | Use token instead of magic number |
+| `.field, .eg-field` | `gap` | `0.4rem` | `6px` | Explicit pixel value on 4px-adjacent grid |
+
+### Validation
+- `npm run lint` — passes
+- `npm run build` — passes
+- `npm test` — passes (spacing fixes are CSS-only, no test assertions change)
+
+### Commit message
+`fix(ui): add spacing-scale tokens and fix spacing inconsistencies`

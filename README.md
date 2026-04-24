@@ -115,7 +115,7 @@ Run these checks before merging changes:
 
 ## E2E Tests
 
-Playwright E2E coverage exercises the registration and login flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first.
+Playwright E2E coverage exercises the registration, login, and core shopping-list CRUD flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first.
 
 Install the Chromium browser once:
 

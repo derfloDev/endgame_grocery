@@ -394,3 +394,64 @@ No blocking, major, or minor findings.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-008 — E2E Tests: Shopping List CRUD
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — `lists.spec.js` adds `test.use({ hasTouch: true })` (line 10). The plan did not mention this, but it is essential: Playwright skips touch-event dispatch by default in Chromium without this flag. Without it the swipe test would pass vacuously (no events fired). Positive addition.
+- **nit** — `swipeEntryLeft` includes `pageX`, `pageY`, `screenX`, `screenY` fields in the `Touch` constructor beyond the plan spec. These improve cross-browser Touch compatibility. Positive.
+- **nit** — Sheet locators use `getByRole("dialog", { name: "..." })` rather than the plan's `getByText(...)`. Querying by ARIA dialog role and accessible name is strictly more robust. Positive.
+- **nit** — `auth.spec.js` fix correctly targets both occurrences and uses `"No lists yet"` (without the ellipsis) to match the `EmptyState` title rendered by T-004. Correct.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-008 confirmed `ready_for_review`.
+2. Re-read T-008 section of `.ai/PLAN.md`.
+3. Read `e2e/lists.spec.js` and `e2e/auth.spec.js` in full.
+4. Verified T-008 acceptance criteria point-by-point (see table below).
+5. Ran `npm run lint` → **0 errors** (1 pre-existing Fast Refresh warning in `AuthContext.jsx`).
+6. Ran `npm run build` → **clean** (975 kB precache, within Workbox limit).
+7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
+8. Ran `npm run e2e` → **9/9 tests pass** (5 auth + 4 lists, 17 s).
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| `e2e/lists.spec.js` — creates a new shopping list | ✅ test at line 118; FAB → NewListSheet dialog → fill name → submit → card appears |
+| `e2e/lists.spec.js` — adds an item to a shopping list | ✅ test at line 133; API-created list → navigate → FAB → AddItemSheet dialog → fill → submit → row appears |
+| `e2e/lists.spec.js` — deletes an item via swipe | ✅ test at line 151; API-created entry → swipe 95 px left (> 80 px threshold) → row gone |
+| `e2e/lists.spec.js` — marks an item as done | ✅ test at line 166; toggle button label flips; `.entry-row-text-done` class applied |
+| `auth.spec.js` "registers" assertion fixed | ✅ line 44: `getByText("No lists yet")` |
+| `auth.spec.js` "logs in" assertion fixed | ✅ line 93: `getByText("No lists yet")` |
+| `npm run e2e` passes all 9 tests | ✅ 9 passed (17.0 s) |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
+
+**Implementation quality:**
+- `setupLoggedInUser` injects the JWT via `localStorage` and reloads — fast, deterministic, avoids re-testing the auth UI flow.
+- `createListByApi` / `createEntryByApi` set up test fixtures via API — eliminates UI flakiness in precondition steps.
+- `swipeEntryLeft` dispatches three synthetic `TouchEvent`s (`touchstart` → `touchmove` → `touchend`) with correct `touches`/`changedTouches`/`targetTouches` arrays, matching `EntryRow`'s handler signature.
+
+##### Risks
+
+- Swipe test depends on the `.entry-row` CSS selector and the 80 px `clientX` delta threshold in `EntryRow`. If either changes, the test needs updating. Acceptable for current scope.
+- E2E tests create real database rows with no teardown. Matches existing `auth.spec.js` pattern; appropriate for this integration environment.
+
+#### Verdict
+`PASS`
