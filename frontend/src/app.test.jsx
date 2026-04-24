@@ -260,7 +260,7 @@ describe("authentication shell", () => {
     expect(screen.getByText("Shared · Alex")).toBeTruthy();
   });
 
-  it("adds, toggles, edits, and deletes entries in list detail", async () => {
+  it("adds, toggles, edits, and collapses done entries in the redesigned list detail", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch
       .mockResolvedValueOnce({
@@ -316,33 +316,46 @@ describe("authentication shell", () => {
 
     renderApp(["/lists/list-1"]);
 
-    expect(await screen.findByText("Milk")).toBeTruthy();
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Share list" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
+
+    expect(screen.getByText("OPEN ITEMS")).toBeTruthy();
+    expect(screen.getByText("DONE")).toBeTruthy();
+    expect(screen.getByText("Milk")).toBeTruthy();
     expect(screen.getByText("Bread")).toBeTruthy();
 
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(await screen.findByRole("dialog", { name: "Add Item" })).toBeTruthy();
+
     await userEvent.type(screen.getByLabelText("Add item"), "Coffee");
-    await userEvent.keyboard("{Enter}");
+    await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
     expect(await screen.findByText("Coffee")).toBeTruthy();
 
-    await userEvent.click(screen.getAllByRole("button", { name: "Done" })[0]);
-    expect(await screen.findAllByText("Milk")).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
+    expect(await screen.findByRole("button", { name: "Mark Milk open" })).toBeTruthy();
 
-    await userEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
-    const editInput = screen.getByLabelText("Edit entry");
+    await userEvent.click(screen.getByRole("button", { name: "Edit Coffee" }));
+    const editInput = screen.getByLabelText("Edit Coffee");
     await userEvent.clear(editInput);
     await userEvent.type(editInput, "Ground coffee");
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save item" }));
 
     expect(await screen.findByText("Ground coffee")).toBeTruthy();
 
-    await userEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Toggle done items" }));
 
-    await waitFor(() => {
-      expect(screen.queryByText("Ground coffee")).toBeNull();
-    });
+    expect(screen.queryByText("Bread")).toBeNull();
+    expect(screen.queryByText("Milk")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Toggle done items" }));
+    expect(await screen.findByText("Bread")).toBeTruthy();
+    expect(screen.getByText("Milk")).toBeTruthy();
   });
 
-  it("shares a list from detail and revokes a member", async () => {
+  it("shares a list from the redesigned detail view and revokes a member", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch
       .mockResolvedValueOnce({
@@ -391,11 +404,11 @@ describe("authentication shell", () => {
 
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
 
-    await userEvent.click(screen.getByRole("button", { name: "Manage sharing" }));
-    expect(await screen.findByRole("heading", { name: "Share list" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Share list" }));
+    expect(await screen.findByText("SQUAD")).toBeTruthy();
 
     await userEvent.type(screen.getByLabelText("Share with email"), "alex@example.com");
-    await userEvent.click(screen.getByRole("button", { name: "Add member" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add Member" }));
 
     expect(await screen.findByText("Alex")).toBeTruthy();
 
@@ -404,6 +417,32 @@ describe("authentication shell", () => {
     await waitFor(() => {
       expect(screen.queryByText("Alex")).toBeNull();
     });
+  });
+
+  it("shows the redesigned list detail loading and error states", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+
+    let rejectFetch;
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+        })
+      })
+      .mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectFetch = reject;
+      })
+      );
+
+    renderApp(["/lists/list-1"]);
+
+    expect(await screen.findByLabelText("Loading")).toBeTruthy();
+
+    rejectFetch(new Error("Load failed"));
+
+    expect(await screen.findByText("Load failed")).toBeTruthy();
   });
 
   it("shows cached lists while offline and displays the offline banner", async () => {

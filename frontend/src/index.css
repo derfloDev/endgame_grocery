@@ -652,6 +652,22 @@ p {
   padding: 0 16px;
 }
 
+.detail-page {
+  padding-bottom: 120px;
+}
+
+.detail-content {
+  padding: 0 16px;
+}
+
+.detail-meta {
+  margin-bottom: 12px;
+}
+
+.detail-banner {
+  margin-bottom: 12px;
+}
+
 .list-card-home {
   margin-bottom: 10px;
   cursor: pointer;
@@ -716,6 +732,101 @@ p {
 
 .list-card-menu-actions {
   margin-top: 8px;
+}
+
+.add-item-form {
+  display: grid;
+  gap: 16px;
+}
+
+.entry-row-wrapper {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 8px;
+  border-radius: var(--radius-md);
+}
+
+.entry-delete-zone {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: rgba(255, 69, 96, 0.2);
+}
+
+.entry-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid rgba(139, 43, 226, 0.2);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.entry-row-done {
+  border-color: rgba(0, 229, 176, 0.15);
+}
+
+.entry-row-edit {
+  display: grid;
+  gap: 12px;
+}
+
+.entry-row-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.entry-row-text {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-base);
+}
+
+.entry-row-text-done {
+  color: var(--text-disabled);
+  text-decoration: line-through;
+}
+
+.entry-row-chip {
+  margin-top: 8px;
+}
+
+.entry-icon-btn {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.entry-icon-btn:hover {
+  border-color: rgba(139, 43, 226, 0.25);
+  background: rgba(20, 24, 50, 0.7);
+  box-shadow: none;
+}
+
+.entry-row-edit-actions {
+  margin-top: 4px;
+}
+
+.detail-section-label {
+  color: var(--text-secondary);
+  font-family: "Orbitron", sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.detail-section-label-done {
+  color: var(--color-success);
+}
+
+.detail-section-label-share {
+  color: var(--neon-violet);
 }
 
 .stack {
@@ -786,6 +897,77 @@ p {
 .entry-text-done {
   color: var(--text-disabled);
   text-decoration: line-through;
+}
+
+.entry-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px 0 8px;
+}
+
+.entry-section-collapse {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.entry-section-collapse .eg-chip-success {
+  margin-left: auto;
+}
+
+.sharing-panel-form {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.member-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.member-row:first-of-type {
+  border-top: 0;
+}
+
+.member-row-copy {
+  min-width: 0;
+}
+
+.member-row-name {
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.member-row-email {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.member-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: end;
+  gap: 8px;
+}
+
+.member-row-revoke {
+  padding: 6px 12px;
+  font-size: 13px;
 }
 
 .card-title {

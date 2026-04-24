@@ -160,6 +160,18 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-005 — review — 2026-04-24T16:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 list detail page redesign; all acceptance criteria met, swipe-to-delete confirmed, all validations pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-004 — IMPLEMENT — 2026-04-24T12:17:11Z
 
 | Field | Value |
@@ -182,6 +194,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/components/ListCardHome.jsx, frontend/src/components/NewListSheet.jsx, frontend/src/components/ui/BottomSheet.jsx, frontend/src/index.css, frontend/src/pages/OverviewPage.jsx |
 | Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run test --workspace frontend -- src/app.test.jsx`, `npm run lint`, `npm run build`, and `npm test`. |
 | Commit | `feat(ui): redesign overview page as Endgame home screen` |
+| Next Role | implement |
+
+---
+
+### T-005 — IMPLEMENT — 2026-04-24T14:36:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Redesigned the list detail screen with a sticky top bar, share action, bottom-sheet add-item flow, swipeable neon entry rows, collapsible done items, and an owner-only squad panel. |
+| Files Changed | README.md, .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/app.test.jsx, frontend/src/components/AddItemSheet.jsx, frontend/src/components/EntryRow.jsx, frontend/src/components/entry-row.test.jsx, frontend/src/index.css, frontend/src/pages/ListDetailPage.jsx |
+| Validation | `npm run test --workspace frontend -- src/app.test.jsx` failed before implementation on the old list-detail UI, then passed after implementation; `npm run test --workspace frontend -- src/components/entry-row.test.jsx` passed after implementation; `npm run lint` passed with the existing AuthContext Fast Refresh warning; `npm run build` passed; `npm test` passed. |
+| Commit | `feat(ui): redesign list detail page with neon theme and swipe-to-delete` |
+| Next Role | review |
+
+---
+
+### T-005 — commit_task — 2026-04-24T14:41:39Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-005 done after review approval and committed the reviewed list detail page redesign. |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/components/AddItemSheet.jsx, frontend/src/components/EntryRow.jsx, frontend/src/components/entry-row.test.jsx, frontend/src/index.css, frontend/src/pages/ListDetailPage.jsx |
+| Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run test --workspace frontend -- src/app.test.jsx`, `npm run test --workspace frontend -- src/components/entry-row.test.jsx`, `npm run lint`, `npm run build`, and `npm test`. |
+| Commit | `feat(ui): redesign list detail page with neon theme and swipe-to-delete` |
 | Next Role | implement |
 
 ---

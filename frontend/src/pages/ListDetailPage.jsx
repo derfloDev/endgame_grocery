@@ -1,30 +1,32 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
 import { createEntry, deleteEntry, fetchEntries, updateEntry } from "../api/entries";
 import { writeCachedResource } from "../api/offlineStore";
 import { fetchLists } from "../api/lists";
 import { fetchListMembers, revokeListMember, shareListWithMember } from "../api/sharing";
+import AddItemSheet from "../components/AddItemSheet";
+import EntryRow from "../components/EntryRow";
+import { EmptyState, FAB, Icon, LoadingState, TopBar } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 
 export default function ListDetailPage() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const { token } = useAuth();
   const { syncVersion } = useOfflineQueue();
-  const inputRef = useRef(null);
   const [list, setList] = useState(null);
   const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
-  const [newEntryText, setNewEntryText] = useState("");
   const [shareEmail, setShareEmail] = useState("");
-  const [editingId, setEditingId] = useState("");
-  const [editingText, setEditingText] = useState("");
   const [entryError, setEntryError] = useState("");
   const [shareError, setShareError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSharingOpen, setIsSharingOpen] = useState(false);
   const [isSharingLoading, setIsSharingLoading] = useState(false);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [doneOpen, setDoneOpen] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -38,32 +40,38 @@ export default function ListDetailPage() {
         const [listsResult, entriesResult] = await Promise.all([fetchLists(token), fetchEntries(id, token)]);
         const activeList = (listsResult.lists ?? []).find((candidate) => candidate.id === id);
 
-        if (isMounted) {
-          if (!activeList) {
-            setEntryError("You no longer have access to this list.");
-            setList(null);
-            setEntries([]);
-            setMembers([]);
-            return;
-          }
-
-          setList(activeList);
-          setEntries(entriesResult.entries ?? []);
+        if (!isMounted) {
+          return;
         }
 
-        if (activeList?.is_owner) {
+        if (!activeList) {
+          setEntryError("You no longer have access to this list.");
+          setList(null);
+          setEntries([]);
+          setMembers([]);
+          return;
+        }
+
+        setList(activeList);
+        setEntries(entriesResult.entries ?? []);
+
+        if (activeList.is_owner) {
           setIsSharingLoading(true);
           const membersResult = await fetchListMembers(id, token);
 
           if (isMounted) {
             setMembers(membersResult.members ?? []);
           }
-        } else if (isMounted) {
+        } else {
           setMembers([]);
+          setIsSharingOpen(false);
         }
       } catch (loadError) {
         if (isMounted) {
           setEntryError(loadError.message);
+          setList(null);
+          setEntries([]);
+          setMembers([]);
         }
       } finally {
         if (isMounted) {
@@ -102,10 +110,10 @@ export default function ListDetailPage() {
     await writeCachedResource(`members:${id}`, { members: nextMembers });
   }
 
-  async function handleCreateEntry(event) {
-    event.preventDefault();
+  async function addEntryByText(text) {
+    const trimmed = text.trim();
 
-    if (!newEntryText.trim()) {
+    if (!trimmed) {
       return;
     }
 
@@ -114,18 +122,16 @@ export default function ListDetailPage() {
 
       const temporaryEntry = {
         id: createTemporaryId("entry"),
-        text: newEntryText.trim(),
+        text: trimmed,
         status: "open",
         created_at: new Date().toISOString(),
         is_pending_sync: true
       };
-      const result = await createEntry(id, token, { text: newEntryText }, { tempId: temporaryEntry.id });
+      const result = await createEntry(id, token, { text: trimmed }, { tempId: temporaryEntry.id });
 
       await updateEntries((currentEntries) =>
         sortEntries([...currentEntries, result?.queued ? temporaryEntry : result.entry])
       );
-      setNewEntryText("");
-      inputRef.current?.focus();
     } catch (submitError) {
       setEntryError(submitError.message);
     }
@@ -145,7 +151,7 @@ export default function ListDetailPage() {
             currentEntry.id === entry.id
               ? {
                   ...currentEntry,
-                  ...(result?.queued ? { status: nextStatus, is_pending_sync: true } : result.entry)
+                  ...(result?.queued ? { is_pending_sync: true, status: nextStatus } : result.entry)
                 }
               : currentEntry
           )
@@ -156,19 +162,16 @@ export default function ListDetailPage() {
     }
   }
 
-  function startEditing(entry) {
-    setEditingId(entry.id);
-    setEditingText(entry.text);
-  }
+  async function submitEditEntry(entryId, text) {
+    const trimmed = text.trim();
 
-  async function submitEdit(entryId) {
-    if (!editingText.trim()) {
+    if (!trimmed) {
       return;
     }
 
     try {
       setEntryError("");
-      const result = await updateEntry(id, entryId, token, { text: editingText });
+      const result = await updateEntry(id, entryId, token, { text: trimmed });
 
       await updateEntries((currentEntries) =>
         sortEntries(
@@ -176,14 +179,12 @@ export default function ListDetailPage() {
             currentEntry.id === entryId
               ? {
                   ...currentEntry,
-                  ...(result?.queued ? { text: editingText.trim(), is_pending_sync: true } : result.entry)
+                  ...(result?.queued ? { is_pending_sync: true, text: trimmed } : result.entry)
                 }
               : currentEntry
           )
         )
       );
-      setEditingId("");
-      setEditingText("");
     } catch (submitError) {
       setEntryError(submitError.message);
     }
@@ -242,237 +243,170 @@ export default function ListDetailPage() {
   const doneEntries = entries.filter((entry) => entry.status === "done");
 
   return (
-    <div className="stack">
-      <div className="overview-header">
-        <div className="stack tight-stack">
-          <div className="button-row">
-            <span
-              className={`pill ${list?.is_owner ? "" : "shared-pill"}`}
-              title={list?.is_owner ? "You own this list." : `Owned by ${list?.owner_name ?? "another member"}`}
-            >
-              {list?.is_owner ? "Owner" : "Shared list"}
-            </span>
-            {list?.is_pending_sync ? <span className="pill shared-pill">Queued</span> : null}
+    <div className="detail-page">
+      <TopBar
+        actions={
+          list?.is_owner
+            ? [
+                {
+                  ariaLabel: "Share list",
+                  icon: <Icon color="var(--text-secondary)" name="share" size={20} />,
+                  onClick: () => setIsSharingOpen((currentValue) => !currentValue)
+                }
+              ]
+            : []
+        }
+        title={list?.name ?? "List"}
+        onBack={() => navigate("/")}
+      />
+
+      <div className="detail-content">
+        {list ? (
+          <div className="detail-meta">
+            <div className="list-card-chips">
+              <span className={list.is_owner ? "eg-chip-purple" : "eg-chip-cyan"}>
+                {list.is_owner ? "Owner" : `Shared · ${list.owner_name ?? "another member"}`}
+              </span>
+              {list.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
+            </div>
           </div>
-          <h1 className="detail-title">{list?.name ?? "List detail"}</h1>
-          <p>
-            {list?.is_owner
-              ? "You can add entries and manage members from this view."
-              : `Shared by ${list?.owner_name ?? "another member"}. You can edit entries, but only the owner can manage access.`}
-          </p>
-        </div>
-        <div className="button-row">
-          {list?.is_owner ? (
-            <button
-              className="button-secondary"
-              type="button"
-              onClick={() => setIsSharingOpen((currentValue) => !currentValue)}
-            >
-              {isSharingOpen ? "Hide sharing" : "Manage sharing"}
-            </button>
-          ) : null}
-          <Link className="button-secondary link-button" to="/">
-            Back to lists
-          </Link>
-        </div>
+        ) : null}
+
+        {entryError ? <div className="detail-banner eg-error-banner">{entryError}</div> : null}
+        {isLoading ? <LoadingState rows={4} /> : null}
+
+        {!isLoading ? (
+          <>
+            <section className="entry-section">
+              <div className="entry-section-header">
+                <span className="detail-section-label">OPEN ITEMS</span>
+                <span className="eg-chip-purple">{openEntries.length}</span>
+              </div>
+
+              {openEntries.length === 0 ? (
+                <EmptyState body="No open items. Add one with the + button." title="All clear" />
+              ) : (
+                openEntries.map((entry) => (
+                  <EntryRow
+                    key={entry.id}
+                    entry={entry}
+                    onDelete={() => void handleDeleteEntry(entry.id)}
+                    onEdit={(text) => void submitEditEntry(entry.id, text)}
+                    onToggle={() => void toggleStatus(entry)}
+                  />
+                ))
+              )}
+            </section>
+
+            {doneEntries.length > 0 ? (
+              <section className="entry-section">
+                <button
+                  aria-label="Toggle done items"
+                  className="entry-section-collapse"
+                  type="button"
+                  onClick={() => setDoneOpen((currentValue) => !currentValue)}
+                >
+                  <span className="detail-section-label detail-section-label-done">DONE</span>
+                  <span className="eg-chip-success">{doneEntries.length}</span>
+                  <Icon
+                    color="var(--color-success)"
+                    name={doneOpen ? "chevronDown" : "chevronRight"}
+                    size={16}
+                  />
+                </button>
+
+                {doneOpen
+                  ? doneEntries.map((entry) => (
+                      <EntryRow
+                        key={entry.id}
+                        entry={entry}
+                        onDelete={() => void handleDeleteEntry(entry.id)}
+                        onEdit={(text) => void submitEditEntry(entry.id, text)}
+                        onToggle={() => void toggleStatus(entry)}
+                      />
+                    ))
+                  : null}
+              </section>
+            ) : null}
+
+            {list?.is_owner && isSharingOpen ? (
+              <SharingPanel
+                isSharingLoading={isSharingLoading}
+                members={members}
+                shareEmail={shareEmail}
+                shareError={shareError}
+                onEmailChange={setShareEmail}
+                onRevoke={handleRevokeMember}
+                onShareSubmit={handleShareSubmit}
+              />
+            ) : null}
+          </>
+        ) : null}
       </div>
 
-      {list?.is_owner && isSharingOpen ? (
-        <section className="sharing-panel stack">
-          <div className="overview-header">
-            <div className="stack tight-stack">
-              <h2 className="card-title">Share list</h2>
-              <p>Add another registered user by email, then revoke access here if needed.</p>
-            </div>
-            <span className="pill shared-pill">{members.length} access entries</span>
-          </div>
-
-          <form className="auth-form compact-form" onSubmit={handleShareSubmit}>
-            <div className="field">
-              <label htmlFor="share-email">Share with email</label>
-              <input
-                id="share-email"
-                name="email"
-                placeholder="alex@example.com"
-                value={shareEmail}
-                onChange={(event) => setShareEmail(event.target.value)}
-              />
-            </div>
-            <div className="button-row">
-              <button className="button-primary" type="submit">
-                Add member
-              </button>
-            </div>
-          </form>
-
-          {shareError ? <p className="error-banner">{shareError}</p> : null}
-          {isSharingLoading ? <p>Loading members...</p> : null}
-
-          {!isSharingLoading ? (
-            <div className="stack">
-              {members.map((member) => (
-                <article key={member.user_id} className="member-card">
-                  <div className="stack tight-stack">
-                    <div className="button-row">
-                      <h3 className="member-name">{member.display_name}</h3>
-                      <span className={`pill ${member.is_owner ? "" : "shared-pill"}`}>
-                        {member.is_owner ? "Owner" : "Member"}
-                      </span>
-                      {member.is_pending_sync ? <span className="pill shared-pill">Queued</span> : null}
-                    </div>
-                    <p>{member.email}</p>
-                  </div>
-                  {!member.is_owner ? (
-                    <button
-                      className="button-secondary destructive-button"
-                      type="button"
-                      onClick={() => void handleRevokeMember(member.user_id)}
-                    >
-                      Revoke
-                    </button>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      <form className="auth-form compact-form" onSubmit={handleCreateEntry}>
-        <div className="field">
-          <label htmlFor="new-entry-text">Add item</label>
-          <input
-            ref={inputRef}
-            id="new-entry-text"
-            name="text"
-            placeholder="Add milk, lemons, bread..."
-            value={newEntryText}
-            onChange={(event) => setNewEntryText(event.target.value)}
-          />
-        </div>
-        <div className="button-row">
-          <button className="button-primary" type="submit">
-            Add item
-          </button>
-        </div>
-      </form>
-
-      {entryError ? <p className="error-banner">{entryError}</p> : null}
-      {isLoading ? <p>Loading entries...</p> : null}
-
-      {!isLoading ? (
-        <div className="stack">
-          <section className="entry-section">
-            <div className="overview-header">
-              <h2 className="card-title">Open items</h2>
-              <span className="pill">{openEntries.length}</span>
-            </div>
-            {openEntries.length === 0 ? <p>No open items yet.</p> : null}
-            <div className="stack">
-              {openEntries.map((entry) => (
-                <EntryCard
-                  key={entry.id}
-                  entry={entry}
-                  editingId={editingId}
-                  editingText={editingText}
-                  onDelete={handleDeleteEntry}
-                  onEditChange={setEditingText}
-                  onStartEdit={startEditing}
-                  onSubmitEdit={submitEdit}
-                  onToggle={toggleStatus}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section className="entry-section">
-            <div className="overview-header">
-              <h2 className="card-title">Done items</h2>
-              <span className="pill shared-pill">{doneEntries.length}</span>
-            </div>
-            {doneEntries.length === 0 ? <p>No done items yet.</p> : null}
-            <div className="stack">
-              {doneEntries.map((entry) => (
-                <EntryCard
-                  key={entry.id}
-                  entry={entry}
-                  editingId={editingId}
-                  editingText={editingText}
-                  onDelete={handleDeleteEntry}
-                  onEditChange={setEditingText}
-                  onStartEdit={startEditing}
-                  onSubmitEdit={submitEdit}
-                  onToggle={toggleStatus}
-                />
-              ))}
-            </div>
-          </section>
-        </div>
-      ) : null}
+      {list ? <FAB onClick={() => setShowAddItem(true)} /> : null}
+      <AddItemSheet
+        open={showAddItem}
+        onAdd={(text) => void addEntryByText(text)}
+        onClose={() => setShowAddItem(false)}
+      />
     </div>
   );
 }
 
-function EntryCard({
-  entry,
-  editingId,
-  editingText,
-  onDelete,
-  onEditChange,
-  onStartEdit,
-  onSubmitEdit,
-  onToggle
-}) {
+function SharingPanel({ members, shareEmail, shareError, isSharingLoading, onEmailChange, onShareSubmit, onRevoke }) {
   return (
-    <article className={`entry-card ${entry.status === "done" ? "entry-card-done" : ""}`}>
-      <button className="entry-toggle" type="button" onClick={() => void onToggle(entry)}>
-        {entry.status === "done" ? "Reopen" : "Done"}
-      </button>
-      <div className="stack tight-stack entry-copy">
-        {editingId === entry.id ? (
-          <>
-            <label className="visually-hidden" htmlFor={`entry-edit-${entry.id}`}>
-              Edit entry
-            </label>
-            <input
-              id={`entry-edit-${entry.id}`}
-              value={editingText}
-              onChange={(event) => onEditChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void onSubmitEdit(entry.id);
-                }
-              }}
-            />
-          </>
-        ) : (
-          <div className="button-row">
-            <p className={`entry-text ${entry.status === "done" ? "entry-text-done" : ""}`}>{entry.text}</p>
-            {entry.is_pending_sync ? <span className="pill shared-pill">Queued</span> : null}
-          </div>
-        )}
+    <section className="sharing-panel">
+      <div className="entry-section-header">
+        <span className="detail-section-label detail-section-label-share">SQUAD</span>
+        <span className="eg-chip-purple">{members.length}</span>
       </div>
-      <div className="button-row">
-        {editingId === entry.id ? (
-          <>
-            <button className="button-secondary" type="button" onClick={() => void onSubmitEdit(entry.id)}>
-              Save
-            </button>
-            <button className="button-secondary" type="button" onClick={() => onEditChange(entry.text)}>
-              Reset
-            </button>
-          </>
-        ) : (
-          <button className="button-secondary" type="button" onClick={() => onStartEdit(entry)}>
-            Edit
-          </button>
-        )}
-        <button className="button-secondary destructive-button" type="button" onClick={() => void onDelete(entry.id)}>
-          Delete
+
+      <form className="sharing-panel-form" onSubmit={onShareSubmit}>
+        <div className="eg-field">
+          <label htmlFor="share-email">Share with email</label>
+          <input
+            id="share-email"
+            className="eg-input"
+            placeholder="Share with email..."
+            value={shareEmail}
+            onChange={(event) => onEmailChange(event.target.value)}
+          />
+        </div>
+        <button className="eg-btn-secondary" type="submit">
+          Add Member
         </button>
-      </div>
-    </article>
+      </form>
+
+      {shareError ? <div className="detail-banner eg-error-banner">{shareError}</div> : null}
+      {isSharingLoading ? <LoadingState rows={2} /> : null}
+
+      {!isSharingLoading
+        ? members.map((member) => (
+            <div key={member.user_id} className="member-row">
+              <div className="member-row-copy">
+                <div className="member-row-name">{member.display_name}</div>
+                <div className="member-row-email">{member.email}</div>
+              </div>
+              <div className="member-row-actions">
+                <span className={member.is_owner ? "eg-chip-purple" : "eg-chip-cyan"}>
+                  {member.is_owner ? "Owner" : "Member"}
+                </span>
+                {member.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
+                {!member.is_owner ? (
+                  <button
+                    className="eg-btn-danger member-row-revoke"
+                    type="button"
+                    onClick={() => void onRevoke(member.user_id)}
+                  >
+                    Revoke
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ))
+        : null}
+    </section>
   );
 }
 

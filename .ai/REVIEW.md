@@ -257,3 +257,77 @@ No blocking, major, or minor findings.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-005 — List Detail Page Redesign
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — `EntryRow` touch handlers early-return when `editMode` is true. Defensive addition beyond the plan spec; prevents accidental swipe-delete during inline edit. Positive.
+- **nit** — `AddItemSheet` uses `<form onSubmit>` instead of `onKeyDown` on input. Same benefit as T-004 `NewListSheet`. Not a concern.
+- **nit** — FAB is guarded by `{list ? <FAB …> : null}` — not shown while loading or on error. Correct; adding to a null list would be a no-op. Not a concern.
+- **nit** — Button labels are entry-specific: `"Mark Milk done"`, `"Edit Coffee"`. More accessible than generic `"Done"` / `"Edit"`.
+- **nit** — `sortEntries` helper ensures open entries appear before done, sorted by `created_at`. Bonus quality-of-life improvement; not required by the plan.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-005 confirmed `ready_for_review`.
+2. Re-read T-005 section of `.ai/PLAN.md`.
+3. Read `ListDetailPage.jsx`, `EntryRow.jsx`, `AddItemSheet.jsx`, `entry-row.test.jsx` in full.
+4. Inspected `git diff --staged` (new files) and `git diff` (modified: `ListDetailPage.jsx`, `index.css`, `app.test.jsx`) for scope.
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (252 kB JS).
+7. Ran `npm test` → **19/19 frontend + 25/25 backend tests pass**.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| TopBar with list name and back navigation | ✅ `TopBar title={list?.name ?? "List"} onBack={() => navigate("/")}` |
+| FAB opens `AddItemSheet` | ✅ `setShowAddItem(true)`; test confirms dialog by role |
+| Adding an item creates an entry | ✅ `addEntryByText` → `createEntry`; offline temp entry support preserved |
+| Items toggle done/open with neon styling & strikethrough | ✅ `checkCircle` color switches on status; `entry-row-done` + `entry-row-text-done` classes |
+| Swipe-to-delete (>80 px left) | ✅ Touch handlers; `entry-row.test.jsx` swipe test confirms `onDelete` called |
+| Done section is collapsible | ✅ `doneOpen` state; collapse button; test confirms hide/show |
+| Sharing panel (owner only) renders and functions | ✅ `SharingPanel` behind `list?.is_owner && isSharingOpen`; share + revoke tests pass |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend |
+
+**Plan compliance — detailed:**
+
+| Item | Status |
+|---|---|
+| `addEntryByText(text)` extracted | ✅ |
+| `submitEditEntry(entryId, text)` extracted | ✅ |
+| `toggleStatus`, `handleDeleteEntry`, `handleShareSubmit`, `handleRevokeMember` preserved | ✅ |
+| State: `showAddItem`, `doneOpen` added | ✅ |
+| `openEntries` / `doneEntries` derived | ✅ |
+| OPEN ITEMS section with EmptyState when empty | ✅ |
+| Done section conditional + collapsible | ✅ |
+| `SharingPanel` as local named function | ✅ |
+| `EntryRow`: swipe zone, touch handlers, check/edit/delete buttons | ✅ |
+| `EntryRow`: inline edit mode with Save/Cancel | ✅ |
+| `AddItemSheet`: does NOT auto-close after add | ✅ |
+| Dedicated swipe test in `entry-row.test.jsx` | ✅ |
+| New integration tests: TopBar elements, collapsible done, loading/error | ✅ |
+| Existing detail tests updated for new UI | ✅ |
+
+##### Risks
+
+- None. All async handlers, API calls, and offline queue integration are unchanged. New components are well-isolated and fully covered by the dedicated + integration test suite.
+
+#### Verdict
+`PASS`
