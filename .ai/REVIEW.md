@@ -455,3 +455,71 @@ No blocking, major, or minor findings.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-009 — Spacing-scale tokens & consistency fixes
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — The plan listed the spacing scale as the last group before shadows in `tokens.css`. The implementer placed it between the radius tokens and shadow tokens (lines 43–50), which is consistent with a small → large visual properties ordering. No functional impact.
+- **nit** — `.auth-form` retains `gap: 1rem` (not converted to a spacing token). This selector was not in the 11-fix list and the rem value is a deliberate existing choice; leaving it is correct scope discipline.
+- **nit** — `.entry-row-edit-actions { margin-top: 0 }` is the correct fix per the plan (removing the `4px` extra push), and the parent `.entry-row-edit` already provides `gap: 12px`. Verified.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-009 confirmed `ready_for_review`.
+2. Re-read T-009 section of `.ai/PLAN.md`.
+3. Read `frontend/src/styles/tokens.css` in full.
+4. Verified all 8 spacing token definitions against the plan spec.
+5. Verified all 11 targeted CSS property changes against the plan table via grep + targeted reads.
+6. Ran `npm run lint` → **0 errors**.
+7. Ran `npm run build` → **clean** (16.70 kB CSS, 975 kB precache — within Workbox limit).
+8. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
+
+##### Findings
+
+**Spacing tokens — all 8 definitions correct:**
+
+| Token | Value | Result |
+|---|---|---|
+| `--space-1` | `4px` | ✅ |
+| `--space-2` | `8px` | ✅ |
+| `--space-3` | `12px` | ✅ |
+| `--space-4` | `16px` | ✅ |
+| `--space-5` | `20px` | ✅ |
+| `--space-6` | `24px` | ✅ |
+| `--space-8` | `32px` | ✅ |
+| `--space-12` | `48px` | ✅ |
+
+**11 targeted index.css fixes — all correct:**
+
+| Selector | Property | Expected | Actual | Result |
+|---|---|---|---|---|
+| `.loading-state` | `padding` | `0` | `0` | ✅ |
+| `.bottom-sheet` | `padding` | `var(--space-5) var(--space-4) var(--space-12)` | `var(--space-5) var(--space-4) var(--space-12)` | ✅ |
+| `.list-card-name` | `margin-bottom` | `var(--space-2)` | `var(--space-2)` | ✅ |
+| `.member-row` | `padding` | `var(--space-3) 0` | `var(--space-3) 0` | ✅ |
+| `.list-option-row` | `padding` | `var(--space-3)` | `var(--space-3)` | ✅ |
+| `.overview-toggle` | `padding` | `0 var(--space-4) var(--space-3)` | `0 var(--space-4) var(--space-3)` | ✅ |
+| `.share-sheet-members-label` | `padding` | `var(--space-2) 0` | `var(--space-2) 0` | ✅ |
+| `.entry-row-edit-actions` | `margin-top` | `0` | `0` | ✅ |
+| `.auth-logo` | `border-radius` | `var(--radius-md)` | `var(--radius-md)` | ✅ |
+| `.overview-logo` | `border-radius` | `var(--radius-md)` | `var(--radius-md)` | ✅ |
+| `.field, .eg-field` | `gap` | `6px` | `6px` | ✅ |
+
+##### Risks
+
+- None. Changes are CSS-only; no component logic touched. All 19 frontend tests and 25 backend tests confirm no regressions.
+
+#### Verdict
+`PASS`

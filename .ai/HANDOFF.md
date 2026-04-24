@@ -295,6 +295,18 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-009 — review — 2026-04-24T18:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-009 spacing-scale tokens and consistency fixes; all 8 tokens correct, all 11 targeted CSS properties updated as specified, all validations pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-008 — review — 2026-04-24T17:55:00Z
 
 | Field | Value |
@@ -329,6 +341,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, e2e/auth.spec.js, e2e/lists.spec.js |
 | Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run lint`, `npm run e2e`, `npm run build`, and `npm test`. |
 | Commit | `test(e2e): add shopping list CRUD end-to-end tests` |
+| Next Role | implement |
+
+---
+
+### T-009 — IMPLEMENT — 2026-04-24T16:07:14.4394147Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added a 4px-based spacing token scale and aligned the targeted auth, overview, sheet, member-row, list-option, and entry-edit spacing declarations with the planned values. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/index.css, frontend/src/styles/tokens.css |
+| Validation | No test files changed because this task only adjusts CSS token values and spacing declarations. `npm run lint` passed with the existing AuthContext Fast Refresh warning; `npm run build` passed; `npm test` passed. |
+| Commit | `fix(ui): add spacing-scale tokens and fix spacing inconsistencies` |
+| Next Role | review |
+
+---
+
+### T-009 — commit_task — 2026-04-24T16:31:37.8414936Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-009 done after review approval and committed the reviewed spacing token scale and consistency fixes. |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, frontend/src/index.css, frontend/src/styles/tokens.css |
+| Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run lint`, `npm run build`, and `npm test`. |
+| Commit | `fix(ui): add spacing-scale tokens and fix spacing inconsistencies` |
 | Next Role | implement |
 
 ---
