@@ -160,6 +160,18 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-007 — review — 2026-04-24T17:05:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-007 options flyout + BottomNav cleanup; all acceptance criteria met, sharing logic preserved, all validations pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-005 — review — 2026-04-24T16:45:00Z
 
 | Field | Value |
@@ -220,6 +232,43 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/components/AddItemSheet.jsx, frontend/src/components/EntryRow.jsx, frontend/src/components/entry-row.test.jsx, frontend/src/index.css, frontend/src/pages/ListDetailPage.jsx |
 | Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run test --workspace frontend -- src/app.test.jsx`, `npm run test --workspace frontend -- src/components/entry-row.test.jsx`, `npm run lint`, `npm run build`, and `npm test`. |
 | Commit | `feat(ui): redesign list detail page with neon theme and swipe-to-delete` |
+| Next Role | implement |
+
+---
+
+### T-006 + T-007 — plan — 2026-04-24T17:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Dropped T-006 (search feature removed from scope); planned T-007 to replace the list detail share button with a moreVertical options flyout (Rename + Share sub-sheets) and clean up BottomNav/router Search remnants |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-007 — IMPLEMENT — 2026-04-24T14:55:07.0285969Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed the Search tab and route, replaced the list detail share action with an owner-only options flyout, and split rename/share flows into dedicated bottom sheets while preserving the existing sharing behavior. |
+| Files Changed | README.md, .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/App.jsx, frontend/src/app.test.jsx, frontend/src/components/ListOptionsSheet.jsx, frontend/src/components/RenameListSheet.jsx, frontend/src/components/ShareListSheet.jsx, frontend/src/components/ui/BottomNav.jsx, frontend/src/components/ui/ui.test.jsx, frontend/src/index.css, frontend/src/pages/ListDetailPage.jsx |
+| Validation | `npm run test --workspace frontend -- src/components/ui/ui.test.jsx` failed before implementation because Search still rendered in BottomNav, then passed after implementation; `npm run test --workspace frontend -- src/app.test.jsx` failed before implementation on the old Search route and list-detail share action, then passed after implementation; `npm run lint` passed with the existing AuthContext Fast Refresh warning; `npm run build` passed; `npm test` passed. |
+| Commit | `feat(ui): replace list detail share button with options flyout and add rename` |
+| Next Role | review |
+
+---
+
+### T-007 — commit_task — 2026-04-24T15:08:11.5828261Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-007 done after review approval and committed the reviewed list-detail options flyout and BottomNav cleanup. |
+| Files Changed | .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, frontend/src/App.jsx, frontend/src/app.test.jsx, frontend/src/components/ListOptionsSheet.jsx, frontend/src/components/RenameListSheet.jsx, frontend/src/components/ShareListSheet.jsx, frontend/src/components/ui/BottomNav.jsx, frontend/src/components/ui/ui.test.jsx, frontend/src/index.css, frontend/src/pages/ListDetailPage.jsx |
+| Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run test --workspace frontend -- src/components/ui/ui.test.jsx`, `npm run test --workspace frontend -- src/app.test.jsx`, `npm run lint`, `npm run build`, and `npm test`. |
+| Commit | `feat(ui): replace list detail share button with options flyout and add rename` |
 | Next Role | implement |
 
 ---

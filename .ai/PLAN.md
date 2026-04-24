@@ -1015,99 +1015,283 @@ function SharingPanel({ members, shareEmail, shareError, isSharingLoading, onEma
 
 ---
 
-## T-006 — Search Page
+## ~~T-006 — Search Page~~ — DROPPED
+
+**Reason:** Search feature removed from scope per user decision (2026-04-24). The Search tab is removed from BottomNav. The `/search` route and `SearchPage` stub are cleaned up as part of T-007.
+
+---
+
+## T-007 — List Detail: Options Flyout + BottomNav Cleanup
 
 ### Objective
-Implement a client-side Search screen accessible from the bottom nav Search tab.
+1. Remove the Search tab from BottomNav and clean up the `/search` route.
+2. Replace the single share icon in the TopBar with a `moreVertical` options button that opens a bottom-sheet flyout. The flyout provides two actions (owner only): **Rename list** and **Share list**, each opening its own focused sub-sheet.
 
-### Files to create / change
+### Files to change / create
 
 | File | Action |
 |------|--------|
-| `frontend/src/pages/SearchPage.jsx` | NEW (replace stub from T-001) |
+| `frontend/src/components/ui/BottomNav.jsx` | Remove Search tab; keep only Lists tab |
+| `frontend/src/App.jsx` | Remove `/search` route and `SearchPage` import |
+| `frontend/src/pages/ListDetailPage.jsx` | Replace share TopBar action with options button; wire three sheets; remove inline SharingPanel |
+| `frontend/src/components/ListOptionsSheet.jsx` | **NEW** — options menu sheet |
+| `frontend/src/components/RenameListSheet.jsx` | **NEW** — rename input sheet |
+| `frontend/src/components/ShareListSheet.jsx` | **NEW** — share form + member list sheet |
 
-### SearchPage.jsx — full implementation
+### BottomNav.jsx change
+Remove the `search` entry from the `tabs` array. Only `lists` tab remains:
 ```jsx
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { fetchLists } from '../api/lists';
-import { useAuth } from '../context/AuthContext';
-import { Icon, EmptyState, LoadingState, ErrorState } from '../components/ui';
-import ListCardHome from '../components/ListCardHome';
+const tabs = [
+  { id: 'lists', label: 'Lists', path: '/', icon: 'list' },
+];
+```
+Active detection and render logic unchanged — no more conditional for search path.
 
-export default function SearchPage() {
-  const { token } = useAuth();
-  const navigate = useNavigate();
-  const [query, setQuery] = useState('');
-  const [lists, setLists] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+### App.jsx change
+- Remove `import SearchPage from './pages/SearchPage'`
+- Remove `<Route path="/search" element={<SearchPage />} />` from the protected routes group
 
-  useEffect(() => {
-    let isMounted = true;
-    setIsLoading(true);
-    setError('');
-    fetchLists(token)
-      .then(r => { if (isMounted) setLists(r.lists ?? []); })
-      .catch(e => { if (isMounted) setError(e.message); })
-      .finally(() => { if (isMounted) setIsLoading(false); });
-    return () => { isMounted = false; };
-  }, [token]);
+### ListOptionsSheet.jsx
+```jsx
+// Props: open (bool), onClose (() => void), isOwner (bool),
+//        onRenameSelect (() => void), onShareSelect (() => void)
+//
+// Renders a BottomSheet with title "List Options"
+// Two option rows (owner only — if !isOwner render nothing / closed sheet):
+//
+//   Option row structure:
+//   <button className="list-option-row" onClick={...}>
+//     <div className="list-option-icon"> <Icon name="..." size={22} color="..."/> </div>
+//     <div className="list-option-text">
+//       <span className="list-option-label">Rename list</span>
+//       <span className="list-option-desc">Change the name of this list</span>
+//     </div>
+//     <Icon name="chevronRight" size={16} color="var(--text-disabled)" />
+//   </button>
+//
+// Row 1: Icon "edit", label "Rename list", desc "Change the name of this list"
+//   onClick → onClose(); onRenameSelect()
+//
+// Row 2: Icon "share", label "Share list", desc "Manage squad access"
+//   onClick → onClose(); onShareSelect()
+//
+// CSS:
+//   .list-option-row {
+//     display: flex; align-items: center; gap: 14px;
+//     width: 100%; background: none; border: none; border-radius: var(--radius-md);
+//     padding: 14px 12px; cursor: pointer; text-align: left;
+//     transition: background var(--duration-micro);
+//   }
+//   .list-option-row:hover { background: rgba(139,43,226,0.1) }
+//   .list-option-row + .list-option-row { border-top: 1px solid rgba(255,255,255,0.05) }
+//   .list-option-icon {
+//     width: 40px; height: 40px; border-radius: var(--radius-md);
+//     display: grid; place-items: center; flex-shrink: 0;
+//   }
+//   .list-option-icon-edit  { background: rgba(139,43,226,0.15) }
+//   .list-option-icon-share { background: rgba(0,229,255,0.12) }
+//   .list-option-text { flex: 1; min-width: 0 }
+//   .list-option-label { display: block; font-weight: 600; font-size: var(--text-base); color: var(--text-primary) }
+//   .list-option-desc  { display: block; font-size: var(--text-sm); color: var(--text-secondary); margin-top: 2px }
+```
 
-  const filtered = query.trim()
-    ? lists.filter(l =>
-        l.name.toLowerCase().includes(query.trim().toLowerCase())
-      )
-    : [];
+### RenameListSheet.jsx
+```jsx
+// Props: open (bool), onClose (() => void),
+//        currentName (string), onRename ((newName: string) => Promise<void>)
+//
+// Internal state: value (string) — initialised to currentName when open becomes true (useEffect)
+//
+// <BottomSheet open={open} onClose={onClose} title="Rename List">
+//   <input className="eg-input" value={value}
+//     onChange={e => setValue(e.target.value)}
+//     onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+//     autoFocus />
+//   <div className="button-row" style={{marginTop:16}}>
+//     <button className="eg-btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
+//     <button className="eg-btn-primary" style={{flex:2}}
+//       onClick={handleSubmit} disabled={!value.trim() || value.trim() === currentName}>
+//       Save
+//     </button>
+//   </div>
+// </BottomSheet>
+//
+// handleSubmit: if value.trim() && value.trim() !== currentName →
+//   await onRename(value.trim()); onClose()
+//
+// useEffect([open]): when open changes to true → setValue(currentName)
+```
 
-  return (
-    <div style={{ paddingBottom: 120 }}>
+### ShareListSheet.jsx
+```jsx
+// Props: open (bool), onClose (() => void),
+//        members ([{user_id, display_name, email, is_owner, is_pending_sync}]),
+//        shareEmail (string), shareError (string), isSharingLoading (bool),
+//        onEmailChange ((email: string) => void),
+//        onShareSubmit ((event) => void),
+//        onRevoke ((memberId: string) => void)
+//
+// <BottomSheet open={open} onClose={onClose} title="Share List">
+//
+//   {/* Share-by-email form */}
+//   <form onSubmit={onShareSubmit} style={{display:'grid',gap:8,marginBottom:16}}>
+//     <label className="eg-field">
+//       <span style={{color:'var(--text-secondary)',fontSize:'var(--text-sm)',fontWeight:600}}>
+//         Add member by email
+//       </span>
+//       <input className="eg-input" type="email" placeholder="alex@example.com"
+//         value={shareEmail} onChange={e => onEmailChange(e.target.value)} />
+//     </label>
+//     <button className="eg-btn-secondary" type="submit">Add Member</button>
+//   </form>
+//
+//   {shareError && <div className="eg-error-banner" style={{marginBottom:8}}>{shareError}</div>}
+//
+//   {/* Member list */}
+//   <div className="share-sheet-members-label eg-orbitron">
+//     SQUAD ({members.length})
+//   </div>
+//   {isSharingLoading && <LoadingState rows={2} />}
+//   {!isSharingLoading && members.map(m => (
+//     <div key={m.user_id} className="member-row">
+//       <div>
+//         <div style={{fontWeight:600,color:'var(--text-primary)',fontSize:'var(--text-base)'}}>
+//           {m.display_name}
+//         </div>
+//         <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>{m.email}</div>
+//       </div>
+//       <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
+//         <span className={m.is_owner ? 'eg-chip-purple' : 'eg-chip-cyan'} style={{fontSize:11}}>
+//           {m.is_owner ? 'Owner' : 'Member'}
+//         </span>
+//         {m.is_pending_sync && <span className="eg-chip-queued" style={{fontSize:11}}>Queued</span>}
+//         {!m.is_owner && (
+//           <button className="eg-btn-danger" style={{fontSize:13,padding:'6px 12px'}}
+//             onClick={() => void onRevoke(m.user_id)}>
+//             Revoke
+//           </button>
+//         )}
+//       </div>
+//     </div>
+//   ))}
+// </BottomSheet>
+//
+// CSS:
+//   .share-sheet-members-label {
+//     font-size: var(--text-xs); letter-spacing: 0.1em; color: var(--text-secondary);
+//     padding: 8px 0 6px; border-top: 1px solid rgba(255,255,255,0.06);
+//     margin-top: 8px;
+//   }
+```
 
-      {/* Header */}
-      <div className="overview-topbar">
-        <div className="eg-orbitron"
-          style={{ fontSize:18, fontWeight:700, color:'var(--text-primary)', letterSpacing:'0.04em' }}>
-          SEARCH
-        </div>
-      </div>
+### ListDetailPage.jsx changes
 
-      {/* Search input with icon */}
-      <div style={{ padding:'0 16px 16px', position:'relative' }}>
-        <span style={{ position:'absolute', left:28, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', display:'flex' }}>
-          <Icon name="search" size={18} color="var(--text-secondary)" />
-        </span>
-        <input
-          className="eg-input"
-          style={{ paddingLeft:44 }}
-          placeholder="Search your lists…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          autoFocus
-        />
-      </div>
+**State changes:**
+- Remove: `isSharingOpen` (bool)
+- Add:
+  ```jsx
+  const [showOptions, setShowOptions] = useState(false);
+  const [showRename, setShowRename]   = useState(false);
+  const [showShare, setShowShare]     = useState(false);
+  ```
 
-      {/* Results */}
-      <div style={{ padding:'0 16px' }}>
-        {error && <ErrorState onRetry={() => { setError(''); setIsLoading(true); }} />}
-        {isLoading && <LoadingState rows={3} />}
-        {!isLoading && !error && !query.trim() && (
-          <EmptyState title="Find your lists" body="Start typing to search by list name." />
-        )}
-        {!isLoading && !error && query.trim() && filtered.length === 0 && (
-          <EmptyState title="No results" body={`No lists match "${query}".`} />
-        )}
-        {!isLoading && !error && filtered.map(list => (
-          <ListCardHome
-            key={list.id}
-            list={list}
-            onOpen={() => navigate(`/lists/${list.id}`)}
-            onRename={() => {}}
-            onDelete={() => {}}
-          />
-        ))}
-      </div>
-    </div>
-  );
+**Rename handler** (new, uses existing `renameList` API):
+```jsx
+async function handleRename(newName) {
+  try {
+    setEntryError('');
+    const result = await renameList(id, token, { name: newName });
+    setList(currentList => ({
+      ...currentList,
+      name: result?.queued ? newName : result.list?.name ?? newName
+    }));
+  } catch (err) {
+    setEntryError(err.message);
+  }
+}
+```
+Import `renameList` from `'../api/lists'`.
+
+**TopBar actions** (replace existing share action):
+```jsx
+actions={list?.is_owner ? [{
+  ariaLabel: 'List options',
+  icon: <Icon name="moreVertical" size={20} color="var(--text-secondary)" />,
+  onClick: () => setShowOptions(true)
+}] : []}
+```
+
+**Remove from JSX:**
+- The entire inline `{list?.is_owner && isSharingOpen ? (<SharingPanel ... />) : null}` block
+- The `SharingPanel` function definition at the bottom of the file
+
+**Add to JSX (after `<AddItemSheet>`)**:
+```jsx
+<ListOptionsSheet
+  open={showOptions}
+  onClose={() => setShowOptions(false)}
+  isOwner={list?.is_owner ?? false}
+  onRenameSelect={() => setShowRename(true)}
+  onShareSelect={() => setShowShare(true)}
+/>
+<RenameListSheet
+  open={showRename}
+  onClose={() => setShowRename(false)}
+  currentName={list?.name ?? ''}
+  onRename={handleRename}
+/>
+<ShareListSheet
+  open={showShare}
+  onClose={() => setShowShare(false)}
+  members={members}
+  shareEmail={shareEmail}
+  shareError={shareError}
+  isSharingLoading={isSharingLoading}
+  onEmailChange={setShareEmail}
+  onShareSubmit={handleShareSubmit}
+  onRevoke={handleRevokeMember}
+/>
+```
+
+**Imports to add:**
+```jsx
+import { renameList } from '../api/lists';
+import ListOptionsSheet from '../components/ListOptionsSheet';
+import RenameListSheet from '../components/RenameListSheet';
+import ShareListSheet from '../components/ShareListSheet';
+```
+
+### New CSS classes (index.css)
+```css
+/* Already covered by existing .member-row class from T-005.
+   New additions: */
+
+.list-option-row {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; background: none; border: none; border-radius: var(--radius-md);
+  padding: 14px 12px; cursor: pointer; text-align: left;
+  transition: background var(--duration-micro);
+}
+.list-option-row:hover { background: rgba(139,43,226,0.1) }
+.list-option-row + .list-option-row {
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+.list-option-icon {
+  width: 40px; height: 40px; border-radius: var(--radius-md);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.list-option-icon-edit  { background: rgba(139,43,226,0.15) }
+.list-option-icon-share { background: rgba(0,229,255,0.12) }
+.list-option-text { flex: 1; min-width: 0 }
+.list-option-label {
+  display: block; font-weight: 600; font-size: var(--text-base); color: var(--text-primary);
+}
+.list-option-desc {
+  display: block; font-size: var(--text-sm); color: var(--text-secondary); margin-top: 2px;
+}
+.share-sheet-members-label {
+  font-size: var(--text-xs); letter-spacing: 0.1em; color: var(--text-secondary);
+  padding: 8px 0 6px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: 8px;
 }
 ```
 
@@ -1117,7 +1301,7 @@ export default function SearchPage() {
 - `npm test`
 
 ### Commit message
-`feat(ui): add client-side search page`
+`feat(ui): replace list detail share button with options flyout and add rename`
 
 ---
 

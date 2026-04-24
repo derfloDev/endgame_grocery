@@ -1,10 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import Icon from "./Icon";
 
-const tabs = [
-  { id: "lists", label: "Lists", path: "/", icon: "list" },
-  { id: "search", label: "Search", path: "/search", icon: "search" }
-];
+const tabs = [{ id: "lists", label: "Lists", path: "/", icon: "list" }];
 
 export default function BottomNav() {
   const location = useLocation();
@@ -13,10 +10,7 @@ export default function BottomNav() {
   return (
     <nav aria-label="Primary navigation" className="bottom-nav">
       {tabs.map((tab) => {
-        const isActive =
-          tab.id === "lists"
-            ? location.pathname === "/" || location.pathname.startsWith("/lists")
-            : location.pathname.startsWith(tab.path);
+        const isActive = location.pathname === "/" || location.pathname.startsWith("/lists");
 
         return (
           <button

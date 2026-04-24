@@ -166,11 +166,11 @@ Version bumps follow Conventional Commits: `feat` creates a minor release, `fix`
 
 ## Feature Overview
 
-- The protected React app uses a dark Endgame-themed shell with bottom navigation for Lists and Search.
+- The protected React app uses a dark Endgame-themed shell with bottom navigation for Lists.
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
 - Authentication supports register and login flows backed by JWT access tokens.
 - Lists support create, rename, delete, ownership, and shared-access visibility.
-- The list detail view uses a sticky top bar, bottom-sheet add-item flow, swipe-to-delete entry rows, collapsible done items, and an owner-only sharing panel.
+- The list detail view uses a sticky top bar, a more-options flyout for rename and sharing, a bottom-sheet add-item flow, swipe-to-delete entry rows, and collapsible done items.
 - Entries support add, edit, toggle, and delete actions with open and done grouping.
 - Sharing supports inviting registered users by email and revoking member access.
 - Offline support caches successful reads and queues failed writes for replay after reconnect.

@@ -103,7 +103,7 @@ describe("authentication shell", () => {
 
     expect(await screen.findByLabelText("Primary navigation")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Lists" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Search" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
 
     rendered.unmount();
     window.localStorage.clear();
@@ -113,13 +113,18 @@ describe("authentication shell", () => {
     expect(screen.queryByLabelText("Primary navigation")).toBeNull();
   });
 
-  it("renders the protected search route without crashing", async () => {
+  it("redirects the removed /search route back to the overview", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ lists: [] })
+    });
 
     renderApp(["/search"]);
 
-    expect(await screen.findByLabelText("Search page")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Search" }).getAttribute("aria-current")).toBe("page");
+    expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Lists" }).getAttribute("aria-current")).toBe("page");
   });
 
   it("submits the register form", async () => {
@@ -260,7 +265,7 @@ describe("authentication shell", () => {
     expect(screen.getByText("Shared · Alex")).toBeTruthy();
   });
 
-  it("adds, toggles, edits, and collapses done entries in the redesigned list detail", async () => {
+  it("adds, toggles, edits, renames, and collapses done entries in the list detail options flow", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch
       .mockResolvedValueOnce({
@@ -311,6 +316,12 @@ describe("authentication shell", () => {
         })
       })
       .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          list: { id: "list-1", name: "Mission groceries", owner_name: "Demo User", is_owner: true }
+        })
+      })
+      .mockResolvedValueOnce({
         status: 204
       });
 
@@ -318,7 +329,8 @@ describe("authentication shell", () => {
 
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Share list" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "List options" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Share list" })).toBeNull();
     expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
 
     expect(screen.getByText("OPEN ITEMS")).toBeTruthy();
@@ -345,6 +357,18 @@ describe("authentication shell", () => {
 
     expect(await screen.findByText("Ground coffee")).toBeTruthy();
 
+    await userEvent.click(screen.getByRole("button", { name: "List options" }));
+    expect(await screen.findByRole("dialog", { name: "List Options" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /^Rename list/ }));
+
+    const renameSheetInput = await screen.findByLabelText("Rename list");
+    expect(renameSheetInput.value).toBe("Weekly groceries");
+    await userEvent.clear(renameSheetInput);
+    await userEvent.type(renameSheetInput, "Mission groceries");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Mission groceries")).toBeTruthy();
+
     await userEvent.click(screen.getByRole("button", { name: "Toggle done items" }));
 
     expect(screen.queryByText("Bread")).toBeNull();
@@ -355,7 +379,7 @@ describe("authentication shell", () => {
     expect(screen.getByText("Milk")).toBeTruthy();
   });
 
-  it("shares a list from the redesigned detail view and revokes a member", async () => {
+  it("opens the share sheet from list options and revokes a member", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch
       .mockResolvedValueOnce({
@@ -404,10 +428,14 @@ describe("authentication shell", () => {
 
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
 
-    await userEvent.click(screen.getByRole("button", { name: "Share list" }));
-    expect(await screen.findByText("SQUAD")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "List options" }));
+    expect(await screen.findByRole("dialog", { name: "List Options" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /^Share list/ }));
 
-    await userEvent.type(screen.getByLabelText("Share with email"), "alex@example.com");
+    expect(await screen.findByRole("dialog", { name: "Share List" })).toBeTruthy();
+    expect(screen.getByText("SQUAD (1)")).toBeTruthy();
+
+    await userEvent.type(screen.getByLabelText("Add member by email"), "alex@example.com");
     await userEvent.click(screen.getByRole("button", { name: "Add Member" }));
 
     expect(await screen.findByText("Alex")).toBeTruthy();

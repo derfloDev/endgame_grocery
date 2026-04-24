@@ -3,10 +3,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
 import { createEntry, deleteEntry, fetchEntries, updateEntry } from "../api/entries";
 import { writeCachedResource } from "../api/offlineStore";
-import { fetchLists } from "../api/lists";
+import { fetchLists, renameList } from "../api/lists";
 import { fetchListMembers, revokeListMember, shareListWithMember } from "../api/sharing";
 import AddItemSheet from "../components/AddItemSheet";
 import EntryRow from "../components/EntryRow";
+import ListOptionsSheet from "../components/ListOptionsSheet";
+import RenameListSheet from "../components/RenameListSheet";
+import ShareListSheet from "../components/ShareListSheet";
 import { EmptyState, FAB, Icon, LoadingState, TopBar } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
@@ -23,10 +26,12 @@ export default function ListDetailPage() {
   const [entryError, setEntryError] = useState("");
   const [shareError, setShareError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [isSharingOpen, setIsSharingOpen] = useState(false);
   const [isSharingLoading, setIsSharingLoading] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   const [doneOpen, setDoneOpen] = useState(true);
+  const [showOptions, setShowOptions] = useState(false);
+  const [showRename, setShowRename] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,7 +69,9 @@ export default function ListDetailPage() {
           }
         } else {
           setMembers([]);
-          setIsSharingOpen(false);
+          setShowOptions(false);
+          setShowRename(false);
+          setShowShare(false);
         }
       } catch (loadError) {
         if (isMounted) {
@@ -141,9 +148,7 @@ export default function ListDetailPage() {
     try {
       setEntryError("");
       const nextStatus = entry.status === "open" ? "done" : "open";
-      const result = await updateEntry(id, entry.id, token, {
-        status: nextStatus
-      });
+      const result = await updateEntry(id, entry.id, token, { status: nextStatus });
 
       await updateEntries((currentEntries) =>
         sortEntries(
@@ -200,6 +205,25 @@ export default function ListDetailPage() {
     }
   }
 
+  async function handleRename(newName) {
+    try {
+      setEntryError("");
+      const result = await renameList(token, id, { name: newName });
+      setList((currentList) =>
+        currentList
+          ? {
+              ...currentList,
+              name: result?.queued ? newName : result.list?.name ?? newName,
+              is_pending_sync: result?.queued ? true : currentList.is_pending_sync
+            }
+          : currentList
+      );
+    } catch (submitError) {
+      setEntryError(submitError.message);
+      throw submitError;
+    }
+  }
+
   async function handleShareSubmit(event) {
     event.preventDefault();
 
@@ -249,9 +273,9 @@ export default function ListDetailPage() {
           list?.is_owner
             ? [
                 {
-                  ariaLabel: "Share list",
-                  icon: <Icon color="var(--text-secondary)" name="share" size={20} />,
-                  onClick: () => setIsSharingOpen((currentValue) => !currentValue)
+                  ariaLabel: "List options",
+                  icon: <Icon color="var(--text-secondary)" name="moreVertical" size={20} />,
+                  onClick: () => setShowOptions(true)
                 }
               ]
             : []
@@ -308,11 +332,7 @@ export default function ListDetailPage() {
                 >
                   <span className="detail-section-label detail-section-label-done">DONE</span>
                   <span className="eg-chip-success">{doneEntries.length}</span>
-                  <Icon
-                    color="var(--color-success)"
-                    name={doneOpen ? "chevronDown" : "chevronRight"}
-                    size={16}
-                  />
+                  <Icon color="var(--color-success)" name={doneOpen ? "chevronDown" : "chevronRight"} size={16} />
                 </button>
 
                 {doneOpen
@@ -328,85 +348,37 @@ export default function ListDetailPage() {
                   : null}
               </section>
             ) : null}
-
-            {list?.is_owner && isSharingOpen ? (
-              <SharingPanel
-                isSharingLoading={isSharingLoading}
-                members={members}
-                shareEmail={shareEmail}
-                shareError={shareError}
-                onEmailChange={setShareEmail}
-                onRevoke={handleRevokeMember}
-                onShareSubmit={handleShareSubmit}
-              />
-            ) : null}
           </>
         ) : null}
       </div>
 
       {list ? <FAB onClick={() => setShowAddItem(true)} /> : null}
-      <AddItemSheet
-        open={showAddItem}
-        onAdd={(text) => void addEntryByText(text)}
-        onClose={() => setShowAddItem(false)}
+      <AddItemSheet open={showAddItem} onAdd={(text) => void addEntryByText(text)} onClose={() => setShowAddItem(false)} />
+      <ListOptionsSheet
+        isOwner={list?.is_owner ?? false}
+        open={showOptions}
+        onClose={() => setShowOptions(false)}
+        onRenameSelect={() => setShowRename(true)}
+        onShareSelect={() => setShowShare(true)}
+      />
+      <RenameListSheet
+        currentName={list?.name ?? ""}
+        open={showRename}
+        onClose={() => setShowRename(false)}
+        onRename={handleRename}
+      />
+      <ShareListSheet
+        isSharingLoading={isSharingLoading}
+        members={members}
+        open={showShare}
+        shareEmail={shareEmail}
+        shareError={shareError}
+        onClose={() => setShowShare(false)}
+        onEmailChange={setShareEmail}
+        onRevoke={handleRevokeMember}
+        onShareSubmit={handleShareSubmit}
       />
     </div>
-  );
-}
-
-function SharingPanel({ members, shareEmail, shareError, isSharingLoading, onEmailChange, onShareSubmit, onRevoke }) {
-  return (
-    <section className="sharing-panel">
-      <div className="entry-section-header">
-        <span className="detail-section-label detail-section-label-share">SQUAD</span>
-        <span className="eg-chip-purple">{members.length}</span>
-      </div>
-
-      <form className="sharing-panel-form" onSubmit={onShareSubmit}>
-        <div className="eg-field">
-          <label htmlFor="share-email">Share with email</label>
-          <input
-            id="share-email"
-            className="eg-input"
-            placeholder="Share with email..."
-            value={shareEmail}
-            onChange={(event) => onEmailChange(event.target.value)}
-          />
-        </div>
-        <button className="eg-btn-secondary" type="submit">
-          Add Member
-        </button>
-      </form>
-
-      {shareError ? <div className="detail-banner eg-error-banner">{shareError}</div> : null}
-      {isSharingLoading ? <LoadingState rows={2} /> : null}
-
-      {!isSharingLoading
-        ? members.map((member) => (
-            <div key={member.user_id} className="member-row">
-              <div className="member-row-copy">
-                <div className="member-row-name">{member.display_name}</div>
-                <div className="member-row-email">{member.email}</div>
-              </div>
-              <div className="member-row-actions">
-                <span className={member.is_owner ? "eg-chip-purple" : "eg-chip-cyan"}>
-                  {member.is_owner ? "Owner" : "Member"}
-                </span>
-                {member.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
-                {!member.is_owner ? (
-                  <button
-                    className="eg-btn-danger member-row-revoke"
-                    type="button"
-                    onClick={() => void onRevoke(member.user_id)}
-                  >
-                    Revoke
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ))
-        : null}
-    </section>
   );
 }
 

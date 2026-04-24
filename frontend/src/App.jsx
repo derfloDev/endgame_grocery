@@ -6,7 +6,6 @@ import ListDetailPage from "./pages/ListDetailPage";
 import LoginPage from "./pages/LoginPage";
 import OverviewPage from "./pages/OverviewPage";
 import RegisterPage from "./pages/RegisterPage";
-import SearchPage from "./pages/SearchPage";
 import "./index.css";
 
 export default function App() {
@@ -17,7 +16,6 @@ export default function App() {
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/lists/:id" element={<ListDetailPage />} />
-        <Route path="/search" element={<SearchPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

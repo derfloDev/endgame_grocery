@@ -48,21 +48,21 @@ describe("shared Endgame UI components", () => {
     expect(screen.getByLabelText("Loading")).toBeTruthy();
   });
 
-  it("marks the active bottom navigation tab from the current route", () => {
+  it("renders a single Lists bottom navigation tab and marks it active on list routes", () => {
     render(
       <MemoryRouter
         future={{
           v7_relativeSplatPath: true,
           v7_startTransition: true
         }}
-        initialEntries={["/search"]}
+        initialEntries={["/lists/list-1"]}
       >
         <BottomNav />
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("button", { name: "Search" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("button", { name: "Lists" }).getAttribute("aria-current")).toBeNull();
+    expect(screen.getByRole("button", { name: "Lists" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
   });
 
   it("closes the bottom sheet from the backdrop and does not render when closed", async () => {

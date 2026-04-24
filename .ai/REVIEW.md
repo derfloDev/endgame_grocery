@@ -331,3 +331,66 @@ No blocking, major, or minor findings.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-007 — List Detail Options Flyout + BottomNav Cleanup
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — `ListOptionsSheet` guards with `if (!open || !isOwner)`. The `!isOwner` check is redundant (the parent never sets `showOptions=true` for non-owners, and the options button only renders for owners) but is a safe belt-and-suspenders guard.
+- **nit** — `ShareListSheet` uses `<label htmlFor="share-list-sheet-email">` wrapping the input, making `htmlFor` technically redundant (implicit association via nesting suffices). Accessible and functional either way; `getByLabelText` works as confirmed by passing tests.
+- **nit** — `RenameListSheet` disables Save when `value.trim() === currentName`. This is a UX improvement beyond the spec — prevents no-op API calls. Positive.
+- **nit** — `handleRename` re-throws on error so `RenameListSheet` can stay open on failure. Correct defensive pattern.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-007 confirmed `ready_for_review`.
+2. Re-read T-007 acceptance criteria (scope change from original T-006).
+3. Read `ListOptionsSheet.jsx`, `RenameListSheet.jsx`, `ShareListSheet.jsx` in full.
+4. Inspected `git diff --staged` (new sheet files) and `git diff` (modified: `App.jsx`, `BottomNav.jsx`, `ListDetailPage.jsx`, `index.css`, `app.test.jsx`, `ui.test.jsx`).
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (254 kB JS).
+7. Ran `npm test` → **19/19 frontend + 25/25 backend tests pass**.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| Search tab removed from BottomNav | ✅ `tabs` array reduced to single Lists entry; `ui.test.jsx` confirms no Search button |
+| `/search` route removed from App.jsx | ✅ Import + `<Route>` removed; `/search` now falls through to `<Navigate to="/" replace />` |
+| TopBar shows moreVertical "List options" button (owner only) | ✅ `ariaLabel: "List options"`, `name="moreVertical"`; test confirms presence and absence of old "Share list" button |
+| Tapping options opens `ListOptionsSheet` | ✅ `setShowOptions(true)`; test confirms `role="dialog" name="List Options"` |
+| "Rename list" → `RenameListSheet` with name pre-filled | ✅ `currentName={list?.name}` prop; `useEffect` syncs on open; test reads pre-filled value |
+| Saving calls `renameList` API | ✅ `handleRename` calls `renameList(token, id, { name })`; TopBar title updates to new name |
+| "Share list" → `ShareListSheet` with email form + member list | ✅ `setShowShare(true)`; `ShareListSheet` has form, member list, Revoke; test verifies flow end-to-end |
+| Existing sharing logic preserved | ✅ `handleShareSubmit`, `handleRevokeMember` unchanged; state props passed through |
+| `/search` redirects to overview | ✅ Catch-all `<Navigate to="/">` handles it; test confirms `Lists` tab is active |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend |
+
+**Scope clean-up verified:**
+- `SharingPanel` inline component fully removed from `ListDetailPage.jsx` ✓
+- `isSharingOpen` state replaced by `showOptions`, `showRename`, `showShare` ✓
+- `renameList` import added to `ListDetailPage.jsx`; `handleRename` wired with offline-aware update ✓
+- `SearchPage` import removed from `App.jsx` ✓
+
+##### Risks
+
+- `/search` now redirects silently to `/` via the catch-all route. Any bookmarked search URLs will land on the overview without error. Acceptable.
+- `handleRename` updates `list.name` in local state. The TopBar title re-renders immediately with the new name, consistent with the offline-first update pattern used elsewhere in the codebase.
+
+#### Verdict
+`PASS`
