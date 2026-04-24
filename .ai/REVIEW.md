@@ -184,3 +184,76 @@ No blocking, major, or minor findings.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004 — Overview Page Redesign
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — `ListCardHome` uses `<article>` instead of the plan's `<div>` as the card root. Semantically more appropriate for a standalone content item. Not a concern.
+- **nit** — `NewListSheet` uses a `<form onSubmit>` instead of an `onKeyDown` handler on the input. Functionally equivalent; the form approach is more robust (Enter key submits natively). Not a concern.
+- **nit** — `BottomSheet` gained `aria-label={title}` on the dialog div — a correctness improvement that enabled `findByRole("dialog", { name: "New List" })` in tests. Positive change.
+- **nit** — Active toggle applies both `eg-toggle eg-toggle-active` classes (not just `eg-toggle-active`). This is correct: `eg-toggle` supplies base padding/radius, `eg-toggle-active` overrides colours via CSS cascade.
+- **nit** — The moreVertical menu button is only rendered for `list.is_owner === true`. The plan's spec omitted this guard, but the implementation is strictly more correct — non-owners cannot rename or delete, so showing the menu would be misleading.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-004 confirmed `ready_for_review`.
+2. Re-read T-004 section of `.ai/PLAN.md`.
+3. Read `OverviewPage.jsx`, `ListCardHome.jsx`, `NewListSheet.jsx` in full.
+4. Inspected `git diff --staged` (new files: `ListCardHome.jsx`, `NewListSheet.jsx`) and `git diff` (unstaged: `OverviewPage.jsx`, `index.css`, `app.test.jsx`, `BottomSheet.jsx`).
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (250 kB JS).
+7. Ran `npm test` → **17/17 frontend + 25/25 backend tests pass**.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| Dark neon list cards with owner/shared chips | ✅ `ListCardHome` renders `eg-card`, `eg-chip-purple`/`eg-chip-cyan`, Queued chip |
+| FAB opens `NewListSheet` bottom sheet | ✅ FAB `onClick={() => setShowNew(true)}`; test confirms dialog appears |
+| Creating a list adds it to the list | ✅ `createListByName` → `updateLists`; offline queuing preserved |
+| Rename & delete via moreVertical menu | ✅ Menu opens on owner cards; rename input + Save/Cancel; delete with confirm |
+| Active/All toggle renders | ✅ `overview-toggle` with `eg-toggle` / `eg-toggle-active` |
+| Empty / loading / error states display | ✅ `EmptyState`, `LoadingState`, `ErrorState` wired; new test covers loading + error |
+| Logout functional | ✅ `eg-icon-btn` `aria-label="Log out"` calls `logout()`; test confirms redirect |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 17/17 frontend |
+
+**Plan compliance — detailed:**
+
+| Item | Status |
+|---|---|
+| State: `view`, `showNew` added | ✅ |
+| `createListByName(name)` extracted | ✅ |
+| `submitRename(listId, newName)` extracted (no state dependency) | ✅ |
+| `handleDelete` unchanged | ✅ |
+| `sharedCount` + `displayLists = lists` | ✅ |
+| `loadLists` as `useCallback` for ErrorState retry | ✅ |
+| `overview-topbar` sticky header with brand + chips | ✅ |
+| `overview-toggle` Active / All Lists | ✅ |
+| `overview-content` with all four states | ✅ |
+| `FAB` + `NewListSheet` | ✅ |
+| All required CSS classes | ✅ |
+| New tests: loading/error states, logout | ✅ |
+| Existing tests updated for new UI copy & interaction flow | ✅ |
+
+##### Risks
+
+- None. All async handlers, offline queue integration, and routing are unchanged. The state refactors (removing `editingId`/`editingName`, removing `newListName`) eliminate race conditions in the old implementation. Full test coverage.
+
+#### Verdict
+`PASS`

@@ -536,6 +536,11 @@ p {
   animation: slideUp 0.3s var(--ease-out);
 }
 
+.bottom-sheet form {
+  display: grid;
+  gap: 16px;
+}
+
 .bottom-sheet-handle {
   width: 36px;
   height: 4px;
@@ -557,6 +562,160 @@ p {
   justify-content: space-between;
   align-items: start;
   gap: 1rem;
+}
+
+.overview-page {
+  padding-bottom: 120px;
+}
+
+.overview-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding: 52px 16px 16px;
+  background: linear-gradient(180deg, rgba(8, 11, 28, 1) 70%, rgba(8, 11, 28, 0) 100%);
+}
+
+.overview-brand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.overview-brand-title {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.overview-brand-sub {
+  margin-top: -2px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.2em;
+}
+
+.overview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overview-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  box-shadow: 0 0 16px rgba(139, 43, 226, 0.4);
+}
+
+.overview-chips {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.overview-chips .eg-chip-purple {
+  gap: 6px;
+}
+
+.overview-toggle {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 14px;
+}
+
+.eg-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 9999px;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: "Exo 2", sans-serif;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 6px 14px;
+  transition: all var(--duration-standard);
+}
+
+.eg-toggle-active {
+  border-color: rgba(0, 229, 255, 0.4);
+  background: rgba(0, 229, 255, 0.12);
+  color: var(--neon-cyan);
+}
+
+.overview-content {
+  padding: 0 16px;
+}
+
+.list-card-home {
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: border-color var(--duration-standard), box-shadow var(--duration-standard);
+}
+
+.list-card-home:hover {
+  border-color: rgba(0, 229, 255, 0.45);
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.12), 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.eg-card-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--gradient-card);
+  pointer-events: none;
+}
+
+.list-card-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+}
+
+.list-card-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.list-card-name {
+  margin-bottom: 10px;
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+}
+
+.list-card-chips {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.list-card-menu {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.list-card-menu-btn {
+  justify-content: center;
+}
+
+.list-card-menu-actions {
+  margin-top: 8px;
 }
 
 .stack {

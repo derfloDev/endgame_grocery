@@ -6,7 +6,7 @@ export default function BottomSheet({ open, onClose, title, children }) {
   return (
     <>
       <button aria-label="Close sheet" className="bottom-sheet-backdrop" type="button" onClick={onClose} />
-      <div aria-modal="true" className="bottom-sheet" role="dialog">
+      <div aria-label={title} aria-modal="true" className="bottom-sheet" role="dialog">
         <div className="bottom-sheet-handle" />
         <div className="bottom-sheet-title">{title}</div>
         {children}

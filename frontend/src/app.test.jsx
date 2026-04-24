@@ -154,7 +154,7 @@ describe("authentication shell", () => {
       );
     });
 
-    expect(await screen.findByText("No lists yet. Create one to get started.")).toBeTruthy();
+    expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
   });
 
   it("creates, renames, and deletes a list from the overview", async () => {
@@ -183,13 +183,17 @@ describe("authentication shell", () => {
 
     renderApp(["/"]);
 
-    expect(await screen.findByText("No lists yet. Create one to get started.")).toBeTruthy();
+    expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(await screen.findByRole("dialog", { name: "New List" })).toBeTruthy();
 
     await userEvent.type(screen.getByLabelText("New list"), "Weekend groceries");
     await userEvent.click(screen.getByRole("button", { name: "Create list" }));
 
     expect(await screen.findByText("Weekend groceries")).toBeTruthy();
 
+    await userEvent.click(screen.getByRole("button", { name: "Actions for Weekend groceries" }));
     await userEvent.click(screen.getByRole("button", { name: "Rename" }));
     const renameInput = screen.getByLabelText("Rename list");
     await userEvent.clear(renameInput);
@@ -198,11 +202,47 @@ describe("authentication shell", () => {
 
     expect(await screen.findByText("Renamed list")).toBeTruthy();
 
+    await userEvent.click(screen.getByRole("button", { name: "Actions for Renamed list" }));
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => {
       expect(screen.queryByText("Renamed list")).toBeNull();
     });
+  });
+
+  it("shows the loading and error states on the overview", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+
+    let rejectFetch;
+    fetch.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectFetch = reject;
+      })
+    );
+
+    renderApp(["/"]);
+
+    expect(await screen.findByLabelText("Loading")).toBeTruthy();
+
+    rejectFetch(new Error("Boom"));
+
+    expect(await screen.findByText("Mission Failed")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+
+  it("logs out from the redesigned overview header", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ lists: [] })
+    });
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("ENDGAME")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Log out" }));
+
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
   });
 
   it("shows a shared badge in the overview with the owner name", async () => {
@@ -217,8 +257,7 @@ describe("authentication shell", () => {
     renderApp(["/"]);
 
     expect(await screen.findByText("BBQ party")).toBeTruthy();
-    expect(screen.getByText("Shared list").getAttribute("title")).toBe("Owned by Alex");
-    expect(screen.getByText("Owned by Alex")).toBeTruthy();
+    expect(screen.getByText("Shared · Alex")).toBeTruthy();
   });
 
   it("adds, toggles, edits, and deletes entries in list detail", async () => {
@@ -414,10 +453,11 @@ describe("authentication shell", () => {
 
     renderApp(["/"]);
 
-    expect(await screen.findByText("No lists yet. Create one to get started.")).toBeTruthy();
+    expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
 
     setNavigatorOnline(false);
     window.dispatchEvent(new Event("offline"));
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
     await userEvent.type(screen.getByLabelText("New list"), "Queued list");
     await userEvent.click(screen.getByRole("button", { name: "Create list" }));
 

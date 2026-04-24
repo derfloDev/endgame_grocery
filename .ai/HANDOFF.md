@@ -147,3 +147,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | implement |
 
 ---
+
+### T-004 — review — 2026-04-24T14:40:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 overview page redesign; all acceptance criteria met, state refactors clean, all validations pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — IMPLEMENT — 2026-04-24T12:17:11Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Redesigned the overview page as the Endgame home screen with a branded header, neon list cards, FAB-driven list creation sheet, and refreshed loading, error, empty, rename, delete, and logout flows. |
+| Files Changed | README.md, .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/app.test.jsx, frontend/src/components/ListCardHome.jsx, frontend/src/components/NewListSheet.jsx, frontend/src/components/ui/BottomSheet.jsx, frontend/src/index.css, frontend/src/pages/OverviewPage.jsx |
+| Validation | `npm run test --workspace frontend -- src/app.test.jsx` failed before implementation on the old overview UI, then passed after implementation; `npm run lint` passed with the existing AuthContext Fast Refresh warning; `npm run build` passed; `npm test` passed. |
+| Commit | `feat(ui): redesign overview page as Endgame home screen` |
+| Next Role | review |
+
+---
+
+### T-004 — commit_task — 2026-04-24T12:35:54Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-004 done after review approval and committed the reviewed overview page redesign. |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/components/ListCardHome.jsx, frontend/src/components/NewListSheet.jsx, frontend/src/components/ui/BottomSheet.jsx, frontend/src/index.css, frontend/src/pages/OverviewPage.jsx |
+| Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run test --workspace frontend -- src/app.test.jsx`, `npm run lint`, `npm run build`, and `npm test`. |
+| Commit | `feat(ui): redesign overview page as Endgame home screen` |
+| Next Role | implement |
+
+---
