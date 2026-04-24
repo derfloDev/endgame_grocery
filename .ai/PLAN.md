@@ -1626,3 +1626,58 @@ Approach chosen: **Option B** — add spacing custom properties to `tokens.css` 
 
 ### Commit message
 `fix(ui): add spacing-scale tokens and fix spacing inconsistencies`
+
+---
+
+## T-010 — List detail section spacing fixes
+
+### Objective
+Fix two visual spacing gaps on the list detail page reported after T-009:
+1. No gap between the Open Items card and the Done card.
+2. No internal spacing between the "DONE" collapse header and the first entry row inside that card.
+
+No layout restructuring — two targeted CSS additions in `index.css`.
+
+### Files to change
+
+| File | Action |
+|------|--------|
+| `frontend/src/index.css` | Add 2 CSS rules |
+
+### index.css — 2 targeted additions
+
+**Fix 1 — gap between section cards**
+
+The two `<section className="entry-section">` elements are direct siblings inside the JSX fragment. No margin separates them. Use the adjacent-sibling combinator so the rule only fires when a second section follows the first (not on a standalone section):
+
+```css
+.entry-section + .entry-section {
+  margin-top: var(--space-4); /* 16px between Open Items card and Done card */
+}
+```
+
+**Fix 2 — space between Done header button and first entry**
+
+`.entry-section-collapse` must remain `padding: 0` on all sides so that when the Done card is **collapsed** the section's own `padding: 1.25rem` produces symmetric spacing (20 px) on all four sides.
+
+Adding `padding-bottom` to the button directly causes asymmetry in the collapsed state (20 px top vs 32 px bottom) — do **not** use that approach.
+
+Instead, target the first entry row that immediately follows the collapse button with the adjacent-sibling combinator. This `margin-top` is only active when entries are actually rendered below the button (expanded state); it has no effect in the collapsed state:
+
+```css
+/* entry-section-collapse padding stays at 0 */
+
+.entry-section-collapse + .entry-row-wrapper {
+  margin-top: var(--space-3); /* 12px gap — only when entries are shown below the DONE header */
+}
+```
+
+⚠️ **Known rework target**: The initial implementation used `padding: 0 0 var(--space-3)` on `.entry-section-collapse`, which breaks the collapsed-state symmetry. The implementer must revert that padding to `padding: 0` and add the `.entry-section-collapse + .entry-row-wrapper` rule instead.
+
+### Validation
+- `npm run lint` — passes
+- `npm run build` — passes
+- `npm test` — passes (CSS-only, no test assertions change)
+
+### Commit message
+`fix(ui): add gap between list detail section cards and done header spacing`

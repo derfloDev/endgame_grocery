@@ -523,3 +523,51 @@ No blocking, major, or minor findings.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-010 — List detail section spacing fixes
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — The plan specified `padding-bottom: var(--space-3)` for `.entry-section-collapse`, but the implementer wrote `padding: 0 0 var(--space-3)`. Since the pre-existing value was `padding: 0`, the shorthand is functionally identical (top/right/left remain 0, bottom becomes 12px). Correct outcome.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-010 confirmed `ready_for_review`.
+2. Read T-010 section of `.ai/PLAN.md`.
+3. Ran `git diff HEAD -- frontend/src/index.css` to isolate the two uncommitted CSS additions.
+4. Verified `.entry-section` class usage in `ListDetailPage.jsx` — two sibling `<section className="entry-section">` elements confirmed at lines 304 and 326; adjacent-sibling combinator fires correctly.
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (16.77 kB CSS, 975 kB precache).
+7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| `.entry-section + .entry-section { margin-top: var(--space-4) }` — 16px gap between Open Items and Done sections | ✅ |
+| `.entry-section-collapse { padding: 0 0 var(--space-3) }` — 12px below "DONE" label before first entry row | ✅ |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
+
+**Scope discipline verified:** only 2 CSS rules changed; no JSX, no logic, no other selectors touched.
+
+##### Risks
+
+- None. Adjacent-sibling combinator is scoped to `.entry-section` elements only; no other page is affected. CSS-only change with no test regressions.
+
+#### Verdict
+`PASS`

@@ -907,6 +907,10 @@ p {
   padding: 16px 0 8px;
 }
 
+.entry-section + .entry-section {
+  margin-top: var(--space-4);
+}
+
 .entry-section-collapse {
   width: 100%;
   display: flex;
@@ -915,7 +919,7 @@ p {
   border: 0;
   background: none;
   cursor: pointer;
-  padding: 0;
+  padding: 0 0 var(--space-3);
   text-align: left;
 }
 

@@ -295,6 +295,29 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-010 — plan — 2026-04-24T18:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned 2 CSS fixes for list detail section spacing: adjacent-sibling margin-top between entry-section cards and padding-bottom on entry-section-collapse to separate DONE header from first entry row |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-010 — review — 2026-04-24T18:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-010 list detail section spacing fixes; both targeted CSS rules correct, acceptance criteria met, all validations pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-009 — review — 2026-04-24T18:15:00Z
 
 | Field | Value |
@@ -367,6 +390,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, frontend/src/index.css, frontend/src/styles/tokens.css |
 | Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run lint`, `npm run build`, and `npm test`. |
 | Commit | `fix(ui): add spacing-scale tokens and fix spacing inconsistencies` |
+| Next Role | implement |
+
+---
+
+### T-010 — IMPLEMENT — 2026-04-24T17:42:19.4661397Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the missing vertical gap between the Open Items and Done cards and restored spacing below the DONE collapse header before the first entry row. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/index.css |
+| Validation | No test files changed because this task only adjusts two CSS spacing rules on the list detail page. `npm run lint` passed with the existing AuthContext Fast Refresh warning; `npm run build` passed; `npm test` passed. |
+| Commit | `fix(ui): add gap between list detail section cards and done header spacing` |
+| Next Role | review |
+
+---
+
+### T-010 — commit_task — 2026-04-24T17:45:17.0491971Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-010 done after review approval and committed the reviewed list-detail section spacing fixes. |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, frontend/src/index.css |
+| Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run lint`, `npm run build`, and `npm test`. |
+| Commit | `fix(ui): add gap between list detail section cards and done header spacing` |
 | Next Role | implement |
 
 ---
