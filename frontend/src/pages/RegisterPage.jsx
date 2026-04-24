@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 
 export default function RegisterPage() {
@@ -37,18 +38,23 @@ export default function RegisterPage() {
   return (
     <main className="auth-layout">
       <section className="auth-card">
-        <p className="eyebrow">Family-ready setup</p>
-        <div className="page-copy">
-          <h1>Create your account</h1>
-          <p>Set up your login now so list sharing and protected views can follow in later tasks.</p>
+        <div className="auth-brand">
+          <img alt="Endgame Grocery" className="auth-logo" src={logo} />
+          <div className="auth-brand-text">
+            <div className="auth-brand-title eg-orbitron eg-gradient-text">ENDGAME</div>
+            <div className="auth-brand-sub">GROCERY</div>
+          </div>
         </div>
+        <h1>Join the Squad</h1>
+        <p>Create your account to get started.</p>
         <form className="auth-form" onSubmit={handleSubmit}>
-          {error ? <p className="error-banner">{error}</p> : null}
-          <div className="field">
+          {error ? <p className="eg-error-banner">{error}</p> : null}
+          <div className="eg-field">
             <label htmlFor="register-display-name">Display name</label>
             <input
               id="register-display-name"
               autoComplete="name"
+              className="eg-input"
               name="display_name"
               required
               type="text"
@@ -56,11 +62,12 @@ export default function RegisterPage() {
               onChange={(event) => setDisplayName(event.target.value)}
             />
           </div>
-          <div className="field">
+          <div className="eg-field">
             <label htmlFor="register-email">Email</label>
             <input
               id="register-email"
               autoComplete="email"
+              className="eg-input"
               name="email"
               required
               type="email"
@@ -68,11 +75,12 @@ export default function RegisterPage() {
               onChange={(event) => setEmail(event.target.value)}
             />
           </div>
-          <div className="field">
+          <div className="eg-field">
             <label htmlFor="register-password">Password</label>
             <input
               id="register-password"
               autoComplete="new-password"
+              className="eg-input"
               minLength={8}
               name="password"
               required
@@ -82,10 +90,10 @@ export default function RegisterPage() {
             />
           </div>
           <div className="button-row">
-            <button className="button-primary" disabled={isSubmitting} type="submit">
+            <button className="eg-btn-primary" disabled={isSubmitting} type="submit">
               {isSubmitting ? "Creating..." : "Create account"}
             </button>
-            <Link className="muted-link" to="/login">
+            <Link className="eg-link" to="/login">
               Already have an account?
             </Link>
           </div>

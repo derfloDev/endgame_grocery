@@ -115,3 +115,72 @@ No blocking, major, or minor findings.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-003 — Auth Pages Redesign
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — `auth-brand-text` wrapper div used in JSX has no corresponding CSS rule. It serves purely as a structural wrapper; no rule is needed, and the plan did not define one either. Not a concern.
+- **nit** — Logo asset was resized from 2048×2048 → 256×256 to satisfy Workbox's precache size limit. Pragmatic and correct; the build now succeeds cleanly. Not a concern.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-003 confirmed `ready_for_review`.
+2. Re-read T-003 section of `.ai/PLAN.md`.
+3. Read `frontend/src/pages/LoginPage.jsx` and `RegisterPage.jsx` in full.
+4. Inspected `git diff --staged` for all changed files: `LoginPage.jsx`, `RegisterPage.jsx`, `index.css`, `app.test.jsx`, logo asset.
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (logo now 130 kB, within Workbox precache budget).
+7. Ran `npm test` → **15/15 frontend + 25/25 backend tests pass**.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| Dark `auth-card` on both pages | ✅ `<section className="auth-card">` present on login and register |
+| Logo + Orbitron "ENDGAME/GROCERY" brand header | ✅ `auth-brand` block, logo img, "ENDGAME" in `.eg-orbitron .eg-gradient-text`, "GROCERY" sub |
+| Neon input focus ring | ✅ All `<input>` have `className="eg-input"`; focus ring defined in T-001 CSS |
+| Gradient primary button | ✅ `eg-btn-primary` uses `var(--gradient-brand)` |
+| Form submission and error display remain functional | ✅ All handler logic unchanged; `eg-error-banner` replaces `error-banner` |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean build |
+
+**Plan compliance — detailed:**
+
+| Item | Plan spec | Status |
+|---|---|---|
+| Login h1 | "Welcome Back" | ✅ |
+| Login subtitle | "Sign in to access your mission." | ✅ |
+| Register h1 | "Join the Squad" | ✅ |
+| Register subtitle | "Create your account to get started." | ✅ |
+| `button-primary` → `eg-btn-primary` | Both pages | ✅ |
+| `error-banner` → `eg-error-banner` | Both pages | ✅ |
+| `muted-link` → `eg-link` | Both pages | ✅ |
+| `<input>` → `className="eg-input"` | All inputs on both pages | ✅ |
+| `field` → `eg-field` | All field wrappers | ✅ |
+| `<p class="eyebrow">` removed | Both pages | ✅ |
+| `<div class="page-copy">` removed | Both pages | ✅ |
+| CSS: `.eyebrow` / `.page-copy` removed | `index.css` | ✅ |
+| CSS: `.auth-brand`, `.auth-logo`, `.auth-brand-title`, `.auth-brand-sub`, `.auth-card h1`, `.auth-card > p` added | `index.css` | ✅ |
+| Test updated for new heading copy | "Welcome Back" (capital B) | ✅ |
+| New test for brand + copy on both auth pages | `app.test.jsx` | ✅ |
+
+##### Risks
+
+- None. All form logic, state management, and routing are unchanged. Only JSX structure and CSS class names were modified, covered by the existing + new tests.
+
+#### Verdict
+`PASS`

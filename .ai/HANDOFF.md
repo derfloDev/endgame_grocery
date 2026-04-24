@@ -109,3 +109,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | implement |
 
 ---
+
+### T-003 — review — 2026-04-24T11:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 auth pages redesign; all acceptance criteria met, form logic intact, all validations pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — IMPLEMENT — 2026-04-24T11:41:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Redesigned the login and register pages with the Endgame auth brand, updated copy, dark field/button styling, and a smaller frontend logo asset so the PWA build remains valid. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/app.test.jsx, frontend/src/assets/endgame_grocery_logo.png, frontend/src/index.css, frontend/src/pages/LoginPage.jsx, frontend/src/pages/RegisterPage.jsx |
+| Validation | `npm run test --workspace frontend -- src/app.test.jsx` failed before implementation on the old auth copy/branding, then passed after implementation; `npm run lint` passed with existing AuthContext Fast Refresh warning; `npm run build` initially failed because the 2048x2048 frontend logo asset exceeded Workbox's precache size limit, then passed after resizing `frontend/src/assets/endgame_grocery_logo.png` to 256x256; `npm test` passed. |
+| Commit | `feat(ui): apply dark design to auth pages` |
+| Next Role | review |
+
+---
+
+### T-003 — commit_task — 2026-04-24T12:10:27Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-003 done after review approval and committed the auth page redesign. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run test --workspace frontend -- src/app.test.jsx`, `npm run lint`, `npm run build`, and `npm test`. |
+| Commit | `feat(ui): apply dark design to auth pages` |
+| Next Role | implement |
+
+---

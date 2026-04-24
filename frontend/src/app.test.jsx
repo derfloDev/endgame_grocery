@@ -41,7 +41,24 @@ describe("authentication shell", () => {
   it("redirects unauthenticated users to login", async () => {
     renderApp(["/"]);
 
-    expect(await screen.findByRole("heading", { name: "Welcome back" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+  });
+
+  it("renders the redesigned auth brand and updated copy on login and register", async () => {
+    const rendered = renderApp(["/login"]);
+
+    expect(await screen.findByRole("img", { name: "Endgame Grocery" })).toBeTruthy();
+    expect(screen.getByText("ENDGAME")).toBeTruthy();
+    expect(screen.getByText("GROCERY")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    expect(screen.getByText("Sign in to access your mission.")).toBeTruthy();
+
+    rendered.unmount();
+    renderApp(["/register"]);
+
+    expect(await screen.findByRole("img", { name: "Endgame Grocery" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Join the Squad" })).toBeTruthy();
+    expect(screen.getByText("Create your account to get started.")).toBeTruthy();
   });
 
   it("submits the login form and shows the protected overview", async () => {
