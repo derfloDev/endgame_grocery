@@ -124,6 +124,49 @@ Reviewed: 2026-04-25
 
 ---
 
+## Task: T-007
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/data/iconDatabase.js` — "banana" maps to `IconCherry` and "potato" maps to `IconCarrot` (no dedicated Tabler icons exist for these). Acceptable substitutions given the available set. No fix required.
+2. **nit** — `frontend/src/data/iconRegistry.js` — `IconVaccine`, `IconEggs`, `IconHome`, `IconScissors` are in the registry but unused in `ICON_DB`. Extra registry coverage is intentional (picker grid), not a problem. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `iconRegistry.js` — 88 imports matched 88 registry entries; `ICON_REGISTRY_KEYS` and `FALLBACK_ICON` exports verified.
+- Read `iconDatabase.js` — 136 bilingual ICON_DB entries; all categories (dairy, produce, bakery, meat/fish, beverages, frozen, snacks, household, condiments, pantry, drugstore) present.
+- Runtime spot-checks: registry size = 88, ICON_DB count = 136, `milch → IconMilk`, `toilettenpapier → IconToiletPaper`, zero dangling references.
+- Confirmed `FALLBACK_ICON` is a `React.forwardRef` object (`{ $$typeof, render }`) — correct Tabler v3 shape, not a plain function.
+- Reviewed diffs for `cosineSimilarity.test.js` (emoji → icon-name assertions, added registry/key count + dangling-reference tests), `useIconSuggestion.test.js` (emoji → icon-name mocks), `app.test.jsx` (emoji → icon-name mock data) — all updates are correct and necessary.
+- Verified git diff scope: `iconRegistry.js` (new), `iconDatabase.js`, `package.json`, `package-lock.json`, plus 3 test files updated for Tabler names; no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js` — **7/7 pass** (2 new registry tests + dangling-reference test + 4 original).
+- Ran `npm run build` — clean; 73 modules transformed; tree-shaking effective.
+- Ran `npm test` — **34/34 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `ICON_REGISTRY` has 88 entries (≥ 80) covering food, household, and drugstore ✅
+- `ICON_REGISTRY_KEYS = Object.freeze(Object.keys(ICON_REGISTRY))` — correct ordered key list ✅
+- `FALLBACK_ICON = IconShoppingCart` exported ✅
+- Every `icon` string in `ICON_DB` resolves to a registered component — no dangling references ✅
+- `EXACT_MATCH_MAP["milch"] === "IconMilk"` and `EXACT_MATCH_MAP["toilettenpapier"] === "IconToiletPaper"` verified at runtime ✅
+- `@tabler/icons-react` in `frontend/package.json`; build tree-shakes to only the registered icons ✅
+
+##### Risks
+- Existing committed code in T-004/T-005 renders `entry.icon` as a text node, so entries created before T-008 through T-010 land will show "IconMilk" etc. as literal text in the UI. This is a known transitional state tracked by the remaining tasks.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-005
 
 ### Review Round 1

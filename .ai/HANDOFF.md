@@ -213,3 +213,72 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-007 — review — 2026-04-25T20:18:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-007 Tabler icon registry + database refactor: 88-entry registry, 136 ICON_DB entries, zero dangling refs, all EN/DE lookups resolve to icon names, tree-shaking confirmed; all checks pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-007 — implement — 2026-04-25T18:02:41Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Installed Tabler Icons, added a tree-shakeable icon registry, and refactored the bilingual icon database and tests to use stored Tabler icon-name strings for grocery, household, and drugstore items. |
+| Files Changed | `frontend/package.json`, `package-lock.json`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconDatabase.js`, `frontend/src/utils/cosineSimilarity.test.js`, `frontend/src/hooks/useIconSuggestion.test.js`, `frontend/src/app.test.jsx`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm install @tabler/icons-react --workspace @endgame-grocery/frontend` (pass), `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): switch grocery icon matching to Tabler icon names |
+| Next Role | review |
+
+---
+
+### T-007..T-010 — plan — 2026-04-25T10:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Rework plan: replace emoji icons with Tabler SVG icons; 4 new tasks added (T-007 data+install, T-008 hook/worker, T-009 inline picker in AddItemSheet, T-010 EntryRow SVG rendering); T-006 deferred to after T-010 so docs reflect final state. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-007 — plan — 2026-04-25T10:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Extended T-007 icon registry scope: added Haushalt (Spray, ToiletPaper, WashMachine, Broom, Bucket, Battery, Bulb, Soap, …) and Drogerie (Pill, FirstAidKit, Bandage, Dental, Razor, Flask, Thermometer, Scissors, Sun, BabyBottle, Eye) categories; target raised from ≥50 to ≥80 icons; iconDatabase bilingual entries extended accordingly. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-007..T-011 — plan — 2026-04-25T10:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Extended rework: manual icon selection added via new shared `IconPickerSheet` (T-011); T-007 registry expanded to ≥50 food-relevant icons with `ICON_REGISTRY_KEYS`; T-009 gains "Mehr anzeigen" button; T-010 edit mode gains inline picker row + "Mehr anzeigen"; `onEdit` signature extended with `iconName`. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-007 — implement — 2026-04-25T18:27:30Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-007 Tabler registry and icon-name data changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

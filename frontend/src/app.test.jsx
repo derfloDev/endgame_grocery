@@ -278,7 +278,7 @@ describe("authentication shell", () => {
         ok: true,
         json: async () => ({
           entries: [
-            { id: "entry-1", text: "Milk", status: "open", icon: "🥛", created_at: "2026-04-21T00:00:00Z" },
+            { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" },
             { id: "entry-2", text: "Bread", status: "done", icon: null, created_at: "2026-04-21T00:01:00Z" }
           ]
         })
@@ -300,19 +300,19 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          entry: { id: "entry-3", text: "Milch", status: "open", icon: "🥛", created_at: "2026-04-21T00:02:00Z" }
+          entry: { id: "entry-3", text: "Milch", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:02:00Z" }
         })
       })
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          entry: { id: "entry-1", text: "Milk", status: "done", created_at: "2026-04-21T00:00:00Z" }
+          entry: { id: "entry-1", text: "Milk", status: "done", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" }
         })
       })
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          entry: { id: "entry-3", text: "Ground coffee", status: "open", created_at: "2026-04-21T00:02:00Z" }
+          entry: { id: "entry-3", text: "Ground coffee", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:02:00Z" }
         })
       })
       .mockResolvedValueOnce({
@@ -342,14 +342,14 @@ describe("authentication shell", () => {
     expect(await screen.findByRole("dialog", { name: "Add Item" })).toBeTruthy();
 
     await userEvent.type(screen.getByLabelText("Add item"), "Milch");
-    expect(screen.getAllByText("🥛")).toHaveLength(2);
+    expect(screen.getAllByText("IconMilk")).toHaveLength(2);
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/lists/list-1/entries",
         expect.objectContaining({
-          body: JSON.stringify({ text: "Milch", icon: "🥛" }),
+          body: JSON.stringify({ text: "Milch", icon: "IconMilk" }),
           method: "POST"
         })
       );

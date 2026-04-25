@@ -32,7 +32,7 @@ describe("useIconSuggestion", () => {
   it("returns an exact match immediately without calling the worker", () => {
     render(createElement(HookHarness, { text: "Milch" }));
 
-    expect(screen.getByTestId("icon").textContent).toBe("🥛");
+    expect(screen.getByTestId("icon").textContent).toBe("IconMilk");
     expect(screen.getByTestId("loading").textContent).toBe("false");
     expect(requestIconMatch).not.toHaveBeenCalled();
   });
@@ -62,7 +62,7 @@ describe("useIconSuggestion", () => {
   });
 
   it("returns the worker icon when the score is above the threshold", async () => {
-    requestIconMatch.mockResolvedValue({ icon: "🧀", score: 0.82 });
+    requestIconMatch.mockResolvedValue({ icon: "IconCheese", score: 0.82 });
 
     render(createElement(HookHarness, { text: "dairy product" }));
 
@@ -71,7 +71,7 @@ describe("useIconSuggestion", () => {
     });
 
     expect(requestIconMatch).toHaveBeenCalledWith("dairy product");
-    expect(screen.getByTestId("icon").textContent).toBe("🧀");
+    expect(screen.getByTestId("icon").textContent).toBe("IconCheese");
     expect(screen.getByTestId("loading").textContent).toBe("false");
   });
 });
