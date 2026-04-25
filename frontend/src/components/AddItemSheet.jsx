@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useIconSuggestion } from "../hooks/useIconSuggestion";
 import { BottomSheet } from "./ui";
 
 export default function AddItemSheet({ open, onAdd, onClose }) {
   const [text, setText] = useState("");
+  const { icon, loading } = useIconSuggestion(text);
 
   useEffect(() => {
     if (!open) {
@@ -19,7 +21,7 @@ export default function AddItemSheet({ open, onAdd, onClose }) {
       return;
     }
 
-    onAdd?.(trimmed);
+    onAdd?.(trimmed, icon);
     setText("");
   }
 
@@ -36,6 +38,17 @@ export default function AddItemSheet({ open, onAdd, onClose }) {
             value={text}
             onChange={(event) => setText(event.target.value)}
           />
+          {loading ? (
+            <div aria-live="polite" className="add-item-preview add-item-preview-loading">
+              <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
+            </div>
+          ) : icon ? (
+            <div aria-live="polite" className="add-item-preview">
+              <span aria-hidden="true" className="add-item-preview-icon">
+                {icon}
+              </span>
+            </div>
+          ) : null}
         </div>
         <div className="button-row">
           <button className="eg-btn-ghost" type="button" onClick={onClose}>

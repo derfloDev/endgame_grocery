@@ -22,10 +22,10 @@ export function fetchEntries(listId, token) {
   return sendEntryRequest(listId, token);
 }
 
-export function createEntry(listId, token, payload, options = {}) {
+export function createEntry(listId, token, { text, icon }, options = {}) {
   return sendEntryRequest(listId, token, "", {
     method: "POST",
-    payload,
+    payload: { text, icon },
     queueMeta: {
       resourceType: "entry",
       tempId: options.tempId ?? ""

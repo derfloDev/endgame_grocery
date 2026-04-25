@@ -84,6 +84,46 @@ Reviewed: 2026-04-25
 
 ---
 
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/api/entries.js` — When `icon` is `undefined` it is omitted from the JSON payload by `JSON.stringify`, which the backend handles as `null`. When `icon` is `null` it serialises as `null` and is also handled correctly. Both paths are safe; the behaviour is consistent. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `AddItemSheet.jsx`, `AddItemSheet.test.jsx`, `entries.js`, `ListDetailPage.jsx`, `index.css`.
+- Inspected `app.test.jsx` diff — API call now asserts `body: JSON.stringify({ text: "Milch", icon: "🥛" })` and entry mock includes `icon` field.
+- Verified `@keyframes spin` exists in `index.css` (line 88); `.add-item-preview-spinner` references it correctly.
+- Verified git diff scope: 6 frontend files changed; no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` — **17/17 pass**.
+- Ran `npm run build` — clean; CSS bundle increased from 16.83 KB to 17.40 KB (new styles); no errors.
+- Ran `npm test` — **28/28 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `AddItemSheet.jsx`: hook wired up; spinner shown when `loading === true`; emoji pill shown when `icon` is non-null; nothing shown when both false/null — matches plan spec ✅
+- `aria-live="polite"` on both states and `aria-label="Loading icon suggestion"` on spinner — accessible and testable ✅
+- `onAdd?.(trimmed, icon)` — icon may be null (no match); callers handle `null` correctly ✅
+- `ListDetailPage.jsx`: `addEntryByText(text, icon)` accepts icon param; `temporaryEntry` includes `icon: icon ?? null`; `createEntry` call passes `icon: icon ?? null`; `AddItemSheet` wired with `onAdd={(text, icon) => void addEntryByText(text, icon)}` ✅
+- `entries.js`: `createEntry` destructures `{ text, icon }` from body argument and includes both in payload ✅
+- Test suite covers: icon preview render, loading indicator, icon passed through `onAdd`, integration POST body assertion ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-002
 
 ### Review Round 1

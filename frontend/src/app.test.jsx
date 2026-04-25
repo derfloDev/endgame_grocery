@@ -278,8 +278,8 @@ describe("authentication shell", () => {
         ok: true,
         json: async () => ({
           entries: [
-            { id: "entry-1", text: "Milk", status: "open", created_at: "2026-04-21T00:00:00Z" },
-            { id: "entry-2", text: "Bread", status: "done", created_at: "2026-04-21T00:01:00Z" }
+            { id: "entry-1", text: "Milk", status: "open", icon: "🥛", created_at: "2026-04-21T00:00:00Z" },
+            { id: "entry-2", text: "Bread", status: "done", icon: null, created_at: "2026-04-21T00:01:00Z" }
           ]
         })
       })
@@ -300,7 +300,7 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          entry: { id: "entry-3", text: "Coffee", status: "open", created_at: "2026-04-21T00:02:00Z" }
+          entry: { id: "entry-3", text: "Milch", status: "open", icon: "🥛", created_at: "2026-04-21T00:02:00Z" }
         })
       })
       .mockResolvedValueOnce({
@@ -341,16 +341,27 @@ describe("authentication shell", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(await screen.findByRole("dialog", { name: "Add Item" })).toBeTruthy();
 
-    await userEvent.type(screen.getByLabelText("Add item"), "Coffee");
+    await userEvent.type(screen.getByLabelText("Add item"), "Milch");
+    expect(screen.getByText("🥛")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
-    expect(await screen.findByText("Coffee")).toBeTruthy();
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/lists/list-1/entries",
+        expect.objectContaining({
+          body: JSON.stringify({ text: "Milch", icon: "🥛" }),
+          method: "POST"
+        })
+      );
+    });
+
+    expect(await screen.findByText("Milch")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
     expect(await screen.findByRole("button", { name: "Mark Milk open" })).toBeTruthy();
 
-    await userEvent.click(screen.getByRole("button", { name: "Edit Coffee" }));
-    const editInput = screen.getByLabelText("Edit Coffee");
+    await userEvent.click(screen.getByRole("button", { name: "Edit Milch" }));
+    const editInput = screen.getByLabelText("Edit Milch");
     await userEvent.clear(editInput);
     await userEvent.type(editInput, "Ground coffee");
     await userEvent.click(screen.getByRole("button", { name: "Save item" }));

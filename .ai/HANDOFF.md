@@ -141,3 +141,39 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — review — 2026-04-25T18:36:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 AddItemSheet/API/page wiring: icon preview, loading spinner, onAdd signature, createEntry payload, temporaryEntry, and integration test all correct; all checks pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-25T16:32:18Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added live icon preview to the add-item sheet and carried the resolved icon through the list-detail submit flow and entry creation API payload. |
+| Files Changed | `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/api/entries.js`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/index.css`, `frontend/src/app.test.jsx`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): preview grocery icons while adding items |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-04-25T17:11:40Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-004 add-item icon preview and payload wiring changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

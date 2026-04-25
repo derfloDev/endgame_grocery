@@ -85,6 +85,16 @@ button {
   }
 }
 
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 h1 {
   margin: 0 0 1rem;
   font-size: clamp(2.25rem, 6vw, 4rem);
@@ -737,6 +747,37 @@ p {
 .add-item-form {
   display: grid;
   gap: 16px;
+}
+
+.add-item-preview {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3rem;
+  min-height: 3rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(0, 229, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(0, 229, 255, 0.08);
+}
+
+.add-item-preview-loading {
+  min-width: 3rem;
+}
+
+.add-item-preview-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.add-item-preview-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(0, 229, 255, 0.18);
+  border-top-color: var(--neon-cyan);
+  border-radius: 999px;
+  animation: spin 0.75s linear infinite;
 }
 
 .entry-row-wrapper {
