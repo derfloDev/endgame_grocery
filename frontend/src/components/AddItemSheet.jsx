@@ -4,7 +4,7 @@ import { BottomSheet } from "./ui";
 
 export default function AddItemSheet({ open, onAdd, onClose }) {
   const [text, setText] = useState("");
-  const { icon, loading } = useIconSuggestion(text);
+  const { iconName, loading } = useIconSuggestion(text);
 
   useEffect(() => {
     if (!open) {
@@ -21,7 +21,7 @@ export default function AddItemSheet({ open, onAdd, onClose }) {
       return;
     }
 
-    onAdd?.(trimmed, icon);
+    onAdd?.(trimmed, iconName);
     setText("");
   }
 
@@ -42,10 +42,10 @@ export default function AddItemSheet({ open, onAdd, onClose }) {
             <div aria-live="polite" className="add-item-preview add-item-preview-loading">
               <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
             </div>
-          ) : icon ? (
+          ) : iconName ? (
             <div aria-live="polite" className="add-item-preview">
               <span aria-hidden="true" className="add-item-preview-icon">
-                {icon}
+                {iconName}
               </span>
             </div>
           ) : null}

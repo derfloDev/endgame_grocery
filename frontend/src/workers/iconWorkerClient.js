@@ -11,7 +11,7 @@ function rejectPendingRequests(error) {
 }
 
 function handleWorkerMessage(event) {
-  const { type, id, icon = null, score = 0, error } = event.data ?? {};
+  const { type, id, iconName = null, score = 0, topMatches = [], error } = event.data ?? {};
 
   if (type === "matchResult") {
     const pendingRequest = pendingRequests.get(id);
@@ -21,7 +21,7 @@ function handleWorkerMessage(event) {
     }
 
     pendingRequests.delete(id);
-    pendingRequest.resolve({ icon, score });
+    pendingRequest.resolve({ iconName, score, topMatches });
     return;
   }
 
@@ -78,7 +78,7 @@ export function requestIconMatch(text) {
   const worker = getIconWorker();
 
   if (!worker) {
-    return Promise.resolve({ icon: null, score: 0 });
+    return Promise.resolve({ iconName: null, score: 0, topMatches: [] });
   }
 
   const id = nextRequestId;

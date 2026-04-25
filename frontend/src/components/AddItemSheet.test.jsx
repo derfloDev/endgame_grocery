@@ -6,14 +6,14 @@ import AddItemSheet from "./AddItemSheet";
 vi.mock("../hooks/useIconSuggestion", () => ({
   useIconSuggestion: vi.fn((text) => {
     if (text === "Milch") {
-      return { icon: "🥛", loading: false };
+      return { iconName: "IconMilk", topMatches: [], loading: false };
     }
 
     if (text === "Mil") {
-      return { icon: null, loading: true };
+      return { iconName: null, topMatches: [], loading: true };
     }
 
-    return { icon: null, loading: false };
+    return { iconName: null, topMatches: [], loading: false };
   })
 }));
 
@@ -25,11 +25,11 @@ describe("AddItemSheet", () => {
 
     await userEvent.type(screen.getByLabelText("Add item"), "Milch");
 
-    expect(screen.getByText("🥛")).toBeTruthy();
+    expect(screen.getByText("IconMilk")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
-    expect(onAdd).toHaveBeenCalledWith("Milch", "🥛");
+    expect(onAdd).toHaveBeenCalledWith("Milch", "IconMilk");
   });
 
   it("shows a loading indicator while the icon suggestion is resolving", async () => {
@@ -38,6 +38,6 @@ describe("AddItemSheet", () => {
     await userEvent.type(screen.getByLabelText("Add item"), "Mil");
 
     expect(screen.getByLabelText("Loading icon suggestion")).toBeTruthy();
-    expect(screen.queryByText("🥛")).toBeNull();
+    expect(screen.queryByText("IconMilk")).toBeNull();
   });
 });

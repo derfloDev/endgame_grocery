@@ -31,7 +31,8 @@ export function useIconSuggestion(inputText) {
   const exactIcon = getExactOrPrefixIcon(normalizedText);
   const requestSequenceRef = useRef(0);
   const [asyncState, setAsyncState] = useState({
-    icon: null,
+    iconName: null,
+    topMatches: [],
     loading: false
   });
 
@@ -41,14 +42,16 @@ export function useIconSuggestion(inputText) {
 
     if (!normalizedText || exactIcon) {
       setAsyncState({
-        icon: null,
+        iconName: null,
+        topMatches: [],
         loading: false
       });
       return;
     }
 
     setAsyncState({
-      icon: null,
+      iconName: null,
+      topMatches: [],
       loading: true
     });
 
@@ -60,7 +63,8 @@ export function useIconSuggestion(inputText) {
           }
 
           setAsyncState({
-            icon: result?.icon ?? null,
+            iconName: result?.iconName ?? null,
+            topMatches: (result?.topMatches ?? []).slice(0, 5).map((match) => match.iconName),
             loading: false
           });
         })
@@ -70,7 +74,8 @@ export function useIconSuggestion(inputText) {
           }
 
           setAsyncState({
-            icon: null,
+            iconName: null,
+            topMatches: [],
             loading: false
           });
         });
@@ -83,14 +88,16 @@ export function useIconSuggestion(inputText) {
 
   if (!normalizedText) {
     return {
-      icon: null,
+      iconName: null,
+      topMatches: [],
       loading: false
     };
   }
 
   if (exactIcon) {
     return {
-      icon: exactIcon,
+      iconName: exactIcon,
+      topMatches: [],
       loading: false
     };
   }

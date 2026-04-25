@@ -124,6 +124,45 @@ Reviewed: 2026-04-25
 
 ---
 
+## Task: T-008
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/hooks/useIconSuggestion.js` line 67 — `.slice(0, 5)` in the hook is redundant because the worker already caps `topMatches` at 5. Harmless defensive guard; no fix required.
+2. **nit** — `frontend/src/components/AddItemSheet.jsx` — The preview pill still renders `{iconName}` as literal text (e.g. "IconMilk"). This is the correct transitional state; SVG rendering is T-009's job. No fix required.
+
+#### Verification
+
+##### Steps
+- Read all 6 changed files: `iconWorker.js`, `iconWorkerClient.js`, `useIconSuggestion.js`, `useIconSuggestion.test.js`, `AddItemSheet.jsx`, `AddItemSheet.test.jsx`.
+- Confirmed `AddItemSheet` changes are necessary to consume the renamed `iconName` field — scope is minimal and correct.
+- Verified git diff scope: 6 frontend files changed; no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/hooks/useIconSuggestion.test.js src/components/AddItemSheet.test.jsx src/app.test.jsx` — **21/21 pass**.
+- Ran `npm run build` — clean.
+- Ran `npm test` — **34/34 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `iconWorker.js`: reference embeddings now store `iconName` (was `icon`); `matchIcon` returns `{ iconName, score, topMatches }`; per-icon score deduplication via Map; filters ≥ 0.25, sorts descending, slices to 5, returns `topMatches: []` when below threshold ✅
+- `iconWorkerClient.js`: `handleWorkerMessage` destructures `{ iconName, topMatches }` with safe defaults; resolves with `{ iconName, score, topMatches }`; no-worker fallback updated ✅
+- `useIconSuggestion.js`: `asyncState` shape updated to `{ iconName, topMatches, loading }`; async path maps `topMatches[].iconName` to `string[]`; exact match path returns `topMatches: []`; empty input path returns `topMatches: []` ✅
+- Test suite covers: exact match (`topMatches: []`), empty input, below-threshold (both null/empty), above-threshold (iconName + topMatches string array) ✅
+- `topMatches` contract: worker returns `Array<{ iconName, score }>` objects; hook surfaces `string[]` for consumer simplicity ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-007
 
 ### Review Round 1

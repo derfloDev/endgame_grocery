@@ -31,7 +31,7 @@ async function getReferenceEmbeddings() {
   referenceEmbeddingsPromise ??= Promise.all(
     ICON_DB.map(async (entry) => ({
       embedding: await embedText([entry.label, ...(entry.tags ?? [])].join(", ")),
-      icon: entry.icon
+      iconName: entry.icon
     }))
   );
 
@@ -42,7 +42,7 @@ async function matchIcon(text) {
   const normalizedText = text.trim();
 
   if (!normalizedText) {
-    return { icon: null, score: 0 };
+    return { iconName: null, score: 0, topMatches: [] };
   }
 
   const [queryEmbedding, referenceEmbeddings] = await Promise.all([
@@ -50,21 +50,34 @@ async function matchIcon(text) {
     getReferenceEmbeddings()
   ]);
 
-  let bestIcon = null;
+  let bestIconName = null;
   let bestScore = -1;
+  const matchScores = new Map();
 
-  for (const { embedding, icon } of referenceEmbeddings) {
+  for (const { embedding, iconName } of referenceEmbeddings) {
     const score = cosineSimilarity(queryEmbedding, embedding);
+    const previousScore = matchScores.get(iconName) ?? -1;
+
+    if (score > previousScore) {
+      matchScores.set(iconName, score);
+    }
 
     if (score > bestScore) {
-      bestIcon = icon;
+      bestIconName = iconName;
       bestScore = score;
     }
   }
 
+  const topMatches = [...matchScores.entries()]
+    .filter(([, score]) => score >= 0.25)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 5)
+    .map(([iconName, score]) => ({ iconName, score }));
+
   return {
-    icon: bestScore >= similarityThreshold ? bestIcon : null,
-    score: bestScore
+    iconName: bestScore >= similarityThreshold ? bestIconName : null,
+    score: bestScore,
+    topMatches: bestScore >= similarityThreshold ? topMatches : []
   };
 }
 
