@@ -1,51 +1,81 @@
 # ROADMAP
 
-Goal: polish the app identity and deliver a production-ready single-image Docker deployment.
+Goal: Apply the Endgame Grocery design system — dark neon Marvel-inspired theme — to the full frontend. Every existing user-facing screen gets the new visual identity. New UI patterns from the design (bottom nav, FAB, bottom sheets, swipe-to-delete, neon animations) are implemented where backend features already exist to support them. Design elements with no existing backend feature are omitted.
 
-## Priority 1 — Logo integration
+## Constraints
 
-Objective: replace placeholder SVG icons with the real PNG logo and surface it in the README.
+- Frontend only (React + Vite). No new backend routes.
+- Squad tab: no backend sharing-members feature surfaced in the UI yet → tab omitted from bottom nav.
+- Category grouping: no backend support → not implemented; entries remain a flat list.
+- Progress bars on the overview require per-list entry counts which the current lists API does not return → omitted from list cards.
+- Search: client-side, filtering across already-fetched lists by name and owner.
 
-- `frontend/public/` contains `icon-192.png` and `icon-512.png` generated from `endgame_grocery_logo.png`.
-- Old placeholder SVG icons are removed.
-- `vite.config.js` PWA manifest entries point to the new PNG icons with `image/png` type.
-- `frontend/index.html` gains a `<link rel="icon">` pointing at the 192-pixel PNG.
-- `README.md` opens with the logo image rendered above the project headline.
+## Priority 1 — Design tokens & app shell
 
-## Priority 3 — CI/CD Pipeline (GitHub Actions)
+Objective: Replace the current light/warm global styles with the Endgame Grocery dark-neon design system and rebuild the app shell to a mobile-first layout.
 
-Objective: automated lint, build, test, and E2E on every push and PR; Release Please on main
-for changelog + GitHub Releases; Docker image published to GHCR on release.
+- Install and configure Google Fonts: Orbitron, Exo 2, JetBrains Mono.
+- Write full CSS design token file (`colors_and_type.css` port) as `frontend/src/styles/tokens.css`.
+- Replace `index.css` body/root/shell styles with dark theme (`#080B1C` bg, neon palette, new type scale).
+- Copy `endgame_grocery_logo.png` into `frontend/src/assets/`.
+- Rebuild `ProtectedLayout` in `App.jsx`: mobile-first 390 px canvas, dark bg, `BottomNav` (Lists + Search tabs), no more `hero-card`.
+- Add `/search` route to the router.
 
-- `.github/workflows/ci.yml` — runs on every push and every PR:
-  - Job `lint-and-build`: `npm run lint` + `npm run build`
-  - Job `unit-test`: `npm test`
-  - Job `e2e` (needs both above): PostgreSQL service container, `.env` created from
-    workflow env, `npm run migrate`, Playwright Chromium, `npm run e2e`; screenshots and
-    videos uploaded as artefacts on failure
-- `.github/workflows/release-please.yml` — runs on push to `main`:
-  - Release Please action (release-type: node) creates/updates release PR with
-    `CHANGELOG.md` bump and `package.json` version bump
-  - On release created: build Docker image and push
-    `ghcr.io/derfloDev/endgame-grocery:<version>` + `:latest` to GHCR
-- `package.json` — add `"version": "0.1.0"` field (required by Release Please)
-- `README.md` — CI badge + short CI/CD workflow description
+## Priority 2 — Shared UI component library
 
-## Priority 2 — Dockerize (single image, nginx + Node.js)
+Objective: Create reusable Endgame Grocery components that all screens use.
 
-Objective: ship a single production Docker image that serves both the static frontend and the
-Express backend, parameterised entirely through environment variables.
+- `Icon` component (inline Lucide-style SVG paths subset).
+- `TopBar` component (sticky, title + optional back button + action slots).
+- `FAB` (floating action button, neon gradient, 56 px, fixed position).
+- `BottomNav` (Lists / Search tabs, active neon-cyan state, fixed bottom).
+- `EmptyState`, `LoadingState` (shimmer), `ErrorState` ("Mission Failed") components.
+- Button variants (primary, secondary, ghost, danger) as CSS classes + optional React wrapper.
+- Input, card, chip/badge CSS classes from the design system.
+- Bottom-sheet overlay component (shared by Add Item, New List, and Add Member flows).
 
-- Multi-stage `Dockerfile`: builder stage runs `vite build`; runtime stage combines nginx
-  (static files + `/api` reverse proxy) and Node.js backend managed by supervisord.
-- `docker/nginx.conf` — nginx server block: static SPA fallback + `/api/` proxy to port 4000,
-  gzip enabled, long-lived cache headers for hashed assets.
-- `docker/supervisord.conf` — starts nginx and the Node.js backend as supervised processes.
-- `docker/entrypoint.sh` — runs database migrations then hands off to supervisord.
-- `.dockerignore` — excludes `node_modules`, `.env`, `dist`, test artefacts.
-- `docker-compose.example.yml` — full-stack example: app service (built from local Dockerfile)
-  + postgres service with health check; all required env vars documented inline.
-- `backend/src/env.js` — load `.env` only when the file is present (local dev); rely on
-  `process.env` when it is absent (Docker/CI).
-- `README.md` — new "Docker Deployment" section documents the example compose file, available
-  environment variables, and how to run migrations manually if needed.
+## Priority 3 — Auth pages
+
+Objective: Apply the dark design to Login and Register screens.
+
+- Dark `auth-layout` + `auth-card` (bg-surface, neon border, `28px` radius).
+- Logo + "ENDGAME GROCERY" Orbitron header on both pages.
+- Neon-styled form inputs and primary button.
+- Error banners using design-system `--color-error`.
+
+## Priority 4 — Overview page (Home screen)
+
+Objective: Redesign the lists overview to match the HomeScreen prototype.
+
+- "ENDGAME / GROCERY" Orbitron gradient header with logo.
+- Summary chips (list count, shared count).
+- Active / All Lists toggle filter.
+- `ListCardHome`: dark card with neon border, list name, owner/shared chip, "Queued" sync badge.
+- `NewListSheet`: bottom sheet with name input and Create/Cancel actions (replaces inline form).
+- FAB triggers `NewListSheet`.
+- Empty state, loading shimmer, error state.
+- Logout action in header (top-right icon button).
+
+## Priority 5 — List detail page
+
+Objective: Redesign the single-list view to match the ListScreen prototype.
+
+- `TopBar` with back arrow and list name.
+- "Add item" as bottom sheet (`AddItemSheet`) triggered by FAB — replaces inline form.
+- Entry items as neon-styled row cards (check circle, text, pending-sync badge).
+- Swipe-to-delete on entry rows (touch `touchstart`/`touchmove`/`touchend`, reveal red delete zone at 80 px threshold).
+- Open items section + "Done" collapsible section with count badge.
+- Sharing panel (owner only): restyled as inline neon section below entries; share-by-email input + member list with Revoke buttons.
+- Edit-in-place for entry text: tap-to-edit inline input.
+- Error/loading/empty states.
+
+## Priority 6 — Search page
+
+Objective: Implement a Search screen accessible via the bottom nav.
+
+- New `SearchPage` component at `/search`.
+- Search input with neon style, auto-focused on enter.
+- Client-side filtering of fetched lists by name (case-insensitive substring).
+- Results displayed as `ListCardHome` cards (tapping navigates to list detail).
+- Empty-search and no-results states.
+- Shares the same `lists` data already fetched; no extra API calls.

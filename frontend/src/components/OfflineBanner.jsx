@@ -18,7 +18,7 @@ export default function OfflineBanner() {
   }
 
   return (
-    <p className={`offline-banner ${syncError ? "offline-banner-error" : ""}`}>
+    <p className={syncError ? "eg-error-banner" : "eg-offline-banner"}>
       {syncError ? `${message} ${syncError}` : message}
     </p>
   );

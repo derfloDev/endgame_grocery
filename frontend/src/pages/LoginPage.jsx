@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
@@ -34,18 +35,23 @@ export default function LoginPage() {
   return (
     <main className="auth-layout">
       <section className="auth-card">
-        <p className="eyebrow">Shared household planning</p>
-        <div className="page-copy">
-          <h1>Welcome back</h1>
-          <p>Log in to keep your grocery lists synced across devices and households.</p>
+        <div className="auth-brand">
+          <img alt="Endgame Grocery" className="auth-logo" src={logo} />
+          <div className="auth-brand-text">
+            <div className="auth-brand-title eg-orbitron eg-gradient-text">ENDGAME</div>
+            <div className="auth-brand-sub">GROCERY</div>
+          </div>
         </div>
+        <h1>Welcome Back</h1>
+        <p>Sign in to access your mission.</p>
         <form className="auth-form" onSubmit={handleSubmit}>
-          {error ? <p className="error-banner">{error}</p> : null}
-          <div className="field">
+          {error ? <p className="eg-error-banner">{error}</p> : null}
+          <div className="eg-field">
             <label htmlFor="login-email">Email</label>
             <input
               id="login-email"
               autoComplete="email"
+              className="eg-input"
               name="email"
               required
               type="email"
@@ -53,11 +59,12 @@ export default function LoginPage() {
               onChange={(event) => setEmail(event.target.value)}
             />
           </div>
-          <div className="field">
+          <div className="eg-field">
             <label htmlFor="login-password">Password</label>
             <input
               id="login-password"
               autoComplete="current-password"
+              className="eg-input"
               name="password"
               required
               type="password"
@@ -66,10 +73,10 @@ export default function LoginPage() {
             />
           </div>
           <div className="button-row">
-            <button className="button-primary" disabled={isSubmitting} type="submit">
+            <button className="eg-btn-primary" disabled={isSubmitting} type="submit">
               {isSubmitting ? "Signing in..." : "Log in"}
             </button>
-            <Link className="muted-link" to="/register">
+            <Link className="eg-link" to="/register">
               Create an account
             </Link>
           </div>
