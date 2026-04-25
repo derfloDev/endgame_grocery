@@ -129,6 +129,10 @@ export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
             />
           </button>
 
+          <span aria-hidden="true" className={`entry-icon ${entry.status === "done" ? "entry-row-done" : ""}`}>
+            {entry.icon ?? "🛒"}
+          </span>
+
           <div className="entry-row-copy">
             <p className={`entry-row-text ${entry.status === "done" ? "entry-row-text-done" : ""}`}>{entry.text}</p>
             {entry.is_pending_sync ? <span className="eg-chip-queued entry-row-chip">Queued</span> : null}

@@ -824,6 +824,16 @@ p {
   flex: 1;
 }
 
+.entry-icon {
+  flex-shrink: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.entry-icon.entry-row-done {
+  opacity: 0.55;
+}
+
 .entry-row-text {
   margin: 0;
   color: var(--text-primary);

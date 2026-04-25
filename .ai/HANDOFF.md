@@ -177,3 +177,39 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-005 — review — 2026-04-25T19:19:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 EntryRow icon display: span placement, null/undefined fallback, done-state opacity, 3 test cases, and CSS; all checks pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — implement — 2026-04-25T17:15:17Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added persisted and fallback entry icons to the list row UI, with tests covering both icon states and the existing swipe-delete behavior. |
+| Files Changed | `frontend/src/components/EntryRow.jsx`, `frontend/src/components/entry-row.test.jsx`, `frontend/src/index.css`, `frontend/src/app.test.jsx`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/entry-row.test.jsx src/app.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): show grocery icons in list entries |
+| Next Role | review |
+
+---
+
+### T-005 — implement — 2026-04-25T17:19:52Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-005 entry-row icon rendering changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

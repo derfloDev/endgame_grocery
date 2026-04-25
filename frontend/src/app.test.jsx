@@ -342,7 +342,7 @@ describe("authentication shell", () => {
     expect(await screen.findByRole("dialog", { name: "Add Item" })).toBeTruthy();
 
     await userEvent.type(screen.getByLabelText("Add item"), "Milch");
-    expect(screen.getByText("🥛")).toBeTruthy();
+    expect(screen.getAllByText("🥛")).toHaveLength(2);
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
     await waitFor(() => {

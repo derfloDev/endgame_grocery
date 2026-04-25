@@ -124,6 +124,48 @@ Reviewed: 2026-04-25
 
 ---
 
+## Task: T-005
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/components/entry-row.test.jsx` line 43 — The swipe-delete test passes `entry` without an `icon` property, so `entry.icon` is `undefined`. `undefined ?? "🛒"` still renders the cart fallback — correct behaviour, and the test passes. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `EntryRow.jsx` — icon span placement, fallback logic, done-state opacity.
+- Read `entry-row.test.jsx` — all 3 test cases reviewed.
+- Checked `index.css` — `.entry-icon` and `.entry-icon.entry-row-done` classes at lines 827–835.
+- Verified git diff scope: 4 frontend files changed (`EntryRow.jsx`, `entry-row.test.jsx`, `index.css`, `app.test.jsx`); no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/entry-row.test.jsx src/app.test.jsx` — **18/18 pass** (3 EntryRow unit tests + 15 integration tests).
+- Ran `npm run build` — clean; 73 modules transformed.
+- Ran `npm test` — **28/28 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `EntryRow.jsx` line 132–134: icon span placed before `.entry-row-copy` div — matches plan spec exactly ✅
+- `entry.icon ?? "🛒"` handles both `null` and `undefined` correctly ✅
+- `entry-row-done` class on the icon span applies `opacity: 0.55` when status is done — matches plan ✅
+- `aria-hidden="true"` — emoji is decorative, correctly hidden from assistive technology ✅
+- Test 1: `icon: "🥛"` renders emoji and asserts `🛒` is absent ✅
+- Test 2: `icon: null` renders `🛒` fallback ✅
+- Test 3: swipe-delete test (no icon prop) still passes ✅
+- CSS: `.entry-icon` at `font-size: 1.5rem`, `flex-shrink: 0`; `.entry-icon.entry-row-done` at `opacity: 0.55` ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-002
 
 ### Review Round 1
