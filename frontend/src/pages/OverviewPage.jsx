@@ -1,27 +1,45 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
 import { writeCachedResource } from "../api/offlineStore";
 import { createList, deleteList, fetchLists, renameList } from "../api/lists";
+import ListCardHome from "../components/ListCardHome";
+import NewListSheet from "../components/NewListSheet";
+import { EmptyState, ErrorState, FAB, Icon, LoadingState } from "../components/ui";
+import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 
 const LISTS_CACHE_KEY = "lists";
 
 export default function OverviewPage() {
-  const { logout, token, user } = useAuth();
+  const navigate = useNavigate();
+  const { logout, token } = useAuth();
   const { syncVersion } = useOfflineQueue();
   const [lists, setLists] = useState([]);
-  const [newListName, setNewListName] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [editingId, setEditingId] = useState("");
-  const [editingName, setEditingName] = useState("");
+  const [view, setView] = useState("active");
+  const [showNew, setShowNew] = useState(false);
+
+  const loadLists = useCallback(async () => {
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const result = await fetchLists(token);
+      setLists(result.lists ?? []);
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadLists() {
+    async function loadListsForEffect() {
       setError("");
       setIsLoading(true);
 
@@ -42,7 +60,7 @@ export default function OverviewPage() {
       }
     }
 
-    void loadLists();
+    void loadListsForEffect();
 
     return () => {
       isMounted = false;
@@ -60,10 +78,8 @@ export default function OverviewPage() {
     await writeCachedResource(LISTS_CACHE_KEY, { lists: nextLists });
   }
 
-  async function handleCreateList(event) {
-    event.preventDefault();
-
-    if (!newListName.trim()) {
+  async function createListByName(name) {
+    if (!name.trim()) {
       return;
     }
 
@@ -72,49 +88,41 @@ export default function OverviewPage() {
 
       const temporaryList = {
         id: createTemporaryId("list"),
-        name: newListName.trim(),
+        name: name.trim(),
         owner_name: "You",
         is_owner: true,
         is_pending_sync: true
       };
-      const result = await createList(token, { name: newListName }, { tempId: temporaryList.id });
+      const result = await createList(token, { name }, { tempId: temporaryList.id });
 
       await updateLists((currentLists) => [
         ...currentLists,
         result?.queued ? temporaryList : result.list
       ]);
-      setNewListName("");
     } catch (submitError) {
       setError(submitError.message);
     }
   }
 
-  function startEditing(list) {
-    setEditingId(list.id);
-    setEditingName(list.name);
-  }
-
-  async function submitRename(listId) {
-    if (!editingName.trim()) {
+  async function submitRename(listId, newName) {
+    if (!newName.trim()) {
       return;
     }
 
     try {
       setError("");
-      const result = await renameList(token, listId, { name: editingName });
+      const result = await renameList(token, listId, { name: newName });
 
       await updateLists((currentLists) =>
         currentLists.map((list) =>
           list.id === listId
             ? {
                 ...list,
-                ...(result?.queued ? { name: editingName.trim(), is_pending_sync: true } : result.list)
+                ...(result?.queued ? { name: newName.trim(), is_pending_sync: true } : result.list)
               }
             : list
         )
       );
-      setEditingId("");
-      setEditingName("");
     } catch (submitError) {
       setError(submitError.message);
     }
@@ -134,135 +142,76 @@ export default function OverviewPage() {
     }
   }
 
+  const sharedCount = lists.filter((list) => !list.is_owner).length;
+  const displayLists = lists;
+
   return (
-    <div className="stack">
-      <header className="overview-header">
-        <div className="stack">
-          <span className="pill">Authenticated session</span>
-          <p>Signed in as user ID: {user?.id ?? "unknown"}</p>
-          <p>Create a list, rename your own lists, and open any list you can access.</p>
+    <div className="overview-page">
+      <div className="overview-topbar">
+        <div className="overview-brand">
+          <div>
+            <div className="eg-gradient-text eg-orbitron overview-brand-title">ENDGAME</div>
+            <div className="overview-brand-sub">GROCERY</div>
+          </div>
+          <div className="overview-actions">
+            <img alt="Endgame Grocery" className="overview-logo" src={logo} />
+            <button aria-label="Log out" className="eg-icon-btn" type="button" onClick={logout}>
+              <Icon name="logOut" color="var(--text-secondary)" size={18} />
+            </button>
+          </div>
         </div>
-        <button className="button-secondary" type="button" onClick={logout}>
-          Log out
-        </button>
-      </header>
+        <div className="overview-chips">
+          <span className="eg-chip-purple">
+            <Icon color="var(--neon-violet)" name="list" size={12} />
+            <span>{lists.length} {lists.length === 1 ? "list" : "lists"}</span>
+          </span>
+          {sharedCount > 0 ? <span className="eg-chip-cyan">{sharedCount} shared</span> : null}
+        </div>
+      </div>
 
-      <form className="auth-form compact-form" onSubmit={handleCreateList}>
-        <div className="field">
-          <label htmlFor="new-list-name">New list</label>
-          <input
-            id="new-list-name"
-            name="name"
-            placeholder="Weekend groceries"
-            value={newListName}
-            onChange={(event) => setNewListName(event.target.value)}
-          />
-        </div>
-        <div className="button-row">
-          <button className="button-primary" type="submit">
-            Create list
+      <div className="overview-toggle">
+        {["active", "all"].map((toggle) => (
+          <button
+            key={toggle}
+            className={view === toggle ? "eg-toggle eg-toggle-active" : "eg-toggle"}
+            type="button"
+            onClick={() => setView(toggle)}
+          >
+            {toggle === "active" ? "Active" : "All Lists"}
           </button>
-        </div>
-      </form>
+        ))}
+      </div>
 
-      {error ? <p className="error-banner">{error}</p> : null}
+      <div className="overview-content">
+        {error ? <ErrorState onRetry={() => void loadLists()} /> : null}
+        {isLoading ? <LoadingState rows={3} /> : null}
+        {!isLoading && !error && displayLists.length === 0 ? (
+          <EmptyState
+            action="New List"
+            body="Create your first mission to get started."
+            title="No lists yet"
+            onAction={() => setShowNew(true)}
+          />
+        ) : null}
+        {!isLoading && !error
+          ? displayLists.map((list) => (
+              <ListCardHome
+                key={list.id}
+                list={list}
+                onDelete={() => void handleDelete(list.id)}
+                onOpen={() => navigate(`/lists/${list.id}`)}
+                onRename={(name) => void submitRename(list.id, name)}
+              />
+            ))
+          : null}
+      </div>
 
-      {isLoading ? <p>Loading lists...</p> : null}
-
-      {!isLoading && lists.length === 0 ? (
-        <p>No lists yet. Create one to get started.</p>
-      ) : (
-        <div className="list-grid">
-          {lists.map((list) => (
-            <article key={list.id} className="list-card">
-              <div className="stack">
-                <div className="overview-header">
-                  <div className="stack tight-stack">
-                    <div className="button-row">
-                      <span
-                        className={`pill ${list.is_owner ? "" : "shared-pill"}`}
-                        title={list.is_owner ? "You own this list." : `Owned by ${list.owner_name}`}
-                      >
-                        {list.is_owner ? "Owner" : "Shared list"}
-                      </span>
-                      {list.is_pending_sync ? <span className="pill shared-pill">Queued</span> : null}
-                    </div>
-                    {!list.is_owner ? <p className="muted-text">Owned by {list.owner_name}</p> : null}
-                    {editingId === list.id ? (
-                      <div className="stack tight-stack">
-                        <label className="visually-hidden" htmlFor={`rename-${list.id}`}>
-                          Rename list
-                        </label>
-                        <input
-                          id={`rename-${list.id}`}
-                          value={editingName}
-                          onChange={(event) => setEditingName(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              void submitRename(list.id);
-                            }
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <h2 className="card-title">{list.name}</h2>
-                    )}
-                  </div>
-                  <Link className="button-secondary link-button" to={`/lists/${list.id}`}>
-                    Open
-                  </Link>
-                </div>
-
-                <div className="button-row">
-                  {list.is_owner ? (
-                    <>
-                      {editingId === list.id ? (
-                        <>
-                          <button
-                            className="button-secondary"
-                            type="button"
-                            onClick={() => void submitRename(list.id)}
-                          >
-                            Save name
-                          </button>
-                          <button
-                            className="button-secondary"
-                            type="button"
-                            onClick={() => {
-                              setEditingId("");
-                              setEditingName("");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          className="button-secondary"
-                          type="button"
-                          onClick={() => startEditing(list)}
-                        >
-                          Rename
-                        </button>
-                      )}
-                      <button
-                        className="button-secondary destructive-button"
-                        type="button"
-                        onClick={() => void handleDelete(list.id)}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  ) : (
-                    <p className="muted-text">Shared lists stay editable here, with the owner shown above.</p>
-                  )}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+      <FAB onClick={() => setShowNew(true)} />
+      <NewListSheet
+        open={showNew}
+        onAdd={(name) => void createListByName(name)}
+        onClose={() => setShowNew(false)}
+      />
     </div>
   );
 }

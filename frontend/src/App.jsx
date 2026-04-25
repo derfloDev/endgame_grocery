@@ -1,7 +1,7 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import OfflineBanner from "./components/OfflineBanner";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { APP_TITLE } from "./app.constants";
+import BottomNav from "./components/ui/BottomNav";
 import ListDetailPage from "./pages/ListDetailPage";
 import LoginPage from "./pages/LoginPage";
 import OverviewPage from "./pages/OverviewPage";
@@ -25,14 +25,11 @@ export default function App() {
 function ProtectedLayout() {
   return (
     <ProtectedRoute>
-      <main className="app-shell">
-        <section className="hero-card">
-          <p className="eyebrow">Shared household planning</p>
-          <h1>{APP_TITLE}</h1>
-          <OfflineBanner />
-          <Outlet />
-        </section>
-      </main>
+      <div className="app-shell">
+        <OfflineBanner />
+        <Outlet />
+        <BottomNav />
+      </div>
     </ProtectedRoute>
   );
 }

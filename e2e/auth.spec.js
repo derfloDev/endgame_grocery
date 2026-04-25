@@ -41,7 +41,7 @@ test.describe("registration", () => {
     await page.getByRole("button", { name: "Create account" }).click();
 
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByText("No lists yet. Create one to get started.")).toBeVisible();
+    await expect(page.getByText("No lists yet")).toBeVisible();
   });
 
   test("shows an error when the email is already registered", async ({ page }) => {
@@ -90,7 +90,7 @@ test.describe("login", () => {
     await page.getByRole("button", { name: "Log in" }).click();
 
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByText("No lists yet. Create one to get started.")).toBeVisible();
+    await expect(page.getByText("No lists yet")).toBeVisible();
   });
 
   test("shows an error for a wrong password", async ({ page, request }) => {

@@ -1,0 +1,63 @@
+:root {
+  --bg-base: #080B1C;
+  --bg-surface: #0D1128;
+  --bg-raised: #141832;
+
+  --neon-purple: #8B2BE2;
+  --neon-violet: #A855F7;
+  --neon-cyan: #00E5FF;
+  --neon-blue: #3B82F6;
+
+  --accent-pink: #FF2D78;
+  --accent-star: #E2E8FF;
+
+  --color-success: #00E5B0;
+  --color-warning: #FFB800;
+  --color-error: #FF4560;
+  --color-info: #00E5FF;
+
+  --text-primary: #F0F0FF;
+  --text-secondary: #8E9AC8;
+  --text-disabled: #3D4470;
+
+  --gradient-brand: linear-gradient(135deg, #8B2BE2 0%, #6366F1 45%, #00E5FF 100%);
+  --gradient-card: linear-gradient(135deg, rgba(139, 43, 226, 0.15) 0%, rgba(0, 229, 255, 0.08) 100%);
+  --gradient-surface: linear-gradient(180deg, #141832 0%, #0D1128 100%);
+  --gradient-text: linear-gradient(90deg, #A855F7, #00E5FF);
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 42px;
+  --text-4xl: 56px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 16px rgba(139, 43, 226, 0.2);
+  --shadow-3: 0 8px 40px rgba(0, 0, 0, 0.7), 0 0 32px rgba(0, 229, 255, 0.25);
+  --glow-purple: 0 0 20px rgba(139, 43, 226, 0.6), 0 0 40px rgba(139, 43, 226, 0.3);
+  --glow-cyan: 0 0 20px rgba(0, 229, 255, 0.5), 0 0 40px rgba(0, 229, 255, 0.25);
+
+  --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  --duration-micro: 150ms;
+  --duration-standard: 250ms;
+  --duration-page: 400ms;
+}

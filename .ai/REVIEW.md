@@ -2,156 +2,629 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
-## Task: T-001
+## Task: T-001 — Design Tokens & App Shell
 
 ### Review Round 1
 
 Status: **PASS**
 
-Reviewed: 2026-04-25
+Reviewed: 2026-04-23
 
 #### Findings
 
-No blockers or majors. One nit noted.
+No blocking or major findings.
 
-| # | Severity | Location | Description | Required fix |
-|---|----------|----------|-------------|--------------|
-| 1 | nit | `.release-please-manifest.json` | File ends with a trailing newline after the JSON content — this is harmless and conventional for text files but could be trimmed for strict JSON tooling. | No |
+- **nit** — `frontend/src/index.css` includes `.auth-layout`, `.auth-card`, and related auth CSS classes that are scoped to T-003. Including them in T-001 is benign (no conflicts, tests pass), but slightly ahead of the task boundary.
+- **nit** — `frontend/src/components/ui/BottomNav.jsx` uses inline SVG paths rather than the shared `Icon` component specified in the plan. Acceptable since the `Icon` component is created in T-002; no regression.
+- **nit** — `SearchPage` stub goes slightly beyond `return null` (renders a `<div aria-label="Search page">`) which is required for the test assertion. Correct choice by the implementer.
 
 #### Verification
 
 ##### Steps
-1. Read `.ai/PLAN.md` — confirmed plan calls for `.release-please-manifest.json` with `{"." : "0.1.0"}` and tag `v0.1.0` on commit `83d6da1`.
-2. Verified `.release-please-manifest.json` exists at repo root with content `{"." : "0.1.0"}` — matches plan exactly.
-3. Ran `git tag --list "v0.1.0"` — tag `v0.1.0` confirmed locally.
-4. Ran `git ls-remote --tags origin v0.1.0` — confirmed `v0.1.0` resolves to `83d6da1af73cf2533b9ff6653debc3edc1855e21` on `origin`, matching the plan's target commit.
-5. Ran `git show v0.1.0 --no-patch` — tag points to merge commit `83d6da1` (matches plan).
-6. Reviewed `git diff HEAD` — only files changed are `.release-please-manifest.json` and `README.md`, matching HANDOFF entry.
-7. Inspected `README.md` changes — bootstrap sentence accurately documents the manifest + tag strategy; no inaccuracies.
-8. Ran `npm run lint` — 0 errors; 1 pre-existing warning in `frontend/src/context/AuthContext.jsx:77` (unrelated to T-001).
-9. Ran `npm run build` — clean build for both frontend and backend.
-10. Ran `npm test` — 25/25 tests pass, 0 failures.
-11. Reviewed `.github/workflows/release-please.yml` — still uses `google-github-actions/release-please-action@v4` with `release-type: node`. With `v0.1.0` tag on `83d6da1`, release-please will only scan commits after that tag, eliminating the bad `Release-As: chore/dockerize` and `Release-As: fix/registration` footers that caused the crash. The manifest file provides additional version tracking. This aligns with the plan's fix strategy.
+1. Read `.ai/TASKS.md` — T-001 status confirmed `ready_for_review`.
+2. Read `.ai/PLAN.md` — reviewed T-001 spec in full.
+3. Read all changed files against plan: `frontend/index.html`, `frontend/src/styles/tokens.css`, `frontend/src/index.css`, `frontend/src/App.jsx`, `frontend/src/components/ui/BottomNav.jsx`, `frontend/src/pages/SearchPage.jsx`, `frontend/src/components/OfflineBanner.jsx`, `frontend/src/app.test.jsx`.
+4. Confirmed logo asset present via `Glob`.
+5. Ran `npm run lint` — passes (1 pre-existing warning in `AuthContext.jsx`, 0 errors).
+6. Ran `npm run build` — passes cleanly (Vite build, PWA precache).
+7. Ran `npm test` — all 11 frontend tests pass, all 25 backend tests pass.
+8. Verified `git diff HEAD -- frontend/` for scope of uncommitted changes.
 
 ##### Findings
-- All acceptance criteria met:
-  - ✅ `.release-please-manifest.json` present with `{"." : "0.1.0"}`
-  - ✅ Tag `v0.1.0` visible on remote `origin` at commit `83d6da1` (correct cutoff per plan)
-  - ✅ Lint, build, and tests all pass
-  - ⏳ "Release Please CI passes on next `main` push" — cannot be verified until branch is merged; prerequisites are correctly in place
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| App background dark navy `#080B1C` | ✅ `--bg-base: #080B1C` in tokens.css; applied to `html`, `body`, `.app-shell` |
+| Google Fonts (Orbitron, Exo 2) load | ✅ `<link>` tags added to `index.html` as specified |
+| Logo asset at `frontend/src/assets/endgame_grocery_logo.png` | ✅ File present |
+| BottomNav on `/` and `/search`, absent on `/login` and `/register` | ✅ BottomNav inside `ProtectedLayout`; login/register outside; test confirms |
+| `/search` route exists and does not crash | ✅ Route wired; SearchPage stub with `aria-label`; test confirms |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean build |
+| `npm test` passes | ✅ 11/11 frontend, 25/25 backend |
 
 ##### Risks
-- Low: The `release-please-action@v4` in simple mode (`release-type: node`) uses git tags as the version cutoff; the manifest file may not be read in this mode but does not cause any harm. The tag is the critical element of the fix, and it is correctly positioned. T-003 will update the action version which may affect manifest behaviour, but that is within T-003 scope.
 
-#### Open Questions
-- None.
+- None. All changes are additive CSS/JSX with no logic mutations beyond removing the old `hero-card` wrapper in `ProtectedLayout`. Existing test suite fully covers the shell.
 
 #### Verdict
 `PASS`
 
 ---
 
-## Task: T-002
+## Task: T-002 — Shared UI Component Library
 
 ### Review Round 1
 
 Status: **PASS**
 
-Reviewed: 2026-04-25
+Reviewed: 2026-04-24
 
 #### Findings
 
-No blockers, majors, or minors. One nit noted.
+No blocking, major, or minor findings.
 
-| # | Severity | Location | Description | Required fix |
-|---|----------|----------|-------------|--------------|
-| 1 | nit | `release-please.yml` line 19 | Implementation uses `if: ${{ github.event.workflow_run.conclusion == 'success' }}` with expression delimiters; plan shows bare `if: github.event.workflow_run.conclusion == 'success'`. Both are valid in GitHub Actions — the `${{ }}` form is actually the preferred style for `if` conditions. | No |
+- **nit** — `BottomSheet` renders its backdrop as a `<button aria-label="Close sheet">` rather than a plain `<div>`. This is a deliberate accessibility improvement (keyboard-reachable close target) that diverges from the plan's plain `div`, and is strictly better. Not a concern.
+- **nit** — `TopBar` action items accept `ariaLabel` and `label` fields beyond the plan's `{icon, onClick}`. Additive, non-breaking.
 
 #### Verification
 
 ##### Steps
-1. Re-read `.ai/PLAN.md` — confirmed exact `on:` block and `if:` condition expected.
-2. Read `.github/workflows/release-please.yml` — trigger replaced from `push` → `workflow_run`; workflows matches `["CI"]`; types `[completed]`; branches `[main]`; `if` guard added to `release-please` job. All match plan.
-3. Verified `.github/workflows/ci.yml` `name:` field is `CI` — exact string match with `workflows: ["CI"]` in the trigger; no mismatch.
-4. Confirmed `docker-publish` job unchanged — it already gates on `needs: release-please` with its own `if` on `release_created`; plan states no further changes required there.
-5. Reviewed `git diff HEAD` — only files changed are `.github/workflows/release-please.yml` and `README.md`, matching HANDOFF entry.
-6. Inspected `README.md` changes — sentence correctly describes the `CI` gate, accurate and clear.
-7. Ran `npm run lint` — 0 errors; 1 pre-existing unrelated warning.
-8. Ran `npm run build` — clean build.
-9. Ran `npm test` — 25/25 pass, 0 failures.
+1. Re-read `.ai/TASKS.md` — T-002 confirmed `ready_for_review`.
+2. Re-read T-002 section of `.ai/PLAN.md` for spec details.
+3. Read all 9 new/modified files: `Icon.jsx`, `TopBar.jsx`, `FAB.jsx`, `BottomNav.jsx`, `EmptyState.jsx`, `LoadingState.jsx`, `ErrorState.jsx`, `BottomSheet.jsx`, `ui/index.js`.
+4. Read `ui.test.jsx` — 3 tests covering all acceptance criteria.
+5. Inspected `git diff HEAD -- frontend/src/index.css` — confirmed all required CSS classes for T-002 components present.
+6. Inspected `git diff HEAD -- frontend/src/components/ui/` — all 9 files accounted for; `BottomNav.jsx` correctly refactored to use `Icon` component.
+7. Ran targeted test: `npx vitest run src/components/ui/ui.test.jsx` → **3/3 pass**.
+8. Ran `npm run lint` → **0 errors** (1 pre-existing warning in AuthContext).
+9. Ran `npm run build` → **clean** (247 kB JS bundle).
+10. Ran `npm test` → **14/14 frontend tests pass**, **25/25 backend tests pass**.
 
 ##### Findings
-- All acceptance criteria met:
-  - ✅ `release-please.yml` trigger is `workflow_run` (not `push`)
-  - ✅ `release-please` job has `if` guarding on `conclusion == 'success'`
-  - ✅ CI workflow name `CI` matches the trigger reference exactly
-  - ✅ `docker-publish` remains gated via `needs` — no spurious publish path possible
-  - ✅ README documents the CI gate
-  - ✅ Lint, build, and tests pass
-  - ⏳ "Failing CI run on `main` does not trigger release or Docker image" — cannot be live-tested without a PR merge; the logic is verified structurally above
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| All 8 components render without errors | ✅ Test 1 in `ui.test.jsx` confirms |
+| BottomNav active state responds to current route | ✅ Test 2 confirms `aria-current="page"` on active tab |
+| BottomSheet opens/closes with slideUp animation | ✅ CSS `animation: slideUp 0.3s var(--ease-out)` present; Test 3 confirms close |
+| Barrel export `ui/index.js` works | ✅ All 8 components importable from `.` |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean build |
+
+**Plan compliance — detailed:**
+
+| Component | Key spec points | Status |
+|---|---|---|
+| `Icon.jsx` | All 20 named icons present; props `name, size=20, color, strokeWidth=1.5` | ✅ |
+| `TopBar.jsx` | Sticky, Orbitron 18px title, subtitle, back button, actions | ✅ |
+| `FAB.jsx` | Fixed 56×56, gradient-brand, glow-purple, hover scale | ✅ |
+| `BottomNav.jsx` | Refactored to use `Icon` component; active detection unchanged | ✅ |
+| `EmptyState.jsx` | shoppingCart icon, Orbitron title, optional action button | ✅ |
+| `LoadingState.jsx` | Shimmer rows, animationDelay per row | ✅ |
+| `ErrorState.jsx` | "Mission Failed" Orbitron + error colour, Retry button | ✅ |
+| `BottomSheet.jsx` | Renders null when closed, slideUp animation, drag handle | ✅ |
 
 ##### Risks
-- Low: `workflow_run` events fire for any branch matching `[main]` in the filter, but the `branches` key on `workflow_run` correctly restricts the triggering workflow's source branch to `main`. No cross-branch contamination risk.
-- Low: If the `CI` workflow is renamed in the future, the `workflow_run` trigger will silently stop firing. This is an operational note, not a current defect.
 
-#### Open Questions
-- None.
+- None. Components are stateless or minimally stateful; no logic mutations to existing behaviour.
 
 #### Verdict
 `PASS`
 
 ---
 
-## Task: T-003
+## Task: T-003 — Auth Pages Redesign
 
 ### Review Round 1
 
-Status: **FAIL**
+Status: **PASS**
 
-Reviewed: 2026-04-25
+Reviewed: 2026-04-24
 
 #### Findings
 
-| # | Severity | Location | Description | Required fix |
-|---|----------|----------|-------------|--------------|
-| 1 | blocker | `release-please.yml` line 25 | Implementation uses `googleapis/release-please-action@v4` but the plan specifies `@v5`. `v5.0.0` was released 2026-04-22 and is the version that upgrades to Node.js 24 as its breaking change. Using `@v4` leaves the release-please step running on Node.js 20, which does NOT eliminate the Node.js 20 deprecation warning for this action — directly violating the acceptance criteria. | Yes — change to `googleapis/release-please-action@v5` |
+No blocking, major, or minor findings.
+
+- **nit** — `auth-brand-text` wrapper div used in JSX has no corresponding CSS rule. It serves purely as a structural wrapper; no rule is needed, and the plan did not define one either. Not a concern.
+- **nit** — Logo asset was resized from 2048×2048 → 256×256 to satisfy Workbox's precache size limit. Pragmatic and correct; the build now succeeds cleanly. Not a concern.
 
 #### Verification
 
 ##### Steps
-1. Re-read `.ai/PLAN.md` — version table specifies `googleapis/release-please-action@v5`.
-2. Read `.github/workflows/release-please.yml` line 25 — shows `googleapis/release-please-action@v4`.
-3. Fetched `https://github.com/googleapis/release-please-action/releases` — confirmed `v5.0.0` released 2026-04-22 with "upgrade to node24" as a breaking change; `v4.4.1` is the latest v4 and remains on Node.js 20.
-4. Verified all other version changes in `ci.yml` against plan table: `checkout@v6` ✅, `setup-node@v6` ✅ (all 3 jobs), `upload-artifact@v7` ✅.
-5. Verified all other version changes in `release-please.yml`: `actions/checkout@v6` ✅, `docker/login-action@v4` ✅, `docker/metadata-action@v6` ✅, `docker/build-push-action@v7` ✅.
-6. Inspected `README.md` changes — sentence about pinning maintained major versions added; accurate and clear.
-7. Ran `npm run lint` — 0 errors; 1 pre-existing unrelated warning.
-8. Ran `npm run build` — clean build.
-9. Ran `npm test` — 25/25 pass, 0 failures.
+1. Re-read `.ai/TASKS.md` — T-003 confirmed `ready_for_review`.
+2. Re-read T-003 section of `.ai/PLAN.md`.
+3. Read `frontend/src/pages/LoginPage.jsx` and `RegisterPage.jsx` in full.
+4. Inspected `git diff --staged` for all changed files: `LoginPage.jsx`, `RegisterPage.jsx`, `index.css`, `app.test.jsx`, logo asset.
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (logo now 130 kB, within Workbox precache budget).
+7. Ran `npm test` → **15/15 frontend + 25/25 backend tests pass**.
 
 ##### Findings
-- Acceptance criteria **not fully met** due to blocker finding #1:
-  - ❌ `googleapis/release-please-action@v4` still runs on Node.js 20 — deprecation warning NOT eliminated for this step
-  - ❌ "all action versions updated per plan table" — `@v4` deviates from plan's `@v5`
-  - ✅ All `ci.yml` action versions updated correctly per plan
-  - ✅ All other `release-please.yml` action versions updated correctly per plan
-  - ✅ `google-github-actions` namespace replaced with `googleapis`
-  - ✅ README documentation added
-  - ✅ Lint, build, and tests pass
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| Dark `auth-card` on both pages | ✅ `<section className="auth-card">` present on login and register |
+| Logo + Orbitron "ENDGAME/GROCERY" brand header | ✅ `auth-brand` block, logo img, "ENDGAME" in `.eg-orbitron .eg-gradient-text`, "GROCERY" sub |
+| Neon input focus ring | ✅ All `<input>` have `className="eg-input"`; focus ring defined in T-001 CSS |
+| Gradient primary button | ✅ `eg-btn-primary` uses `var(--gradient-brand)` |
+| Form submission and error display remain functional | ✅ All handler logic unchanged; `eg-error-banner` replaces `error-banner` |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean build |
+
+**Plan compliance — detailed:**
+
+| Item | Plan spec | Status |
+|---|---|---|
+| Login h1 | "Welcome Back" | ✅ |
+| Login subtitle | "Sign in to access your mission." | ✅ |
+| Register h1 | "Join the Squad" | ✅ |
+| Register subtitle | "Create your account to get started." | ✅ |
+| `button-primary` → `eg-btn-primary` | Both pages | ✅ |
+| `error-banner` → `eg-error-banner` | Both pages | ✅ |
+| `muted-link` → `eg-link` | Both pages | ✅ |
+| `<input>` → `className="eg-input"` | All inputs on both pages | ✅ |
+| `field` → `eg-field` | All field wrappers | ✅ |
+| `<p class="eyebrow">` removed | Both pages | ✅ |
+| `<div class="page-copy">` removed | Both pages | ✅ |
+| CSS: `.eyebrow` / `.page-copy` removed | `index.css` | ✅ |
+| CSS: `.auth-brand`, `.auth-logo`, `.auth-brand-title`, `.auth-brand-sub`, `.auth-card h1`, `.auth-card > p` added | `index.css` | ✅ |
+| Test updated for new heading copy | "Welcome Back" (capital B) | ✅ |
+| New test for brand + copy on both auth pages | `app.test.jsx` | ✅ |
 
 ##### Risks
-- Medium: `googleapis/release-please-action@v5` is a semver-major with a Node.js 24 runtime change. The implementer should verify no input/output interface changes in v5 affect the current usage (`release-type: node`). Parameters are expected to be compatible but should be confirmed against the v5 release notes.
 
-#### Required Fixes
-1. `.github/workflows/release-please.yml` line 25: change `googleapis/release-please-action@v4` → `googleapis/release-please-action@v5`
-
-#### Open Questions
-- None.
+- None. All form logic, state management, and routing are unchanged. Only JSX structure and CSS class names were modified, covered by the existing + new tests.
 
 #### Verdict
-`FAIL`
+`PASS`
 
-### Review Round 2
+---
+
+## Task: T-004 — Overview Page Redesign
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — `ListCardHome` uses `<article>` instead of the plan's `<div>` as the card root. Semantically more appropriate for a standalone content item. Not a concern.
+- **nit** — `NewListSheet` uses a `<form onSubmit>` instead of an `onKeyDown` handler on the input. Functionally equivalent; the form approach is more robust (Enter key submits natively). Not a concern.
+- **nit** — `BottomSheet` gained `aria-label={title}` on the dialog div — a correctness improvement that enabled `findByRole("dialog", { name: "New List" })` in tests. Positive change.
+- **nit** — Active toggle applies both `eg-toggle eg-toggle-active` classes (not just `eg-toggle-active`). This is correct: `eg-toggle` supplies base padding/radius, `eg-toggle-active` overrides colours via CSS cascade.
+- **nit** — The moreVertical menu button is only rendered for `list.is_owner === true`. The plan's spec omitted this guard, but the implementation is strictly more correct — non-owners cannot rename or delete, so showing the menu would be misleading.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-004 confirmed `ready_for_review`.
+2. Re-read T-004 section of `.ai/PLAN.md`.
+3. Read `OverviewPage.jsx`, `ListCardHome.jsx`, `NewListSheet.jsx` in full.
+4. Inspected `git diff --staged` (new files: `ListCardHome.jsx`, `NewListSheet.jsx`) and `git diff` (unstaged: `OverviewPage.jsx`, `index.css`, `app.test.jsx`, `BottomSheet.jsx`).
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (250 kB JS).
+7. Ran `npm test` → **17/17 frontend + 25/25 backend tests pass**.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| Dark neon list cards with owner/shared chips | ✅ `ListCardHome` renders `eg-card`, `eg-chip-purple`/`eg-chip-cyan`, Queued chip |
+| FAB opens `NewListSheet` bottom sheet | ✅ FAB `onClick={() => setShowNew(true)}`; test confirms dialog appears |
+| Creating a list adds it to the list | ✅ `createListByName` → `updateLists`; offline queuing preserved |
+| Rename & delete via moreVertical menu | ✅ Menu opens on owner cards; rename input + Save/Cancel; delete with confirm |
+| Active/All toggle renders | ✅ `overview-toggle` with `eg-toggle` / `eg-toggle-active` |
+| Empty / loading / error states display | ✅ `EmptyState`, `LoadingState`, `ErrorState` wired; new test covers loading + error |
+| Logout functional | ✅ `eg-icon-btn` `aria-label="Log out"` calls `logout()`; test confirms redirect |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 17/17 frontend |
+
+**Plan compliance — detailed:**
+
+| Item | Status |
+|---|---|
+| State: `view`, `showNew` added | ✅ |
+| `createListByName(name)` extracted | ✅ |
+| `submitRename(listId, newName)` extracted (no state dependency) | ✅ |
+| `handleDelete` unchanged | ✅ |
+| `sharedCount` + `displayLists = lists` | ✅ |
+| `loadLists` as `useCallback` for ErrorState retry | ✅ |
+| `overview-topbar` sticky header with brand + chips | ✅ |
+| `overview-toggle` Active / All Lists | ✅ |
+| `overview-content` with all four states | ✅ |
+| `FAB` + `NewListSheet` | ✅ |
+| All required CSS classes | ✅ |
+| New tests: loading/error states, logout | ✅ |
+| Existing tests updated for new UI copy & interaction flow | ✅ |
+
+##### Risks
+
+- None. All async handlers, offline queue integration, and routing are unchanged. The state refactors (removing `editingId`/`editingName`, removing `newListName`) eliminate race conditions in the old implementation. Full test coverage.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-005 — List Detail Page Redesign
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — `EntryRow` touch handlers early-return when `editMode` is true. Defensive addition beyond the plan spec; prevents accidental swipe-delete during inline edit. Positive.
+- **nit** — `AddItemSheet` uses `<form onSubmit>` instead of `onKeyDown` on input. Same benefit as T-004 `NewListSheet`. Not a concern.
+- **nit** — FAB is guarded by `{list ? <FAB …> : null}` — not shown while loading or on error. Correct; adding to a null list would be a no-op. Not a concern.
+- **nit** — Button labels are entry-specific: `"Mark Milk done"`, `"Edit Coffee"`. More accessible than generic `"Done"` / `"Edit"`.
+- **nit** — `sortEntries` helper ensures open entries appear before done, sorted by `created_at`. Bonus quality-of-life improvement; not required by the plan.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-005 confirmed `ready_for_review`.
+2. Re-read T-005 section of `.ai/PLAN.md`.
+3. Read `ListDetailPage.jsx`, `EntryRow.jsx`, `AddItemSheet.jsx`, `entry-row.test.jsx` in full.
+4. Inspected `git diff --staged` (new files) and `git diff` (modified: `ListDetailPage.jsx`, `index.css`, `app.test.jsx`) for scope.
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (252 kB JS).
+7. Ran `npm test` → **19/19 frontend + 25/25 backend tests pass**.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| TopBar with list name and back navigation | ✅ `TopBar title={list?.name ?? "List"} onBack={() => navigate("/")}` |
+| FAB opens `AddItemSheet` | ✅ `setShowAddItem(true)`; test confirms dialog by role |
+| Adding an item creates an entry | ✅ `addEntryByText` → `createEntry`; offline temp entry support preserved |
+| Items toggle done/open with neon styling & strikethrough | ✅ `checkCircle` color switches on status; `entry-row-done` + `entry-row-text-done` classes |
+| Swipe-to-delete (>80 px left) | ✅ Touch handlers; `entry-row.test.jsx` swipe test confirms `onDelete` called |
+| Done section is collapsible | ✅ `doneOpen` state; collapse button; test confirms hide/show |
+| Sharing panel (owner only) renders and functions | ✅ `SharingPanel` behind `list?.is_owner && isSharingOpen`; share + revoke tests pass |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend |
+
+**Plan compliance — detailed:**
+
+| Item | Status |
+|---|---|
+| `addEntryByText(text)` extracted | ✅ |
+| `submitEditEntry(entryId, text)` extracted | ✅ |
+| `toggleStatus`, `handleDeleteEntry`, `handleShareSubmit`, `handleRevokeMember` preserved | ✅ |
+| State: `showAddItem`, `doneOpen` added | ✅ |
+| `openEntries` / `doneEntries` derived | ✅ |
+| OPEN ITEMS section with EmptyState when empty | ✅ |
+| Done section conditional + collapsible | ✅ |
+| `SharingPanel` as local named function | ✅ |
+| `EntryRow`: swipe zone, touch handlers, check/edit/delete buttons | ✅ |
+| `EntryRow`: inline edit mode with Save/Cancel | ✅ |
+| `AddItemSheet`: does NOT auto-close after add | ✅ |
+| Dedicated swipe test in `entry-row.test.jsx` | ✅ |
+| New integration tests: TopBar elements, collapsible done, loading/error | ✅ |
+| Existing detail tests updated for new UI | ✅ |
+
+##### Risks
+
+- None. All async handlers, API calls, and offline queue integration are unchanged. New components are well-isolated and fully covered by the dedicated + integration test suite.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-007 — List Detail Options Flyout + BottomNav Cleanup
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — `ListOptionsSheet` guards with `if (!open || !isOwner)`. The `!isOwner` check is redundant (the parent never sets `showOptions=true` for non-owners, and the options button only renders for owners) but is a safe belt-and-suspenders guard.
+- **nit** — `ShareListSheet` uses `<label htmlFor="share-list-sheet-email">` wrapping the input, making `htmlFor` technically redundant (implicit association via nesting suffices). Accessible and functional either way; `getByLabelText` works as confirmed by passing tests.
+- **nit** — `RenameListSheet` disables Save when `value.trim() === currentName`. This is a UX improvement beyond the spec — prevents no-op API calls. Positive.
+- **nit** — `handleRename` re-throws on error so `RenameListSheet` can stay open on failure. Correct defensive pattern.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-007 confirmed `ready_for_review`.
+2. Re-read T-007 acceptance criteria (scope change from original T-006).
+3. Read `ListOptionsSheet.jsx`, `RenameListSheet.jsx`, `ShareListSheet.jsx` in full.
+4. Inspected `git diff --staged` (new sheet files) and `git diff` (modified: `App.jsx`, `BottomNav.jsx`, `ListDetailPage.jsx`, `index.css`, `app.test.jsx`, `ui.test.jsx`).
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (254 kB JS).
+7. Ran `npm test` → **19/19 frontend + 25/25 backend tests pass**.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| Search tab removed from BottomNav | ✅ `tabs` array reduced to single Lists entry; `ui.test.jsx` confirms no Search button |
+| `/search` route removed from App.jsx | ✅ Import + `<Route>` removed; `/search` now falls through to `<Navigate to="/" replace />` |
+| TopBar shows moreVertical "List options" button (owner only) | ✅ `ariaLabel: "List options"`, `name="moreVertical"`; test confirms presence and absence of old "Share list" button |
+| Tapping options opens `ListOptionsSheet` | ✅ `setShowOptions(true)`; test confirms `role="dialog" name="List Options"` |
+| "Rename list" → `RenameListSheet` with name pre-filled | ✅ `currentName={list?.name}` prop; `useEffect` syncs on open; test reads pre-filled value |
+| Saving calls `renameList` API | ✅ `handleRename` calls `renameList(token, id, { name })`; TopBar title updates to new name |
+| "Share list" → `ShareListSheet` with email form + member list | ✅ `setShowShare(true)`; `ShareListSheet` has form, member list, Revoke; test verifies flow end-to-end |
+| Existing sharing logic preserved | ✅ `handleShareSubmit`, `handleRevokeMember` unchanged; state props passed through |
+| `/search` redirects to overview | ✅ Catch-all `<Navigate to="/">` handles it; test confirms `Lists` tab is active |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend |
+
+**Scope clean-up verified:**
+- `SharingPanel` inline component fully removed from `ListDetailPage.jsx` ✓
+- `isSharingOpen` state replaced by `showOptions`, `showRename`, `showShare` ✓
+- `renameList` import added to `ListDetailPage.jsx`; `handleRename` wired with offline-aware update ✓
+- `SearchPage` import removed from `App.jsx` ✓
+
+##### Risks
+
+- `/search` now redirects silently to `/` via the catch-all route. Any bookmarked search URLs will land on the overview without error. Acceptable.
+- `handleRename` updates `list.name` in local state. The TopBar title re-renders immediately with the new name, consistent with the offline-first update pattern used elsewhere in the codebase.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-008 — E2E Tests: Shopping List CRUD
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — `lists.spec.js` adds `test.use({ hasTouch: true })` (line 10). The plan did not mention this, but it is essential: Playwright skips touch-event dispatch by default in Chromium without this flag. Without it the swipe test would pass vacuously (no events fired). Positive addition.
+- **nit** — `swipeEntryLeft` includes `pageX`, `pageY`, `screenX`, `screenY` fields in the `Touch` constructor beyond the plan spec. These improve cross-browser Touch compatibility. Positive.
+- **nit** — Sheet locators use `getByRole("dialog", { name: "..." })` rather than the plan's `getByText(...)`. Querying by ARIA dialog role and accessible name is strictly more robust. Positive.
+- **nit** — `auth.spec.js` fix correctly targets both occurrences and uses `"No lists yet"` (without the ellipsis) to match the `EmptyState` title rendered by T-004. Correct.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-008 confirmed `ready_for_review`.
+2. Re-read T-008 section of `.ai/PLAN.md`.
+3. Read `e2e/lists.spec.js` and `e2e/auth.spec.js` in full.
+4. Verified T-008 acceptance criteria point-by-point (see table below).
+5. Ran `npm run lint` → **0 errors** (1 pre-existing Fast Refresh warning in `AuthContext.jsx`).
+6. Ran `npm run build` → **clean** (975 kB precache, within Workbox limit).
+7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
+8. Ran `npm run e2e` → **9/9 tests pass** (5 auth + 4 lists, 17 s).
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| `e2e/lists.spec.js` — creates a new shopping list | ✅ test at line 118; FAB → NewListSheet dialog → fill name → submit → card appears |
+| `e2e/lists.spec.js` — adds an item to a shopping list | ✅ test at line 133; API-created list → navigate → FAB → AddItemSheet dialog → fill → submit → row appears |
+| `e2e/lists.spec.js` — deletes an item via swipe | ✅ test at line 151; API-created entry → swipe 95 px left (> 80 px threshold) → row gone |
+| `e2e/lists.spec.js` — marks an item as done | ✅ test at line 166; toggle button label flips; `.entry-row-text-done` class applied |
+| `auth.spec.js` "registers" assertion fixed | ✅ line 44: `getByText("No lists yet")` |
+| `auth.spec.js` "logs in" assertion fixed | ✅ line 93: `getByText("No lists yet")` |
+| `npm run e2e` passes all 9 tests | ✅ 9 passed (17.0 s) |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
+
+**Implementation quality:**
+- `setupLoggedInUser` injects the JWT via `localStorage` and reloads — fast, deterministic, avoids re-testing the auth UI flow.
+- `createListByApi` / `createEntryByApi` set up test fixtures via API — eliminates UI flakiness in precondition steps.
+- `swipeEntryLeft` dispatches three synthetic `TouchEvent`s (`touchstart` → `touchmove` → `touchend`) with correct `touches`/`changedTouches`/`targetTouches` arrays, matching `EntryRow`'s handler signature.
+
+##### Risks
+
+- Swipe test depends on the `.entry-row` CSS selector and the 80 px `clientX` delta threshold in `EntryRow`. If either changes, the test needs updating. Acceptable for current scope.
+- E2E tests create real database rows with no teardown. Matches existing `auth.spec.js` pattern; appropriate for this integration environment.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-009 — Spacing-scale tokens & consistency fixes
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — The plan listed the spacing scale as the last group before shadows in `tokens.css`. The implementer placed it between the radius tokens and shadow tokens (lines 43–50), which is consistent with a small → large visual properties ordering. No functional impact.
+- **nit** — `.auth-form` retains `gap: 1rem` (not converted to a spacing token). This selector was not in the 11-fix list and the rem value is a deliberate existing choice; leaving it is correct scope discipline.
+- **nit** — `.entry-row-edit-actions { margin-top: 0 }` is the correct fix per the plan (removing the `4px` extra push), and the parent `.entry-row-edit` already provides `gap: 12px`. Verified.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-009 confirmed `ready_for_review`.
+2. Re-read T-009 section of `.ai/PLAN.md`.
+3. Read `frontend/src/styles/tokens.css` in full.
+4. Verified all 8 spacing token definitions against the plan spec.
+5. Verified all 11 targeted CSS property changes against the plan table via grep + targeted reads.
+6. Ran `npm run lint` → **0 errors**.
+7. Ran `npm run build` → **clean** (16.70 kB CSS, 975 kB precache — within Workbox limit).
+8. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
+
+##### Findings
+
+**Spacing tokens — all 8 definitions correct:**
+
+| Token | Value | Result |
+|---|---|---|
+| `--space-1` | `4px` | ✅ |
+| `--space-2` | `8px` | ✅ |
+| `--space-3` | `12px` | ✅ |
+| `--space-4` | `16px` | ✅ |
+| `--space-5` | `20px` | ✅ |
+| `--space-6` | `24px` | ✅ |
+| `--space-8` | `32px` | ✅ |
+| `--space-12` | `48px` | ✅ |
+
+**11 targeted index.css fixes — all correct:**
+
+| Selector | Property | Expected | Actual | Result |
+|---|---|---|---|---|
+| `.loading-state` | `padding` | `0` | `0` | ✅ |
+| `.bottom-sheet` | `padding` | `var(--space-5) var(--space-4) var(--space-12)` | `var(--space-5) var(--space-4) var(--space-12)` | ✅ |
+| `.list-card-name` | `margin-bottom` | `var(--space-2)` | `var(--space-2)` | ✅ |
+| `.member-row` | `padding` | `var(--space-3) 0` | `var(--space-3) 0` | ✅ |
+| `.list-option-row` | `padding` | `var(--space-3)` | `var(--space-3)` | ✅ |
+| `.overview-toggle` | `padding` | `0 var(--space-4) var(--space-3)` | `0 var(--space-4) var(--space-3)` | ✅ |
+| `.share-sheet-members-label` | `padding` | `var(--space-2) 0` | `var(--space-2) 0` | ✅ |
+| `.entry-row-edit-actions` | `margin-top` | `0` | `0` | ✅ |
+| `.auth-logo` | `border-radius` | `var(--radius-md)` | `var(--radius-md)` | ✅ |
+| `.overview-logo` | `border-radius` | `var(--radius-md)` | `var(--radius-md)` | ✅ |
+| `.field, .eg-field` | `gap` | `6px` | `6px` | ✅ |
+
+##### Risks
+
+- None. Changes are CSS-only; no component logic touched. All 19 frontend tests and 25 backend tests confirm no regressions.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-010 — List detail section spacing fixes
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+- **nit** — The plan specified `padding-bottom: var(--space-3)` for `.entry-section-collapse`, but the implementer wrote `padding: 0 0 var(--space-3)`. Since the pre-existing value was `padding: 0`, the shorthand is functionally identical (top/right/left remain 0, bottom becomes 12px). Correct outcome.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-010 confirmed `ready_for_review`.
+2. Read T-010 section of `.ai/PLAN.md`.
+3. Ran `git diff HEAD -- frontend/src/index.css` to isolate the two uncommitted CSS additions.
+4. Verified `.entry-section` class usage in `ListDetailPage.jsx` — two sibling `<section className="entry-section">` elements confirmed at lines 304 and 326; adjacent-sibling combinator fires correctly.
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (16.77 kB CSS, 975 kB precache).
+7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| `.entry-section + .entry-section { margin-top: var(--space-4) }` — 16px gap between Open Items and Done sections | ✅ |
+| `.entry-section-collapse { padding: 0 0 var(--space-3) }` — 12px below "DONE" label before first entry row | ✅ |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
+
+**Scope discipline verified:** only 2 CSS rules changed; no JSX, no logic, no other selectors touched.
+
+##### Risks
+
+- None. Adjacent-sibling combinator is scoped to `.entry-section` elements only; no other page is affected. CSS-only change with no test regressions.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-011 — Fix Done card collapsed-state bottom padding asymmetry
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings. Implementation matches the plan exactly.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-011 confirmed `ready_for_review`.
+2. Read T-011 section of `.ai/PLAN.md`.
+3. Ran `git diff HEAD -- frontend/src/index.css` to isolate the two uncommitted changes.
+4. Confirmed `.entry-row-wrapper` is the root element of `EntryRow.jsx` (line 69) — adjacent-sibling combinator fires only when done entries are rendered (expanded state); produces no spacing in collapsed state.
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (975 kB precache).
+7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| `.entry-section-collapse { padding: 0 }` — T-010 bottom-padding reverted | ✅ diff line: `- padding: 0 0 var(--space-3)` → `+ padding: 0` |
+| `.entry-section-collapse + .entry-row-wrapper { margin-top: var(--space-3) }` — 12px gap only when expanded | ✅ new rule at index.css line 930 |
+| Collapsed state: symmetric 20px top/bottom (from `.entry-section` card padding only) | ✅ no extra padding on the button; section padding is sole spacing |
+| Expanded state: 12px gap between DONE label and first entry row | ✅ sibling combinator fires on the first `.entry-row-wrapper` child |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
+
+**Scope discipline:** exactly 1 property change + 1 new rule; no JSX, no logic, no other selectors touched.
+
+##### Risks
+
+- None. The sibling combinator `.entry-section-collapse + .entry-row-wrapper` is narrowly scoped to this specific collapse-then-entries DOM sequence; no other screen uses this pattern.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-012 — Fix Open Items card excess top spacing
+
+### Review Round 1
 
 Status: **PASS**
 
@@ -159,38 +632,37 @@ Reviewed: 2026-04-25
 
 #### Findings
 
-Round 1 blocker resolved. No new findings.
-
-| # | Severity | Location | Description | Required fix |
-|---|----------|----------|-------------|--------------|
-| — | — | — | No findings | — |
+No blocking, major, or minor findings. Implementation is a single targeted property change that matches the plan exactly.
 
 #### Verification
 
 ##### Steps
-1. Re-read `.ai/PLAN.md` version table — all entries checked against working tree.
-2. Read `.github/workflows/release-please.yml` line 25 — now shows `googleapis/release-please-action@v5`. Blocker resolved. ✅
-3. Confirmed `git diff HEAD` for `release-please.yml`: the single additional change from Round 1 is `@v4` → `@v5` on line 25; all other lines unchanged from Round 1.
-4. Confirmed `git diff HEAD` for `ci.yml` and `README.md` unchanged from Round 1 (already correct).
-5. Ran `npm run lint` — 0 errors; 1 pre-existing unrelated warning.
-6. Ran `npm run build` — clean build.
-7. Ran `npm test` — 25/25 pass, 0 failures.
+1. Re-read `.ai/TASKS.md` — T-012 confirmed `ready_for_review`.
+2. Read T-012 section of `.ai/PLAN.md`.
+3. Ran `git diff HEAD -- frontend/src/index.css` — one property change confirmed, no other files touched.
+4. Verified the fix: `.entry-section-header` `padding: 16px 0 8px` → `padding: 0 0 var(--space-2)`. Removing the 16px top aligns the label with the section's own `1.25rem` (20px) card padding; `var(--space-2)` = 8px bottom gap preserved.
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean**.
+7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
 
 ##### Findings
-- All acceptance criteria met:
-  - ✅ `googleapis/release-please-action@v5` — Node.js 24 runtime, no deprecation warning
-  - ✅ No `google-github-actions/release-please-action` reference remains
-  - ✅ All `ci.yml` action versions match plan table (`checkout@v6`, `setup-node@v6`, `upload-artifact@v7`)
-  - ✅ All `release-please.yml` action versions match plan table (`release-please-action@v5`, `checkout@v6`, `login-action@v4`, `metadata-action@v6`, `build-push-action@v7`)
-  - ✅ README documents maintained-version pinning policy
-  - ✅ Lint, build, and tests pass
-  - ⏳ "No Node.js 20 deprecation warnings in any GitHub Actions run" — verifiable only after merge to `main`; all action versions are confirmed Node.js 24-compatible
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| Top padding removed from `.entry-section-header` (was 16px, now 0) | ✅ diff confirmed |
+| Bottom gap of 8px (`var(--space-2)`) preserved below the label | ✅ `padding: 0 0 var(--space-2)` |
+| Section's own `1.25rem` padding provides the ~20px top gap | ✅ no change to `.entry-section` rule |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
+
+**Scope discipline:** exactly 1 property on 1 selector changed; no JSX, no logic touched.
 
 ##### Risks
-- Low: `googleapis/release-please-action@v5` is a major version. If any undocumented breaking interface change affects `release-type: node` usage it would surface on the first `main` push after merge. Risk is low given the action's changelog focus on runtime only.
 
-#### Open Questions
-- None.
+- None. `.entry-section-header` is only used inside `.entry-section` cards on the list detail page; the change is fully contained.
 
 #### Verdict
 `PASS`
