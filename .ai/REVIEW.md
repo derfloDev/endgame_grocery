@@ -99,3 +99,98 @@ No blockers, majors, or minors. One nit noted.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **FAIL**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+| # | Severity | Location | Description | Required fix |
+|---|----------|----------|-------------|--------------|
+| 1 | blocker | `release-please.yml` line 25 | Implementation uses `googleapis/release-please-action@v4` but the plan specifies `@v5`. `v5.0.0` was released 2026-04-22 and is the version that upgrades to Node.js 24 as its breaking change. Using `@v4` leaves the release-please step running on Node.js 20, which does NOT eliminate the Node.js 20 deprecation warning for this action — directly violating the acceptance criteria. | Yes — change to `googleapis/release-please-action@v5` |
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/PLAN.md` — version table specifies `googleapis/release-please-action@v5`.
+2. Read `.github/workflows/release-please.yml` line 25 — shows `googleapis/release-please-action@v4`.
+3. Fetched `https://github.com/googleapis/release-please-action/releases` — confirmed `v5.0.0` released 2026-04-22 with "upgrade to node24" as a breaking change; `v4.4.1` is the latest v4 and remains on Node.js 20.
+4. Verified all other version changes in `ci.yml` against plan table: `checkout@v6` ✅, `setup-node@v6` ✅ (all 3 jobs), `upload-artifact@v7` ✅.
+5. Verified all other version changes in `release-please.yml`: `actions/checkout@v6` ✅, `docker/login-action@v4` ✅, `docker/metadata-action@v6` ✅, `docker/build-push-action@v7` ✅.
+6. Inspected `README.md` changes — sentence about pinning maintained major versions added; accurate and clear.
+7. Ran `npm run lint` — 0 errors; 1 pre-existing unrelated warning.
+8. Ran `npm run build` — clean build.
+9. Ran `npm test` — 25/25 pass, 0 failures.
+
+##### Findings
+- Acceptance criteria **not fully met** due to blocker finding #1:
+  - ❌ `googleapis/release-please-action@v4` still runs on Node.js 20 — deprecation warning NOT eliminated for this step
+  - ❌ "all action versions updated per plan table" — `@v4` deviates from plan's `@v5`
+  - ✅ All `ci.yml` action versions updated correctly per plan
+  - ✅ All other `release-please.yml` action versions updated correctly per plan
+  - ✅ `google-github-actions` namespace replaced with `googleapis`
+  - ✅ README documentation added
+  - ✅ Lint, build, and tests pass
+
+##### Risks
+- Medium: `googleapis/release-please-action@v5` is a semver-major with a Node.js 24 runtime change. The implementer should verify no input/output interface changes in v5 affect the current usage (`release-type: node`). Parameters are expected to be compatible but should be confirmed against the v5 release notes.
+
+#### Required Fixes
+1. `.github/workflows/release-please.yml` line 25: change `googleapis/release-please-action@v4` → `googleapis/release-please-action@v5`
+
+#### Open Questions
+- None.
+
+#### Verdict
+`FAIL`
+
+### Review Round 2
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+Round 1 blocker resolved. No new findings.
+
+| # | Severity | Location | Description | Required fix |
+|---|----------|----------|-------------|--------------|
+| — | — | — | No findings | — |
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/PLAN.md` version table — all entries checked against working tree.
+2. Read `.github/workflows/release-please.yml` line 25 — now shows `googleapis/release-please-action@v5`. Blocker resolved. ✅
+3. Confirmed `git diff HEAD` for `release-please.yml`: the single additional change from Round 1 is `@v4` → `@v5` on line 25; all other lines unchanged from Round 1.
+4. Confirmed `git diff HEAD` for `ci.yml` and `README.md` unchanged from Round 1 (already correct).
+5. Ran `npm run lint` — 0 errors; 1 pre-existing unrelated warning.
+6. Ran `npm run build` — clean build.
+7. Ran `npm test` — 25/25 pass, 0 failures.
+
+##### Findings
+- All acceptance criteria met:
+  - ✅ `googleapis/release-please-action@v5` — Node.js 24 runtime, no deprecation warning
+  - ✅ No `google-github-actions/release-please-action` reference remains
+  - ✅ All `ci.yml` action versions match plan table (`checkout@v6`, `setup-node@v6`, `upload-artifact@v7`)
+  - ✅ All `release-please.yml` action versions match plan table (`release-please-action@v5`, `checkout@v6`, `login-action@v4`, `metadata-action@v6`, `build-push-action@v7`)
+  - ✅ README documents maintained-version pinning policy
+  - ✅ Lint, build, and tests pass
+  - ⏳ "No Node.js 20 deprecation warnings in any GitHub Actions run" — verifiable only after merge to `main`; all action versions are confirmed Node.js 24-compatible
+
+##### Risks
+- Low: `googleapis/release-please-action@v5` is a major version. If any undocumented breaking interface change affects `release-type: node` usage it would surface on the first `main` push after merge. Risk is low given the action's changelog focus on runtime only.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
