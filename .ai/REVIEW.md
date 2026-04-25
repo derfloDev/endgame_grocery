@@ -41,3 +41,44 @@ Reviewed: 2026-04-25
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/data/iconDatabase.js` — Several entries share an emoji with a more prominent item due to Unicode gaps (`cream` → `🥛`, `cocoa` → `☕`, `mustard` → `🌭`, `black pepper` → `🧂`). This is expected and appropriate given emoji availability. No fix required.
+2. **nit** — `frontend/src/data/iconDatabase.js` — Typing "pepper" alone does not resolve to a match (only "black pepper" is in the label/tags). This is a minor gap in coverage but not required by the plan. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/data/iconDatabase.js` — structure, entry count, bilingual coverage, `EXACT_MATCH_MAP` construction reviewed.
+- Read `frontend/src/utils/cosineSimilarity.js` — algorithm, guard clauses, edge cases reviewed.
+- Read `frontend/src/utils/cosineSimilarity.test.js` — all 5 test cases reviewed.
+- Runtime spot-check via `node -e` to confirm entry count (78), map size (257 keys), and all 12 plan-specified EN/DE lookups resolve correctly.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js` — **5/5 pass**.
+- Ran `npm run build` — clean.
+- Ran `npm test` — **24/24 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `ICON_DB` has 78 entries, well above the ≥ 60 minimum.
+- All required categories present: dairy, produce, bakery, meat/fish, beverages, frozen, snacks, household, condiments.
+- `EXACT_MATCH_MAP` is frozen and derived from label + tags; keys are lower-cased and trimmed.
+- `createExactMatchMap` correctly skips empty keys and handles missing `tags` with a default of `[]`.
+- `cosineSimilarity` handles zero-magnitude vectors (returns 0), mismatched lengths (RangeError), and non-array inputs (TypeError). Compatible with TypedArrays via `Number()` coercion.
+- Test coverage: entry count assertion, 12 exact-match pairs (EN + DE), and 3 vector similarity cases (identical, orthogonal, partial overlap with `toBeCloseTo`).
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
