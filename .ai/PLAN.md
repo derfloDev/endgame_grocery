@@ -1681,3 +1681,53 @@ Instead, target the first entry row that immediately follows the collapse button
 
 ### Commit message
 `fix(ui): add gap between list detail section cards and done header spacing`
+
+---
+
+## T-011 — Fix Done card collapsed-state bottom padding asymmetry
+
+### Objective
+T-010 set `padding: 0 0 var(--space-3)` on `.entry-section-collapse`. In the **collapsed** state this adds 12 px below the button text on top of the section's own 20 px bottom padding, producing 32 px of space at the bottom vs 20 px at the top — a visible asymmetry. The fix moves the gap to a sibling selector so it only fires when entries are actually rendered.
+
+### Root cause
+```css
+/* current — wrong */
+.entry-section-collapse {
+  padding: 0 0 var(--space-3); /* 12px bottom always, even when collapsed */
+}
+```
+
+### Files to change
+
+| File | Action |
+|------|--------|
+| `frontend/src/index.css` | 1 property change + 1 new rule |
+
+### index.css — exact changes
+
+**Step 1** — revert the padding on the collapse button to `0`:
+```css
+.entry-section-collapse {
+  /* all existing properties unchanged except padding */
+  padding: 0;
+}
+```
+
+**Step 2** — add adjacent-sibling rule directly after `.entry-section-collapse .eg-chip-success { … }`:
+```css
+.entry-section-collapse + .entry-row-wrapper {
+  margin-top: var(--space-3); /* 12px — only when entries are rendered below the DONE header */
+}
+```
+
+Result:
+- **Collapsed**: section padding (20 px) is the sole spacing on all four sides → symmetric ✓
+- **Expanded**: first `.entry-row-wrapper` gets 12 px top margin from the button → correct gap ✓
+
+### Validation
+- `npm run lint` — passes
+- `npm run build` — passes
+- `npm test` — passes (CSS-only)
+
+### Commit message
+`fix(ui): restore symmetric Done card padding by using sibling margin instead of button padding`

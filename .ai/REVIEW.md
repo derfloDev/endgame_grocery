@@ -571,3 +571,51 @@ No blocking, major, or minor findings.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-011 — Fix Done card collapsed-state bottom padding asymmetry
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-24
+
+#### Findings
+
+No blocking, major, or minor findings. Implementation matches the plan exactly.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-011 confirmed `ready_for_review`.
+2. Read T-011 section of `.ai/PLAN.md`.
+3. Ran `git diff HEAD -- frontend/src/index.css` to isolate the two uncommitted changes.
+4. Confirmed `.entry-row-wrapper` is the root element of `EntryRow.jsx` (line 69) — adjacent-sibling combinator fires only when done entries are rendered (expanded state); produces no spacing in collapsed state.
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean** (975 kB precache).
+7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| `.entry-section-collapse { padding: 0 }` — T-010 bottom-padding reverted | ✅ diff line: `- padding: 0 0 var(--space-3)` → `+ padding: 0` |
+| `.entry-section-collapse + .entry-row-wrapper { margin-top: var(--space-3) }` — 12px gap only when expanded | ✅ new rule at index.css line 930 |
+| Collapsed state: symmetric 20px top/bottom (from `.entry-section` card padding only) | ✅ no extra padding on the button; section padding is sole spacing |
+| Expanded state: 12px gap between DONE label and first entry row | ✅ sibling combinator fires on the first `.entry-row-wrapper` child |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
+
+**Scope discipline:** exactly 1 property change + 1 new rule; no JSX, no logic, no other selectors touched.
+
+##### Risks
+
+- None. The sibling combinator `.entry-section-collapse + .entry-row-wrapper` is narrowly scoped to this specific collapse-then-entries DOM sequence; no other screen uses this pattern.
+
+#### Verdict
+`PASS`

@@ -306,6 +306,18 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-011 — review — 2026-04-24T18:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-011 Done card padding asymmetry fix; T-010 padding correctly reverted, sibling-margin rule correctly added, collapsed/expanded states both correct, all validations pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-010 — review — 2026-04-24T18:30:00Z
 
 | Field | Value |
@@ -416,6 +428,43 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, frontend/src/index.css |
 | Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run lint`, `npm run build`, and `npm test`. |
 | Commit | `fix(ui): add gap between list detail section cards and done header spacing` |
+| Next Role | implement |
+
+---
+
+### T-011 — plan — 2026-04-24T18:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned fix for Done card collapsed-state asymmetry: revert entry-section-collapse padding to 0 and use .entry-section-collapse + .entry-row-wrapper { margin-top: var(--space-3) } so the gap only renders when entries are visible |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-011 — IMPLEMENT — 2026-04-24T17:48:19.0916930Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Restored symmetric collapsed Done card padding by removing button bottom padding and moving the 12px gap onto the first rendered done-entry row via a sibling selector. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/index.css |
+| Validation | No test files changed because this task only adjusts CSS spacing on the list detail page. `npm run lint` passed with the existing AuthContext Fast Refresh warning; `npm run build` passed; `npm test` passed. |
+| Commit | `fix(ui): restore symmetric Done card padding by using sibling margin instead of button padding` |
+| Next Role | review |
+
+---
+
+### T-011 — commit_task — 2026-04-24T17:50:22.7867331Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-011 done after review approval and committed the reviewed collapsed-state Done card padding fix. |
+| Files Changed | .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, .ai/TASKS.md, frontend/src/index.css |
+| Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run lint`, `npm run build`, and `npm test`. |
+| Commit | `fix(ui): restore symmetric Done card padding by using sibling margin instead of button padding` |
 | Next Role | implement |
 
 ---

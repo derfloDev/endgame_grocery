@@ -919,12 +919,16 @@ p {
   border: 0;
   background: none;
   cursor: pointer;
-  padding: 0 0 var(--space-3);
+  padding: 0;
   text-align: left;
 }
 
 .entry-section-collapse .eg-chip-success {
   margin-left: auto;
+}
+
+.entry-section-collapse + .entry-row-wrapper {
+  margin-top: var(--space-3);
 }
 
 .sharing-panel-form {
