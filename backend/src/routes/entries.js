@@ -44,7 +44,7 @@ export function createEntryRouter({
 
       const result = await pool.query(
         `
-          SELECT id, list_id, text, status, created_at, updated_at
+          SELECT id, list_id, text, status, icon, created_at, updated_at
           FROM entries
           WHERE list_id = $1
           ORDER BY status ASC, created_at ASC
@@ -61,7 +61,7 @@ export function createEntryRouter({
   });
 
   router.post("/", async (req, res, next) => {
-    const { text } = req.body ?? {};
+    const { text, icon } = req.body ?? {};
 
     if (!text?.trim()) {
       res.status(400).json({ error: "Entry text is required." });
@@ -83,11 +83,11 @@ export function createEntryRouter({
 
       const result = await pool.query(
         `
-          INSERT INTO entries (list_id, text, status)
-          VALUES ($1, $2, 'open')
-          RETURNING id, list_id, text, status, created_at, updated_at
+          INSERT INTO entries (list_id, text, status, icon)
+          VALUES ($1, $2, 'open', $3)
+          RETURNING id, list_id, text, status, icon, created_at, updated_at
         `,
-        [req.params.id, text.trim()]
+        [req.params.id, text.trim(), icon ?? null]
       );
 
       res.status(201).json({
@@ -99,9 +99,9 @@ export function createEntryRouter({
   });
 
   router.patch("/:entryId", async (req, res, next) => {
-    const { text, status } = req.body ?? {};
+    const { text, status, icon } = req.body ?? {};
 
-    if (!text?.trim() && !status) {
+    if (!text?.trim() && !status && icon === undefined) {
       res.status(400).json({ error: "At least one entry update field is required." });
       return;
     }
@@ -130,11 +130,12 @@ export function createEntryRouter({
           SET
             text = COALESCE($1, text),
             status = COALESCE($2, status),
+            icon = COALESCE($3, icon),
             updated_at = NOW()
-          WHERE id = $3 AND list_id = $4
-          RETURNING id, list_id, text, status, created_at, updated_at
+          WHERE id = $4 AND list_id = $5
+          RETURNING id, list_id, text, status, icon, created_at, updated_at
         `,
-        [text?.trim() || null, status ?? null, req.params.entryId, req.params.id]
+        [text?.trim() || null, status ?? null, icon ?? null, req.params.entryId, req.params.id]
       );
 
       if (!result.rows[0]) {

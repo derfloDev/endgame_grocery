@@ -20,7 +20,9 @@
       "Bash(git:*)",
       "mcp__aide__*",
       "Bash(ls *)",
-      "Bash(grep -rn \"describe\\\\|postgres\\\\|DATABASE_URL\\\\|supertest\" C:/develop/endgame_grocery/backend/src/*.test.js)"
+      "Bash(grep -rn \"describe\\\\|postgres\\\\|DATABASE_URL\\\\|supertest\" C:/develop/endgame_grocery/backend/src/*.test.js)",
+      "Bash(dir C:\\\\develop\\\\endgame_grocery\\\\src)",
+      "Bash(xargs cat *)"
     ]
   }
 }

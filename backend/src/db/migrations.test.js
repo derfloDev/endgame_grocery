@@ -11,4 +11,12 @@ describe("database migrations", () => {
     assert.equal(typeof migration.up, "function");
     assert.equal(typeof migration.down, "function");
   });
+
+  it("exports up and down functions for the icon migration", async () => {
+    const migrationPath = path.resolve("src/db/migrations/1713898800000_add_icon_to_entries.cjs");
+    const migration = await import(pathToFileURL(migrationPath));
+
+    assert.equal(typeof migration.up, "function");
+    assert.equal(typeof migration.down, "function");
+  });
 });
