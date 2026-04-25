@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  optimizeDeps: {
+    exclude: ["@xenova/transformers"]
+  },
   server: {
     proxy: {
       "/api": "http://localhost:4000"

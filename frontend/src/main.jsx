@@ -5,8 +5,10 @@ import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 import { registerServiceWorker } from "./sw/register";
+import { primeIconWorker } from "./workers/iconWorkerClient";
 
 registerServiceWorker();
+primeIconWorker();
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

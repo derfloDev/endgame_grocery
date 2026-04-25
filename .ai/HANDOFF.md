@@ -105,3 +105,39 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-04-25T18:26:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 worker/hook implementation: singleton pipeline, request-ID correlation, 300 ms debounce with stale-result guard, eager init in main.jsx, and 4-case test suite; all checks pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-25T16:20:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the shared icon worker client, transformers.js worker, debounced `useIconSuggestion` hook, eager worker boot, and Vite config needed for local icon matching. |
+| Files Changed | `frontend/package.json`, `package-lock.json`, `frontend/vite.config.js`, `frontend/src/main.jsx`, `frontend/src/hooks/useIconSuggestion.js`, `frontend/src/hooks/useIconSuggestion.test.js`, `frontend/src/workers/iconWorker.js`, `frontend/src/workers/iconWorkerClient.js`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm install @xenova/transformers --workspace @endgame-grocery/frontend` (pass), `npm run test --workspace frontend -- src/hooks/useIconSuggestion.test.js` (pass), `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): add local grocery icon suggestion engine |
+| Next Role | review |
+
+---
+
+### T-003 — implement — 2026-04-25T16:26:12Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-003 frontend worker and icon-suggestion changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---
