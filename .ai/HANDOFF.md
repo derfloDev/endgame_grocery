@@ -306,6 +306,18 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-012 — review — 2026-04-25T06:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-012 Open Items card excess top spacing fix; single property change correct, double-padding eliminated, 8px bottom gap preserved, all validations pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-011 — review — 2026-04-24T18:45:00Z
 
 | Field | Value |
@@ -465,6 +477,43 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, .ai/TASKS.md, frontend/src/index.css |
 | Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run lint`, `npm run build`, and `npm test`. |
 | Commit | `fix(ui): restore symmetric Done card padding by using sibling margin instead of button padding` |
+| Next Role | implement |
+
+---
+
+### T-012 — plan — 2026-04-25T07:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned removal of double top padding on .entry-section-header (16px stacked on section's 20px) — change padding from `16px 0 8px` to `0 0 var(--space-2)` |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-012 — IMPLEMENT — 2026-04-25T08:02:58.0186482Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed the double top padding from the Open Items card header so the label aligns with the card's section padding, while preserving the 8px gap below the header. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/index.css |
+| Validation | No test files changed because this task only adjusts one CSS spacing rule on the list detail page. `.ai/TASKS.md` was also corrected so T-011 and T-012 remain separate source-of-truth rows. `npm run lint` passed with the existing AuthContext Fast Refresh warning; `npm run build` passed; `npm test` passed. |
+| Commit | `fix(ui): remove double top padding from Open Items card header` |
+| Next Role | review |
+
+---
+
+### T-012 — commit_task — 2026-04-25T08:05:02.5298596Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-012 done after review approval and committed the reviewed Open Items header spacing fix. |
+| Files Changed | .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, .ai/TASKS.md, frontend/src/index.css |
+| Validation | Review PASS in `.ai/REVIEW.md`; prior implementation validation passed `npm run lint`, `npm run build`, and `npm test`. |
+| Commit | `fix(ui): remove double top padding from Open Items card header` |
 | Next Role | implement |
 
 ---

@@ -1731,3 +1731,40 @@ Result:
 
 ### Commit message
 `fix(ui): restore symmetric Done card padding by using sibling margin instead of button padding`
+
+---
+
+## T-012 — Fix Open Items card excess top spacing
+
+### Objective
+The "OPEN ITEMS" label sits 36 px from the top border of the card instead of the expected ~20 px. Root cause: `.entry-section-header` has `padding: 16px 0 8px` — the 16 px top padding stacks on top of the section's own `padding: 1.25rem` (20 px), producing 36 px total.
+
+### Files to change
+
+| File | Action |
+|------|--------|
+| `frontend/src/index.css` | 1 property change |
+
+### index.css — exact change
+
+Remove the top padding from `.entry-section-header`. The section's own padding already provides the correct outer gap. Keep `8px` below the header to separate it from the first entry row:
+
+```css
+/* before */
+.entry-section-header {
+  padding: 16px 0 8px;
+}
+
+/* after */
+.entry-section-header {
+  padding: 0 0 var(--space-2); /* 8px below label, section padding handles top */
+}
+```
+
+### Validation
+- `npm run lint` — passes
+- `npm run build` — passes
+- `npm test` — passes (CSS-only)
+
+### Commit message
+`fix(ui): remove double top padding from Open Items card header`

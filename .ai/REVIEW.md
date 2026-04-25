@@ -619,3 +619,50 @@ No blocking, major, or minor findings. Implementation matches the plan exactly.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-012 — Fix Open Items card excess top spacing
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+No blocking, major, or minor findings. Implementation is a single targeted property change that matches the plan exactly.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-012 confirmed `ready_for_review`.
+2. Read T-012 section of `.ai/PLAN.md`.
+3. Ran `git diff HEAD -- frontend/src/index.css` — one property change confirmed, no other files touched.
+4. Verified the fix: `.entry-section-header` `padding: 16px 0 8px` → `padding: 0 0 var(--space-2)`. Removing the 16px top aligns the label with the section's own `1.25rem` (20px) card padding; `var(--space-2)` = 8px bottom gap preserved.
+5. Ran `npm run lint` → **0 errors**.
+6. Ran `npm run build` → **clean**.
+7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
+
+##### Findings
+
+**All acceptance criteria met:**
+
+| Criterion | Result |
+|---|---|
+| Top padding removed from `.entry-section-header` (was 16px, now 0) | ✅ diff confirmed |
+| Bottom gap of 8px (`var(--space-2)`) preserved below the label | ✅ `padding: 0 0 var(--space-2)` |
+| Section's own `1.25rem` padding provides the ~20px top gap | ✅ no change to `.entry-section` rule |
+| `npm run lint` passes | ✅ 0 errors |
+| `npm run build` passes | ✅ Clean |
+| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
+
+**Scope discipline:** exactly 1 property on 1 selector changed; no JSX, no logic touched.
+
+##### Risks
+
+- None. `.entry-section-header` is only used inside `.entry-section` cards on the list detail page; the change is fully contained.
+
+#### Verdict
+`PASS`

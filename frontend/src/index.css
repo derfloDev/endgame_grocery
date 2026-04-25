@@ -904,7 +904,7 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 16px 0 8px;
+  padding: 0 0 var(--space-2);
 }
 
 .entry-section + .entry-section {
