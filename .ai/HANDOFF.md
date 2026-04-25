@@ -318,3 +318,39 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-011 — review — 2026-04-25T20:56:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-011 IconPickerSheet: grid renders full registry, search filters correctly, selection fires onSelect+onClose, selected icon highlighted, CSS complete; all checks pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-011 — implement — 2026-04-25T18:51:52Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the shared `IconPickerSheet` bottom sheet with searchable full-registry icon grid, selection highlighting, and tests covering render, filter, and selection behavior. |
+| Files Changed | `frontend/src/components/IconPickerSheet.jsx`, `frontend/src/components/IconPickerSheet.test.jsx`, `frontend/src/index.css`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/IconPickerSheet.test.jsx src/components/ui/ui.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): add a shared full-catalogue icon picker |
+| Next Role | review |
+
+---
+
+### T-011 — implement — 2026-04-25T19:00:02Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-011 shared icon picker changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

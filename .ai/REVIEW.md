@@ -124,6 +124,44 @@ Reviewed: 2026-04-25
 
 ---
 
+## Task: T-011
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/components/IconPickerSheet.jsx` line 53 — The button label renders the raw camelCase name (e.g. "IconMilk") rather than a human-readable string. Functional for now; cosmetic improvement is out of scope. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `IconPickerSheet.jsx`, `IconPickerSheet.test.jsx`, and the `icon-picker-*` CSS block in `index.css`.
+- Verified git diff scope: 3 files changed (`IconPickerSheet.jsx` new, `IconPickerSheet.test.jsx` new, `index.css` extended); no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/IconPickerSheet.test.jsx src/components/ui/ui.test.jsx` — **6/6 pass** (3 picker + 3 ui tests).
+- Ran `npm run build` — clean.
+- Ran `npm test` — **37/37 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `IconPickerSheet.jsx`: search clears on close via effect; filter is case-insensitive substring match; icon grid maps `visibleIconNames`; each button has `aria-label="Select ${iconName}"`, selected-highlight class, `onSelect → onClose` on click; SVG rendered with `aria-hidden="true" size={24} stroke={1.6}` ✅
+- Accessible: `<label>` uses `visually-hidden` class + `htmlFor` pairing ✅
+- CSS: `auto-fill minmax(88px, 1fr)` grid; `max-height: 52vh` + `overflow-y: auto` prevents sheet overflow; `.icon-picker-btn--selected` provides cyan highlight ✅
+- Test 1: grid renders exactly `ICON_REGISTRY_KEYS.length` (88) buttons ✅
+- Test 2: searching "milk" narrows to IconMilk; selected button has `icon-picker-btn--selected` class; non-matching buttons absent ✅
+- Test 3: clicking "Select IconMilk" fires `onSelect("IconMilk")` and `onClose()` ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-008
 
 ### Review Round 1
