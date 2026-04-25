@@ -147,9 +147,13 @@ The Playwright config reuses an already-running frontend or backend dev server w
 
 GitHub Actions runs lint, build, unit tests, and Playwright E2E tests on every push and pull request. The E2E job provisions PostgreSQL, writes CI test environment variables, applies migrations, installs Chromium, and uploads Playwright artifacts when a run fails.
 
-Release Please runs on `main` and opens release PRs based on Conventional Commits. Merging a release PR creates a GitHub Release and publishes Docker images to `ghcr.io/derfloDev/endgame-grocery` with the release version tag and `latest`.
+The workflow files pin current maintained major versions of the GitHub-hosted actions so the pipeline stays compatible with GitHub's Node.js runtime upgrades.
+
+Release Please runs after the `CI` workflow completes successfully on `main` and opens release PRs based on Conventional Commits. That CI gate prevents failed `main` builds from producing a release or publishing Docker images. Merging a release PR creates a GitHub Release and publishes Docker images to `ghcr.io/derfloDev/endgame-grocery` with the release version tag and `latest`.
 
 Version bumps follow Conventional Commits: `feat` creates a minor release, `fix` creates a patch release, and breaking changes create a major release.
+
+The repository is bootstrapped with `.release-please-manifest.json` and the baseline tag `v0.1.0`, so Release Please only calculates future versions from commits created after that cutoff.
 
 ## Workspace Layout
 
