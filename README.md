@@ -151,6 +151,8 @@ Release Please runs on `main` and opens release PRs based on Conventional Commit
 
 Version bumps follow Conventional Commits: `feat` creates a minor release, `fix` creates a patch release, and breaking changes create a major release.
 
+The repository is bootstrapped with `.release-please-manifest.json` and the baseline tag `v0.1.0`, so Release Please only calculates future versions from commits created after that cutoff.
+
 ## Workspace Layout
 
 - `frontend` contains the Vite + React application.
