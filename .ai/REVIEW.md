@@ -48,3 +48,54 @@ No blockers or majors. One nit noted.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+No blockers, majors, or minors. One nit noted.
+
+| # | Severity | Location | Description | Required fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `release-please.yml` line 19 | Implementation uses `if: ${{ github.event.workflow_run.conclusion == 'success' }}` with expression delimiters; plan shows bare `if: github.event.workflow_run.conclusion == 'success'`. Both are valid in GitHub Actions — the `${{ }}` form is actually the preferred style for `if` conditions. | No |
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/PLAN.md` — confirmed exact `on:` block and `if:` condition expected.
+2. Read `.github/workflows/release-please.yml` — trigger replaced from `push` → `workflow_run`; workflows matches `["CI"]`; types `[completed]`; branches `[main]`; `if` guard added to `release-please` job. All match plan.
+3. Verified `.github/workflows/ci.yml` `name:` field is `CI` — exact string match with `workflows: ["CI"]` in the trigger; no mismatch.
+4. Confirmed `docker-publish` job unchanged — it already gates on `needs: release-please` with its own `if` on `release_created`; plan states no further changes required there.
+5. Reviewed `git diff HEAD` — only files changed are `.github/workflows/release-please.yml` and `README.md`, matching HANDOFF entry.
+6. Inspected `README.md` changes — sentence correctly describes the `CI` gate, accurate and clear.
+7. Ran `npm run lint` — 0 errors; 1 pre-existing unrelated warning.
+8. Ran `npm run build` — clean build.
+9. Ran `npm test` — 25/25 pass, 0 failures.
+
+##### Findings
+- All acceptance criteria met:
+  - ✅ `release-please.yml` trigger is `workflow_run` (not `push`)
+  - ✅ `release-please` job has `if` guarding on `conclusion == 'success'`
+  - ✅ CI workflow name `CI` matches the trigger reference exactly
+  - ✅ `docker-publish` remains gated via `needs` — no spurious publish path possible
+  - ✅ README documents the CI gate
+  - ✅ Lint, build, and tests pass
+  - ⏳ "Failing CI run on `main` does not trigger release or Docker image" — cannot be live-tested without a PR merge; the logic is verified structurally above
+
+##### Risks
+- Low: `workflow_run` events fire for any branch matching `[main]` in the filter, but the `branches` key on `workflow_run` correctly restricts the triggering workflow's source branch to `main`. No cross-branch contamination risk.
+- Low: If the `CI` workflow is renamed in the future, the `workflow_run` trigger will silently stop firing. This is an operational note, not a current defect.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

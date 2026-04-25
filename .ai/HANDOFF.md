@@ -94,3 +94,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-04-25T10:05:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002: workflow_run trigger, CI name match, if-guard, and README documentation all correct; lint, build, and tests pass |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-25T08:30:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Changed Release Please to run only after successful `CI` completion on `main` and documented the release gate in the README |
+| Files Changed | `.github/workflows/release-please.yml`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass with pre-existing warning in `frontend/src/context/AuthContext.jsx:77`), `npm run build` (pass), `npm test` (pass) |
+| Commit | `ci(release): gate Release Please on successful CI runs` |
+| Next Role | review |
+
+---
+
+### T-002 — commit_task — 2026-04-25T08:34:19Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and committed the reviewed CI gate for Release Please |
+| Files Changed | `.github/workflows/release-please.yml`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md` |
+| Validation | Reused reviewed validation from the `next_task` entry: `npm run lint`, `npm run build`, `npm test` |
+| Commit | `ci(release): gate Release Please on successful CI runs` |
+| Next Role | none |
+
+---
