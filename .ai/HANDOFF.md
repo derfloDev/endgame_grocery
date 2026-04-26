@@ -425,3 +425,38 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-006 — implement — 2026-04-26T08:33:47Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Wired the icon similarity threshold into repo-root Vite env loading and Docker builds, and documented the setting and local icon-assignment flow in the deployment and setup docs. |
+| Files Changed | `.env.example`, `Dockerfile`, `docker-compose.example.yml`, `frontend/vite.config.js`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | chore(config): wire icon similarity threshold into local and Docker builds |
+| Next Role | review |
+
+---
+### T-006 — review — 2026-04-26T10:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed VITE_ICON_SIMILARITY_THRESHOLD env var wiring in .env.example, Dockerfile ARG/ENV, docker-compose.example.yml build args, and README env table + Icon Assignment section; all acceptance criteria met. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-04-26T08:36:59Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-006 configuration and documentation updates after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

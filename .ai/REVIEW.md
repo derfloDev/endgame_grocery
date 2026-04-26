@@ -408,3 +408,44 @@ Reviewed: 2026-04-26
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `docker-compose.example.yml` — The `build` section is added to the `app` service which also specifies `image: ghcr.io/derfloDev/endgame-grocery:latest`. Docker Compose will use the `build` section only when the image does not already exist locally or when `--build` is passed; otherwise it pulls the published image. The inline comment accurately explains this behaviour. No fix required.
+2. **nit** — `README.md` "Icon Assignment" section — Does not mention the bilingual (EN/DE) nature of the exact-match catalogue or the 88-icon `ICON_REGISTRY`. This is extra colour that the plan does not require. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `.env.example` — new var with comment verified.
+- Read `Dockerfile` — `ARG` before `RUN npm run build` (line 11); `ENV` propagation (line 12); placement is correct (after `COPY . .`, before the build step).
+- Verified `VITE_ICON_SIMILARITY_THRESHOLD` is consumed in `frontend/src/workers/iconWorker.js` lines 5–6 via `import.meta.env` with a safe `Number.isFinite` fallback.
+- Read `docker-compose.example.yml` — `build.args` entry with explanatory comment confirmed.
+- Read `README.md` diff — env-var table row added; "Icon Assignment" subsection added under existing features list; `.env` loading sentence extended with mention of `VITE_*` vars.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run build` — clean (1 upstream `onnxruntime-web` eval warning, unchanged).
+- Ran `npm test` — **39/39 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- `.env.example` contains `VITE_ICON_SIMILARITY_THRESHOLD=0.5` with a descriptive comment — criterion met.
+- Dockerfile `ARG`/`ENV` pair is placed correctly in the builder stage before the frontend build step; the default value `0.5` matches the worker default — criterion met.
+- `docker-compose.example.yml` `build.args` entry present and commented — criterion met.
+- README env table row added with description and example value; "Icon Assignment" subsection concisely describes local AI icon suggestion and threshold semantics — criteria met.
+- No new lint errors introduced.
+- Build succeeds.
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
