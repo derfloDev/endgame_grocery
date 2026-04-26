@@ -33,6 +33,7 @@ export default function AddItemSheet({
   const inputLabel = isEditMode ? "Edit item" : "Add item";
   const submitLabel = isEditMode ? "Save Item" : "Add Item";
   const iconBrowserToggleLabel = showIconBrowser ? "Weniger anzeigen" : "Mehr anzeigen";
+  const sheetClassName = showIconBrowser ? "bottom-sheet--browser-open" : "";
 
   useEffect(() => {
     setText(initialText);
@@ -70,7 +71,7 @@ export default function AddItemSheet({
   }
 
   return (
-    <BottomSheet open={open} title={sheetTitle} onClose={onClose}>
+    <BottomSheet className={sheetClassName} open={open} title={sheetTitle} onClose={onClose}>
       <form className="add-item-form" onSubmit={handleSubmit}>
         <div className="eg-field">
           <label htmlFor={textInputId}>{inputLabel}</label>

@@ -618,3 +618,47 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-015 — plan — 2026-04-26T09:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-015: fix double scrollbar — `.bottom-sheet` gets `overflow: hidden` + flex column via `.bottom-sheet--browser-open` modifier when icon browser is open; form is `flex-shrink: 0`; browser section is `flex: 1; overflow: hidden`; grid is the sole scrolling element (`flex: 1; overflow-y: auto; max-height: none`); `BottomSheet` accepts `className` prop. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+### T-015 — implement — 2026-04-26T11:56:54Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Updated the bottom-sheet and item-sheet layout so the browser-open state uses a dedicated modifier class and flex overflow rules, leaving the icon grid as the only scrollable region while the form stays pinned above it. |
+| Files Changed | `frontend/src/components/ui/BottomSheet.jsx`, `frontend/src/components/ui/ui.test.jsx`, `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/index.css`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/ui/ui.test.jsx src/components/AddItemSheet.test.jsx src/app.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | fix(frontend): remove the extra scrollbar from the icon browser |
+| Next Role | review |
+
+---
+### T-015 — review — 2026-04-26T15:08:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed double-scrollbar fix: BottomSheet className prop, bottom-sheet--browser-open flex layout, single overflow-y on grid, form elements always visible; all acceptance criteria met. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+### T-015 — implement — 2026-04-26T15:41:38Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-015 single-scroll browser layout changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

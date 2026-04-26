@@ -614,3 +614,48 @@ Reviewed: 2026-04-26
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-015
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `frontend/src/index.css` — The implementer deviated from the plan's flex strategy in a correct way: the plan specified `.add-item-form { flex-shrink: 0 }` (form takes only its intrinsic height), but the actual DOM nests the browser inside the form. The implementer instead made the form `flex: 1` (fills sheet height) with `.add-item-form > :not(.add-item-icon-browser) { flex-shrink: 0 }` (all direct non-browser children are fixed-size) and `.add-item-icon-browser { flex: 1 }` (browser fills the remainder). This is architecturally correct for the actual DOM structure and achieves the same UX goal. No fix required.
+2. **nit** — `frontend/src/components/ui/ui.test.jsx` — The new `BottomSheet` `className` test uses `open` as a bare attribute (boolean prop shorthand) while existing tests use `open={true}`. Minor style inconsistency across the file; both are equivalent in JSX. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/ui/BottomSheet.jsx` diff — `className` prop added with empty-string default; `resolvedClassName` merges base class + prop using `filter(Boolean).join(" ")`; forwarded onto the dialog `<div>`. ✅
+- Read `frontend/src/components/AddItemSheet.jsx` diff — `sheetClassName` derived from `showIconBrowser`; passed as `className` prop to `BottomSheet`. ✅
+- Read `frontend/src/index.css` diff — `.bottom-sheet--browser-open`: `display: flex; flex-direction: column; overflow: hidden`; form: `flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0`; `form > :not(.add-item-icon-browser)`: `flex-shrink: 0`; browser section: `flex: 1; overflow: hidden; min-height: 0`; grid: `flex: 1; max-height: none` (grid's base `overflow-y: auto` unchanged = sole scrolling element).
+- Read `frontend/src/components/AddItemSheet.test.jsx` diff — modifier class assertion (`toContain("bottom-sheet--browser-open")`); single grid assertion (`querySelectorAll(".add-item-icon-browser-grid").length === 1`); class removal after browser collapse. ✅
+- Read `frontend/src/components/ui/ui.test.jsx` diff — new test asserts `className` forwarded onto dialog element. ✅
+- Verified CSS specificity: `.bottom-sheet--browser-open .add-item-form` (two classes, specificity 0-2-0) > `.bottom-sheet form` (one class + element, 0-1-1); modifier rules correctly override base grid layout.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/ui/ui.test.jsx src/components/AddItemSheet.test.jsx src/app.test.jsx` — **23/23 pass** (4 ui + 4 AddItemSheet + 15 app).
+- Ran `npm run build` — clean.
+- Ran `npm test` — **39/39 frontend (6 test files) + 27/27 backend, all pass**.
+
+##### Findings
+- `BottomSheet` now accepts and forwards `className` — enabling layout modifier classes without coupling UI components to business logic. ✅
+- `.bottom-sheet--browser-open` disables outer scroll (`overflow: hidden`) and switches to flex column. ✅
+- Only `.add-item-icon-browser-grid` has `overflow-y: auto` — sole scrollbar. ✅
+- Form elements above the browser (field, suggestions, toggle button) have `flex-shrink: 0` — always fully visible. ✅
+- Button-row below the browser also has `flex-shrink: 0` (via `> :not(.add-item-icon-browser)`) — always visible at bottom. ✅
+- `min-height: 0` on form and browser section prevents flex overflow in Safari/Chrome. ✅
+- Modifier class removed when browser collapses — normal sheet scroll behaviour restored. ✅
+- Test file count: 6; test count: 39 (up 1 from new `BottomSheet` className test). ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`

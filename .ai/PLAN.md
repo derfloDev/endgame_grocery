@@ -520,16 +520,59 @@ Replace the toggle-view pattern with an accordion/expand-below pattern:
 
 ---
 
+---
+
+## T-015 — Frontend: fix double scrollbar when icon browser is expanded
+
+### Context
+T-014 renders the icon browser as an accordion below the form within
+`.bottom-sheet` (which already has `overflow-y: auto`). When the browser
+expands, `.add-item-icon-browser-grid` also has `overflow-y: auto`, causing
+two simultaneous scrollbars. Only the icon grid should scroll; the outer sheet
+must not.
+
+### Root cause
+`.bottom-sheet { overflow-y: auto }` scrolls the whole sheet when content
+exceeds `max-height: min(80vh, 44rem)`. The grid inside also scrolls because it
+has its own `max-height` + `overflow-y: auto`. Result: two scrollbars.
+
+### Fix strategy — flex layout with `overflow: hidden` on the sheet
+When the icon browser is open, switch the sheet to a flex column that fills the
+available height. The form is `flex-shrink: 0`; the browser section grows to
+fill the rest with `flex: 1; overflow: hidden`; only the grid inside it scrolls.
+A modifier class `.bottom-sheet--browser-open` (toggled by `AddItemSheet` via
+a `className` prop on `BottomSheet`, or directly on the wrapping element) drives
+the layout change.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/index.css` | Add `.bottom-sheet--browser-open { overflow: hidden; display: flex; flex-direction: column; }` — disables outer scroll and enables flex; add `.bottom-sheet--browser-open .add-item-form { flex-shrink: 0; }` — form takes only the space it needs; add `.bottom-sheet--browser-open .add-item-icon-browser { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }` — browser section fills remaining height; change `.bottom-sheet--browser-open .add-item-icon-browser-grid { flex: 1; max-height: none; overflow-y: auto; }` — grid is the sole scrolling element |
+| `frontend/src/components/AddItemSheet.jsx` | Pass `className` (or equivalent prop) to `BottomSheet` when `showIconBrowser` is `true` so the modifier class is applied: e.g. `<BottomSheet className={showIconBrowser ? "bottom-sheet--browser-open" : ""} …>` |
+| `frontend/src/components/ui/BottomSheet.jsx` | Accept and forward a `className` prop onto the `.bottom-sheet` `<div>` if not already supported |
+| `frontend/src/components/AddItemSheet.test.jsx` | Add test: when browser is expanded, the sheet element has the modifier class; confirm only one scrollable container (the grid) is present |
+
+### Acceptance criteria
+- Opening the icon browser shows **one** scrollbar (on the icon grid only).
+- The outer sheet does **not** display a scrollbar while the browser is open.
+- The form (input, suggestions, "Mehr/Weniger anzeigen" button) remains fully visible and non-scrolling above the grid.
+- Closing the browser restores normal sheet scroll behaviour.
+- `npm run lint` and `npm test` pass; `npm run build` succeeds.
+
+---
+
 ## Implementation Order (final)
 
 ```
 [done]  T-001 → T-002 → T-003 → T-004 → T-005
 [done]  T-007 → T-008 → T-011 → T-009 → T-010 → T-006
 [done]  T-012 → T-013
-[next]  T-014
+[done]  T-014
+[next]  T-015
           ↑
-      AddItemSheet
-      accordion fix
+      double-scrollbar
+      CSS fix
 ```
 
 Each task is independently committable. The implementer should run

@@ -85,4 +85,14 @@ describe("shared Endgame UI components", () => {
 
     expect(screen.queryByText("Add Item")).toBeNull();
   });
+
+  it("forwards custom class names to the bottom sheet container", () => {
+    render(
+      <BottomSheet className="bottom-sheet--browser-open" open title="Add Item" onClose={() => {}}>
+        <p>Milk</p>
+      </BottomSheet>
+    );
+
+    expect(screen.getByRole("dialog", { name: "Add Item" }).className).toContain("bottom-sheet--browser-open");
+  });
 });
