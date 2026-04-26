@@ -906,6 +906,11 @@ p {
   gap: 12px;
 }
 
+.entry-row-edit-icon-stack {
+  display: grid;
+  gap: 12px;
+}
+
 .entry-row-copy {
   min-width: 0;
   flex: 1;
@@ -913,12 +918,25 @@ p {
 
 .entry-icon {
   flex-shrink: 0;
-  font-size: 1.5rem;
-  line-height: 1;
+  display: block;
 }
 
 .entry-icon.entry-row-done {
   opacity: 0.55;
+}
+
+.entry-row-edit-preview {
+  width: fit-content;
+}
+
+.entry-row-icon-picker {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.entry-row-icon-picker .add-item-icon-picker-btn {
+  flex-shrink: 0;
 }
 
 .entry-row-text {

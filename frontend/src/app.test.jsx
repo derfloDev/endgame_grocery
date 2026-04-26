@@ -312,7 +312,13 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          entry: { id: "entry-3", text: "Ground coffee", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:02:00Z" }
+          entry: {
+            id: "entry-3",
+            text: "Ground coffee",
+            status: "open",
+            icon: "IconCoffee",
+            created_at: "2026-04-21T00:02:00Z"
+          }
         })
       })
       .mockResolvedValueOnce({
@@ -365,7 +371,18 @@ describe("authentication shell", () => {
     const editInput = screen.getByLabelText("Edit Milch");
     await userEvent.clear(editInput);
     await userEvent.type(editInput, "Ground coffee");
+    await userEvent.click(screen.getByRole("button", { name: "Choose IconCoffee" }));
     await userEvent.click(screen.getByRole("button", { name: "Save item" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/lists/list-1/entries/entry-3",
+        expect.objectContaining({
+          body: JSON.stringify({ text: "Ground coffee", icon: "IconCoffee" }),
+          method: "PATCH"
+        })
+      );
+    });
 
     expect(await screen.findByText("Ground coffee")).toBeTruthy();
 

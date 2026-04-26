@@ -366,3 +366,45 @@ Reviewed: 2026-04-25
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-010
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `frontend/src/components/EntryRow.jsx` line 27 — In edit mode, `PreviewIcon` falls back to `FALLBACK_ICON` when `selectedIconName` is null (i.e. the entry has no icon). This means the preview always shows a cart icon even when the entry genuinely has no icon. The plan says "fallback for null" in view mode, so this is consistent and intentional. No fix required.
+2. **nit** — `frontend/src/components/EntryRow.jsx` lines 29–35 — The `useEffect` that resets `selectedIconName` on `editMode` exit is redundant with `cancelEdit` and `submitEdit`, which already call `setSelectedIconName(normalizeSelectedIconName(entry.icon))`. Harmless duplicate state reset; no bug. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/EntryRow.jsx` — full component reviewed.
+- Read `frontend/src/components/entry-row.test.jsx` — all 4 test cases reviewed.
+- Ran `git diff HEAD -- frontend/src/components/EntryRow.jsx frontend/src/components/entry-row.test.jsx frontend/src/index.css` — confirmed scope of changes.
+- Verified `submitEditEntry` in `frontend/src/pages/ListDetailPage.jsx` (line 171) accepts `(entryId, text, iconName)` and passes `icon: nextIcon` to `updateEntry`; `onEdit` prop wired as `(text, iconName) => void submitEditEntry(entry.id, text, iconName)` at lines 320 and 346.
+- Verified CSS classes `entry-row-edit-icon-stack`, `entry-row-edit-preview`, `entry-row-icon-picker`, `entry-icon` are present in `frontend/src/index.css`.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/entry-row.test.jsx src/app.test.jsx` — **19/19 pass**.
+- Ran `npm run build` — clean (1 upstream `onnxruntime-web` eval warning, unchanged; CSS bundle grew ~0.2 kB for new classes).
+- Ran `npm test` — **39/39 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- View mode: `EntryIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON` renders a Tabler SVG component with `data-testid` and `data-icon-name` attributes; `null` entry icon correctly resolves through `normalizeSelectedIconName` → `null` → `FALLBACK_ICON` + `FALLBACK_ICON_NAME`. Test assertions on `getAttribute("data-icon-name")` confirm both branches.
+- `normalizeSelectedIconName` guard handles unknown icon names (maps to `FALLBACK_ICON_NAME`) — defensive and correct.
+- Edit mode: all 88 registry icons rendered as inline picker buttons (`ICON_REGISTRY_KEYS.map`); `"Mehr anzeigen"` opens `IconPickerSheet`; both paths update `selectedIconName`. Full round-trip test (`Edit Coffee` → picker → `IconTrash` → rename → `Save item`) asserts `onEdit("Ground coffee", "IconTrash")`.
+- `onEdit?.(trimmed, selectedIconName)` in `submitEdit` correctly passes the current `selectedIconName` — plan criterion met.
+- `submitEditEntry` in `ListDetailPage` correctly threads `iconName` into `updateEntry({ text, icon })` — full stack wiring confirmed.
+- Swipe-delete test still passes (no regression).
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`

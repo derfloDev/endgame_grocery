@@ -390,3 +390,38 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-010 — implement — 2026-04-26T08:01:05Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Replaced EntryRow emoji rendering with Tabler SVG icons and added edit-mode inline and full-sheet icon picking wired through the list-detail edit submit flow. |
+| Files Changed | `frontend/src/components/EntryRow.jsx`, `frontend/src/components/entry-row.test.jsx`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/app.test.jsx`, `frontend/src/index.css`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/entry-row.test.jsx src/app.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): add icon editing to grocery list entries |
+| Next Role | review |
+
+---
+### T-010 — review — 2026-04-26T10:05:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed EntryRow SVG icon view mode, edit-mode inline picker, "Mehr anzeigen" → IconPickerSheet, and submitEditEntry icon wiring; all acceptance criteria met. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-010 — implement — 2026-04-26T08:05:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-010 entry-row icon editing changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

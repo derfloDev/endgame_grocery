@@ -168,7 +168,7 @@ export default function ListDetailPage() {
     }
   }
 
-  async function submitEditEntry(entryId, text) {
+  async function submitEditEntry(entryId, text, iconName) {
     const trimmed = text.trim();
 
     if (!trimmed) {
@@ -177,7 +177,8 @@ export default function ListDetailPage() {
 
     try {
       setEntryError("");
-      const result = await updateEntry(id, entryId, token, { text: trimmed });
+      const nextIcon = iconName ?? null;
+      const result = await updateEntry(id, entryId, token, { text: trimmed, icon: nextIcon });
 
       await updateEntries((currentEntries) =>
         sortEntries(
@@ -185,7 +186,7 @@ export default function ListDetailPage() {
             currentEntry.id === entryId
               ? {
                   ...currentEntry,
-                  ...(result?.queued ? { is_pending_sync: true, text: trimmed } : result.entry)
+                  ...(result?.queued ? { icon: nextIcon, is_pending_sync: true, text: trimmed } : result.entry)
                 }
               : currentEntry
           )
@@ -316,7 +317,7 @@ export default function ListDetailPage() {
                     key={entry.id}
                     entry={entry}
                     onDelete={() => void handleDeleteEntry(entry.id)}
-                    onEdit={(text) => void submitEditEntry(entry.id, text)}
+                    onEdit={(text, iconName) => void submitEditEntry(entry.id, text, iconName)}
                     onToggle={() => void toggleStatus(entry)}
                   />
                 ))
@@ -342,7 +343,7 @@ export default function ListDetailPage() {
                         key={entry.id}
                         entry={entry}
                         onDelete={() => void handleDeleteEntry(entry.id)}
-                        onEdit={(text) => void submitEditEntry(entry.id, text)}
+                        onEdit={(text, iconName) => void submitEditEntry(entry.id, text, iconName)}
                         onToggle={() => void toggleStatus(entry)}
                       />
                     ))
