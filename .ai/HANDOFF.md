@@ -541,3 +541,36 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+### T-013 — implement — 2026-04-26T11:27:45Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed `EntryRow` inline editing, routed entry edits through the shared `AddItemSheet`, deleted the obsolete `IconPickerSheet` files, and fixed the sheet submit flow so add/edit dialogs close cleanly only after successful saves. |
+| Files Changed | `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/EntryRow.jsx`, `frontend/src/components/entry-row.test.jsx`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/app.test.jsx`, `frontend/src/components/IconPickerSheet.jsx`, `frontend/src/components/IconPickerSheet.test.jsx`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/entry-row.test.jsx src/app.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): edit grocery entries in the shared item sheet |
+| Next Role | review |
+
+---
+### T-013 — review — 2026-04-26T11:32:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed EntryRow inline-edit removal, edit-via-AddItemSheet wiring in ListDetailPage, and IconPickerSheet deletion; all acceptance criteria met; justified scope expansion in AddItemSheet noted as a nit. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+### T-013 — implement — 2026-04-26T11:33:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-013 edit-via-shared-sheet changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

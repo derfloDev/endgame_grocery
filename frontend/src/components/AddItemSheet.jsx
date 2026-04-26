@@ -27,6 +27,8 @@ export default function AddItemSheet({
     candidate.toLowerCase().includes(normalizedIconBrowserSearchText)
   );
   const isEditMode = mode === "edit";
+  const textInputId = isEditMode ? "edit-item-sheet-text" : "add-item-sheet-text";
+  const iconSearchInputId = isEditMode ? "edit-item-icon-browser-search" : "add-item-icon-browser-search";
   const sheetTitle = isEditMode ? "Edit Item" : "Add Item";
   const inputLabel = isEditMode ? "Edit item" : "Add item";
   const submitLabel = isEditMode ? "Save Item" : "Add Item";
@@ -50,7 +52,7 @@ export default function AddItemSheet({
     setSelectedIconName(iconName);
   }, [iconName]);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event?.preventDefault();
 
     const trimmed = text.trim();
@@ -59,7 +61,12 @@ export default function AddItemSheet({
       return;
     }
 
-    onAdd?.(trimmed, selectedIconName);
+    const submitResult = await onAdd?.(trimmed, selectedIconName);
+
+    if (submitResult === false) {
+      return;
+    }
+
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
 
@@ -73,11 +80,11 @@ export default function AddItemSheet({
     <BottomSheet open={open} title={sheetTitle} onClose={onClose}>
       {showIconBrowser ? (
         <div className="add-item-icon-browser">
-          <label className="visually-hidden" htmlFor="add-item-icon-browser-search">
+          <label className="visually-hidden" htmlFor={iconSearchInputId}>
             Search icons
           </label>
           <input
-            id="add-item-icon-browser-search"
+            id={iconSearchInputId}
             autoFocus
             className="eg-input"
             placeholder="Search icons"
@@ -117,9 +124,9 @@ export default function AddItemSheet({
       ) : (
         <form className="add-item-form" onSubmit={handleSubmit}>
           <div className="eg-field">
-            <label htmlFor="add-item-sheet-text">{inputLabel}</label>
+            <label htmlFor={textInputId}>{inputLabel}</label>
             <input
-              id="add-item-sheet-text"
+              id={textInputId}
               autoFocus
               className="eg-input"
               placeholder="Add milk, lemons, bread..."

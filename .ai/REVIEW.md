@@ -527,3 +527,49 @@ Reviewed: 2026-04-26
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-013
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `frontend/src/components/AddItemSheet.jsx` (T-013 scope expansion) — The implementer also updated `AddItemSheet` to add mode-specific HTML element IDs (`textInputId`, `iconSearchInputId`) and made `handleSubmit` async with `onAdd` return-value gating. These changes were not listed in the T-013 plan file table but are necessary: `ListDetailPage` now mounts two `<AddItemSheet>` instances simultaneously (add + edit), so duplicate IDs without this fix would create an accessibility and HTML-validity bug. The extra scope is justified and correct. No fix required.
+2. **nit** — `frontend/src/pages/ListDetailPage.jsx` — `addEntryByText` and `submitEditEntry` now return `true`/`false`, and the add-mode `onAdd` handler gates `setShowAddItem(false)` on the result. This means a failed add keeps the sheet open (good UX), but `AddItemSheet.test.jsx` was not updated to exercise this new `onAdd` async contract. Coverage gap is minor; the integration path is exercised via `app.test.jsx`. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/EntryRow.jsx` diff — all inline-edit state/JSX removed; edit button calls `onEdit?.()` with no args; view-mode SVG icon rendering intact.
+- Read `frontend/src/components/entry-row.test.jsx` diff — inline-edit test replaced with `"calls onEdit when the edit button is pressed"`; view-mode icon and swipe-delete tests kept.
+- Read `frontend/src/pages/ListDetailPage.jsx` diff — `editingEntry` state added; `onEdit={() => setEditingEntry(entry)}` wired on both `open` and `done` entry lists; edit `<AddItemSheet mode="edit">` rendered with `initialText`, `initialIconName`, gated `onAdd`, and `onClose`.
+- Read `frontend/src/components/AddItemSheet.jsx` diff — unique element IDs for simultaneous mount; `handleSubmit` async with `onAdd` result check.
+- Verified `IconPickerSheet.jsx` and `IconPickerSheet.test.jsx` absent from filesystem.
+- Verified zero `IconPickerSheet` imports across `frontend/src`.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/entry-row.test.jsx src/app.test.jsx` — **19/19 pass**.
+- Ran `npm run build` — clean; `IconPickerSheet` chunk absent from bundle.
+- Ran `npm test` — **38/38 frontend (6 test files, down from 7 — `IconPickerSheet.test.jsx` deleted) + 27/27 backend, all pass**.
+
+##### Findings
+- `EntryRow` is now a pure view component — no edit state, no form, no picker. Component is substantially simpler. ✅
+- Edit button fires `onEdit?.()` with no arguments; `ListDetailPage` stores the target entry and opens the edit sheet. ✅
+- Edit `AddItemSheet` pre-fills `initialText` and `initialIconName` from `editingEntry`; closing sets `editingEntry` to null without saving. ✅
+- `submitEditEntry(editingEntry.id, text, icon)` called on submit; on success `editingEntry` cleared, sheet closes. ✅
+- `addEntryByText` / `submitEditEntry` now return `boolean` — sheets stay open on API error; close on success. Good UX improvement. ✅
+- No second bottom sheet ever opens — inline icon browser is the only expansion surface. ✅
+- `IconPickerSheet.jsx` + test fully removed; no dangling imports. ✅
+- `app.test.jsx` "edits, renames, and collapses done entries" test still passes — confirms the full edit flow works end-to-end in integration. ✅
+- Test file count: 7 → 6 (expected); test count: 41 → 38 (3 `IconPickerSheet` tests removed). ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -363,16 +363,32 @@ describe("authentication shell", () => {
     });
 
     expect(await screen.findByText("Milch")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Add Item" })).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
     expect(await screen.findByRole("button", { name: "Mark Milk open" })).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Edit Milch" }));
-    const editInput = screen.getByLabelText("Edit Milch");
-    await userEvent.clear(editInput);
-    await userEvent.type(editInput, "Ground coffee");
-    await userEvent.click(screen.getByRole("button", { name: "Choose IconCoffee" }));
-    await userEvent.click(screen.getByRole("button", { name: "Save item" }));
+    const editDialog = await screen.findByRole("dialog", { name: "Edit Item" });
+    const editInput = within(editDialog).getByLabelText("Edit item");
+    expect(editInput.value).toBe("Milch");
+    await userEvent.click(within(editDialog).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog", { name: "Edit Item" })).toBeNull();
+    expect(screen.getByText("Milch")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit Milch" }));
+    const reopenedEditDialog = await screen.findByRole("dialog", { name: "Edit Item" });
+    const reopenedEditInput = within(reopenedEditDialog).getByLabelText("Edit item");
+    expect(reopenedEditInput.value).toBe("Milch");
+
+    await userEvent.clear(reopenedEditInput);
+    await userEvent.type(reopenedEditInput, "Ground coffee");
+    await userEvent.click(within(reopenedEditDialog).getByRole("button", { name: "Mehr anzeigen" }));
+    expect(within(reopenedEditDialog).getByLabelText("Search icons")).toBeTruthy();
+    await userEvent.type(within(reopenedEditDialog).getByLabelText("Search icons"), "coffee");
+    await userEvent.click(within(reopenedEditDialog).getByRole("button", { name: "Browse IconCoffee" }));
+    await userEvent.click(within(reopenedEditDialog).getByRole("button", { name: "Save Item" }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
@@ -385,6 +401,7 @@ describe("authentication shell", () => {
     });
 
     expect(await screen.findByText("Ground coffee")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Edit Item" })).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "List options" }));
     expect(await screen.findByRole("dialog", { name: "List Options" })).toBeTruthy();
