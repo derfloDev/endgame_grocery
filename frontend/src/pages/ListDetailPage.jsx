@@ -28,6 +28,7 @@ export default function ListDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSharingLoading, setIsSharingLoading] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null);
   const [doneOpen, setDoneOpen] = useState(true);
   const [showOptions, setShowOptions] = useState(false);
   const [showRename, setShowRename] = useState(false);
@@ -117,11 +118,11 @@ export default function ListDetailPage() {
     await writeCachedResource(`members:${id}`, { members: nextMembers });
   }
 
-  async function addEntryByText(text) {
+  async function addEntryByText(text, icon) {
     const trimmed = text.trim();
 
     if (!trimmed) {
-      return;
+      return false;
     }
 
     try {
@@ -130,17 +131,20 @@ export default function ListDetailPage() {
       const temporaryEntry = {
         id: createTemporaryId("entry"),
         text: trimmed,
+        icon: icon ?? null,
         status: "open",
         created_at: new Date().toISOString(),
         is_pending_sync: true
       };
-      const result = await createEntry(id, token, { text: trimmed }, { tempId: temporaryEntry.id });
+      const result = await createEntry(id, token, { text: trimmed, icon: icon ?? null }, { tempId: temporaryEntry.id });
 
       await updateEntries((currentEntries) =>
         sortEntries([...currentEntries, result?.queued ? temporaryEntry : result.entry])
       );
+      return true;
     } catch (submitError) {
       setEntryError(submitError.message);
+      return false;
     }
   }
 
@@ -167,16 +171,17 @@ export default function ListDetailPage() {
     }
   }
 
-  async function submitEditEntry(entryId, text) {
+  async function submitEditEntry(entryId, text, iconName) {
     const trimmed = text.trim();
 
     if (!trimmed) {
-      return;
+      return false;
     }
 
     try {
       setEntryError("");
-      const result = await updateEntry(id, entryId, token, { text: trimmed });
+      const nextIcon = iconName ?? null;
+      const result = await updateEntry(id, entryId, token, { text: trimmed, icon: nextIcon });
 
       await updateEntries((currentEntries) =>
         sortEntries(
@@ -184,14 +189,16 @@ export default function ListDetailPage() {
             currentEntry.id === entryId
               ? {
                   ...currentEntry,
-                  ...(result?.queued ? { is_pending_sync: true, text: trimmed } : result.entry)
+                  ...(result?.queued ? { icon: nextIcon, is_pending_sync: true, text: trimmed } : result.entry)
                 }
               : currentEntry
           )
         )
       );
+      return true;
     } catch (submitError) {
       setEntryError(submitError.message);
+      return false;
     }
   }
 
@@ -315,7 +322,7 @@ export default function ListDetailPage() {
                     key={entry.id}
                     entry={entry}
                     onDelete={() => void handleDeleteEntry(entry.id)}
-                    onEdit={(text) => void submitEditEntry(entry.id, text)}
+                    onEdit={() => setEditingEntry(entry)}
                     onToggle={() => void toggleStatus(entry)}
                   />
                 ))
@@ -341,7 +348,7 @@ export default function ListDetailPage() {
                         key={entry.id}
                         entry={entry}
                         onDelete={() => void handleDeleteEntry(entry.id)}
-                        onEdit={(text) => void submitEditEntry(entry.id, text)}
+                        onEdit={() => setEditingEntry(entry)}
                         onToggle={() => void toggleStatus(entry)}
                       />
                     ))
@@ -353,7 +360,39 @@ export default function ListDetailPage() {
       </div>
 
       {list ? <FAB onClick={() => setShowAddItem(true)} /> : null}
-      <AddItemSheet open={showAddItem} onAdd={(text) => void addEntryByText(text)} onClose={() => setShowAddItem(false)} />
+      <AddItemSheet
+        open={showAddItem}
+        onAdd={async (text, icon) => {
+          const didAddEntry = await addEntryByText(text, icon);
+
+          if (didAddEntry) {
+            setShowAddItem(false);
+          }
+
+          return didAddEntry;
+        }}
+        onClose={() => setShowAddItem(false)}
+      />
+      <AddItemSheet
+        initialIconName={editingEntry?.icon ?? null}
+        initialText={editingEntry?.text ?? ""}
+        mode="edit"
+        open={Boolean(editingEntry)}
+        onAdd={async (text, icon) => {
+          if (!editingEntry) {
+            return false;
+          }
+
+          const didSaveEntry = await submitEditEntry(editingEntry.id, text, icon);
+
+          if (didSaveEntry) {
+            setEditingEntry(null);
+          }
+
+          return didSaveEntry;
+        }}
+        onClose={() => setEditingEntry(null)}
+      />
       <ListOptionsSheet
         isOwner={list?.is_owner ?? false}
         open={showOptions}

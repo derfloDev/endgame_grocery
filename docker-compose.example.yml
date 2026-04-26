@@ -3,6 +3,12 @@
 services:
   app:
     image: ghcr.io/derfloDev/endgame-grocery:latest
+    # Used only when building the app image locally. When you pull the published
+    # image, this build section does not change the baked frontend threshold.
+    build:
+      context: .
+      args:
+        VITE_ICON_SIMILARITY_THRESHOLD: 0.5
     ports:
       - "80:80"
     environment:

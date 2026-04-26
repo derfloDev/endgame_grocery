@@ -1,46 +1,32 @@
 import { useRef, useState } from "react";
+import { FALLBACK_ICON, ICON_REGISTRY } from "../data/iconRegistry";
 import { Icon } from "./ui";
 
+const FALLBACK_ICON_NAME = "IconShoppingCart";
+
+function normalizeSelectedIconName(iconName) {
+  if (iconName == null) {
+    return null;
+  }
+
+  return ICON_REGISTRY[iconName] ? iconName : FALLBACK_ICON_NAME;
+}
+
 export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
-  const [editMode, setEditMode] = useState(false);
-  const [editText, setEditText] = useState(entry.text);
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
   const startX = useRef(0);
   const currentDx = useRef(0);
-
-  function cancelEdit() {
-    setEditMode(false);
-    setEditText(entry.text);
-  }
-
-  function submitEdit() {
-    const trimmed = editText.trim();
-
-    if (!trimmed) {
-      return;
-    }
-
-    onEdit?.(trimmed);
-    setEditMode(false);
-    setEditText(trimmed);
-  }
+  const resolvedIconName = normalizeSelectedIconName(entry.icon);
+  const EntryIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
 
   function handleTouchStart(event) {
-    if (editMode) {
-      return;
-    }
-
     startX.current = event.touches[0].clientX;
     currentDx.current = 0;
     setSwiping(true);
   }
 
   function handleTouchMove(event) {
-    if (editMode) {
-      return;
-    }
-
     currentDx.current = event.touches[0].clientX - startX.current;
 
     if (currentDx.current < 0) {
@@ -49,10 +35,6 @@ export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
   }
 
   function handleTouchEnd() {
-    if (editMode) {
-      return;
-    }
-
     setSwiping(false);
 
     if (currentDx.current < -80) {
@@ -71,82 +53,53 @@ export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
         <Icon color="var(--color-error)" name="trash" size={20} />
       </div>
 
-      {editMode ? (
-        <div className="entry-row entry-row-edit">
-          <div className="eg-field">
-            <label className="visually-hidden" htmlFor={`entry-edit-${entry.id}`}>
-              {`Edit ${entry.text}`}
-            </label>
-            <input
-              id={`entry-edit-${entry.id}`}
-              autoFocus
-              className="eg-input"
-              value={editText}
-              onChange={(event) => setEditText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  submitEdit();
-                }
-
-                if (event.key === "Escape") {
-                  cancelEdit();
-                }
-              }}
-            />
-          </div>
-          <div className="button-row entry-row-edit-actions">
-            <button className="eg-btn-ghost" type="button" onClick={cancelEdit}>
-              Cancel edit
-            </button>
-            <button className="eg-btn-secondary" type="button" onClick={submitEdit}>
-              Save item
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div
-          className={`entry-row ${entry.status === "done" ? "entry-row-done" : ""}`}
-          data-testid={`entry-row-${entry.id}`}
-          style={{
-            transform: `translateX(${swipeX}px)`,
-            transition: swiping ? "none" : "transform 0.25s var(--ease-out)"
-          }}
-          onTouchEnd={handleTouchEnd}
-          onTouchMove={handleTouchMove}
-          onTouchStart={handleTouchStart}
+      <div
+        className={`entry-row ${entry.status === "done" ? "entry-row-done" : ""}`}
+        data-testid={`entry-row-${entry.id}`}
+        style={{
+          transform: `translateX(${swipeX}px)`,
+          transition: swiping ? "none" : "transform 0.25s var(--ease-out)"
+        }}
+        onTouchEnd={handleTouchEnd}
+        onTouchMove={handleTouchMove}
+        onTouchStart={handleTouchStart}
+      >
+        <button
+          aria-label={entry.status === "done" ? `Mark ${entry.text} open` : `Mark ${entry.text} done`}
+          className="eg-icon-btn entry-icon-btn"
+          type="button"
+          onClick={() => onToggle?.()}
         >
-          <button
-            aria-label={entry.status === "done" ? `Mark ${entry.text} open` : `Mark ${entry.text} done`}
-            className="eg-icon-btn entry-icon-btn"
-            type="button"
-            onClick={() => onToggle?.()}
-          >
-            <Icon
-              color={entry.status === "done" ? "var(--color-success)" : "var(--text-disabled)"}
-              name="checkCircle"
-              size={22}
-            />
-          </button>
+          <Icon
+            color={entry.status === "done" ? "var(--color-success)" : "var(--text-disabled)"}
+            name="checkCircle"
+            size={22}
+          />
+        </button>
 
-          <div className="entry-row-copy">
-            <p className={`entry-row-text ${entry.status === "done" ? "entry-row-text-done" : ""}`}>{entry.text}</p>
-            {entry.is_pending_sync ? <span className="eg-chip-queued entry-row-chip">Queued</span> : null}
-          </div>
+        <EntryIcon
+          aria-hidden="true"
+          className={`entry-icon ${entry.status === "done" ? "entry-row-done" : ""}`}
+          data-icon-name={resolvedIconName ?? FALLBACK_ICON_NAME}
+          data-testid={`entry-row-icon-${entry.id}`}
+          size={22}
+          stroke={1.5}
+        />
 
-          <button
-            aria-label={`Edit ${entry.text}`}
-            className="eg-icon-btn entry-icon-btn"
-            type="button"
-            onClick={() => {
-              setEditMode(true);
-              setEditText(entry.text);
-            }}
-          >
-            <Icon color="var(--text-secondary)" name="edit" size={18} />
-          </button>
+        <div className="entry-row-copy">
+          <p className={`entry-row-text ${entry.status === "done" ? "entry-row-text-done" : ""}`}>{entry.text}</p>
+          {entry.is_pending_sync ? <span className="eg-chip-queued entry-row-chip">Queued</span> : null}
         </div>
-      )}
+
+        <button
+          aria-label={`Edit ${entry.text}`}
+          className="eg-icon-btn entry-icon-btn"
+          type="button"
+          onClick={() => onEdit?.()}
+        >
+          <Icon color="var(--text-secondary)" name="edit" size={18} />
+        </button>
+      </div>
     </div>
   );
 }

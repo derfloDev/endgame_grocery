@@ -2,627 +2,9 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
-## Task: T-001 — Design Tokens & App Shell
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-23
-
-#### Findings
-
-No blocking or major findings.
-
-- **nit** — `frontend/src/index.css` includes `.auth-layout`, `.auth-card`, and related auth CSS classes that are scoped to T-003. Including them in T-001 is benign (no conflicts, tests pass), but slightly ahead of the task boundary.
-- **nit** — `frontend/src/components/ui/BottomNav.jsx` uses inline SVG paths rather than the shared `Icon` component specified in the plan. Acceptable since the `Icon` component is created in T-002; no regression.
-- **nit** — `SearchPage` stub goes slightly beyond `return null` (renders a `<div aria-label="Search page">`) which is required for the test assertion. Correct choice by the implementer.
-
-#### Verification
-
-##### Steps
-1. Read `.ai/TASKS.md` — T-001 status confirmed `ready_for_review`.
-2. Read `.ai/PLAN.md` — reviewed T-001 spec in full.
-3. Read all changed files against plan: `frontend/index.html`, `frontend/src/styles/tokens.css`, `frontend/src/index.css`, `frontend/src/App.jsx`, `frontend/src/components/ui/BottomNav.jsx`, `frontend/src/pages/SearchPage.jsx`, `frontend/src/components/OfflineBanner.jsx`, `frontend/src/app.test.jsx`.
-4. Confirmed logo asset present via `Glob`.
-5. Ran `npm run lint` — passes (1 pre-existing warning in `AuthContext.jsx`, 0 errors).
-6. Ran `npm run build` — passes cleanly (Vite build, PWA precache).
-7. Ran `npm test` — all 11 frontend tests pass, all 25 backend tests pass.
-8. Verified `git diff HEAD -- frontend/` for scope of uncommitted changes.
-
-##### Findings
-
-**All acceptance criteria met:**
-
-| Criterion | Result |
-|---|---|
-| App background dark navy `#080B1C` | ✅ `--bg-base: #080B1C` in tokens.css; applied to `html`, `body`, `.app-shell` |
-| Google Fonts (Orbitron, Exo 2) load | ✅ `<link>` tags added to `index.html` as specified |
-| Logo asset at `frontend/src/assets/endgame_grocery_logo.png` | ✅ File present |
-| BottomNav on `/` and `/search`, absent on `/login` and `/register` | ✅ BottomNav inside `ProtectedLayout`; login/register outside; test confirms |
-| `/search` route exists and does not crash | ✅ Route wired; SearchPage stub with `aria-label`; test confirms |
-| `npm run lint` passes | ✅ 0 errors |
-| `npm run build` passes | ✅ Clean build |
-| `npm test` passes | ✅ 11/11 frontend, 25/25 backend |
-
-##### Risks
-
-- None. All changes are additive CSS/JSX with no logic mutations beyond removing the old `hero-card` wrapper in `ProtectedLayout`. Existing test suite fully covers the shell.
-
-#### Verdict
-`PASS`
-
 ---
 
-## Task: T-002 — Shared UI Component Library
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-24
-
-#### Findings
-
-No blocking, major, or minor findings.
-
-- **nit** — `BottomSheet` renders its backdrop as a `<button aria-label="Close sheet">` rather than a plain `<div>`. This is a deliberate accessibility improvement (keyboard-reachable close target) that diverges from the plan's plain `div`, and is strictly better. Not a concern.
-- **nit** — `TopBar` action items accept `ariaLabel` and `label` fields beyond the plan's `{icon, onClick}`. Additive, non-breaking.
-
-#### Verification
-
-##### Steps
-1. Re-read `.ai/TASKS.md` — T-002 confirmed `ready_for_review`.
-2. Re-read T-002 section of `.ai/PLAN.md` for spec details.
-3. Read all 9 new/modified files: `Icon.jsx`, `TopBar.jsx`, `FAB.jsx`, `BottomNav.jsx`, `EmptyState.jsx`, `LoadingState.jsx`, `ErrorState.jsx`, `BottomSheet.jsx`, `ui/index.js`.
-4. Read `ui.test.jsx` — 3 tests covering all acceptance criteria.
-5. Inspected `git diff HEAD -- frontend/src/index.css` — confirmed all required CSS classes for T-002 components present.
-6. Inspected `git diff HEAD -- frontend/src/components/ui/` — all 9 files accounted for; `BottomNav.jsx` correctly refactored to use `Icon` component.
-7. Ran targeted test: `npx vitest run src/components/ui/ui.test.jsx` → **3/3 pass**.
-8. Ran `npm run lint` → **0 errors** (1 pre-existing warning in AuthContext).
-9. Ran `npm run build` → **clean** (247 kB JS bundle).
-10. Ran `npm test` → **14/14 frontend tests pass**, **25/25 backend tests pass**.
-
-##### Findings
-
-**All acceptance criteria met:**
-
-| Criterion | Result |
-|---|---|
-| All 8 components render without errors | ✅ Test 1 in `ui.test.jsx` confirms |
-| BottomNav active state responds to current route | ✅ Test 2 confirms `aria-current="page"` on active tab |
-| BottomSheet opens/closes with slideUp animation | ✅ CSS `animation: slideUp 0.3s var(--ease-out)` present; Test 3 confirms close |
-| Barrel export `ui/index.js` works | ✅ All 8 components importable from `.` |
-| `npm run lint` passes | ✅ 0 errors |
-| `npm run build` passes | ✅ Clean build |
-
-**Plan compliance — detailed:**
-
-| Component | Key spec points | Status |
-|---|---|---|
-| `Icon.jsx` | All 20 named icons present; props `name, size=20, color, strokeWidth=1.5` | ✅ |
-| `TopBar.jsx` | Sticky, Orbitron 18px title, subtitle, back button, actions | ✅ |
-| `FAB.jsx` | Fixed 56×56, gradient-brand, glow-purple, hover scale | ✅ |
-| `BottomNav.jsx` | Refactored to use `Icon` component; active detection unchanged | ✅ |
-| `EmptyState.jsx` | shoppingCart icon, Orbitron title, optional action button | ✅ |
-| `LoadingState.jsx` | Shimmer rows, animationDelay per row | ✅ |
-| `ErrorState.jsx` | "Mission Failed" Orbitron + error colour, Retry button | ✅ |
-| `BottomSheet.jsx` | Renders null when closed, slideUp animation, drag handle | ✅ |
-
-##### Risks
-
-- None. Components are stateless or minimally stateful; no logic mutations to existing behaviour.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-003 — Auth Pages Redesign
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-24
-
-#### Findings
-
-No blocking, major, or minor findings.
-
-- **nit** — `auth-brand-text` wrapper div used in JSX has no corresponding CSS rule. It serves purely as a structural wrapper; no rule is needed, and the plan did not define one either. Not a concern.
-- **nit** — Logo asset was resized from 2048×2048 → 256×256 to satisfy Workbox's precache size limit. Pragmatic and correct; the build now succeeds cleanly. Not a concern.
-
-#### Verification
-
-##### Steps
-1. Re-read `.ai/TASKS.md` — T-003 confirmed `ready_for_review`.
-2. Re-read T-003 section of `.ai/PLAN.md`.
-3. Read `frontend/src/pages/LoginPage.jsx` and `RegisterPage.jsx` in full.
-4. Inspected `git diff --staged` for all changed files: `LoginPage.jsx`, `RegisterPage.jsx`, `index.css`, `app.test.jsx`, logo asset.
-5. Ran `npm run lint` → **0 errors**.
-6. Ran `npm run build` → **clean** (logo now 130 kB, within Workbox precache budget).
-7. Ran `npm test` → **15/15 frontend + 25/25 backend tests pass**.
-
-##### Findings
-
-**All acceptance criteria met:**
-
-| Criterion | Result |
-|---|---|
-| Dark `auth-card` on both pages | ✅ `<section className="auth-card">` present on login and register |
-| Logo + Orbitron "ENDGAME/GROCERY" brand header | ✅ `auth-brand` block, logo img, "ENDGAME" in `.eg-orbitron .eg-gradient-text`, "GROCERY" sub |
-| Neon input focus ring | ✅ All `<input>` have `className="eg-input"`; focus ring defined in T-001 CSS |
-| Gradient primary button | ✅ `eg-btn-primary` uses `var(--gradient-brand)` |
-| Form submission and error display remain functional | ✅ All handler logic unchanged; `eg-error-banner` replaces `error-banner` |
-| `npm run lint` passes | ✅ 0 errors |
-| `npm run build` passes | ✅ Clean build |
-
-**Plan compliance — detailed:**
-
-| Item | Plan spec | Status |
-|---|---|---|
-| Login h1 | "Welcome Back" | ✅ |
-| Login subtitle | "Sign in to access your mission." | ✅ |
-| Register h1 | "Join the Squad" | ✅ |
-| Register subtitle | "Create your account to get started." | ✅ |
-| `button-primary` → `eg-btn-primary` | Both pages | ✅ |
-| `error-banner` → `eg-error-banner` | Both pages | ✅ |
-| `muted-link` → `eg-link` | Both pages | ✅ |
-| `<input>` → `className="eg-input"` | All inputs on both pages | ✅ |
-| `field` → `eg-field` | All field wrappers | ✅ |
-| `<p class="eyebrow">` removed | Both pages | ✅ |
-| `<div class="page-copy">` removed | Both pages | ✅ |
-| CSS: `.eyebrow` / `.page-copy` removed | `index.css` | ✅ |
-| CSS: `.auth-brand`, `.auth-logo`, `.auth-brand-title`, `.auth-brand-sub`, `.auth-card h1`, `.auth-card > p` added | `index.css` | ✅ |
-| Test updated for new heading copy | "Welcome Back" (capital B) | ✅ |
-| New test for brand + copy on both auth pages | `app.test.jsx` | ✅ |
-
-##### Risks
-
-- None. All form logic, state management, and routing are unchanged. Only JSX structure and CSS class names were modified, covered by the existing + new tests.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-004 — Overview Page Redesign
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-24
-
-#### Findings
-
-No blocking, major, or minor findings.
-
-- **nit** — `ListCardHome` uses `<article>` instead of the plan's `<div>` as the card root. Semantically more appropriate for a standalone content item. Not a concern.
-- **nit** — `NewListSheet` uses a `<form onSubmit>` instead of an `onKeyDown` handler on the input. Functionally equivalent; the form approach is more robust (Enter key submits natively). Not a concern.
-- **nit** — `BottomSheet` gained `aria-label={title}` on the dialog div — a correctness improvement that enabled `findByRole("dialog", { name: "New List" })` in tests. Positive change.
-- **nit** — Active toggle applies both `eg-toggle eg-toggle-active` classes (not just `eg-toggle-active`). This is correct: `eg-toggle` supplies base padding/radius, `eg-toggle-active` overrides colours via CSS cascade.
-- **nit** — The moreVertical menu button is only rendered for `list.is_owner === true`. The plan's spec omitted this guard, but the implementation is strictly more correct — non-owners cannot rename or delete, so showing the menu would be misleading.
-
-#### Verification
-
-##### Steps
-1. Re-read `.ai/TASKS.md` — T-004 confirmed `ready_for_review`.
-2. Re-read T-004 section of `.ai/PLAN.md`.
-3. Read `OverviewPage.jsx`, `ListCardHome.jsx`, `NewListSheet.jsx` in full.
-4. Inspected `git diff --staged` (new files: `ListCardHome.jsx`, `NewListSheet.jsx`) and `git diff` (unstaged: `OverviewPage.jsx`, `index.css`, `app.test.jsx`, `BottomSheet.jsx`).
-5. Ran `npm run lint` → **0 errors**.
-6. Ran `npm run build` → **clean** (250 kB JS).
-7. Ran `npm test` → **17/17 frontend + 25/25 backend tests pass**.
-
-##### Findings
-
-**All acceptance criteria met:**
-
-| Criterion | Result |
-|---|---|
-| Dark neon list cards with owner/shared chips | ✅ `ListCardHome` renders `eg-card`, `eg-chip-purple`/`eg-chip-cyan`, Queued chip |
-| FAB opens `NewListSheet` bottom sheet | ✅ FAB `onClick={() => setShowNew(true)}`; test confirms dialog appears |
-| Creating a list adds it to the list | ✅ `createListByName` → `updateLists`; offline queuing preserved |
-| Rename & delete via moreVertical menu | ✅ Menu opens on owner cards; rename input + Save/Cancel; delete with confirm |
-| Active/All toggle renders | ✅ `overview-toggle` with `eg-toggle` / `eg-toggle-active` |
-| Empty / loading / error states display | ✅ `EmptyState`, `LoadingState`, `ErrorState` wired; new test covers loading + error |
-| Logout functional | ✅ `eg-icon-btn` `aria-label="Log out"` calls `logout()`; test confirms redirect |
-| `npm run lint` passes | ✅ 0 errors |
-| `npm run build` passes | ✅ Clean |
-| `npm test` passes | ✅ 17/17 frontend |
-
-**Plan compliance — detailed:**
-
-| Item | Status |
-|---|---|
-| State: `view`, `showNew` added | ✅ |
-| `createListByName(name)` extracted | ✅ |
-| `submitRename(listId, newName)` extracted (no state dependency) | ✅ |
-| `handleDelete` unchanged | ✅ |
-| `sharedCount` + `displayLists = lists` | ✅ |
-| `loadLists` as `useCallback` for ErrorState retry | ✅ |
-| `overview-topbar` sticky header with brand + chips | ✅ |
-| `overview-toggle` Active / All Lists | ✅ |
-| `overview-content` with all four states | ✅ |
-| `FAB` + `NewListSheet` | ✅ |
-| All required CSS classes | ✅ |
-| New tests: loading/error states, logout | ✅ |
-| Existing tests updated for new UI copy & interaction flow | ✅ |
-
-##### Risks
-
-- None. All async handlers, offline queue integration, and routing are unchanged. The state refactors (removing `editingId`/`editingName`, removing `newListName`) eliminate race conditions in the old implementation. Full test coverage.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-005 — List Detail Page Redesign
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-24
-
-#### Findings
-
-No blocking, major, or minor findings.
-
-- **nit** — `EntryRow` touch handlers early-return when `editMode` is true. Defensive addition beyond the plan spec; prevents accidental swipe-delete during inline edit. Positive.
-- **nit** — `AddItemSheet` uses `<form onSubmit>` instead of `onKeyDown` on input. Same benefit as T-004 `NewListSheet`. Not a concern.
-- **nit** — FAB is guarded by `{list ? <FAB …> : null}` — not shown while loading or on error. Correct; adding to a null list would be a no-op. Not a concern.
-- **nit** — Button labels are entry-specific: `"Mark Milk done"`, `"Edit Coffee"`. More accessible than generic `"Done"` / `"Edit"`.
-- **nit** — `sortEntries` helper ensures open entries appear before done, sorted by `created_at`. Bonus quality-of-life improvement; not required by the plan.
-
-#### Verification
-
-##### Steps
-1. Re-read `.ai/TASKS.md` — T-005 confirmed `ready_for_review`.
-2. Re-read T-005 section of `.ai/PLAN.md`.
-3. Read `ListDetailPage.jsx`, `EntryRow.jsx`, `AddItemSheet.jsx`, `entry-row.test.jsx` in full.
-4. Inspected `git diff --staged` (new files) and `git diff` (modified: `ListDetailPage.jsx`, `index.css`, `app.test.jsx`) for scope.
-5. Ran `npm run lint` → **0 errors**.
-6. Ran `npm run build` → **clean** (252 kB JS).
-7. Ran `npm test` → **19/19 frontend + 25/25 backend tests pass**.
-
-##### Findings
-
-**All acceptance criteria met:**
-
-| Criterion | Result |
-|---|---|
-| TopBar with list name and back navigation | ✅ `TopBar title={list?.name ?? "List"} onBack={() => navigate("/")}` |
-| FAB opens `AddItemSheet` | ✅ `setShowAddItem(true)`; test confirms dialog by role |
-| Adding an item creates an entry | ✅ `addEntryByText` → `createEntry`; offline temp entry support preserved |
-| Items toggle done/open with neon styling & strikethrough | ✅ `checkCircle` color switches on status; `entry-row-done` + `entry-row-text-done` classes |
-| Swipe-to-delete (>80 px left) | ✅ Touch handlers; `entry-row.test.jsx` swipe test confirms `onDelete` called |
-| Done section is collapsible | ✅ `doneOpen` state; collapse button; test confirms hide/show |
-| Sharing panel (owner only) renders and functions | ✅ `SharingPanel` behind `list?.is_owner && isSharingOpen`; share + revoke tests pass |
-| `npm run lint` passes | ✅ 0 errors |
-| `npm run build` passes | ✅ Clean |
-| `npm test` passes | ✅ 19/19 frontend |
-
-**Plan compliance — detailed:**
-
-| Item | Status |
-|---|---|
-| `addEntryByText(text)` extracted | ✅ |
-| `submitEditEntry(entryId, text)` extracted | ✅ |
-| `toggleStatus`, `handleDeleteEntry`, `handleShareSubmit`, `handleRevokeMember` preserved | ✅ |
-| State: `showAddItem`, `doneOpen` added | ✅ |
-| `openEntries` / `doneEntries` derived | ✅ |
-| OPEN ITEMS section with EmptyState when empty | ✅ |
-| Done section conditional + collapsible | ✅ |
-| `SharingPanel` as local named function | ✅ |
-| `EntryRow`: swipe zone, touch handlers, check/edit/delete buttons | ✅ |
-| `EntryRow`: inline edit mode with Save/Cancel | ✅ |
-| `AddItemSheet`: does NOT auto-close after add | ✅ |
-| Dedicated swipe test in `entry-row.test.jsx` | ✅ |
-| New integration tests: TopBar elements, collapsible done, loading/error | ✅ |
-| Existing detail tests updated for new UI | ✅ |
-
-##### Risks
-
-- None. All async handlers, API calls, and offline queue integration are unchanged. New components are well-isolated and fully covered by the dedicated + integration test suite.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-007 — List Detail Options Flyout + BottomNav Cleanup
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-24
-
-#### Findings
-
-No blocking, major, or minor findings.
-
-- **nit** — `ListOptionsSheet` guards with `if (!open || !isOwner)`. The `!isOwner` check is redundant (the parent never sets `showOptions=true` for non-owners, and the options button only renders for owners) but is a safe belt-and-suspenders guard.
-- **nit** — `ShareListSheet` uses `<label htmlFor="share-list-sheet-email">` wrapping the input, making `htmlFor` technically redundant (implicit association via nesting suffices). Accessible and functional either way; `getByLabelText` works as confirmed by passing tests.
-- **nit** — `RenameListSheet` disables Save when `value.trim() === currentName`. This is a UX improvement beyond the spec — prevents no-op API calls. Positive.
-- **nit** — `handleRename` re-throws on error so `RenameListSheet` can stay open on failure. Correct defensive pattern.
-
-#### Verification
-
-##### Steps
-1. Re-read `.ai/TASKS.md` — T-007 confirmed `ready_for_review`.
-2. Re-read T-007 acceptance criteria (scope change from original T-006).
-3. Read `ListOptionsSheet.jsx`, `RenameListSheet.jsx`, `ShareListSheet.jsx` in full.
-4. Inspected `git diff --staged` (new sheet files) and `git diff` (modified: `App.jsx`, `BottomNav.jsx`, `ListDetailPage.jsx`, `index.css`, `app.test.jsx`, `ui.test.jsx`).
-5. Ran `npm run lint` → **0 errors**.
-6. Ran `npm run build` → **clean** (254 kB JS).
-7. Ran `npm test` → **19/19 frontend + 25/25 backend tests pass**.
-
-##### Findings
-
-**All acceptance criteria met:**
-
-| Criterion | Result |
-|---|---|
-| Search tab removed from BottomNav | ✅ `tabs` array reduced to single Lists entry; `ui.test.jsx` confirms no Search button |
-| `/search` route removed from App.jsx | ✅ Import + `<Route>` removed; `/search` now falls through to `<Navigate to="/" replace />` |
-| TopBar shows moreVertical "List options" button (owner only) | ✅ `ariaLabel: "List options"`, `name="moreVertical"`; test confirms presence and absence of old "Share list" button |
-| Tapping options opens `ListOptionsSheet` | ✅ `setShowOptions(true)`; test confirms `role="dialog" name="List Options"` |
-| "Rename list" → `RenameListSheet` with name pre-filled | ✅ `currentName={list?.name}` prop; `useEffect` syncs on open; test reads pre-filled value |
-| Saving calls `renameList` API | ✅ `handleRename` calls `renameList(token, id, { name })`; TopBar title updates to new name |
-| "Share list" → `ShareListSheet` with email form + member list | ✅ `setShowShare(true)`; `ShareListSheet` has form, member list, Revoke; test verifies flow end-to-end |
-| Existing sharing logic preserved | ✅ `handleShareSubmit`, `handleRevokeMember` unchanged; state props passed through |
-| `/search` redirects to overview | ✅ Catch-all `<Navigate to="/">` handles it; test confirms `Lists` tab is active |
-| `npm run lint` passes | ✅ 0 errors |
-| `npm run build` passes | ✅ Clean |
-| `npm test` passes | ✅ 19/19 frontend |
-
-**Scope clean-up verified:**
-- `SharingPanel` inline component fully removed from `ListDetailPage.jsx` ✓
-- `isSharingOpen` state replaced by `showOptions`, `showRename`, `showShare` ✓
-- `renameList` import added to `ListDetailPage.jsx`; `handleRename` wired with offline-aware update ✓
-- `SearchPage` import removed from `App.jsx` ✓
-
-##### Risks
-
-- `/search` now redirects silently to `/` via the catch-all route. Any bookmarked search URLs will land on the overview without error. Acceptable.
-- `handleRename` updates `list.name` in local state. The TopBar title re-renders immediately with the new name, consistent with the offline-first update pattern used elsewhere in the codebase.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-008 — E2E Tests: Shopping List CRUD
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-24
-
-#### Findings
-
-No blocking, major, or minor findings.
-
-- **nit** — `lists.spec.js` adds `test.use({ hasTouch: true })` (line 10). The plan did not mention this, but it is essential: Playwright skips touch-event dispatch by default in Chromium without this flag. Without it the swipe test would pass vacuously (no events fired). Positive addition.
-- **nit** — `swipeEntryLeft` includes `pageX`, `pageY`, `screenX`, `screenY` fields in the `Touch` constructor beyond the plan spec. These improve cross-browser Touch compatibility. Positive.
-- **nit** — Sheet locators use `getByRole("dialog", { name: "..." })` rather than the plan's `getByText(...)`. Querying by ARIA dialog role and accessible name is strictly more robust. Positive.
-- **nit** — `auth.spec.js` fix correctly targets both occurrences and uses `"No lists yet"` (without the ellipsis) to match the `EmptyState` title rendered by T-004. Correct.
-
-#### Verification
-
-##### Steps
-1. Re-read `.ai/TASKS.md` — T-008 confirmed `ready_for_review`.
-2. Re-read T-008 section of `.ai/PLAN.md`.
-3. Read `e2e/lists.spec.js` and `e2e/auth.spec.js` in full.
-4. Verified T-008 acceptance criteria point-by-point (see table below).
-5. Ran `npm run lint` → **0 errors** (1 pre-existing Fast Refresh warning in `AuthContext.jsx`).
-6. Ran `npm run build` → **clean** (975 kB precache, within Workbox limit).
-7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
-8. Ran `npm run e2e` → **9/9 tests pass** (5 auth + 4 lists, 17 s).
-
-##### Findings
-
-**All acceptance criteria met:**
-
-| Criterion | Result |
-|---|---|
-| `e2e/lists.spec.js` — creates a new shopping list | ✅ test at line 118; FAB → NewListSheet dialog → fill name → submit → card appears |
-| `e2e/lists.spec.js` — adds an item to a shopping list | ✅ test at line 133; API-created list → navigate → FAB → AddItemSheet dialog → fill → submit → row appears |
-| `e2e/lists.spec.js` — deletes an item via swipe | ✅ test at line 151; API-created entry → swipe 95 px left (> 80 px threshold) → row gone |
-| `e2e/lists.spec.js` — marks an item as done | ✅ test at line 166; toggle button label flips; `.entry-row-text-done` class applied |
-| `auth.spec.js` "registers" assertion fixed | ✅ line 44: `getByText("No lists yet")` |
-| `auth.spec.js` "logs in" assertion fixed | ✅ line 93: `getByText("No lists yet")` |
-| `npm run e2e` passes all 9 tests | ✅ 9 passed (17.0 s) |
-| `npm run lint` passes | ✅ 0 errors |
-| `npm run build` passes | ✅ Clean |
-| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
-
-**Implementation quality:**
-- `setupLoggedInUser` injects the JWT via `localStorage` and reloads — fast, deterministic, avoids re-testing the auth UI flow.
-- `createListByApi` / `createEntryByApi` set up test fixtures via API — eliminates UI flakiness in precondition steps.
-- `swipeEntryLeft` dispatches three synthetic `TouchEvent`s (`touchstart` → `touchmove` → `touchend`) with correct `touches`/`changedTouches`/`targetTouches` arrays, matching `EntryRow`'s handler signature.
-
-##### Risks
-
-- Swipe test depends on the `.entry-row` CSS selector and the 80 px `clientX` delta threshold in `EntryRow`. If either changes, the test needs updating. Acceptable for current scope.
-- E2E tests create real database rows with no teardown. Matches existing `auth.spec.js` pattern; appropriate for this integration environment.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-009 — Spacing-scale tokens & consistency fixes
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-24
-
-#### Findings
-
-No blocking, major, or minor findings.
-
-- **nit** — The plan listed the spacing scale as the last group before shadows in `tokens.css`. The implementer placed it between the radius tokens and shadow tokens (lines 43–50), which is consistent with a small → large visual properties ordering. No functional impact.
-- **nit** — `.auth-form` retains `gap: 1rem` (not converted to a spacing token). This selector was not in the 11-fix list and the rem value is a deliberate existing choice; leaving it is correct scope discipline.
-- **nit** — `.entry-row-edit-actions { margin-top: 0 }` is the correct fix per the plan (removing the `4px` extra push), and the parent `.entry-row-edit` already provides `gap: 12px`. Verified.
-
-#### Verification
-
-##### Steps
-1. Re-read `.ai/TASKS.md` — T-009 confirmed `ready_for_review`.
-2. Re-read T-009 section of `.ai/PLAN.md`.
-3. Read `frontend/src/styles/tokens.css` in full.
-4. Verified all 8 spacing token definitions against the plan spec.
-5. Verified all 11 targeted CSS property changes against the plan table via grep + targeted reads.
-6. Ran `npm run lint` → **0 errors**.
-7. Ran `npm run build` → **clean** (16.70 kB CSS, 975 kB precache — within Workbox limit).
-8. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
-
-##### Findings
-
-**Spacing tokens — all 8 definitions correct:**
-
-| Token | Value | Result |
-|---|---|---|
-| `--space-1` | `4px` | ✅ |
-| `--space-2` | `8px` | ✅ |
-| `--space-3` | `12px` | ✅ |
-| `--space-4` | `16px` | ✅ |
-| `--space-5` | `20px` | ✅ |
-| `--space-6` | `24px` | ✅ |
-| `--space-8` | `32px` | ✅ |
-| `--space-12` | `48px` | ✅ |
-
-**11 targeted index.css fixes — all correct:**
-
-| Selector | Property | Expected | Actual | Result |
-|---|---|---|---|---|
-| `.loading-state` | `padding` | `0` | `0` | ✅ |
-| `.bottom-sheet` | `padding` | `var(--space-5) var(--space-4) var(--space-12)` | `var(--space-5) var(--space-4) var(--space-12)` | ✅ |
-| `.list-card-name` | `margin-bottom` | `var(--space-2)` | `var(--space-2)` | ✅ |
-| `.member-row` | `padding` | `var(--space-3) 0` | `var(--space-3) 0` | ✅ |
-| `.list-option-row` | `padding` | `var(--space-3)` | `var(--space-3)` | ✅ |
-| `.overview-toggle` | `padding` | `0 var(--space-4) var(--space-3)` | `0 var(--space-4) var(--space-3)` | ✅ |
-| `.share-sheet-members-label` | `padding` | `var(--space-2) 0` | `var(--space-2) 0` | ✅ |
-| `.entry-row-edit-actions` | `margin-top` | `0` | `0` | ✅ |
-| `.auth-logo` | `border-radius` | `var(--radius-md)` | `var(--radius-md)` | ✅ |
-| `.overview-logo` | `border-radius` | `var(--radius-md)` | `var(--radius-md)` | ✅ |
-| `.field, .eg-field` | `gap` | `6px` | `6px` | ✅ |
-
-##### Risks
-
-- None. Changes are CSS-only; no component logic touched. All 19 frontend tests and 25 backend tests confirm no regressions.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-010 — List detail section spacing fixes
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-24
-
-#### Findings
-
-No blocking, major, or minor findings.
-
-- **nit** — The plan specified `padding-bottom: var(--space-3)` for `.entry-section-collapse`, but the implementer wrote `padding: 0 0 var(--space-3)`. Since the pre-existing value was `padding: 0`, the shorthand is functionally identical (top/right/left remain 0, bottom becomes 12px). Correct outcome.
-
-#### Verification
-
-##### Steps
-1. Re-read `.ai/TASKS.md` — T-010 confirmed `ready_for_review`.
-2. Read T-010 section of `.ai/PLAN.md`.
-3. Ran `git diff HEAD -- frontend/src/index.css` to isolate the two uncommitted CSS additions.
-4. Verified `.entry-section` class usage in `ListDetailPage.jsx` — two sibling `<section className="entry-section">` elements confirmed at lines 304 and 326; adjacent-sibling combinator fires correctly.
-5. Ran `npm run lint` → **0 errors**.
-6. Ran `npm run build` → **clean** (16.77 kB CSS, 975 kB precache).
-7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
-
-##### Findings
-
-**All acceptance criteria met:**
-
-| Criterion | Result |
-|---|---|
-| `.entry-section + .entry-section { margin-top: var(--space-4) }` — 16px gap between Open Items and Done sections | ✅ |
-| `.entry-section-collapse { padding: 0 0 var(--space-3) }` — 12px below "DONE" label before first entry row | ✅ |
-| `npm run lint` passes | ✅ 0 errors |
-| `npm run build` passes | ✅ Clean |
-| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
-
-**Scope discipline verified:** only 2 CSS rules changed; no JSX, no logic, no other selectors touched.
-
-##### Risks
-
-- None. Adjacent-sibling combinator is scoped to `.entry-section` elements only; no other page is affected. CSS-only change with no test regressions.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-011 — Fix Done card collapsed-state bottom padding asymmetry
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-24
-
-#### Findings
-
-No blocking, major, or minor findings. Implementation matches the plan exactly.
-
-#### Verification
-
-##### Steps
-1. Re-read `.ai/TASKS.md` — T-011 confirmed `ready_for_review`.
-2. Read T-011 section of `.ai/PLAN.md`.
-3. Ran `git diff HEAD -- frontend/src/index.css` to isolate the two uncommitted changes.
-4. Confirmed `.entry-row-wrapper` is the root element of `EntryRow.jsx` (line 69) — adjacent-sibling combinator fires only when done entries are rendered (expanded state); produces no spacing in collapsed state.
-5. Ran `npm run lint` → **0 errors**.
-6. Ran `npm run build` → **clean** (975 kB precache).
-7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
-
-##### Findings
-
-**All acceptance criteria met:**
-
-| Criterion | Result |
-|---|---|
-| `.entry-section-collapse { padding: 0 }` — T-010 bottom-padding reverted | ✅ diff line: `- padding: 0 0 var(--space-3)` → `+ padding: 0` |
-| `.entry-section-collapse + .entry-row-wrapper { margin-top: var(--space-3) }` — 12px gap only when expanded | ✅ new rule at index.css line 930 |
-| Collapsed state: symmetric 20px top/bottom (from `.entry-section` card padding only) | ✅ no extra padding on the button; section padding is sole spacing |
-| Expanded state: 12px gap between DONE label and first entry row | ✅ sibling combinator fires on the first `.entry-row-wrapper` child |
-| `npm run lint` passes | ✅ 0 errors |
-| `npm run build` passes | ✅ Clean |
-| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
-
-**Scope discipline:** exactly 1 property change + 1 new rule; no JSX, no logic, no other selectors touched.
-
-##### Risks
-
-- None. The sibling combinator `.entry-section-collapse + .entry-row-wrapper` is narrowly scoped to this specific collapse-then-entries DOM sequence; no other screen uses this pattern.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-012 — Fix Open Items card excess top spacing
+## Task: T-001
 
 ### Review Round 1
 
@@ -632,37 +14,794 @@ Reviewed: 2026-04-25
 
 #### Findings
 
-No blocking, major, or minor findings. Implementation is a single targeted property change that matches the plan exactly.
+1. **nit** — `backend/src/routes/entries.js` line 138 — `icon ?? null` in the PATCH handler means sending `{ icon: null }` cannot clear a previously set icon (COALESCE preserves the existing DB value). The plan does not require clearing icons, so this is an acceptable design choice, but future tasks that want a clear/reset capability would need a different update strategy (e.g. a dedicated null sentinel or explicit `icon = $3` without COALESCE). No fix required.
 
 #### Verification
 
 ##### Steps
-1. Re-read `.ai/TASKS.md` — T-012 confirmed `ready_for_review`.
-2. Read T-012 section of `.ai/PLAN.md`.
-3. Ran `git diff HEAD -- frontend/src/index.css` — one property change confirmed, no other files touched.
-4. Verified the fix: `.entry-section-header` `padding: 16px 0 8px` → `padding: 0 0 var(--space-2)`. Removing the 16px top aligns the label with the section's own `1.25rem` (20px) card padding; `var(--space-2)` = 8px bottom gap preserved.
-5. Ran `npm run lint` → **0 errors**.
-6. Ran `npm run build` → **clean**.
-7. Ran `npm test` → **19/19 frontend + 25/25 backend** tests pass.
+- Read migration file `backend/src/db/migrations/1713898800000_add_icon_to_entries.cjs` — correct `up`/`down` structure using `pgm.addColumns` / `pgm.dropColumns`.
+- Read `backend/src/routes/entries.js` — GET, POST, PATCH, DELETE all reviewed.
+- Read `backend/src/entries.test.js` — all new and updated test cases reviewed.
+- Read `backend/src/db/migrations.test.js` — new test case for icon migration reviewed.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning in `AuthContext.jsx` (unchanged).
+- Ran `npm run test --workspace backend -- src/entries.test.js` — **5/5 pass**.
+- Ran `npm run test --workspace backend -- src/db/migrations.test.js` — **2/2 pass**.
+- Ran `npm run build` — frontend bundle and backend syntax check both clean.
+- Ran `npm test` — **27/27 backend tests pass, 19/19 frontend tests pass**.
+- Inspected `git diff HEAD` — changes are exactly scoped to the 4 implementation files; no unintended modifications.
 
 ##### Findings
-
-**All acceptance criteria met:**
-
-| Criterion | Result |
-|---|---|
-| Top padding removed from `.entry-section-header` (was 16px, now 0) | ✅ diff confirmed |
-| Bottom gap of 8px (`var(--space-2)`) preserved below the label | ✅ `padding: 0 0 var(--space-2)` |
-| Section's own `1.25rem` padding provides the ~20px top gap | ✅ no change to `.entry-section` rule |
-| `npm run lint` passes | ✅ 0 errors |
-| `npm run build` passes | ✅ Clean |
-| `npm test` passes | ✅ 19/19 frontend, 25/25 backend |
-
-**Scope discipline:** exactly 1 property on 1 selector changed; no JSX, no logic touched.
+- All acceptance criteria from the plan are satisfied.
+- Migration `up`/`down` is structurally correct; live up/down/up cycle was reported passing by the implementer and confirmed via HANDOFF entry.
+- PATCH guard condition correctly uses `icon === undefined` (not falsy), so `{ icon: '🥛' }` alone passes validation.
+- RETURNING clauses on GET, POST, and PATCH all include `icon`.
 
 ##### Risks
+- Live migration rollback was not re-executed by the reviewer (no DB connection in this environment). The implementer's HANDOFF entry records a successful up/down/up run. The migration code itself is correct.
 
-- None. `.entry-section-header` is only used inside `.entry-section` cards on the list detail page; the change is fully contained.
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/hooks/useIconSuggestion.js` line 20–24 — `getExactOrPrefixIcon` iterates all 257 map keys with bidirectional `startsWith` on every call. For a grocery app this is imperceptible, but it is O(n) on every render. No fix required.
+2. **nit** — `frontend/src/workers/iconWorkerClient.js` line 40–41 — The `handleWorkerError` listener rejects all pending requests but does not set `iconWorker = null`, so subsequent `getIconWorker()` calls return the crashed worker without recreating it. The app would need a page refresh to recover from a fatal worker crash. Acceptable for the current scope; no fix required.
+
+#### Verification
+
+##### Steps
+- Read all 6 implementation files: `vite.config.js`, `iconWorker.js`, `iconWorkerClient.js`, `useIconSuggestion.js`, `useIconSuggestion.test.js`, `main.jsx`.
+- Verified git diff scope: 7 frontend files changed + `package-lock.json`; no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/hooks/useIconSuggestion.test.js` — **4/4 pass**.
+- Ran `npm run build` — clean; `iconWorker-*.js` bundle at 822 KB (expected for WASM ML); upstream `onnxruntime-web eval` warning noted but not actionable.
+- Ran `npm test` — **28/28 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `vite.config.js`: `optimizeDeps: { exclude: ['@xenova/transformers'] }` added at top level ✅
+- `iconWorker.js`: singleton pipeline via `??=`; threshold read from env with `Number.isFinite` guard; reference embeddings pre-computed on `init` and memoized; `pooling: 'mean'` + `normalize: true` correct for all-MiniLM-L6-v2; error handling posts `matchError` ✅
+- `iconWorkerClient.js`: request-ID correlation; pending-request map; `primeIconWorker()` sends `init`; graceful `Worker === undefined` fallback ✅
+- `useIconSuggestion.js`: 300 ms debounce; request sequence number guards against stale async results; cleanup via `clearTimeout` in effect; exact + prefix fast path bypasses worker entirely ✅
+- `main.jsx`: `primeIconWorker()` called as module-level side effect before rendering, triggering eager model warm-up ✅
+- Test suite: exact-match (no worker call), whitespace (null/false), below-threshold (null), above-threshold (icon) — all four acceptance-criteria cases covered ✅
+- `iconWorkerClient.js` as a dedicated shared module was not in the plan but is a clean architectural improvement over inline worker construction in `main.jsx`.
+
+##### Risks
+- The 822 KB worker bundle will be fetched on first app load. No caching strategy for the WASM model weights is in scope for this task (deferred to T-006 / future work).
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/api/entries.js` — When `icon` is `undefined` it is omitted from the JSON payload by `JSON.stringify`, which the backend handles as `null`. When `icon` is `null` it serialises as `null` and is also handled correctly. Both paths are safe; the behaviour is consistent. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `AddItemSheet.jsx`, `AddItemSheet.test.jsx`, `entries.js`, `ListDetailPage.jsx`, `index.css`.
+- Inspected `app.test.jsx` diff — API call now asserts `body: JSON.stringify({ text: "Milch", icon: "🥛" })` and entry mock includes `icon` field.
+- Verified `@keyframes spin` exists in `index.css` (line 88); `.add-item-preview-spinner` references it correctly.
+- Verified git diff scope: 6 frontend files changed; no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` — **17/17 pass**.
+- Ran `npm run build` — clean; CSS bundle increased from 16.83 KB to 17.40 KB (new styles); no errors.
+- Ran `npm test` — **28/28 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `AddItemSheet.jsx`: hook wired up; spinner shown when `loading === true`; emoji pill shown when `icon` is non-null; nothing shown when both false/null — matches plan spec ✅
+- `aria-live="polite"` on both states and `aria-label="Loading icon suggestion"` on spinner — accessible and testable ✅
+- `onAdd?.(trimmed, icon)` — icon may be null (no match); callers handle `null` correctly ✅
+- `ListDetailPage.jsx`: `addEntryByText(text, icon)` accepts icon param; `temporaryEntry` includes `icon: icon ?? null`; `createEntry` call passes `icon: icon ?? null`; `AddItemSheet` wired with `onAdd={(text, icon) => void addEntryByText(text, icon)}` ✅
+- `entries.js`: `createEntry` destructures `{ text, icon }` from body argument and includes both in payload ✅
+- Test suite covers: icon preview render, loading indicator, icon passed through `onAdd`, integration POST body assertion ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-011
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/components/IconPickerSheet.jsx` line 53 — The button label renders the raw camelCase name (e.g. "IconMilk") rather than a human-readable string. Functional for now; cosmetic improvement is out of scope. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `IconPickerSheet.jsx`, `IconPickerSheet.test.jsx`, and the `icon-picker-*` CSS block in `index.css`.
+- Verified git diff scope: 3 files changed (`IconPickerSheet.jsx` new, `IconPickerSheet.test.jsx` new, `index.css` extended); no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/IconPickerSheet.test.jsx src/components/ui/ui.test.jsx` — **6/6 pass** (3 picker + 3 ui tests).
+- Ran `npm run build` — clean.
+- Ran `npm test` — **37/37 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `IconPickerSheet.jsx`: search clears on close via effect; filter is case-insensitive substring match; icon grid maps `visibleIconNames`; each button has `aria-label="Select ${iconName}"`, selected-highlight class, `onSelect → onClose` on click; SVG rendered with `aria-hidden="true" size={24} stroke={1.6}` ✅
+- Accessible: `<label>` uses `visually-hidden` class + `htmlFor` pairing ✅
+- CSS: `auto-fill minmax(88px, 1fr)` grid; `max-height: 52vh` + `overflow-y: auto` prevents sheet overflow; `.icon-picker-btn--selected` provides cyan highlight ✅
+- Test 1: grid renders exactly `ICON_REGISTRY_KEYS.length` (88) buttons ✅
+- Test 2: searching "milk" narrows to IconMilk; selected button has `icon-picker-btn--selected` class; non-matching buttons absent ✅
+- Test 3: clicking "Select IconMilk" fires `onSelect("IconMilk")` and `onClose()` ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-008
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/hooks/useIconSuggestion.js` line 67 — `.slice(0, 5)` in the hook is redundant because the worker already caps `topMatches` at 5. Harmless defensive guard; no fix required.
+2. **nit** — `frontend/src/components/AddItemSheet.jsx` — The preview pill still renders `{iconName}` as literal text (e.g. "IconMilk"). This is the correct transitional state; SVG rendering is T-009's job. No fix required.
+
+#### Verification
+
+##### Steps
+- Read all 6 changed files: `iconWorker.js`, `iconWorkerClient.js`, `useIconSuggestion.js`, `useIconSuggestion.test.js`, `AddItemSheet.jsx`, `AddItemSheet.test.jsx`.
+- Confirmed `AddItemSheet` changes are necessary to consume the renamed `iconName` field — scope is minimal and correct.
+- Verified git diff scope: 6 frontend files changed; no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/hooks/useIconSuggestion.test.js src/components/AddItemSheet.test.jsx src/app.test.jsx` — **21/21 pass**.
+- Ran `npm run build` — clean.
+- Ran `npm test` — **34/34 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `iconWorker.js`: reference embeddings now store `iconName` (was `icon`); `matchIcon` returns `{ iconName, score, topMatches }`; per-icon score deduplication via Map; filters ≥ 0.25, sorts descending, slices to 5, returns `topMatches: []` when below threshold ✅
+- `iconWorkerClient.js`: `handleWorkerMessage` destructures `{ iconName, topMatches }` with safe defaults; resolves with `{ iconName, score, topMatches }`; no-worker fallback updated ✅
+- `useIconSuggestion.js`: `asyncState` shape updated to `{ iconName, topMatches, loading }`; async path maps `topMatches[].iconName` to `string[]`; exact match path returns `topMatches: []`; empty input path returns `topMatches: []` ✅
+- Test suite covers: exact match (`topMatches: []`), empty input, below-threshold (both null/empty), above-threshold (iconName + topMatches string array) ✅
+- `topMatches` contract: worker returns `Array<{ iconName, score }>` objects; hook surfaces `string[]` for consumer simplicity ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-007
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/data/iconDatabase.js` — "banana" maps to `IconCherry` and "potato" maps to `IconCarrot` (no dedicated Tabler icons exist for these). Acceptable substitutions given the available set. No fix required.
+2. **nit** — `frontend/src/data/iconRegistry.js` — `IconVaccine`, `IconEggs`, `IconHome`, `IconScissors` are in the registry but unused in `ICON_DB`. Extra registry coverage is intentional (picker grid), not a problem. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `iconRegistry.js` — 88 imports matched 88 registry entries; `ICON_REGISTRY_KEYS` and `FALLBACK_ICON` exports verified.
+- Read `iconDatabase.js` — 136 bilingual ICON_DB entries; all categories (dairy, produce, bakery, meat/fish, beverages, frozen, snacks, household, condiments, pantry, drugstore) present.
+- Runtime spot-checks: registry size = 88, ICON_DB count = 136, `milch → IconMilk`, `toilettenpapier → IconToiletPaper`, zero dangling references.
+- Confirmed `FALLBACK_ICON` is a `React.forwardRef` object (`{ $$typeof, render }`) — correct Tabler v3 shape, not a plain function.
+- Reviewed diffs for `cosineSimilarity.test.js` (emoji → icon-name assertions, added registry/key count + dangling-reference tests), `useIconSuggestion.test.js` (emoji → icon-name mocks), `app.test.jsx` (emoji → icon-name mock data) — all updates are correct and necessary.
+- Verified git diff scope: `iconRegistry.js` (new), `iconDatabase.js`, `package.json`, `package-lock.json`, plus 3 test files updated for Tabler names; no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js` — **7/7 pass** (2 new registry tests + dangling-reference test + 4 original).
+- Ran `npm run build` — clean; 73 modules transformed; tree-shaking effective.
+- Ran `npm test` — **34/34 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `ICON_REGISTRY` has 88 entries (≥ 80) covering food, household, and drugstore ✅
+- `ICON_REGISTRY_KEYS = Object.freeze(Object.keys(ICON_REGISTRY))` — correct ordered key list ✅
+- `FALLBACK_ICON = IconShoppingCart` exported ✅
+- Every `icon` string in `ICON_DB` resolves to a registered component — no dangling references ✅
+- `EXACT_MATCH_MAP["milch"] === "IconMilk"` and `EXACT_MATCH_MAP["toilettenpapier"] === "IconToiletPaper"` verified at runtime ✅
+- `@tabler/icons-react` in `frontend/package.json`; build tree-shakes to only the registered icons ✅
+
+##### Risks
+- Existing committed code in T-004/T-005 renders `entry.icon` as a text node, so entries created before T-008 through T-010 land will show "IconMilk" etc. as literal text in the UI. This is a known transitional state tracked by the remaining tasks.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/components/entry-row.test.jsx` line 43 — The swipe-delete test passes `entry` without an `icon` property, so `entry.icon` is `undefined`. `undefined ?? "🛒"` still renders the cart fallback — correct behaviour, and the test passes. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `EntryRow.jsx` — icon span placement, fallback logic, done-state opacity.
+- Read `entry-row.test.jsx` — all 3 test cases reviewed.
+- Checked `index.css` — `.entry-icon` and `.entry-icon.entry-row-done` classes at lines 827–835.
+- Verified git diff scope: 4 frontend files changed (`EntryRow.jsx`, `entry-row.test.jsx`, `index.css`, `app.test.jsx`); no unintended modifications.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/entry-row.test.jsx src/app.test.jsx` — **18/18 pass** (3 EntryRow unit tests + 15 integration tests).
+- Ran `npm run build` — clean; 73 modules transformed.
+- Ran `npm test` — **28/28 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `EntryRow.jsx` line 132–134: icon span placed before `.entry-row-copy` div — matches plan spec exactly ✅
+- `entry.icon ?? "🛒"` handles both `null` and `undefined` correctly ✅
+- `entry-row-done` class on the icon span applies `opacity: 0.55` when status is done — matches plan ✅
+- `aria-hidden="true"` — emoji is decorative, correctly hidden from assistive technology ✅
+- Test 1: `icon: "🥛"` renders emoji and asserts `🛒` is absent ✅
+- Test 2: `icon: null` renders `🛒` fallback ✅
+- Test 3: swipe-delete test (no icon prop) still passes ✅
+- CSS: `.entry-icon` at `font-size: 1.5rem`, `flex-shrink: 0`; `.entry-icon.entry-row-done` at `opacity: 0.55` ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/data/iconDatabase.js` — Several entries share an emoji with a more prominent item due to Unicode gaps (`cream` → `🥛`, `cocoa` → `☕`, `mustard` → `🌭`, `black pepper` → `🧂`). This is expected and appropriate given emoji availability. No fix required.
+2. **nit** — `frontend/src/data/iconDatabase.js` — Typing "pepper" alone does not resolve to a match (only "black pepper" is in the label/tags). This is a minor gap in coverage but not required by the plan. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/data/iconDatabase.js` — structure, entry count, bilingual coverage, `EXACT_MATCH_MAP` construction reviewed.
+- Read `frontend/src/utils/cosineSimilarity.js` — algorithm, guard clauses, edge cases reviewed.
+- Read `frontend/src/utils/cosineSimilarity.test.js` — all 5 test cases reviewed.
+- Runtime spot-check via `node -e` to confirm entry count (78), map size (257 keys), and all 12 plan-specified EN/DE lookups resolve correctly.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js` — **5/5 pass**.
+- Ran `npm run build` — clean.
+- Ran `npm test` — **24/24 frontend tests + 27/27 backend tests, all pass**.
+
+##### Findings
+- `ICON_DB` has 78 entries, well above the ≥ 60 minimum.
+- All required categories present: dairy, produce, bakery, meat/fish, beverages, frozen, snacks, household, condiments.
+- `EXACT_MATCH_MAP` is frozen and derived from label + tags; keys are lower-cased and trimmed.
+- `createExactMatchMap` correctly skips empty keys and handles missing `tags` with a default of `[]`.
+- `cosineSimilarity` handles zero-magnitude vectors (returns 0), mismatched lengths (RangeError), and non-array inputs (TypeError). Compatible with TypedArrays via `Number()` coercion.
+- Test coverage: entry count assertion, 12 exact-match pairs (EN + DE), and 3 vector similarity cases (identical, orthogonal, partial overlap with `toBeCloseTo`).
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-009
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/components/AddItemSheet.jsx` line 87 — "Mehr anzeigen" button is always rendered, even when there are no `topMatches` and no semantic alternatives to show. A user typing "Milch" (exact match, `topMatches: []`) will see the button but opening `IconPickerSheet` is still functional, so this is not a blocker. Acceptable UX trade-off. No fix required.
+2. **nit** — `frontend/src/components/AddItemSheet.jsx` lines 23–25 — The `useEffect` that syncs `iconName` → `selectedIconName` runs whenever `iconName` changes, which will overwrite a user's manual alternative selection if the debounce fires after they click an alternative. In practice the 300 ms debounce window is short enough that this race is unlikely, and the plan does not require protection against it. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/AddItemSheet.jsx` — full component reviewed.
+- Read `frontend/src/components/AddItemSheet.test.jsx` — all 3 test cases reviewed.
+- Ran `git diff HEAD -- frontend/src/components/AddItemSheet.jsx frontend/src/components/AddItemSheet.test.jsx frontend/src/index.css` — confirmed scope of changes.
+- Verified CSS classes `add-item-icon-picker`, `add-item-icon-picker-btn`, `add-item-icon-picker-btn--selected`, `add-item-more-btn`, `add-item-preview-svg` are present in `frontend/src/index.css`.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` — **18/18 pass**.
+- Ran `npm run build` — clean (1 upstream `onnxruntime-web` eval warning, unchanged).
+- Ran `npm test` — **38/38 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- `selectedIconName` local state added; initialised from `useIconSuggestion`'s `iconName` via a dedicated `useEffect`; user alternative clicks and full-picker selection both update it; `onAdd` passes `selectedIconName` — all correct.
+- `PreviewIcon` resolves via `ICON_REGISTRY[selectedIconName]` and renders as an SVG `<PreviewIcon>` component with `data-testid="add-item-icon-preview"`. Confirmed by test assertion `container.querySelector("[data-testid='add-item-icon-preview'] svg")`.
+- `suggestedIconNames` deduplicated with `Set` and filtered through `ICON_REGISTRY` guard — safe against unknown names returned from the worker.
+- `showFullPicker` boolean gates `IconPickerSheet`; picker `onSelect` calls `setSelectedIconName`; picker `onClose` resets `showFullPicker` to false. Round-trip test (`Gemüse` → alternatives → picker → `IconTrash` → submit) passes and asserts `onAdd("Gemüse", "IconTrash")`.
+- Reset on close (`open` → false) clears `text`, `selectedIconName`, and `showFullPicker` — no stale state between uses.
+- Loading state renders spinner with `aria-label="Loading icon suggestion"` and hides the preview — correct.
+- Tests use `vi.mock` for `useIconSuggestion` with three controlled branches: exact match (`Milch`), semantic with alternatives (`Gemüse`), and loading (`Mil`). All three branches exercised.
+
+##### Risks
+- Minor: if the ML worker debounce fires after a user clicks an alternative icon, `selectedIconName` is overwritten (see nit #2). Unlikely in typical use and not in scope for this task.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-010
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `frontend/src/components/EntryRow.jsx` line 27 — In edit mode, `PreviewIcon` falls back to `FALLBACK_ICON` when `selectedIconName` is null (i.e. the entry has no icon). This means the preview always shows a cart icon even when the entry genuinely has no icon. The plan says "fallback for null" in view mode, so this is consistent and intentional. No fix required.
+2. **nit** — `frontend/src/components/EntryRow.jsx` lines 29–35 — The `useEffect` that resets `selectedIconName` on `editMode` exit is redundant with `cancelEdit` and `submitEdit`, which already call `setSelectedIconName(normalizeSelectedIconName(entry.icon))`. Harmless duplicate state reset; no bug. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/EntryRow.jsx` — full component reviewed.
+- Read `frontend/src/components/entry-row.test.jsx` — all 4 test cases reviewed.
+- Ran `git diff HEAD -- frontend/src/components/EntryRow.jsx frontend/src/components/entry-row.test.jsx frontend/src/index.css` — confirmed scope of changes.
+- Verified `submitEditEntry` in `frontend/src/pages/ListDetailPage.jsx` (line 171) accepts `(entryId, text, iconName)` and passes `icon: nextIcon` to `updateEntry`; `onEdit` prop wired as `(text, iconName) => void submitEditEntry(entry.id, text, iconName)` at lines 320 and 346.
+- Verified CSS classes `entry-row-edit-icon-stack`, `entry-row-edit-preview`, `entry-row-icon-picker`, `entry-icon` are present in `frontend/src/index.css`.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/entry-row.test.jsx src/app.test.jsx` — **19/19 pass**.
+- Ran `npm run build` — clean (1 upstream `onnxruntime-web` eval warning, unchanged; CSS bundle grew ~0.2 kB for new classes).
+- Ran `npm test` — **39/39 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- View mode: `EntryIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON` renders a Tabler SVG component with `data-testid` and `data-icon-name` attributes; `null` entry icon correctly resolves through `normalizeSelectedIconName` → `null` → `FALLBACK_ICON` + `FALLBACK_ICON_NAME`. Test assertions on `getAttribute("data-icon-name")` confirm both branches.
+- `normalizeSelectedIconName` guard handles unknown icon names (maps to `FALLBACK_ICON_NAME`) — defensive and correct.
+- Edit mode: all 88 registry icons rendered as inline picker buttons (`ICON_REGISTRY_KEYS.map`); `"Mehr anzeigen"` opens `IconPickerSheet`; both paths update `selectedIconName`. Full round-trip test (`Edit Coffee` → picker → `IconTrash` → rename → `Save item`) asserts `onEdit("Ground coffee", "IconTrash")`.
+- `onEdit?.(trimmed, selectedIconName)` in `submitEdit` correctly passes the current `selectedIconName` — plan criterion met.
+- `submitEditEntry` in `ListDetailPage` correctly threads `iconName` into `updateEntry({ text, icon })` — full stack wiring confirmed.
+- Swipe-delete test still passes (no regression).
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `docker-compose.example.yml` — The `build` section is added to the `app` service which also specifies `image: ghcr.io/derfloDev/endgame-grocery:latest`. Docker Compose will use the `build` section only when the image does not already exist locally or when `--build` is passed; otherwise it pulls the published image. The inline comment accurately explains this behaviour. No fix required.
+2. **nit** — `README.md` "Icon Assignment" section — Does not mention the bilingual (EN/DE) nature of the exact-match catalogue or the 88-icon `ICON_REGISTRY`. This is extra colour that the plan does not require. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `.env.example` — new var with comment verified.
+- Read `Dockerfile` — `ARG` before `RUN npm run build` (line 11); `ENV` propagation (line 12); placement is correct (after `COPY . .`, before the build step).
+- Verified `VITE_ICON_SIMILARITY_THRESHOLD` is consumed in `frontend/src/workers/iconWorker.js` lines 5–6 via `import.meta.env` with a safe `Number.isFinite` fallback.
+- Read `docker-compose.example.yml` — `build.args` entry with explanatory comment confirmed.
+- Read `README.md` diff — env-var table row added; "Icon Assignment" subsection added under existing features list; `.env` loading sentence extended with mention of `VITE_*` vars.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run build` — clean (1 upstream `onnxruntime-web` eval warning, unchanged).
+- Ran `npm test` — **39/39 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- `.env.example` contains `VITE_ICON_SIMILARITY_THRESHOLD=0.5` with a descriptive comment — criterion met.
+- Dockerfile `ARG`/`ENV` pair is placed correctly in the builder stage before the frontend build step; the default value `0.5` matches the worker default — criterion met.
+- `docker-compose.example.yml` `build.args` entry present and commented — criterion met.
+- README env table row added with description and example value; "Icon Assignment" subsection concisely describes local AI icon suggestion and threshold semantics — criteria met.
+- No new lint errors introduced.
+- Build succeeds.
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-018
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `frontend/src/workers/iconWorkerClient.js` line 62 — Guard changed from `=== undefined` to `== null`. This is strictly correct: `iconWorker` is initialised as `let iconWorker;` (value `undefined`) and set to `null` by `handleWorkerError`. Using `== null` covers both the initial `undefined` case and the post-crash `null` case in one check. No fix required.
+2. **nit** — `frontend/src/workers/iconWorkerClient.test.js` — The test imports `iconWorkerClient` with dynamic `await import(…)` inside each `it` block and relies on `vi.resetModules()` in `afterEach` to re-initialise module-level state (`iconWorker`, `nextRequestId`, `pendingRequests`) between tests. This is the correct pattern for testing modules with singleton state, and it works cleanly here. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/vite.config.js` — `optimizeDeps.exclude` array includes both `"@xenova/transformers"` and `"onnxruntime-web"`; `worker: { format: "es" }` present; explanatory comments added. ✅
+- Read `frontend/src/workers/iconWorkerClient.js` — `handleWorkerError` sets `iconWorker = null`; `getIconWorker` guard is `== null`; `createIconWorker` returns `null` when `Worker` is undefined (SSR-safe). ✅
+- Read `frontend/src/vite-config.test.js` — 2 tests: `optimizeDeps.exclude` includes both packages; `worker.format` equals `"es"`. Uses `// @vitest-environment node` to import the config directly. ✅
+- Read `frontend/src/workers/iconWorkerClient.test.js` — 2 tests: prime + `getIconWorker` smoke test; crash-rejection + worker recreation round-trip test. `MockWorker` class with static `instances` array and `dispatch` helper; `vi.stubGlobal("Worker", MockWorker)` + `vi.resetModules()` pattern is correct for singleton module isolation. ✅
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (`AuthContext.jsx`, unchanged). ✅
+- Ran `npm run test --workspace frontend -- src/vite-config.test.js src/workers/iconWorkerClient.test.js src/hooks/useIconSuggestion.test.js` — **9/9 pass** (2 vite-config + 2 iconWorkerClient + 5 useIconSuggestion). ✅
+- Ran `npm run build` — clean (1 upstream `onnxruntime-web` eval warning, unchanged); `iconWorker` chunk present in `dist/assets/`. ✅
+- Ran `npm test` — **44/44 frontend (8 test files, +2 from new test files) + 27/27 backend, all pass**. ✅
+
+##### Findings
+- `optimizeDeps.exclude` prevents Vite from pre-bundling ONNX packages, which ship their own WASM/worker loading path incompatible with esbuild. ✅
+- `worker: { format: "es" }` ensures the icon worker bundle is emitted as an ESM module, which is required for `@xenova/transformers` to register the ONNX runtime backend. Without this the `registerBackend` error occurs at runtime. ✅
+- Worker crash recovery path: `handleWorkerError` rejects all pending requests immediately, sets `iconWorker = null`, then the next `getIconWorker()` call rebuilds a fresh worker instance. Test confirms that after crash: (a) the in-flight promise rejects with `"Icon worker failed."`, (b) `getIconWorker()` returns a new distinct instance, (c) subsequent requests on the new worker resolve correctly. ✅
+- `nextRequestId` continues incrementing across the crash (id 0 → crash → id 1) — correct: IDs are process-global counters and the new worker handles the next batch independently. ✅
+- `primeIconWorker` eagerly calls `getIconWorker()` + posts `{ type: "init" }` to warm up the transformer pipeline before the user types. This prevents the spinner appearing on the first keystroke. ✅
+- Test coverage: vite-config contract (2), worker singleton lifecycle (2), hook debounce/exact-match/async paths (5) — all critical code paths covered. ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-012
+
+### Review Round 1
+
+Status: **FAIL**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **major** — `frontend/src/components/AddItemSheet.jsx` line 114 — "Zurück" button is rendered as `"Zuruck"` (missing the umlaut `ü`). The plan explicitly specifies `"Zurück"` as the back-button label. This is a user-visible German text error. **Required fix.**
+2. **nit** — `frontend/src/components/AddItemSheet.jsx` lines 34–47 — The `useEffect` has identical code in both the `if (open) { …; return; }` branch and the fallthrough branch. The `open` check and early `return` are dead code — the same four state resets execute regardless of the `open` value. Harmless but confusing. No fix required.
+3. **nit** — `frontend/src/components/AddItemSheet.jsx` lines 49–51 — The `useIconSuggestion` → `setSelectedIconName(iconName)` sync effect still fires in edit mode and will overwrite `initialIconName` if the hook returns a different suggestion for `initialText`. Pre-existing design pattern from T-009; acceptable. No fix required.
+
+#### Required Fixes
+
+1. **`frontend/src/components/AddItemSheet.jsx` line 114**: Change `"Zuruck"` → `"Zurück"`.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/AddItemSheet.jsx` — full component reviewed.
+- Read `frontend/src/components/AddItemSheet.test.jsx` — all 4 test cases reviewed.
+- Read `frontend/src/data/iconRegistry.js` — `fromLucide` wrapper, `Banana` import, registry merge reviewed.
+- Verified `Banana` entry in `frontend/src/data/iconDatabase.js` uses `icon: "Banana"` matching the registry key.
+- Verified `lucide-react: "^1.11.0"` in `frontend/package.json`.
+- Verified new CSS classes `add-item-icon-browser`, `add-item-icon-browser-grid`, `add-item-icon-browser-btn`, `add-item-icon-browser-btn--selected` in `frontend/src/index.css`.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js src/hooks/useIconSuggestion.test.js src/components/AddItemSheet.test.jsx` — **16/16 pass**.
+- Ran `npm run build` — clean (both libraries tree-shaken; 1 upstream `onnxruntime-web` eval warning, unchanged; main bundle grew ~5 kB for Lucide).
+- Ran `npm test` — **41/41 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- `fromLucide` wrapper correctly translates `stroke` → `strokeWidth` and sets `displayName` for dev tooling. All callers use `stroke={…}` uniformly — correct.
+- `Banana` from `lucide-react` wrapped and keyed as `"Banana"` in `ICON_REGISTRY`; `iconDatabase.js` banana entry uses `icon: "Banana"` — exact-match and build both work.
+- `initialText`/`initialIconName`/`mode` props correctly drive title (`"Edit Item"` / `"Add Item"`), input label, and submit button label via `isEditMode`.
+- Inline icon browser rendered within the same `<BottomSheet>` — no second sheet opened; `<IconPickerSheet>` import removed — plan criterion met.
+- Browser search filters `ICON_REGISTRY_KEYS` case-insensitively; clicking a browser icon sets `selectedIconName` and collapses the browser — correct.
+- "Mehr anzeigen" back-navigation renders `"Zuruck"` — **incorrect; should be `"Zurück"`**.
+- `aria-label="Browse {iconName}"` distinguishes browser buttons from the former `"Select {iconName}"` labels used by `IconPickerSheet` — tests updated accordingly.
+- Add-mode submit clears `text` and resets `selectedIconName`; edit-mode submit preserves text and icon state — correct per plan.
+- Test suite updated: inline browser test replaces second-sheet test; new edit-mode test exercises pre-fill, browser selection, and `"Save Item"` submit path.
+
+##### Risks
+- Minor: in edit mode, the `useIconSuggestion` hook runs on every keystroke and will overwrite `selectedIconName` via the sync effect if the debounce suggestion changes. A user editing text in edit mode may see their originally-set icon replaced mid-edit (see nit #3). Not a blocker for this task.
+
+#### Verdict
+`FAIL`
+
+### Review Round 2
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Required Fix Verification
+
+- `frontend/src/components/AddItemSheet.jsx` line 114: confirmed `"Zuruck"` corrected to `"Zurück"` ✅
+
+#### Verification
+
+##### Steps
+- Ran `grep -n "Zuruck\|Zurück"` — only `"Zurück"` present; fix confirmed.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js src/hooks/useIconSuggestion.test.js src/components/AddItemSheet.test.jsx` — **16/16 pass**.
+- Ran `npm test` — **41/41 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- All Round 1 findings addressed. No new issues introduced.
+
+##### Risks
+- None beyond those noted in Round 1.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-013
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `frontend/src/components/AddItemSheet.jsx` (T-013 scope expansion) — The implementer also updated `AddItemSheet` to add mode-specific HTML element IDs (`textInputId`, `iconSearchInputId`) and made `handleSubmit` async with `onAdd` return-value gating. These changes were not listed in the T-013 plan file table but are necessary: `ListDetailPage` now mounts two `<AddItemSheet>` instances simultaneously (add + edit), so duplicate IDs without this fix would create an accessibility and HTML-validity bug. The extra scope is justified and correct. No fix required.
+2. **nit** — `frontend/src/pages/ListDetailPage.jsx` — `addEntryByText` and `submitEditEntry` now return `true`/`false`, and the add-mode `onAdd` handler gates `setShowAddItem(false)` on the result. This means a failed add keeps the sheet open (good UX), but `AddItemSheet.test.jsx` was not updated to exercise this new `onAdd` async contract. Coverage gap is minor; the integration path is exercised via `app.test.jsx`. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/EntryRow.jsx` diff — all inline-edit state/JSX removed; edit button calls `onEdit?.()` with no args; view-mode SVG icon rendering intact.
+- Read `frontend/src/components/entry-row.test.jsx` diff — inline-edit test replaced with `"calls onEdit when the edit button is pressed"`; view-mode icon and swipe-delete tests kept.
+- Read `frontend/src/pages/ListDetailPage.jsx` diff — `editingEntry` state added; `onEdit={() => setEditingEntry(entry)}` wired on both `open` and `done` entry lists; edit `<AddItemSheet mode="edit">` rendered with `initialText`, `initialIconName`, gated `onAdd`, and `onClose`.
+- Read `frontend/src/components/AddItemSheet.jsx` diff — unique element IDs for simultaneous mount; `handleSubmit` async with `onAdd` result check.
+- Verified `IconPickerSheet.jsx` and `IconPickerSheet.test.jsx` absent from filesystem.
+- Verified zero `IconPickerSheet` imports across `frontend/src`.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/entry-row.test.jsx src/app.test.jsx` — **19/19 pass**.
+- Ran `npm run build` — clean; `IconPickerSheet` chunk absent from bundle.
+- Ran `npm test` — **38/38 frontend (6 test files, down from 7 — `IconPickerSheet.test.jsx` deleted) + 27/27 backend, all pass**.
+
+##### Findings
+- `EntryRow` is now a pure view component — no edit state, no form, no picker. Component is substantially simpler. ✅
+- Edit button fires `onEdit?.()` with no arguments; `ListDetailPage` stores the target entry and opens the edit sheet. ✅
+- Edit `AddItemSheet` pre-fills `initialText` and `initialIconName` from `editingEntry`; closing sets `editingEntry` to null without saving. ✅
+- `submitEditEntry(editingEntry.id, text, icon)` called on submit; on success `editingEntry` cleared, sheet closes. ✅
+- `addEntryByText` / `submitEditEntry` now return `boolean` — sheets stay open on API error; close on success. Good UX improvement. ✅
+- No second bottom sheet ever opens — inline icon browser is the only expansion surface. ✅
+- `IconPickerSheet.jsx` + test fully removed; no dangling imports. ✅
+- `app.test.jsx` "edits, renames, and collapses done entries" test still passes — confirms the full edit flow works end-to-end in integration. ✅
+- Test file count: 7 → 6 (expected); test count: 41 → 38 (3 `IconPickerSheet` tests removed). ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-014
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `frontend/src/components/AddItemSheet.jsx` — `autoFocus` on the text input is now `autoFocus={!showIconBrowser}`. This prevents the text input reclaiming focus when the browser section is open, which is correct. However when the browser opens, the search `<input>` carries a static `autoFocus` attribute and will grab focus — good UX, though not explicitly called out in the plan. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/AddItemSheet.jsx` diff — view-swap removed; form always rendered; icon browser section conditionally rendered below toggle button; "Mehr anzeigen" / "Weniger anzeigen" label toggle; "Zurück" button absent; dead-code `if (open)` branch in `useEffect` cleaned up (T-012 nit resolved).
+- Read `frontend/src/components/AddItemSheet.test.jsx` diff — accordion assertions added: form elements present when browser open; "Weniger anzeigen" visible; "Zurück" absent; "Mehr anzeigen" restored after browser collapses.
+- Read `frontend/src/index.css` diff — bottom sheet container gains `max-height: min(80vh, 44rem)` + `overflow-y: auto` for natural scroll; browser section gains subtle top border; browser grid max-height adjusted to `min(38vh, 20rem)`.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` — **19/19 pass** (4 AddItemSheet + 15 app).
+- Ran `npm run build` — clean (1 upstream `onnxruntime-web` eval warning, unchanged).
+- Ran `npm test` — **38/38 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- Form always visible — input, suggestion row, toggle button, Cancel/Submit buttons all present in DOM when browser is open. ✅
+- "Mehr anzeigen" → "Weniger anzeigen" on expand; restored to "Mehr anzeigen" after browser icon selection. ✅
+- "Zurück" button absent from DOM entirely. ✅
+- Browser section rendered with `{showIconBrowser ? <div className="add-item-icon-browser">…</div> : null}` — natural document flow below the button. ✅
+- Selecting a browser icon sets `selectedIconName`, collapses browser, clears search text. ✅
+- Bottom sheet `overflow-y: auto` + constrained `max-height` enables scrolling when form + full grid are both visible. ✅
+- T-012 nit (dead `if (open)` branches in reset `useEffect`) resolved as a bonus cleanup. ✅
+- All four acceptance criteria fully met.
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-015
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `frontend/src/index.css` — The implementer deviated from the plan's flex strategy in a correct way: the plan specified `.add-item-form { flex-shrink: 0 }` (form takes only its intrinsic height), but the actual DOM nests the browser inside the form. The implementer instead made the form `flex: 1` (fills sheet height) with `.add-item-form > :not(.add-item-icon-browser) { flex-shrink: 0 }` (all direct non-browser children are fixed-size) and `.add-item-icon-browser { flex: 1 }` (browser fills the remainder). This is architecturally correct for the actual DOM structure and achieves the same UX goal. No fix required.
+2. **nit** — `frontend/src/components/ui/ui.test.jsx` — The new `BottomSheet` `className` test uses `open` as a bare attribute (boolean prop shorthand) while existing tests use `open={true}`. Minor style inconsistency across the file; both are equivalent in JSX. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/ui/BottomSheet.jsx` diff — `className` prop added with empty-string default; `resolvedClassName` merges base class + prop using `filter(Boolean).join(" ")`; forwarded onto the dialog `<div>`. ✅
+- Read `frontend/src/components/AddItemSheet.jsx` diff — `sheetClassName` derived from `showIconBrowser`; passed as `className` prop to `BottomSheet`. ✅
+- Read `frontend/src/index.css` diff — `.bottom-sheet--browser-open`: `display: flex; flex-direction: column; overflow: hidden`; form: `flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0`; `form > :not(.add-item-icon-browser)`: `flex-shrink: 0`; browser section: `flex: 1; overflow: hidden; min-height: 0`; grid: `flex: 1; max-height: none` (grid's base `overflow-y: auto` unchanged = sole scrolling element).
+- Read `frontend/src/components/AddItemSheet.test.jsx` diff — modifier class assertion (`toContain("bottom-sheet--browser-open")`); single grid assertion (`querySelectorAll(".add-item-icon-browser-grid").length === 1`); class removal after browser collapse. ✅
+- Read `frontend/src/components/ui/ui.test.jsx` diff — new test asserts `className` forwarded onto dialog element. ✅
+- Verified CSS specificity: `.bottom-sheet--browser-open .add-item-form` (two classes, specificity 0-2-0) > `.bottom-sheet form` (one class + element, 0-1-1); modifier rules correctly override base grid layout.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/ui/ui.test.jsx src/components/AddItemSheet.test.jsx src/app.test.jsx` — **23/23 pass** (4 ui + 4 AddItemSheet + 15 app).
+- Ran `npm run build` — clean.
+- Ran `npm test` — **39/39 frontend (6 test files) + 27/27 backend, all pass**.
+
+##### Findings
+- `BottomSheet` now accepts and forwards `className` — enabling layout modifier classes without coupling UI components to business logic. ✅
+- `.bottom-sheet--browser-open` disables outer scroll (`overflow: hidden`) and switches to flex column. ✅
+- Only `.add-item-icon-browser-grid` has `overflow-y: auto` — sole scrollbar. ✅
+- Form elements above the browser (field, suggestions, toggle button) have `flex-shrink: 0` — always fully visible. ✅
+- Button-row below the browser also has `flex-shrink: 0` (via `> :not(.add-item-icon-browser)`) — always visible at bottom. ✅
+- `min-height: 0` on form and browser section prevents flex overflow in Safari/Chrome. ✅
+- Modifier class removed when browser collapses — normal sheet scroll behaviour restored. ✅
+- Test file count: 6; test count: 39 (up 1 from new `BottomSheet` className test). ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-016
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+None.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/index.css` diff — exactly two lines removed: `overflow: hidden` from `.bottom-sheet--browser-open .add-item-form` and `overflow: hidden` from `.bottom-sheet--browser-open .add-item-icon-browser`; all other rules (flex, flex-direction, min-height, flex: 1) unchanged.
+- Confirmed no JSX changes (`git diff HEAD -- AddItemSheet.jsx AddItemSheet.test.jsx` → empty).
+- Verified the scrolling element `.add-item-icon-browser-grid { overflow-y: auto }` is unaffected — still the sole scroll container.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` — **19/19 pass**.
+- Ran `npm run build` — clean.
+- Ran `npm test` — **39/39 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- `overflow: hidden` removed from `add-item-form` — input focus ring (and button glow) no longer clipped. ✅
+- `overflow: hidden` removed from `add-item-icon-browser` — search input focus ring no longer clipped. ✅
+- Flex height constraints preserved (`flex: 1; min-height: 0` on both containers) — no layout regression. ✅
+- Grid sole-scroll behaviour preserved — `overflow-y: auto` on `.add-item-icon-browser-grid` unchanged. ✅
+- No new tests needed — the fix is a CSS-only visual correction; existing tests continue to assert modifier class presence and single-grid presence. ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-017
+
+### Review Round 1
+
+Status: **FAIL**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **blocker** — `frontend/src/components/AddItemSheet.test.jsx` line 9 — `process.cwd()` uses the `process` Node.js global, which is not declared in the ESLint browser environment config. `npm run lint` exits with error: `'process' is not defined  no-undef`. The acceptance criteria explicitly requires `npm run lint` to pass. **Required fix.**
+
+#### Required Fixes
+
+1. **`frontend/src/components/AddItemSheet.test.jsx` line 9**: Replace `process.cwd()` with an ESM-safe alternative. Options:
+   - `new URL("../index.css", import.meta.url)` with `fileURLToPath` + `readFileSync`
+   - `import.meta.dirname` (Node 20.11+)
+   - Or simply read the CSS relative to `import.meta.url`: `readFileSync(new URL("../index.css", import.meta.url), "utf8")` and remove the separate `path.resolve` call.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/index.css` diff — `cursor: wait` → `cursor: not-allowed` at line 246, inside `.button-primary:disabled, .eg-btn-primary:disabled`. Correct fix. ✅
+- Read `frontend/src/components/AddItemSheet.test.jsx` diff — new test added: imports `readFileSync`, `path`, `../index.css`; reads CSS via `process.cwd()`; asserts disabled button's `disabled` property and CSS cursor rule via regex.
+- Ran `npm run lint` — **1 error: `'process' is not defined` at `AddItemSheet.test.jsx:9:45`**. FAIL.
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx` — **5/5 pass** (Vitest runs in Node env where `process` is available).
+
+##### Findings
+- CSS change is correct: single character change, right rule, right value. ✅
+- New test's approach (reading CSS source and asserting the rule text) is creative and verifies the actual stylesheet, but the `process.cwd()` call fails ESLint's `no-undef` rule.
+- Tests pass at runtime (Vitest exposes `process`) but ESLint's static analysis rejects the global.
+
+##### Risks
+- None beyond the lint blocker.
+
+#### Verdict
+`FAIL`
+
+### Review Round 2
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Required Fix Verification
+
+- `frontend/src/components/AddItemSheet.test.jsx` line 9: `process.cwd()` replaced with `import.meta.dirname` — `process` reference removed. ✅
+
+#### Verification
+
+##### Steps
+- Confirmed `import.meta.dirname` at line 9; `path` import retained (used in the `path.resolve` call); no remaining `process` reference.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged). ✅
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` — **20/20 pass** (5 AddItemSheet + 15 app). ✅
+- Ran `npm test` — **40/40 frontend (6 files) + 27/27 backend, all pass**. ✅
+
+##### Findings
+- All Round 1 findings addressed. No new issues introduced.
+
+##### Risks
+- None.
 
 #### Verdict
 `PASS`

@@ -1,81 +1,43 @@
 # ROADMAP
 
-Goal: Apply the Endgame Grocery design system — dark neon Marvel-inspired theme — to the full frontend. Every existing user-facing screen gets the new visual identity. New UI patterns from the design (bottom nav, FAB, bottom sheets, swipe-to-delete, neon animations) are implemented where backend features already exist to support them. Design elements with no existing backend feature are omitted.
+## Priority 1 — Automatic Icon Assignment (auto-icons)
 
-## Constraints
+**Objective:** Assign a food/grocery emoji icon to each list entry automatically,
+using local in-browser semantic matching (transformers.js) so that synonyms and
+cross-language terms are recognised without any cloud AI dependency.
 
-- Frontend only (React + Vite). No new backend routes.
-- Squad tab: no backend sharing-members feature surfaced in the UI yet → tab omitted from bottom nav.
-- Category grouping: no backend support → not implemented; entries remain a flat list.
-- Progress bars on the overview require per-list entry counts which the current lists API does not return → omitted from list cards.
-- Search: client-side, filtering across already-fetched lists by name and owner.
+### Accepted decisions
 
-## Priority 1 — Design tokens & app shell
+| # | Decision |
+|---|----------|
+| Persistence | **Option B – store in DB**: the resolved icon is saved in the `entries` table so all list members see the same icon regardless of client state. |
+| UI placement | **Both**: live preview in `AddItemSheet` while typing, and permanent display in `EntryRow`. |
+| Language | **Bilingual (EN + DE)**: the icon reference database covers both English and German grocery terms. |
+| Model loading | **Eager**: `Xenova/all-MiniLM-L6-v2` (~23 MB WASM) starts loading in the background immediately on app start via the Service Worker; subsequent sessions use the browser cache. |
+| Similarity threshold | **Configurable constant** exposed as an env var (`VITE_ICON_SIMILARITY_THRESHOLD`) and wired into `docker-compose.yml` so it can be tuned without code changes. Default: `0.5`. |
 
-Objective: Replace the current light/warm global styles with the Endgame Grocery dark-neon design system and rebuild the app shell to a mobile-first layout.
+### Planned outcomes
 
-- Install and configure Google Fonts: Orbitron, Exo 2, JetBrains Mono.
-- Write full CSS design token file (`colors_and_type.css` port) as `frontend/src/styles/tokens.css`.
-- Replace `index.css` body/root/shell styles with dark theme (`#080B1C` bg, neon palette, new type scale).
-- Copy `endgame_grocery_logo.png` into `frontend/src/assets/`.
-- Rebuild `ProtectedLayout` in `App.jsx`: mobile-first 390 px canvas, dark bg, `BottomNav` (Lists + Search tabs), no more `hero-card`.
-- Add `/search` route to the router.
-
-## Priority 2 — Shared UI component library
-
-Objective: Create reusable Endgame Grocery components that all screens use.
-
-- `Icon` component (inline Lucide-style SVG paths subset).
-- `TopBar` component (sticky, title + optional back button + action slots).
-- `FAB` (floating action button, neon gradient, 56 px, fixed position).
-- `BottomNav` (Lists / Search tabs, active neon-cyan state, fixed bottom).
-- `EmptyState`, `LoadingState` (shimmer), `ErrorState` ("Mission Failed") components.
-- Button variants (primary, secondary, ghost, danger) as CSS classes + optional React wrapper.
-- Input, card, chip/badge CSS classes from the design system.
-- Bottom-sheet overlay component (shared by Add Item, New List, and Add Member flows).
-
-## Priority 3 — Auth pages
-
-Objective: Apply the dark design to Login and Register screens.
-
-- Dark `auth-layout` + `auth-card` (bg-surface, neon border, `28px` radius).
-- Logo + "ENDGAME GROCERY" Orbitron header on both pages.
-- Neon-styled form inputs and primary button.
-- Error banners using design-system `--color-error`.
-
-## Priority 4 — Overview page (Home screen)
-
-Objective: Redesign the lists overview to match the HomeScreen prototype.
-
-- "ENDGAME / GROCERY" Orbitron gradient header with logo.
-- Summary chips (list count, shared count).
-- Active / All Lists toggle filter.
-- `ListCardHome`: dark card with neon border, list name, owner/shared chip, "Queued" sync badge.
-- `NewListSheet`: bottom sheet with name input and Create/Cancel actions (replaces inline form).
-- FAB triggers `NewListSheet`.
-- Empty state, loading shimmer, error state.
-- Logout action in header (top-right icon button).
-
-## Priority 5 — List detail page
-
-Objective: Redesign the single-list view to match the ListScreen prototype.
-
-- `TopBar` with back arrow and list name.
-- "Add item" as bottom sheet (`AddItemSheet`) triggered by FAB — replaces inline form.
-- Entry items as neon-styled row cards (check circle, text, pending-sync badge).
-- Swipe-to-delete on entry rows (touch `touchstart`/`touchmove`/`touchend`, reveal red delete zone at 80 px threshold).
-- Open items section + "Done" collapsible section with count badge.
-- Sharing panel (owner only): restyled as inline neon section below entries; share-by-email input + member list with Revoke buttons.
-- Edit-in-place for entry text: tap-to-edit inline input.
-- Error/loading/empty states.
-
-## Priority 6 — Search page
-
-Objective: Implement a Search screen accessible via the bottom nav.
-
-- New `SearchPage` component at `/search`.
-- Search input with neon style, auto-focused on enter.
-- Client-side filtering of fetched lists by name (case-insensitive substring).
-- Results displayed as `ListCardHome` cards (tapping navigates to list detail).
-- Empty-search and no-results states.
-- Shares the same `lists` data already fetched; no extra API calls.
+- `entries` table gains a nullable `icon` column (text, stores a single emoji).
+- Backend `POST /api/lists/:id/entries` and `PATCH /api/lists/:id/entries/:eid`
+  accept an optional `icon` field and return it in all entry responses.
+- A bilingual icon reference database (`src/data/iconDatabase.js`) with ≥ 60
+  entries covering common grocery categories (dairy, produce, bakery, meat,
+  beverages, snacks, household).
+- A `useIconSuggestion` hook that:
+  1. Runs an O(1) exact/prefix string-match map first.
+  2. Falls back to cosine-similarity over transformer embeddings when no exact
+     match is found.
+  3. Returns `{ icon, loading }` so callers can show a spinner.
+- `AddItemSheet` shows the resolved icon as a live preview badge next to the
+  input; the icon is passed to `onAdd` so the page can persist it.
+- `EntryRow` renders the persisted `entry.icon` (or `🛒` fallback) to the left
+  of the item text.
+- The transformer model worker is initialised eagerly on app start (background
+  import, does not block render).
+- `VITE_ICON_SIMILARITY_THRESHOLD` env var controls the cutoff (default `0.5`);
+  added to `docker-compose.yml` and `.env.example`.
+- All new behaviour is covered by unit tests (hook logic, similarity util,
+  string-match map).
+- Documentation updated: `README.md` env-var table, inline JSDoc for public
+  hook API.

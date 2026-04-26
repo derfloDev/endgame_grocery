@@ -20,7 +20,15 @@
       "Bash(git:*)",
       "mcp__aide__*",
       "Bash(ls *)",
-      "Bash(grep -rn \"describe\\\\|postgres\\\\|DATABASE_URL\\\\|supertest\" C:/develop/endgame_grocery/backend/src/*.test.js)"
+      "Bash(grep -rn \"describe\\\\|postgres\\\\|DATABASE_URL\\\\|supertest\" C:/develop/endgame_grocery/backend/src/*.test.js)",
+      "Bash(dir C:\\\\develop\\\\endgame_grocery\\\\src)",
+      "Bash(xargs cat *)",
+      "Bash(sed -n '533,560p' /c/develop/endgame_grocery/frontend/src/index.css)",
+      "Bash(sed -n '749,760p' /c/develop/endgame_grocery/frontend/src/index.css)",
+      "Bash(sed -n '872,920p' /c/develop/endgame_grocery/frontend/src/index.css)",
+      "Bash(sed -n '197,215p' /c/develop/endgame_grocery/frontend/src/index.css)",
+      "Bash(sed -n '551,575p' /c/develop/endgame_grocery/frontend/src/index.css)",
+      "Bash(sed -n '760,920p' /c/develop/endgame_grocery/frontend/src/index.css)"
     ]
   }
 }

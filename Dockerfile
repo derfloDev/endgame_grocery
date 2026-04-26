@@ -8,6 +8,8 @@ COPY backend/package.json ./backend/
 RUN npm ci
 
 COPY . .
+ARG VITE_ICON_SIMILARITY_THRESHOLD=0.5
+ENV VITE_ICON_SIMILARITY_THRESHOLD=$VITE_ICON_SIMILARITY_THRESHOLD
 RUN npm run build --workspace frontend
 
 FROM node:22-alpine AS runtime

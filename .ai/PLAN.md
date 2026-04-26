@@ -1,1770 +1,767 @@
-# PLAN — UI Redesign: Endgame Grocery Design System
+# Plan
 
-## Goal
-Apply the Endgame Grocery dark-neon design system (from `Endgame Grocery Design System-handoff.zip`) to every frontend screen. Replace the current light/warm theme with the Marvel-inspired dark-space visual identity. Implement all new UI patterns where existing backend features support them.
+Status: **ready_for_implement**
 
-## Source Material
-- `Endgame Grocery Design System-handoff.zip`
-  - `project/README.md` — full design system spec
-  - `project/colors_and_type.css` — design tokens
-  - `project/ui_kits/app/Components.jsx` — shared components prototype
-  - `project/ui_kits/app/HomeScreen.jsx` — overview screen prototype
-  - `project/ui_kits/app/ListScreen.jsx` — list detail prototype
+Goal: implement automatic icon assignment for grocery entries using local
+in-browser semantic matching (transformers.js), with DB persistence, bilingual
+reference data, eager model loading, and a configurable similarity threshold.
 
-## Task Sequence (implement in order — each task depends on the prior)
+## Scope
 
-```
-T-001 → T-002 → T-003 → T-004 → T-005 → T-006
-```
+See `ROADMAP.md` for the full decision log. The six tasks below map to the
+accepted decisions.
 
 ---
 
-## T-001 — Design Tokens & App Shell
+## T-001 — Backend: DB migration + `icon` field in entry routes
 
-### Objective
-Replace the global CSS with dark theme tokens and rebuild the app shell to a mobile-first layout with bottom navigation.
-
-### Files to change / create
-
-| File | Action |
-|------|--------|
-| `frontend/index.html` | Add Google Fonts `<link>`, update `<title>` |
-| `frontend/src/styles/tokens.css` | **NEW** — full CSS custom property set |
-| `frontend/src/index.css` | **REWRITE** — dark theme base styles, utility classes |
-| `frontend/src/assets/endgame_grocery_logo.png` | **NEW** — copy from zip |
-| `frontend/src/App.jsx` | Rebuild `ProtectedLayout`, add `/search` route |
-
-### index.html
-```html
-<!-- Add before </head> -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800;900&family=Exo+2:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<!-- Update title -->
-<title>Endgame Grocery</title>
-```
-
-### tokens.css — full variable set
-```css
-:root {
-  /* Background */
-  --bg-base:    #080B1C;
-  --bg-surface: #0D1128;
-  --bg-raised:  #141832;
-
-  /* Neon primaries */
-  --neon-purple: #8B2BE2;
-  --neon-violet: #A855F7;
-  --neon-cyan:   #00E5FF;
-  --neon-blue:   #3B82F6;
-
-  /* Accents */
-  --accent-pink: #FF2D78;
-  --accent-star: #E2E8FF;
-
-  /* Semantic */
-  --color-success: #00E5B0;
-  --color-warning: #FFB800;
-  --color-error:   #FF4560;
-  --color-info:    #00E5FF;
-
-  /* Text */
-  --text-primary:   #F0F0FF;
-  --text-secondary: #8E9AC8;
-  --text-disabled:  #3D4470;
-
-  /* Gradients */
-  --gradient-brand:   linear-gradient(135deg, #8B2BE2 0%, #6366F1 45%, #00E5FF 100%);
-  --gradient-card:    linear-gradient(135deg, rgba(139,43,226,0.15) 0%, rgba(0,229,255,0.08) 100%);
-  --gradient-surface: linear-gradient(180deg, #141832 0%, #0D1128 100%);
-  --gradient-text:    linear-gradient(90deg, #A855F7, #00E5FF);
-
-  /* Type scale */
-  --text-xs:   11px;
-  --text-sm:   13px;
-  --text-base: 15px;
-  --text-md:   17px;
-  --text-lg:   20px;
-  --text-xl:   24px;
-  --text-2xl:  32px;
-  --text-3xl:  42px;
-  --text-4xl:  56px;
-
-  /* Border radius */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
-
-  /* Shadows / elevation */
-  --shadow-1:    0 2px 8px rgba(0,0,0,0.4);
-  --shadow-2:    0 4px 24px rgba(0,0,0,0.5), 0 0 16px rgba(139,43,226,0.2);
-  --shadow-3:    0 8px 40px rgba(0,0,0,0.7), 0 0 32px rgba(0,229,255,0.25);
-  --glow-purple: 0 0 20px rgba(139,43,226,0.6), 0 0 40px rgba(139,43,226,0.3);
-  --glow-cyan:   0 0 20px rgba(0,229,255,0.5), 0 0 40px rgba(0,229,255,0.25);
-
-  /* Easing */
-  --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-
-  /* Durations */
-  --duration-micro:    150ms;
-  --duration-standard: 250ms;
-  --duration-page:     400ms;
-}
-```
-
-### index.css — structural changes
-- `:root`: `@import './styles/tokens.css'`; `color-scheme: dark; background: var(--bg-base); color: var(--text-primary); font-family: 'Exo 2', sans-serif`
-- `body`: `margin: 0; min-height: 100vh`
-- Remove `.hero-card` entirely
-- `.app-shell`: mobile canvas — `max-width: 430px; margin: 0 auto; min-height: 100vh; position: relative; overflow-x: hidden`
-- Add `@keyframes shimmer`, `@keyframes slideUp`, `@keyframes fadeIn`
-- Keep `.visually-hidden` as-is
-- Old classes (`.hero-card`, `.eyebrow`, etc.) removed; old classes still used by unported components (`.stack`, `.button-row`) kept as stubs until all pages are migrated
-
-#### New dark-theme utility classes added to index.css
-
-**Buttons**
-```css
-.eg-btn-primary   /* gradient-brand bg, #080B1C text, pill, glow-purple shadow */
-.eg-btn-secondary /* transparent, neon-cyan border + text, pill */
-.eg-btn-ghost     /* rgba(139,43,226,0.1) bg, violet text, purple border, pill */
-.eg-btn-danger    /* rgba(255,69,96,0.1) bg, error text, red border, pill */
-.eg-icon-btn      /* 36×36 square, bg-raised, subtle border, radius-md */
-```
-
-**Form**
-```css
-.eg-input     /* bg-raised, purple border 1.5px, radius-md, text-primary, neon focus glow */
-.eg-field     /* display:grid; gap:0.4rem */
-.eg-field label { font-size: var(--text-sm); font-weight: 600; color: var(--text-secondary) }
-```
-
-**Cards / surfaces**
-```css
-.eg-card       /* bg-surface, purple border, radius-lg, position:relative, overflow:hidden */
-```
-
-**Chips**
-```css
-.eg-chip-purple  /* rgba(139,43,226,0.12) bg, neon-violet text, purple border, radius pill */
-.eg-chip-cyan    /* rgba(0,229,255,0.1) bg, neon-cyan text */
-.eg-chip-success /* rgba(0,229,176,0.1) bg, success text */
-.eg-chip-queued  /* rgba(61,68,112,0.4) bg, text-disabled text */
-```
-
-**Banners**
-```css
-.eg-error-banner   /* rgba(255,69,96,0.1) bg, error text, radius-md, padding */
-.eg-offline-banner /* bg-raised, text-secondary, radius-md */
-```
-
-**Typography helpers**
-```css
-.eg-orbitron      { font-family: 'Orbitron', sans-serif }
-.eg-mono          { font-family: 'JetBrains Mono', monospace }
-.eg-gradient-text { background: var(--gradient-text); -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent; background-clip: text }
-```
-
-### App.jsx changes
-```jsx
-// Remove <section className="hero-card"> wrapper from ProtectedLayout
-// New ProtectedLayout:
-function ProtectedLayout() {
-  return (
-    <ProtectedRoute>
-      <div className="app-shell">
-        <OfflineBanner />
-        <Outlet />
-        <BottomNav />
-      </div>
-    </ProtectedRoute>
-  );
-}
-
-// Add to router (inside protected group):
-<Route path="/search" element={<SearchPage />} />
-
-// Imports to add:
-import BottomNav from './components/ui/BottomNav';
-import SearchPage from './pages/SearchPage';
-```
-
-Note: `SearchPage` can be a stub (`export default function SearchPage() { return null; }`) until T-006 is implemented. The import + route must exist after T-001 so BottomNav links work.
-
-### Asset extraction (run before implementing T-001)
-```bash
-mkdir -p frontend/src/assets
-unzip -p "Endgame Grocery Design System-handoff.zip" \
-  "endgame-grocery-design-system/project/assets/endgame_grocery_logo.png" \
-  > frontend/src/assets/endgame_grocery_logo.png
-```
-
-### Validation
-- `npm run lint`
-- `npm run build`
-- `npm test` (existing tests still pass)
-
-### Commit message
-`feat(ui): add Endgame design tokens and dark app shell`
-
----
-
-## T-002 — Shared UI Component Library
-
-### Objective
-Create the reusable Endgame Grocery UI components consumed by all redesigned screens.
-
-### Files to create
-
-| File | Component |
-|------|-----------|
-| `frontend/src/components/ui/Icon.jsx` | Inline SVG icon subset |
-| `frontend/src/components/ui/TopBar.jsx` | Sticky top bar |
-| `frontend/src/components/ui/FAB.jsx` | Floating action button |
-| `frontend/src/components/ui/BottomNav.jsx` | Bottom tab navigation |
-| `frontend/src/components/ui/EmptyState.jsx` | Empty content placeholder |
-| `frontend/src/components/ui/LoadingState.jsx` | Shimmer skeleton rows |
-| `frontend/src/components/ui/ErrorState.jsx` | Error / retry view |
-| `frontend/src/components/ui/BottomSheet.jsx` | Bottom sheet overlay |
-| `frontend/src/components/ui/index.js` | Barrel export |
-
-### Component specs
-
-#### Icon.jsx
-```jsx
-// Props: name (string), size=20, color='currentColor', strokeWidth=1.5
-// Returns <svg> with inline Lucide-style path
-// Required icon names (copy paths from handoff Components.jsx):
-//   plus, check, checkCircle, trash, edit, x,
-//   chevronRight, chevronDown, chevronLeft, share, users,
-//   shoppingCart, list, search, alertCircle, sparkles,
-//   moreVertical, arrowLeft, filter
-// Add logOut:
-//   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-//   <polyline points="16 17 21 12 16 7"/>
-//   <line x1="21" y1="12" x2="9" y2="12"/>
-```
-
-#### TopBar.jsx
-```jsx
-// Props: title (string), subtitle? (string), onBack? (() => void), actions? ([{icon, onClick}])
-// position: sticky; top: 0; z-index: 50
-// padding: 52px 16px 12px
-// background: linear-gradient(180deg, rgba(8,11,28,1) 70%, rgba(8,11,28,0) 100%)
-// display: flex; align-items: center; gap: 12px
-// back button: eg-icon-btn with arrowLeft Icon
-// title: Orbitron 18px weight 700 text-primary
-// subtitle: 12px text-secondary margin-top 2px
-// actions: rendered as eg-icon-btn at right
-```
-
-#### FAB.jsx
-```jsx
-// Props: onClick (() => void), icon='plus'
-// position: fixed; bottom: 92px; right: calc(50% - 195px); z-index: 90
-// 56×56px circle; background: var(--gradient-brand)
-// box-shadow: var(--glow-purple), 0 4px 16px rgba(0,0,0,0.5)
-// transition: transform var(--duration-micro), box-shadow var(--duration-micro)
-// onMouseEnter: scale(1.08) + stronger glow
-// onMouseLeave: reset
-// Icon inside: size 24, color '#080B1C', strokeWidth 2.5
-```
-
-#### BottomNav.jsx
-```jsx
-// No props
-// Uses useLocation() for active detection, useNavigate() for navigation
-// Tabs: [
-//   { id:'lists',  icon:'list',   label:'Lists',  path:'/' },
-//   { id:'search', icon:'search', label:'Search', path:'/search' }
-// ]
-// Active detection:
-//   lists tab: pathname === '/' || pathname.startsWith('/lists')
-//   search tab: pathname.startsWith('/search')
-// position: fixed; bottom: 0; left: 50%; transform: translateX(-50%)
-// width: 100%; max-width: 430px; z-index: 100
-// background: rgba(8,11,28,0.95); backdrop-filter: blur(20px)
-// border-top: 1px solid rgba(139,43,226,0.25)
-// padding: 8px 0 28px
-// display: flex; justify-content: space-around
-// Active tab: neon-cyan icon + label, text-shadow glow
-// Inactive: text-disabled color, strokeWidth 1.5
-```
-
-#### EmptyState.jsx
-```jsx
-// Props: title (string), body (string), action? (string), onAction? (() => void)
-// Centered column: padding 48px 32px, gap 12px
-// shoppingCart Icon 56px text-disabled color
-// title: Orbitron 16px weight 600 text-secondary
-// body: 14px text-disabled, max-width 240px, line-height 1.5
-// Optional eg-btn-primary action button (margin-top 8px)
-```
-
-#### LoadingState.jsx
-```jsx
-// Props: rows=4
-// Renders `rows` shimmer skeleton divs
-// Each: height 64px, radius-md, shimmer gradient animation
-// background: linear-gradient(90deg, rgba(20,24,50,0.8) 25%, rgba(30,36,72,0.8) 50%, rgba(20,24,50,0.8) 75%)
-// backgroundSize: 200% 100%
-// animation: shimmer 1.4s infinite, delay i*0.1s
-// border: 1px solid rgba(139,43,226,0.1)
-// gap 8px, padding 16px
-```
-
-#### ErrorState.jsx
-```jsx
-// Props: onRetry (() => void)
-// Centered column: padding 48px 32px, gap 12px
-// alertCircle Icon 48px color-error
-// "Mission Failed": Orbitron 16px weight 600, color-error, text-shadow 0 0 16px rgba(255,69,96,0.4)
-// "Something went wrong. Try again.": 14px text-secondary
-// eg-btn-secondary Retry button (margin-top 8px)
-```
-
-#### BottomSheet.jsx
-```jsx
-// Props: open (bool), onClose (() => void), title (string), children
-// Renders nothing when open=false
-// Backdrop: position fixed, inset 0, rgba(8,11,28,0.7), backdropFilter blur(4px),
-//   onClick→onClose, z-index 200
-// Sheet: position fixed, bottom 0, left 50%, transform translateX(-50%),
-//   width 100%, maxWidth 430px, z-index 201
-//   background: rgba(13,17,40,0.98)
-//   border-top: 1px solid rgba(139,43,226,0.4)
-//   border-radius: 28px 28px 0 0
-//   padding: 20px 20px 48px
-//   box-shadow: 0 -8px 40px rgba(139,43,226,0.2)
-//   animation: slideUp 0.3s var(--ease-out)
-// Drag handle: 36×4px, border-radius 9999, rgba(139,43,226,0.4), margin: -8px auto 16px
-// Title: Orbitron 16px weight 600 text-primary, margin-bottom 16px
-// children rendered below title
-```
-
-#### ui/index.js
-```js
-export { default as Icon } from './Icon';
-export { default as TopBar } from './TopBar';
-export { default as FAB } from './FAB';
-export { default as BottomNav } from './BottomNav';
-export { default as EmptyState } from './EmptyState';
-export { default as LoadingState } from './LoadingState';
-export { default as ErrorState } from './ErrorState';
-export { default as BottomSheet } from './BottomSheet';
-```
-
-### Validation
-- `npm run lint`
-- `npm run build`
-
-### Commit message
-`feat(ui): add shared Endgame UI component library`
-
----
-
-## T-003 — Auth Pages Redesign
-
-### Objective
-Apply the dark design system to Login and Register screens. All form logic unchanged.
+### What
+Add a nullable `icon` column (text, single emoji) to the `entries` table.
+Update all entry routes to accept and return the new field.
 
 ### Files to change
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `frontend/src/pages/LoginPage.jsx` | Update JSX — all logic unchanged |
-| `frontend/src/pages/RegisterPage.jsx` | Update JSX — all logic unchanged |
-| `frontend/src/index.css` | Add/update auth dark CSS classes |
+| `backend/src/db/migrations/<ts>_add_icon_to_entries.cjs` | **new** — `pgm.addColumns('entries', { icon: { type: 'text', notNull: false } })` |
+| `backend/src/routes/entries.js` | GET: add `icon` to SELECT list; POST: accept `icon` from body, add to INSERT; PATCH: accept `icon`, add to `COALESCE` update; all `RETURNING` clauses include `icon` |
+| `backend/src/entries.test.js` | Extend existing tests to assert `icon` is returned; add a test for POST with icon and PATCH with icon |
 
-### Brand header block (both pages)
-```jsx
-import logo from '../assets/endgame_grocery_logo.png';
-
-// Replace <p className="eyebrow"> with:
-<div className="auth-brand">
-  <img src={logo} alt="Endgame Grocery" className="auth-logo" />
-  <div className="auth-brand-text">
-    <div className="eg-orbitron eg-gradient-text auth-brand-title">ENDGAME</div>
-    <div className="auth-brand-sub">GROCERY</div>
-  </div>
-</div>
-```
-
-### LoginPage copy & class changes
-- `<h1>` → `"Welcome Back"`
-- subtitle `<p>` → `"Sign in to access your mission."`
-- `className="button-primary"` → `"eg-btn-primary"`
-- `className="error-banner"` → `"eg-error-banner"`
-- `className="muted-link"` → `"eg-link"`
-- All `<input>` → add `className="eg-input"`
-- `<div className="field">` → `<div className="eg-field">`
-- Remove `<p className="eyebrow">` (replaced by auth-brand block)
-- Remove `<div className="page-copy">` wrapper
-
-### RegisterPage copy & class changes
-- Same class replacements as LoginPage
-- `<h1>` → `"Join the Squad"`
-- subtitle `<p>` → `"Create your account to get started."`
-- Remove `<p className="eyebrow">`
-
-### CSS additions / replacements (index.css)
-```css
-.auth-layout {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 2rem 1.25rem;
-  background: var(--bg-base);
-}
-
-.auth-card {
-  width: min(100%, 30rem);
-  background: var(--bg-surface);
-  border: 1px solid rgba(139, 43, 226, 0.3);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-3);
-  padding: 2rem;
-}
-
-.auth-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 1.5rem;
-}
-
-.auth-logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  box-shadow: 0 0 16px rgba(139, 43, 226, 0.5);
-  flex-shrink: 0;
-}
-
-.auth-brand-title {
-  font-size: var(--text-xl);
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  line-height: 1;
-}
-
-.auth-brand-sub {
-  font-size: var(--text-xs);
-  font-weight: 500;
-  letter-spacing: 0.2em;
-  color: var(--text-secondary);
-  margin-top: 2px;
-}
-
-.auth-card h1 {
-  font-family: 'Orbitron', sans-serif;
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 0.5rem;
-}
-
-.auth-card > p {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  margin: 0 0 1.5rem;
-}
-
-.auth-form {
-  display: grid;
-  gap: 1rem;
-}
-
-.eg-link {
-  color: var(--neon-cyan);
-  font-weight: 600;
-  text-decoration: none;
-  font-size: var(--text-sm);
-}
-```
-
-### Validation
-- `npm run lint`
-- `npm run build`
-
-### Commit message
-`feat(ui): apply dark design to auth pages`
+### Acceptance criteria
+- Migration applies and rolls back cleanly.
+- `POST /api/lists/:id/entries` with `{ text, icon }` returns `entry.icon`.
+- `PATCH /api/lists/:id/entries/:eid` with `{ icon }` returns updated `entry.icon`.
+- `GET /api/lists/:id/entries` returns `icon` on every row (null when unset).
+- Existing tests still pass; no new lint errors.
 
 ---
 
-## T-004 — Overview Page Redesign
-
-### Objective
-Redesign the lists overview as the dark HomeScreen with neon list cards, bottom-sheet new-list flow, and Orbitron brand header.
-
-### Files to change / create
-
-| File | Action |
-|------|--------|
-| `frontend/src/pages/OverviewPage.jsx` | Full JSX rewrite — all state/logic preserved |
-| `frontend/src/components/ListCardHome.jsx` | NEW |
-| `frontend/src/components/NewListSheet.jsx` | NEW |
-
-### ListCardHome.jsx
-```jsx
-// Props:
-//   list: { id, name, is_owner, owner_name, is_pending_sync }
-//   onOpen: () => void         — tap the card body
-//   onRename: (name) => void   — called from inline rename form
-//   onDelete: () => void       — called from inline delete btn
-//
-// Internal state: menuOpen (bool), renamingMode (bool), renameValue (string)
-//
-// Structure:
-//   <div className="eg-card list-card-home" onClick={onOpen}>
-//     {/* gradient overlay */}
-//     <div className="eg-card-overlay" />
-//
-//     <div className="list-card-row">
-//       <div className="list-card-info">
-//         <div className="eg-orbitron list-card-name">{list.name}</div>
-//         <div className="list-card-chips">
-//           <span className={list.is_owner ? 'eg-chip-purple' : 'eg-chip-cyan'}>
-//             {list.is_owner ? 'Owner' : `Shared · ${list.owner_name}`}
-//           </span>
-//           {list.is_pending_sync && <span className="eg-chip-queued">Queued</span>}
-//         </div>
-//       </div>
-//       <button className="eg-icon-btn" onClick={e => { e.stopPropagation(); setMenuOpen(v=>!v); }}>
-//         <Icon name="moreVertical" size={18} color="var(--text-secondary)" />
-//       </button>
-//     </div>
-//
-//     {/* Inline action menu (shown when menuOpen) */}
-//     {menuOpen && !renamingMode && (
-//       <div className="list-card-menu" onClick={e => e.stopPropagation()}>
-//         <button className="eg-btn-ghost list-card-menu-btn"
-//           onClick={() => { setRenamingMode(true); setRenameValue(list.name); }}>
-//           Rename
-//         </button>
-//         <button className="eg-btn-danger list-card-menu-btn" onClick={() => { setMenuOpen(false); onDelete(); }}>
-//           Delete
-//         </button>
-//       </div>
-//     )}
-//     {menuOpen && renamingMode && (
-//       <div className="list-card-menu" onClick={e => e.stopPropagation()}>
-//         <input className="eg-input" value={renameValue}
-//           onChange={e => setRenameValue(e.target.value)}
-//           onKeyDown={e => {
-//             if (e.key === 'Enter') submitRename();
-//             if (e.key === 'Escape') { setRenamingMode(false); setMenuOpen(false); }
-//           }} autoFocus />
-//         <div className="button-row" style={{marginTop:8}}>
-//           <button className="eg-btn-ghost" onClick={() => { setRenamingMode(false); setMenuOpen(false); }}>Cancel</button>
-//           <button className="eg-btn-secondary" onClick={submitRename}>Save</button>
-//         </div>
-//       </div>
-//     )}
-//   </div>
-//
-// submitRename: if renameValue.trim() calls onRename(renameValue.trim()), resets state
-//
-// CSS additions:
-//   .list-card-home { cursor: pointer; margin-bottom: 10px; transition: border-color var(--duration-standard), box-shadow var(--duration-standard) }
-//   .list-card-home:hover { border-color: rgba(0,229,255,0.45); box-shadow: 0 0 24px rgba(0,229,255,0.12), 0 4px 24px rgba(0,0,0,0.5) }
-//   .eg-card-overlay { position:absolute; inset:0; border-radius:inherit; pointer-events:none; background:var(--gradient-card) }
-//   .list-card-row { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; position:relative }
-//   .list-card-info { flex:1; min-width:0 }
-//   .list-card-name { font-size: var(--text-base); font-weight:600; color:var(--text-primary); margin-bottom:6px }
-//   .list-card-chips { display:flex; gap:6px; flex-wrap:wrap }
-//   .list-card-menu { padding:12px 0 0; display:grid; gap:8px; position:relative }
-//   .list-card-menu-btn { width:100%; justify-content:flex-start }
-```
-
-### NewListSheet.jsx
-```jsx
-// Props: open (bool), onAdd ((name:string) => void), onClose (() => void)
-// Internal state: name (string)
-//
-// <BottomSheet open={open} onClose={handleClose} title="New List">
-//   <input className="eg-input" placeholder="List name…" autoFocus
-//     value={name} onChange={e=>setName(e.target.value)}
-//     onKeyDown={e => e.key==='Enter' && handleSubmit()} />
-//   <div className="button-row" style={{marginTop:16}}>
-//     <button className="eg-btn-ghost" style={{flex:1}} onClick={handleClose}>Cancel</button>
-//     <button className="eg-btn-primary" style={{flex:2}} onClick={handleSubmit}
-//       disabled={!name.trim()}>Create List</button>
-//   </div>
-// </BottomSheet>
-//
-// handleClose: setName(''); onClose()
-// handleSubmit: if name.trim() → onAdd(name.trim()); setName(''); onClose()
-```
-
-### OverviewPage.jsx — JSX rewrite
-Preserve all existing state (`lists`, `isLoading`, `error`, `syncVersion`) and all async handlers.
-
-**Refactors needed to existing logic:**
-1. Extract `handleCreateList` into a function accepting `name: string` directly (not an event): `async function createListByName(name)` — called from `NewListSheet`.
-2. Extract `submitRename` to accept `(listId, newName)` as parameters (remove dependency on `editingId`/`editingName` state — those state variables can be removed).
-3. Keep `handleDelete` as-is.
-
-**New state:**
-```jsx
-const [view, setView] = useState('active');   // 'active' | 'all' — visual only (no item data)
-const [showNew, setShowNew] = useState(false);
-```
-
-**Derived values:**
-```jsx
-const sharedCount = lists.filter(l => !l.is_owner).length;
-// Both views show all lists (no item-count data to filter by active state)
-const displayLists = lists;
-```
-
-**Returned JSX:**
-```jsx
-return (
-  <div style={{ paddingBottom: 120 }}>
-
-    {/* Sticky header */}
-    <div className="overview-topbar">
-      <div className="overview-brand">
-        <div>
-          <div className="eg-orbitron eg-gradient-text overview-brand-title">ENDGAME</div>
-          <div className="overview-brand-sub">GROCERY</div>
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <img src={logo} alt="Endgame Grocery" className="overview-logo" />
-          <button className="eg-icon-btn" onClick={logout} title="Log out">
-            <Icon name="logOut" size={18} color="var(--text-secondary)" />
-          </button>
-        </div>
-      </div>
-      <div className="overview-chips">
-        <span className="eg-chip-purple">
-          <Icon name="list" size={12} color="var(--neon-violet)" />
-          {' '}{lists.length} {lists.length === 1 ? 'list' : 'lists'}
-        </span>
-        {sharedCount > 0 && (
-          <span className="eg-chip-cyan">{sharedCount} shared</span>
-        )}
-      </div>
-    </div>
-
-    {/* View toggle */}
-    <div className="overview-toggle">
-      {['active','all'].map(v => (
-        <button key={v}
-          className={view === v ? 'eg-toggle-active' : 'eg-toggle'}
-          onClick={() => setView(v)}>
-          {v === 'active' ? 'Active' : 'All Lists'}
-        </button>
-      ))}
-    </div>
-
-    {/* Content */}
-    <div style={{ padding: '0 16px' }}>
-      {error && <ErrorState onRetry={loadLists} />}
-      {isLoading && <LoadingState rows={3} />}
-      {!isLoading && !error && displayLists.length === 0 && (
-        <EmptyState
-          title="No lists yet"
-          body="Create your first mission to get started."
-          action="New List"
-          onAction={() => setShowNew(true)}
-        />
-      )}
-      {!isLoading && !error && displayLists.map(list => (
-        <ListCardHome
-          key={list.id}
-          list={list}
-          onOpen={() => navigate(`/lists/${list.id}`)}
-          onRename={(name) => void createRename(list.id, name)}
-          onDelete={() => void handleDelete(list.id)}
-        />
-      ))}
-    </div>
-
-    <FAB onClick={() => setShowNew(true)} />
-    <NewListSheet
-      open={showNew}
-      onAdd={(name) => void createListByName(name)}
-      onClose={() => setShowNew(false)}
-    />
-  </div>
-);
-```
-
-**Imports to add:** `useNavigate` from react-router-dom, `logo` from assets, `Icon, FAB, EmptyState, LoadingState, ErrorState` from ui, `ListCardHome`, `NewListSheet`.
-
-### New CSS classes (index.css)
-```css
-.overview-topbar {
-  padding: 52px 16px 16px;
-  background: linear-gradient(180deg, rgba(8,11,28,1) 70%, rgba(8,11,28,0) 100%);
-  position: sticky; top: 0; z-index: 50;
-}
-.overview-brand {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 12px;
-}
-.overview-brand-title { font-size: var(--text-2xl); font-weight: 800; letter-spacing: 0.06em; line-height: 1 }
-.overview-brand-sub   { font-size: var(--text-xs); font-weight: 500; letter-spacing: 0.2em; color: var(--text-secondary); margin-top: -2px }
-.overview-logo        { width: 40px; height: 40px; border-radius: 10px; box-shadow: 0 0 16px rgba(139,43,226,0.4) }
-.overview-chips       { display: flex; gap: 8px; align-items: center; flex-wrap: wrap }
-.overview-toggle      { display: flex; gap: 6px; padding: 0 16px 14px }
-.eg-toggle            { /* inactive pill filter btn */ font-family:'Exo 2',sans-serif; font-size:var(--text-sm); font-weight:500; padding:6px 14px; border-radius:9999px; cursor:pointer; background:var(--bg-raised); color:var(--text-secondary); border:1px solid rgba(255,255,255,0.06); transition:all var(--duration-standard) }
-.eg-toggle-active     { background:rgba(0,229,255,0.12); color:var(--neon-cyan); border-color:rgba(0,229,255,0.4) }
-```
-
-### Validation
-- `npm run lint`
-- `npm run build`
-- `npm test`
-
-### Commit message
-`feat(ui): redesign overview page as Endgame home screen`
-
----
-
-## T-005 — List Detail Page Redesign
-
-### Objective
-Redesign the list detail view with TopBar navigation, FAB-triggered add-item sheet, neon entry rows, swipe-to-delete, and collapsible done section.
-
-### Files to change / create
-
-| File | Action |
-|------|--------|
-| `frontend/src/pages/ListDetailPage.jsx` | Full JSX rewrite — all state/logic preserved |
-| `frontend/src/components/AddItemSheet.jsx` | NEW |
-| `frontend/src/components/EntryRow.jsx` | NEW |
-
-### AddItemSheet.jsx
-```jsx
-// Props: open (bool), onAdd ((text:string) => void), onClose (() => void)
-// Internal state: text (string)
-//
-// <BottomSheet open={open} onClose={onClose} title="Add Item">
-//   <input className="eg-input" placeholder="Add milk, lemons, bread…"
-//     autoFocus value={text} onChange={e=>setText(e.target.value)}
-//     onKeyDown={e => e.key==='Enter' && handleSubmit()} />
-//   <div className="button-row" style={{marginTop:16}}>
-//     <button className="eg-btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-//     <button className="eg-btn-primary" style={{flex:2}} onClick={handleSubmit}
-//       disabled={!text.trim()}>Add Item</button>
-//   </div>
-// </BottomSheet>
-//
-// handleSubmit: if text.trim() → onAdd(text.trim()); setText('')
-//   (does NOT auto-close — allows adding multiple items in sequence)
-//   User closes explicitly via Cancel or backdrop tap
-```
-
-### EntryRow.jsx
-```jsx
-// Props:
-//   entry: { id, text, status, is_pending_sync }
-//   onToggle: () => void
-//   onEdit: (newText: string) => void
-//   onDelete: () => void
-//
-// State: editMode (bool), editText (string), swipeX (number), swiping (bool)
-// Refs: rowRef (div), startX (number), currentDx (number)
-//
-// === Normal (non-edit) mode ===
-// Outer wrapper: position:relative; overflow:hidden; margin-bottom:8px
-//
-// Delete zone (always rendered, behind the row):
-//   position:absolute; right:0; top:0; bottom:0; width:80px
-//   display:flex; align-items:center; justify-content:center
-//   background: rgba(255,69,96,0.2); border-radius: 0 var(--radius-md) var(--radius-md) 0
-//   <Icon name="trash" size={20} color="var(--color-error)" />
-//
-// Row div (ref=rowRef):
-//   style={{ transform:`translateX(${swipeX}px)`, transition: swiping?'none':'transform 0.25s var(--ease-out)' }}
-//   onTouchStart={handleTouchStart}
-//   onTouchMove={handleTouchMove}
-//   onTouchEnd={handleTouchEnd}
-//   className="entry-row"
-//
-//   Row contents:
-//   [check-circle btn] [text area, flex:1] [edit btn]
-//
-//   Check-circle btn (eg-icon-btn borderless):
-//     Icon name="checkCircle" size=22
-//     color: status==='done' ? 'var(--color-success)' : 'var(--text-disabled)'
-//     onClick → onToggle()
-//
-//   Text area:
-//     <p> entry.text, Exo 2 15px
-//     done: text-decoration:line-through; color:var(--text-disabled)
-//     is_pending_sync: + <span className="eg-chip-queued" style={{fontSize:10}}>Queued</span>
-//
-//   Edit btn: eg-icon-btn, Icon name="edit" size=18 text-secondary
-//     onClick → { setEditMode(true); setEditText(entry.text); }
-//
-// Touch handler logic:
-//   handleTouchStart(e): startX.current = e.touches[0].clientX; setSwiping(true)
-//   handleTouchMove(e):
-//     currentDx.current = e.touches[0].clientX - startX.current
-//     if (currentDx.current < 0) setSwipeX(Math.max(currentDx.current, -100))
-//   handleTouchEnd():
-//     setSwiping(false)
-//     if (currentDx.current < -80) { setSwipeX(0); onDelete(); }
-//     else setSwipeX(0)
-//     currentDx.current = 0
-//
-// === Edit mode ===
-// Renders inline input + Save/Cancel
-//   <input className="eg-input" value={editText} onChange autoFocus
-//     onKeyDown: Enter → submitEdit(); Escape → cancelEdit() />
-//   <div className="button-row" style={{marginTop:8}}>
-//     <button className="eg-btn-ghost" onClick={cancelEdit}>Cancel</button>
-//     <button className="eg-btn-secondary" onClick={submitEdit}>Save</button>
-//   </div>
-//   submitEdit: if editText.trim() → onEdit(editText.trim()); setEditMode(false)
-//   cancelEdit: setEditMode(false); setEditText('')
-//
-// CSS:
-//   .entry-row {
-//     display: flex; align-items: center; gap: 12px;
-//     background: var(--bg-surface);
-//     border: 1px solid rgba(139,43,226,0.2);   /* open */
-//     border-radius: var(--radius-md);
-//     padding: 12px 16px;
-//   }
-//   .entry-row-done { border-color: rgba(0,229,176,0.15) }
-```
-
-### ListDetailPage.jsx — JSX rewrite
-Preserve all existing state, effects, and handler functions.
-
-**Refactors to existing logic:**
-1. Extract add-entry into `async function addEntryByText(text)` (same logic as `handleCreateEntry` but takes text string, not form event).
-2. Extract edit-entry into `async function submitEditEntry(entryId, text)` (same logic as `submitEdit` but params instead of state).
-3. Keep `toggleStatus`, `handleDeleteEntry`, `handleShareSubmit`, `handleRevokeMember` as-is.
-
-**New state:**
-```jsx
-const [showAddItem, setShowAddItem] = useState(false);
-const [doneOpen, setDoneOpen] = useState(true);  // collapsible done section
-```
-
-**Returned JSX:**
-```jsx
-return (
-  <div style={{ paddingBottom: 120 }}>
-
-    <TopBar
-      title={list?.name ?? 'List'}
-      onBack={() => navigate('/')}
-      actions={list?.is_owner ? [{
-        icon: <Icon name="share" size={20} color="var(--text-secondary)" />,
-        onClick: () => setIsSharingOpen(v => !v)
-      }] : []}
-    />
-
-    {entryError && (
-      <div className="eg-error-banner" style={{margin:'0 16px 8px'}}>
-        {entryError}
-      </div>
-    )}
-    {isLoading && <LoadingState rows={4} />}
-
-    {!isLoading && (
-      <div style={{ padding: '0 16px' }}>
-
-        {/* Open items */}
-        <div className="entry-section-header">
-          <span className="eg-orbitron" style={{fontSize:13, color:'var(--text-secondary)', letterSpacing:'0.08em'}}>
-            OPEN ITEMS
-          </span>
-          <span className="eg-chip-purple" style={{fontSize:11}}>{openEntries.length}</span>
-        </div>
-        {openEntries.length === 0 && (
-          <EmptyState title="All clear" body="No open items. Add one with the + button." />
-        )}
-        {openEntries.map(entry => (
-          <EntryRow key={entry.id} entry={entry}
-            onToggle={() => void toggleStatus(entry)}
-            onEdit={(text) => void submitEditEntry(entry.id, text)}
-            onDelete={() => void handleDeleteEntry(entry.id)} />
-        ))}
-
-        {/* Done items — collapsible */}
-        {doneEntries.length > 0 && (
-          <>
-            <button className="entry-section-collapse"
-              onClick={() => setDoneOpen(v => !v)}>
-              <span className="eg-orbitron" style={{fontSize:13, color:'var(--color-success)', letterSpacing:'0.08em'}}>
-                DONE
-              </span>
-              <span className="eg-chip-success" style={{fontSize:11, marginLeft:'auto'}}>{doneEntries.length}</span>
-              <Icon name={doneOpen ? 'chevronDown' : 'chevronRight'} size={16} color="var(--color-success)" />
-            </button>
-            {doneOpen && doneEntries.map(entry => (
-              <EntryRow key={entry.id} entry={entry}
-                onToggle={() => void toggleStatus(entry)}
-                onEdit={(text) => void submitEditEntry(entry.id, text)}
-                onDelete={() => void handleDeleteEntry(entry.id)} />
-            ))}
-          </>
-        )}
-
-        {/* Sharing panel (owner only, inline expandable) */}
-        {list?.is_owner && isSharingOpen && (
-          <SharingPanel
-            members={members}
-            shareEmail={shareEmail}
-            shareError={shareError}
-            isSharingLoading={isSharingLoading}
-            onEmailChange={setShareEmail}
-            onShareSubmit={handleShareSubmit}
-            onRevoke={handleRevokeMember}
-          />
-        )}
-
-      </div>
-    )}
-
-    <FAB onClick={() => setShowAddItem(true)} />
-    <AddItemSheet
-      open={showAddItem}
-      onAdd={(text) => void addEntryByText(text)}
-      onClose={() => setShowAddItem(false)}
-    />
-  </div>
-);
-```
-
-**SharingPanel** — define as a named function in the same file (not exported):
-```jsx
-function SharingPanel({ members, shareEmail, shareError, isSharingLoading, onEmailChange, onShareSubmit, onRevoke }) {
-  return (
-    <div className="sharing-panel">
-      <div className="entry-section-header">
-        <span className="eg-orbitron" style={{fontSize:13,color:'var(--neon-violet)',letterSpacing:'0.08em'}}>SQUAD</span>
-        <span className="eg-chip-purple" style={{fontSize:11}}>{members.length}</span>
-      </div>
-
-      <form onSubmit={onShareSubmit} style={{display:'grid',gap:8,marginBottom:16}}>
-        <input className="eg-input" placeholder="Share with email…"
-          value={shareEmail} onChange={e=>onEmailChange(e.target.value)} />
-        <button className="eg-btn-secondary" type="submit">Add Member</button>
-      </form>
-
-      {shareError && <div className="eg-error-banner" style={{marginBottom:8}}>{shareError}</div>}
-      {isSharingLoading && <LoadingState rows={2} />}
-
-      {!isSharingLoading && members.map(m => (
-        <div key={m.user_id} className="member-row">
-          <div>
-            <div style={{fontWeight:600,color:'var(--text-primary)',fontSize:'var(--text-base)'}}>{m.display_name}</div>
-            <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>{m.email}</div>
-          </div>
-          <div style={{display:'flex',gap:8,alignItems:'center'}}>
-            <span className={m.is_owner ? 'eg-chip-purple' : 'eg-chip-cyan'} style={{fontSize:11}}>
-              {m.is_owner ? 'Owner' : 'Member'}
-            </span>
-            {m.is_pending_sync && <span className="eg-chip-queued" style={{fontSize:11}}>Queued</span>}
-            {!m.is_owner && (
-              <button className="eg-btn-danger" style={{fontSize:13,padding:'6px 12px'}}
-                onClick={() => void onRevoke(m.user_id)}>Revoke</button>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-```
-
-### New CSS classes (index.css)
-```css
-.entry-section-header {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 16px 0 8px;
-}
-.entry-section-collapse {
-  display: flex; align-items: center; gap: 8px;
-  width: 100%; background: none; border: none; border-top: 1px solid rgba(0,229,176,0.15);
-  padding: 12px 0; cursor: pointer;
-}
-.sharing-panel {
-  margin-top: 24px;
-  background: var(--bg-surface);
-  border: 1px solid rgba(139,43,226,0.25);
-  border-radius: var(--radius-lg);
-  padding: 16px;
-}
-.member-row {
-  display: flex; justify-content: space-between; align-items: center; gap: 12px;
-  padding: 10px 0;
-  border-top: 1px solid rgba(255,255,255,0.05);
-}
-.member-row:first-of-type { border-top: none }
-```
-
-### Validation
-- `npm run lint`
-- `npm run build`
-- `npm test`
-
-### Commit message
-`feat(ui): redesign list detail page with neon theme and swipe-to-delete`
-
----
-
-## ~~T-006 — Search Page~~ — DROPPED
-
-**Reason:** Search feature removed from scope per user decision (2026-04-24). The Search tab is removed from BottomNav. The `/search` route and `SearchPage` stub are cleaned up as part of T-007.
-
----
-
-## T-007 — List Detail: Options Flyout + BottomNav Cleanup
-
-### Objective
-1. Remove the Search tab from BottomNav and clean up the `/search` route.
-2. Replace the single share icon in the TopBar with a `moreVertical` options button that opens a bottom-sheet flyout. The flyout provides two actions (owner only): **Rename list** and **Share list**, each opening its own focused sub-sheet.
-
-### Files to change / create
-
-| File | Action |
-|------|--------|
-| `frontend/src/components/ui/BottomNav.jsx` | Remove Search tab; keep only Lists tab |
-| `frontend/src/App.jsx` | Remove `/search` route and `SearchPage` import |
-| `frontend/src/pages/ListDetailPage.jsx` | Replace share TopBar action with options button; wire three sheets; remove inline SharingPanel |
-| `frontend/src/components/ListOptionsSheet.jsx` | **NEW** — options menu sheet |
-| `frontend/src/components/RenameListSheet.jsx` | **NEW** — rename input sheet |
-| `frontend/src/components/ShareListSheet.jsx` | **NEW** — share form + member list sheet |
-
-### BottomNav.jsx change
-Remove the `search` entry from the `tabs` array. Only `lists` tab remains:
-```jsx
-const tabs = [
-  { id: 'lists', label: 'Lists', path: '/', icon: 'list' },
-];
-```
-Active detection and render logic unchanged — no more conditional for search path.
-
-### App.jsx change
-- Remove `import SearchPage from './pages/SearchPage'`
-- Remove `<Route path="/search" element={<SearchPage />} />` from the protected routes group
-
-### ListOptionsSheet.jsx
-```jsx
-// Props: open (bool), onClose (() => void), isOwner (bool),
-//        onRenameSelect (() => void), onShareSelect (() => void)
-//
-// Renders a BottomSheet with title "List Options"
-// Two option rows (owner only — if !isOwner render nothing / closed sheet):
-//
-//   Option row structure:
-//   <button className="list-option-row" onClick={...}>
-//     <div className="list-option-icon"> <Icon name="..." size={22} color="..."/> </div>
-//     <div className="list-option-text">
-//       <span className="list-option-label">Rename list</span>
-//       <span className="list-option-desc">Change the name of this list</span>
-//     </div>
-//     <Icon name="chevronRight" size={16} color="var(--text-disabled)" />
-//   </button>
-//
-// Row 1: Icon "edit", label "Rename list", desc "Change the name of this list"
-//   onClick → onClose(); onRenameSelect()
-//
-// Row 2: Icon "share", label "Share list", desc "Manage squad access"
-//   onClick → onClose(); onShareSelect()
-//
-// CSS:
-//   .list-option-row {
-//     display: flex; align-items: center; gap: 14px;
-//     width: 100%; background: none; border: none; border-radius: var(--radius-md);
-//     padding: 14px 12px; cursor: pointer; text-align: left;
-//     transition: background var(--duration-micro);
-//   }
-//   .list-option-row:hover { background: rgba(139,43,226,0.1) }
-//   .list-option-row + .list-option-row { border-top: 1px solid rgba(255,255,255,0.05) }
-//   .list-option-icon {
-//     width: 40px; height: 40px; border-radius: var(--radius-md);
-//     display: grid; place-items: center; flex-shrink: 0;
-//   }
-//   .list-option-icon-edit  { background: rgba(139,43,226,0.15) }
-//   .list-option-icon-share { background: rgba(0,229,255,0.12) }
-//   .list-option-text { flex: 1; min-width: 0 }
-//   .list-option-label { display: block; font-weight: 600; font-size: var(--text-base); color: var(--text-primary) }
-//   .list-option-desc  { display: block; font-size: var(--text-sm); color: var(--text-secondary); margin-top: 2px }
-```
-
-### RenameListSheet.jsx
-```jsx
-// Props: open (bool), onClose (() => void),
-//        currentName (string), onRename ((newName: string) => Promise<void>)
-//
-// Internal state: value (string) — initialised to currentName when open becomes true (useEffect)
-//
-// <BottomSheet open={open} onClose={onClose} title="Rename List">
-//   <input className="eg-input" value={value}
-//     onChange={e => setValue(e.target.value)}
-//     onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-//     autoFocus />
-//   <div className="button-row" style={{marginTop:16}}>
-//     <button className="eg-btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-//     <button className="eg-btn-primary" style={{flex:2}}
-//       onClick={handleSubmit} disabled={!value.trim() || value.trim() === currentName}>
-//       Save
-//     </button>
-//   </div>
-// </BottomSheet>
-//
-// handleSubmit: if value.trim() && value.trim() !== currentName →
-//   await onRename(value.trim()); onClose()
-//
-// useEffect([open]): when open changes to true → setValue(currentName)
-```
-
-### ShareListSheet.jsx
-```jsx
-// Props: open (bool), onClose (() => void),
-//        members ([{user_id, display_name, email, is_owner, is_pending_sync}]),
-//        shareEmail (string), shareError (string), isSharingLoading (bool),
-//        onEmailChange ((email: string) => void),
-//        onShareSubmit ((event) => void),
-//        onRevoke ((memberId: string) => void)
-//
-// <BottomSheet open={open} onClose={onClose} title="Share List">
-//
-//   {/* Share-by-email form */}
-//   <form onSubmit={onShareSubmit} style={{display:'grid',gap:8,marginBottom:16}}>
-//     <label className="eg-field">
-//       <span style={{color:'var(--text-secondary)',fontSize:'var(--text-sm)',fontWeight:600}}>
-//         Add member by email
-//       </span>
-//       <input className="eg-input" type="email" placeholder="alex@example.com"
-//         value={shareEmail} onChange={e => onEmailChange(e.target.value)} />
-//     </label>
-//     <button className="eg-btn-secondary" type="submit">Add Member</button>
-//   </form>
-//
-//   {shareError && <div className="eg-error-banner" style={{marginBottom:8}}>{shareError}</div>}
-//
-//   {/* Member list */}
-//   <div className="share-sheet-members-label eg-orbitron">
-//     SQUAD ({members.length})
-//   </div>
-//   {isSharingLoading && <LoadingState rows={2} />}
-//   {!isSharingLoading && members.map(m => (
-//     <div key={m.user_id} className="member-row">
-//       <div>
-//         <div style={{fontWeight:600,color:'var(--text-primary)',fontSize:'var(--text-base)'}}>
-//           {m.display_name}
-//         </div>
-//         <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>{m.email}</div>
-//       </div>
-//       <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
-//         <span className={m.is_owner ? 'eg-chip-purple' : 'eg-chip-cyan'} style={{fontSize:11}}>
-//           {m.is_owner ? 'Owner' : 'Member'}
-//         </span>
-//         {m.is_pending_sync && <span className="eg-chip-queued" style={{fontSize:11}}>Queued</span>}
-//         {!m.is_owner && (
-//           <button className="eg-btn-danger" style={{fontSize:13,padding:'6px 12px'}}
-//             onClick={() => void onRevoke(m.user_id)}>
-//             Revoke
-//           </button>
-//         )}
-//       </div>
-//     </div>
-//   ))}
-// </BottomSheet>
-//
-// CSS:
-//   .share-sheet-members-label {
-//     font-size: var(--text-xs); letter-spacing: 0.1em; color: var(--text-secondary);
-//     padding: 8px 0 6px; border-top: 1px solid rgba(255,255,255,0.06);
-//     margin-top: 8px;
-//   }
-```
-
-### ListDetailPage.jsx changes
-
-**State changes:**
-- Remove: `isSharingOpen` (bool)
-- Add:
-  ```jsx
-  const [showOptions, setShowOptions] = useState(false);
-  const [showRename, setShowRename]   = useState(false);
-  const [showShare, setShowShare]     = useState(false);
-  ```
-
-**Rename handler** (new, uses existing `renameList` API):
-```jsx
-async function handleRename(newName) {
-  try {
-    setEntryError('');
-    const result = await renameList(id, token, { name: newName });
-    setList(currentList => ({
-      ...currentList,
-      name: result?.queued ? newName : result.list?.name ?? newName
-    }));
-  } catch (err) {
-    setEntryError(err.message);
-  }
-}
-```
-Import `renameList` from `'../api/lists'`.
-
-**TopBar actions** (replace existing share action):
-```jsx
-actions={list?.is_owner ? [{
-  ariaLabel: 'List options',
-  icon: <Icon name="moreVertical" size={20} color="var(--text-secondary)" />,
-  onClick: () => setShowOptions(true)
-}] : []}
-```
-
-**Remove from JSX:**
-- The entire inline `{list?.is_owner && isSharingOpen ? (<SharingPanel ... />) : null}` block
-- The `SharingPanel` function definition at the bottom of the file
-
-**Add to JSX (after `<AddItemSheet>`)**:
-```jsx
-<ListOptionsSheet
-  open={showOptions}
-  onClose={() => setShowOptions(false)}
-  isOwner={list?.is_owner ?? false}
-  onRenameSelect={() => setShowRename(true)}
-  onShareSelect={() => setShowShare(true)}
-/>
-<RenameListSheet
-  open={showRename}
-  onClose={() => setShowRename(false)}
-  currentName={list?.name ?? ''}
-  onRename={handleRename}
-/>
-<ShareListSheet
-  open={showShare}
-  onClose={() => setShowShare(false)}
-  members={members}
-  shareEmail={shareEmail}
-  shareError={shareError}
-  isSharingLoading={isSharingLoading}
-  onEmailChange={setShareEmail}
-  onShareSubmit={handleShareSubmit}
-  onRevoke={handleRevokeMember}
-/>
-```
-
-**Imports to add:**
-```jsx
-import { renameList } from '../api/lists';
-import ListOptionsSheet from '../components/ListOptionsSheet';
-import RenameListSheet from '../components/RenameListSheet';
-import ShareListSheet from '../components/ShareListSheet';
-```
-
-### New CSS classes (index.css)
-```css
-/* Already covered by existing .member-row class from T-005.
-   New additions: */
-
-.list-option-row {
-  display: flex; align-items: center; gap: 14px;
-  width: 100%; background: none; border: none; border-radius: var(--radius-md);
-  padding: 14px 12px; cursor: pointer; text-align: left;
-  transition: background var(--duration-micro);
-}
-.list-option-row:hover { background: rgba(139,43,226,0.1) }
-.list-option-row + .list-option-row {
-  border-top: 1px solid rgba(255,255,255,0.05);
-}
-.list-option-icon {
-  width: 40px; height: 40px; border-radius: var(--radius-md);
-  display: grid; place-items: center; flex-shrink: 0;
-}
-.list-option-icon-edit  { background: rgba(139,43,226,0.15) }
-.list-option-icon-share { background: rgba(0,229,255,0.12) }
-.list-option-text { flex: 1; min-width: 0 }
-.list-option-label {
-  display: block; font-weight: 600; font-size: var(--text-base); color: var(--text-primary);
-}
-.list-option-desc {
-  display: block; font-size: var(--text-sm); color: var(--text-secondary); margin-top: 2px;
-}
-.share-sheet-members-label {
-  font-size: var(--text-xs); letter-spacing: 0.1em; color: var(--text-secondary);
-  padding: 8px 0 6px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: 8px;
-}
-```
-
-### Validation
-- `npm run lint`
-- `npm run build`
-- `npm test`
-
-### Commit message
-`feat(ui): replace list detail share button with options flyout and add rename`
-
----
-
-## T-008 — E2E Tests: Shopping List CRUD
-
-### Objective
-Add four Playwright end-to-end tests covering the core shopping-list flows: create list, add item, delete item (swipe), and mark item as done. Also fix two existing `auth.spec.js` assertions that reference old overview copy removed in T-004.
-
-### Files to change / create
-
-| File | Action |
-|------|--------|
-| `e2e/lists.spec.js` | **NEW** — 4 shopping list E2E tests |
-| `e2e/auth.spec.js` | Fix 2 broken `getByText("No lists yet…")` assertions |
-
-### Context: available selectors (no component changes needed)
-
-| Element | Locator |
-|---------|---------|
-| FAB (overview + detail) | `getByRole("button", { name: "Add" })` — `aria-label="Add"` already set |
-| NewListSheet input | `getByLabel("New list")` — `<label htmlFor="new-list-sheet-name">New list</label>` |
-| NewListSheet submit | `getByRole("button", { name: "Create list" })` |
-| AddItemSheet input | `getByLabel("Add item")` — `<label htmlFor="add-item-sheet-text">Add item</label>` |
-| AddItemSheet submit | `getByRole("button", { name: "Add Item" })` |
-| Toggle-done button | `getByRole("button", { name: "Mark {text} done" })` — dynamic aria-label |
-| Toggle-open button | `getByRole("button", { name: "Mark {text} open" })` |
-| Entry row (normal) | `.entry-row` — also has `data-testid="entry-row-{id}"` |
-| Entry row (done) | `.entry-row.entry-row-done` |
-| Done text | `.entry-row-text-done` containing the item text |
-| Auth token key | `"endgame_grocery.auth_token"` in `localStorage` |
-
-### auth.spec.js fix
-
-Two tests check for the old combined overview copy string that no longer exists after T-004:
-
-```js
-// OLD — fails: EmptyState renders title and body in separate elements
-await expect(page.getByText("No lists yet. Create one to get started.")).toBeVisible();
-
-// NEW — matches the EmptyState title element
-await expect(page.getByText("No lists yet")).toBeVisible();
-```
-
-Both occurrences (in the "registers a new user" test and the "logs in an existing user" test) must be updated.
-
-### lists.spec.js — full implementation
-
-```js
-import { expect, test } from "@playwright/test";
-
-const STORAGE_KEY = "endgame_grocery.auth_token";
-const TEST_PASSWORD = "password123";
-
-function uniqueEmail(prefix) {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}@e2e.test`;
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Register a user via API, log in via API, inject the JWT into localStorage
- * and navigate to the overview. Returns the token for subsequent API calls.
- */
-async function setupLoggedInUser(page, request) {
-  const email = uniqueEmail("lists");
-
-  const regRes = await request.post("/api/auth/register", {
-    data: { display_name: "List Tester", email, password: TEST_PASSWORD }
-  });
-  expect(regRes.ok()).toBeTruthy();
-
-  const loginRes = await request.post("/api/auth/login", {
-    data: { email, password: TEST_PASSWORD }
-  });
-  expect(loginRes.ok()).toBeTruthy();
-  const { token } = await loginRes.json();
-
-  // Navigate to the app origin first, inject the token, then reload
-  // so the AuthProvider reads it and renders the protected overview.
-  await page.goto("/");
-  await page.evaluate(
-    ({ key, value }) => localStorage.setItem(key, value),
-    { key: STORAGE_KEY, value: token }
-  );
-  await page.goto("/");
-  await page.waitForURL("/");
-
-  return { token };
-}
-
-/** Create a shopping list via API. Returns the created list object. */
-async function createListByApi(request, token, name) {
-  const res = await request.post("/api/lists", {
-    data: { name },
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  expect(res.ok()).toBeTruthy();
-  return (await res.json()).list;
-}
-
-/** Create an entry on a list via API. Returns the created entry object. */
-async function createEntryByApi(request, token, listId, text) {
-  const res = await request.post(`/api/lists/${listId}/entries`, {
-    data: { text },
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  expect(res.ok()).toBeTruthy();
-  return (await res.json()).entry;
-}
-
-/**
- * Simulate a left swipe on the entry row containing `entryText` by dispatching
- * synthetic TouchEvents. The swipe distance (95 px) exceeds the 80 px delete
- * threshold in EntryRow's handleTouchEnd.
- */
-async function swipeEntryLeft(page, entryText) {
-  const row = page.locator(".entry-row").filter({ hasText: entryText });
-  const box = await row.boundingBox();
-
-  await row.evaluate(
-    (el, { sx, ex, y }) => {
-      const makeTouch = (x) =>
-        new Touch({
-          identifier: 1,
-          target: el,
-          clientX: x,
-          clientY: y,
-          radiusX: 1,
-          radiusY: 1,
-          rotationAngle: 0,
-          force: 1
-        });
-
-      el.dispatchEvent(
-        new TouchEvent("touchstart", {
-          bubbles: true,
-          cancelable: true,
-          touches: [makeTouch(sx)],
-          changedTouches: [makeTouch(sx)]
-        })
-      );
-      el.dispatchEvent(
-        new TouchEvent("touchmove", {
-          bubbles: true,
-          cancelable: true,
-          touches: [makeTouch(ex)],
-          changedTouches: [makeTouch(ex)]
-        })
-      );
-      el.dispatchEvent(
-        new TouchEvent("touchend", {
-          bubbles: true,
-          cancelable: true,
-          touches: [],
-          changedTouches: [makeTouch(ex)]
-        })
-      );
-    },
-    {
-      sx: box.x + box.width - 20,  // start near right edge
-      ex: box.x + box.width - 115, // end 95 px to the left (> 80 px threshold)
-      y: box.y + box.height / 2
-    }
-  );
-}
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
-test.describe("shopping lists", () => {
-
-  test("creates a new shopping list", async ({ page, request }) => {
-    await setupLoggedInUser(page, request);
-
-    const listName = `Mission ${Date.now()}`;
-
-    // Open NewListSheet via FAB
-    await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByText("New List")).toBeVisible();
-
-    // Fill name and submit
-    await page.getByLabel("New list").fill(listName);
-    await page.getByRole("button", { name: "Create list" }).click();
-
-    // List card with the new name appears on the overview
-    await expect(page.getByText(listName)).toBeVisible();
-  });
-
-  test("adds an item to a shopping list", async ({ page, request }) => {
-    const { token } = await setupLoggedInUser(page, request);
-    const list = await createListByApi(request, token, "Avengers Pantry");
-
-    await page.goto(`/lists/${list.id}`);
-
-    const itemText = `Mjolnir ${Date.now()}`;
-
-    // Open AddItemSheet via FAB
-    await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByText("Add Item")).toBeVisible();
-
-    await page.getByLabel("Add item").fill(itemText);
-    await page.getByRole("button", { name: "Add Item" }).click();
-
-    // Entry row with the item text appears
-    await expect(page.getByText(itemText)).toBeVisible();
-  });
-
-  test("deletes an item from a shopping list via swipe", async ({ page, request }) => {
-    const { token } = await setupLoggedInUser(page, request);
-    const list = await createListByApi(request, token, "Quantum Realm Groceries");
-    const itemText = `Pym Particles ${Date.now()}`;
-    await createEntryByApi(request, token, list.id, itemText);
-
-    await page.goto(`/lists/${list.id}`);
-
-    // Entry is visible before deletion
-    await expect(page.getByText(itemText)).toBeVisible();
-
-    // Swipe left past the 80 px threshold to trigger deletion
-    await swipeEntryLeft(page, itemText);
-
-    // Entry is no longer rendered
-    await expect(page.getByText(itemText)).not.toBeVisible();
-  });
-
-  test("marks an item as done in a shopping list", async ({ page, request }) => {
-    const { token } = await setupLoggedInUser(page, request);
-    const list = await createListByApi(request, token, "Endgame Checklist");
-    const itemText = `Infinity Stone ${Date.now()}`;
-    await createEntryByApi(request, token, list.id, itemText);
-
-    await page.goto(`/lists/${list.id}`);
-
-    // Toggle button starts with "Mark … done" label (item is open)
-    const toggleBtn = page.getByRole("button", { name: `Mark ${itemText} done` });
-    await expect(toggleBtn).toBeVisible();
-
-    await toggleBtn.click();
-
-    // Label flips to "open" → item is in done state
-    await expect(
-      page.getByRole("button", { name: `Mark ${itemText} open` })
-    ).toBeVisible();
-
-    // Text has the done (strikethrough) class applied
-    await expect(
-      page.locator(".entry-row-text-done", { hasText: itemText })
-    ).toBeVisible();
-  });
-
-});
-```
-
-### Validation
-- `npm run e2e` — all 9 tests pass (5 existing auth + 4 new lists)
-
-### Commit message
-`test(e2e): add shopping list CRUD end-to-end tests`
-
----
-
-## Cross-cutting notes
-
-### OfflineBanner
-Update `frontend/src/components/OfflineBanner.jsx` to use `eg-offline-banner` and `eg-error-banner` CSS classes instead of the old light-theme variants. Logic unchanged.
-
-### app.test.jsx
-The smoke test renders `<App />`. After T-001 the `BottomNav` uses `useLocation`. Ensure test already wraps `<App />` in a `MemoryRouter` or that the existing test setup handles this. If the test fails due to router context, add a `MemoryRouter` wrapper in the test.
-
-### Existing light-theme CSS classes
-Old classes (`.button-primary`, `.button-secondary`, `.field`, `.pill`, etc.) in `index.css` may be left as non-conflicting stubs until all pages are fully migrated. They will be visually overridden once all pages switch to `eg-*` classes.
-
----
-
-## T-009 — Spacing-scale tokens & consistency fixes
-
-### Objective
-Introduce a formal 4-px-based spacing scale in `tokens.css` and fix eleven specific spacing inconsistencies found in the full-app audit. No layout changes — only padding, margin, gap, and border-radius corrections.
-
-Approach chosen: **Option B** — add spacing custom properties to `tokens.css` and update the specific properties in `index.css`. Tailwind was evaluated but rejected for this cycle due to migration cost across 20+ JSX files and complex neon gradient arbitrary-value requirements.
+## T-002 — Frontend: icon reference database + utility functions
+
+### What
+Create the bilingual (EN/DE) grocery icon catalogue and the pure-JS
+cosine-similarity helper. No React, no worker — just data and math that can be
+unit-tested in isolation.
 
 ### Files to change
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `frontend/src/styles/tokens.css` | Add `--space-*` scale |
-| `frontend/src/index.css` | Fix 11 spacing properties |
+| `frontend/src/data/iconDatabase.js` | **new** — array of `{ label, icon, tags[] }` objects (≥ 60 entries, EN+DE); exports `ICON_DB` and `EXACT_MATCH_MAP` (lower-cased label+tag → emoji) |
+| `frontend/src/utils/cosineSimilarity.js` | **new** — `cosineSimilarity(vecA, vecB): number` (pure function, no deps) |
+| `frontend/src/utils/cosineSimilarity.test.js` | **new** — unit tests: identical vectors → 1.0; orthogonal → 0.0; known partial overlap |
 
-### tokens.css — spacing scale to append inside `:root`
+### Icon database categories (≥ 60 entries)
+Cover at minimum: dairy (Milch/milk, Käse/cheese, Butter, Joghurt/yoghurt, …),
+produce (Apfel/apple, Banane/banana, Tomate/tomato, Karotte/carrot, …),
+bakery (Brot/bread, Brötchen/roll, …), meat (Hähnchen/chicken, Rind/beef, …),
+beverages (Wasser/water, Saft/juice, Bier/beer, Kaffee/coffee, …),
+frozen (Eis/ice cream, …), snacks (Chips, Schokolade/chocolate, …),
+household (Toilettenpapier/toilet paper, Waschmittel/detergent, …),
+condiments (Salz/salt, Pfeffer/pepper, Öl/oil, …).
 
-```css
-  /* Spacing scale (4px base grid) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-12: 48px;
-```
-
-### index.css — 11 targeted fixes
-
-| Selector | Property | Old value | New value | Rationale |
-|----------|----------|-----------|-----------|-----------|
-| `.loading-state` | `padding` | `16px` | `0` | LoadingState is already centered via flex parent; padding creates asymmetric gap |
-| `.bottom-sheet` | `padding` | `20px 20px 48px` | `var(--space-5) var(--space-4) var(--space-12)` | Align horizontal padding to 16px grid; 48px bottom keeps FAB clearance |
-| `.list-card-name` | `margin-bottom` | `10px` | `var(--space-2)` | 8px matches 4px grid |
-| `.member-row` | `padding` | `10px 0` | `var(--space-3) 0` | 12px matches 4px grid |
-| `.list-option-row` | `padding` | `14px 12px` | `var(--space-3)` | Uniform 12px all sides for touch target |
-| `.overview-toggle` | `padding` | `0 16px 14px` | `0 var(--space-4) var(--space-3)` | Bottom drops to 12px grid value |
-| `.share-sheet-members-label` | `padding` | `8px 0 6px` | `var(--space-2) 0` | Symmetric 8px top/bottom |
-| `.entry-row-edit-actions` | `margin-top` | `4px` | `0` | Parent `.entry-row-edit` already has `gap: 12px`; the extra 4px pushes total to 16px inconsistently |
-| `.auth-logo` | `border-radius` | `10px` | `var(--radius-md)` | Use token instead of magic number |
-| `.overview-logo` | `border-radius` | `10px` | `var(--radius-md)` | Use token instead of magic number |
-| `.field, .eg-field` | `gap` | `0.4rem` | `6px` | Explicit pixel value on 4px-adjacent grid |
-
-### Validation
-- `npm run lint` — passes
-- `npm run build` — passes
-- `npm test` — passes (spacing fixes are CSS-only, no test assertions change)
-
-### Commit message
-`fix(ui): add spacing-scale tokens and fix spacing inconsistencies`
+### Acceptance criteria
+- `EXACT_MATCH_MAP` returns the correct emoji for known EN and DE terms.
+- `cosineSimilarity` test suite passes.
+- No lint errors.
 
 ---
 
-## T-010 — List detail section spacing fixes
+## T-003 — Frontend: transformers.js worker + `useIconSuggestion` hook + eager init
 
-### Objective
-Fix two visual spacing gaps on the list detail page reported after T-009:
-1. No gap between the Open Items card and the Done card.
-2. No internal spacing between the "DONE" collapse header and the first entry row inside that card.
+### What
+Wire up `@xenova/transformers` in a dedicated Web Worker. Expose the matching
+logic through a React hook. Start the worker eagerly on app boot so the model
+is warm before the first user interaction.
 
-No layout restructuring — two targeted CSS additions in `index.css`.
+### Package change
+Install in the frontend workspace:
+```
+npm install @xenova/transformers --workspace @endgame-grocery/frontend
+```
 
 ### Files to change
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `frontend/src/index.css` | Add 2 CSS rules |
+| `frontend/vite.config.js` | Add `optimizeDeps: { exclude: ['@xenova/transformers'] }` so Vite does not bundle the WASM module |
+| `frontend/src/workers/iconWorker.js` | **new** — Web Worker module: imports `pipeline` from `@xenova/transformers`; maintains a singleton `pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true })`; pre-computes reference embeddings on first `init` message; handles `{ type: 'match', text }` messages and posts back `{ icon, score }` |
+| `frontend/src/hooks/useIconSuggestion.js` | **new** — React hook; accepts `inputText: string`; fast path: exact/prefix lookup via `EXACT_MATCH_MAP` (synchronous, no worker); slow path: posts to worker, awaits embedding match; returns `{ icon: string \| null, loading: boolean }`; debounces worker calls by 300 ms |
+| `frontend/src/hooks/useIconSuggestion.test.js` | **new** — unit tests with mocked worker: exact match returns immediately; empty string → null; below-threshold score → null; above-threshold → icon |
+| `frontend/src/main.jsx` | Import `frontend/src/workers/iconWorker.js` via `new Worker(new URL('./workers/iconWorker.js', import.meta.url), { type: 'module' })` as a module-level side effect; store singleton reference in a shared module so the hook reuses it |
 
-### index.css — 2 targeted additions
+### Threshold env var
+Read threshold in the worker from `import.meta.env.VITE_ICON_SIMILARITY_THRESHOLD`
+with a default of `0.5`. Convert to `Number` before comparing.
 
-**Fix 1 — gap between section cards**
-
-The two `<section className="entry-section">` elements are direct siblings inside the JSX fragment. No margin separates them. Use the adjacent-sibling combinator so the rule only fires when a second section follows the first (not on a standalone section):
-
-```css
-.entry-section + .entry-section {
-  margin-top: var(--space-4); /* 16px between Open Items card and Done card */
-}
-```
-
-**Fix 2 — space between Done header button and first entry**
-
-`.entry-section-collapse` must remain `padding: 0` on all sides so that when the Done card is **collapsed** the section's own `padding: 1.25rem` produces symmetric spacing (20 px) on all four sides.
-
-Adding `padding-bottom` to the button directly causes asymmetry in the collapsed state (20 px top vs 32 px bottom) — do **not** use that approach.
-
-Instead, target the first entry row that immediately follows the collapse button with the adjacent-sibling combinator. This `margin-top` is only active when entries are actually rendered below the button (expanded state); it has no effect in the collapsed state:
-
-```css
-/* entry-section-collapse padding stays at 0 */
-
-.entry-section-collapse + .entry-row-wrapper {
-  margin-top: var(--space-3); /* 12px gap — only when entries are shown below the DONE header */
-}
-```
-
-⚠️ **Known rework target**: The initial implementation used `padding: 0 0 var(--space-3)` on `.entry-section-collapse`, which breaks the collapsed-state symmetry. The implementer must revert that padding to `padding: 0` and add the `.entry-section-collapse + .entry-row-wrapper` rule instead.
-
-### Validation
-- `npm run lint` — passes
-- `npm run build` — passes
-- `npm test` — passes (CSS-only, no test assertions change)
-
-### Commit message
-`fix(ui): add gap between list detail section cards and done header spacing`
+### Acceptance criteria
+- Worker initialises without blocking the main thread.
+- `useIconSuggestion('Milch')` resolves to `🥛` (exact path).
+- `useIconSuggestion('dairy product')` resolves to a plausible dairy icon via
+  embedding within the debounce window (integration; can be skipped in unit
+  tests where the worker is mocked).
+- `useIconSuggestion('')` returns `{ icon: null, loading: false }`.
+- Score below threshold → `icon: null`.
+- No lint errors.
 
 ---
 
-## T-011 — Fix Done card collapsed-state bottom padding asymmetry
+## T-004 — Frontend UI: `AddItemSheet` live preview + API/page wiring
 
-### Objective
-T-010 set `padding: 0 0 var(--space-3)` on `.entry-section-collapse`. In the **collapsed** state this adds 12 px below the button text on top of the section's own 20 px bottom padding, producing 32 px of space at the bottom vs 20 px at the top — a visible asymmetry. The fix moves the gap to a sibling selector so it only fires when entries are actually rendered.
+### What
+Show the resolved icon as a badge in the Add-Item form. Carry the icon through
+the `onAdd` callback, the API call, and the optimistic local state.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/AddItemSheet.jsx` | Use `useIconSuggestion(text)` hook; render the emoji badge (or spinner if `loading`) next to the input label; call `onAdd(trimmed, icon)` (second argument added) |
+| `frontend/src/api/entries.js` | `createEntry(listId, token, { text, icon }, options)` — pass `icon` in payload (already forwarded if present) |
+| `frontend/src/pages/ListDetailPage.jsx` | `addEntryByText(text, icon)` — accept icon param; include `icon` in `temporaryEntry` and `createEntry` call |
+
+### UI detail
+The badge appears below/beside the input as a large emoji (1.5 rem) inside a
+rounded pill. While `loading === true` show a small animated spinner in its
+place. If `icon === null` show nothing (no placeholder in the sheet, only
+fallback in EntryRow).
+
+### Acceptance criteria
+- Typing "Milch" in the sheet shows `🥛` within ≤ 300 ms (exact-match path).
+- Submitting the form passes the resolved icon to `createEntry`.
+- `onAdd` signature change is reflected in `ListDetailPage`.
+- No lint errors.
+
+---
+
+## T-005 — Frontend UI: `EntryRow` icon display
+
+### What
+Render the persisted `entry.icon` to the left of the item text. Fall back to
+`🛒` when the field is absent.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/EntryRow.jsx` | Add an `<span aria-hidden="true" className="entry-icon">{ entry.icon ?? '🛒' }</span>` before the `entry-row-copy` div; apply `entry-row-done` opacity to the icon span when status is done |
+| `frontend/src/components/entry-row.test.jsx` | Add a test: entry with `icon: '🥛'` renders the emoji; entry without `icon` renders `🛒` |
+
+### Acceptance criteria
+- EntryRow renders the correct emoji when `entry.icon` is set.
+- EntryRow renders `🛒` when `entry.icon` is null/undefined.
+- Swipe-delete test still passes.
+- No lint errors.
+
+---
+
+## T-006 — Configuration + documentation
+
+### What
+Expose the similarity threshold as a configurable env var and document it.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `.env.example` | Add `VITE_ICON_SIMILARITY_THRESHOLD=0.5` with a comment explaining the range (0–1) |
+| `Dockerfile` | Add `ARG VITE_ICON_SIMILARITY_THRESHOLD=0.5` before the `RUN npm run build --workspace frontend` step; set it as `ENV VITE_ICON_SIMILARITY_THRESHOLD=$VITE_ICON_SIMILARITY_THRESHOLD` so Vite picks it up |
+| `docker-compose.example.yml` | Add a `build` section to the `app` service with `args: [VITE_ICON_SIMILARITY_THRESHOLD=0.5]` and a comment noting this only applies when building locally, not when pulling a pre-built image |
+| `README.md` | Add `VITE_ICON_SIMILARITY_THRESHOLD` row to the env-var table; add a brief "Icon Assignment" subsection under a new "Features" heading (or existing equivalent) explaining the local-AI approach and the threshold |
+
+### Acceptance criteria
+- `.env.example` contains the new var.
+- Dockerfile builds without errors when the build arg is overridden.
+- README env table lists the new var with description and example.
+- No lint errors; `npm run build` succeeds.
+
+---
+
+---
+
+## T-007 — Frontend: install Tabler Icons + refactor icon database to icon names
+
+### Context
+T-001–T-005 are committed and use emoji strings in the `icon` field. T-007–T-010
+replace that approach with Tabler SVG icon components. The DB column type (`text`)
+stays the same; the stored value changes semantics from an emoji character to a
+Tabler component name (e.g. `"IconMilk"`). Existing DB rows with emoji values
+will fall back to `IconShoppingCart` at render time — no migration needed.
+
+### What
+Install `@tabler/icons-react`, create a curated icon registry (only the icons
+actually referenced in the database, ensuring tree-shaking), and update the
+icon database so `icon` fields hold Tabler component name strings.
+
+### Package change
+```
+npm install @tabler/icons-react --workspace @endgame-grocery/frontend
+```
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/data/iconRegistry.js` | **new** — named imports from `@tabler/icons-react` for all food-relevant icons (target: 50–80); exports `ICON_REGISTRY: Record<string, ComponentType>`, `ICON_REGISTRY_KEYS: string[]` (ordered list for the picker grid), and `FALLBACK_ICON` (`IconShoppingCart`) |
+| `frontend/src/data/iconDatabase.js` | Replace every `icon: "🥛"` (emoji) with the matching Tabler name string `icon: "IconMilk"`; update `EXACT_MATCH_MAP` accordingly; categories and tags stay bilingual |
+
+### Tabler icon name guidance — expanded set (~80–110 icons)
+The implementer must verify all names against the installed package; build will
+fail on a bad import. Broad categories and representative confirmed names
+(Tabler v3) to target:
+
+| Category | Icons |
+|----------|-------|
+| Dairy | `IconMilk`, `IconCheese`, `IconEgg`, `IconBottle` (cream) |
+| Produce | `IconApple`, `IconCarrot`, `IconBanana`, `IconGrapes`, `IconLemon`, `IconCherry`, `IconPepper`, `IconMushroom`, `IconPumpkin` |
+| Salad/herbs | `IconSalad`, `IconLeaf` |
+| Bakery | `IconBread`, `IconCroissant` |
+| Meat/Fish | `IconFish`, `IconMeat`, `IconBacon`, `IconDrumstick` |
+| Beverages | `IconCoffee`, `IconBeer`, `IconWine`, `IconGlass`, `IconDroplet`, `IconJuice` |
+| Prepared food | `IconPizza`, `IconSoup`, `IconBurger`, `IconHotdog`, `IconNoodles` |
+| Snacks/sweets | `IconCookie`, `IconCandy`, `IconIceCream2`, `IconCake`, `IconPopcorn`, `IconChocolate` |
+| Pantry/condiments | `IconSalt`, `IconJar`, `IconBottle` (oil) |
+| Frozen | `IconSnowflake` |
+| **Haushalt** | `IconSpray` (Reiniger), `IconToiletPaper`, `IconHanger` (Wäsche), `IconWashMachine` (Waschmittel), `IconBroom` (Reinigung), `IconTrash` (Müllbeutel), `IconBucket`, `IconBattery`, `IconBulb` (Glühbirnen), `IconToolsKitchen2` (Küchenhelfer), `IconSoap` |
+| **Drogerie** | `IconPill` (Medikamente), `IconFirstAidKit`, `IconBandage`, `IconDental` (Zahnpflege), `IconRazor` (Rasierer), `IconFlask` (Kosmetik/Pflege), `IconThermometer`, `IconScissors` (Nagelpflege), `IconSun` (Sonnenschutz), `IconBabyBottle` (Babypflege), `IconEye` (Kontaktlinsen) |
+| Fallback | `IconShoppingCart` |
+
+The `iconDatabase.js` bilingual entry list should be extended with EN/DE terms
+for the new household and drugstore entries so the semantic search covers them.
+For items without a precise match use the nearest thematic icon. All names are
+suggestions — verify against actual package exports before use.
+
+### Acceptance criteria
+- `npm install` succeeds; `@tabler/icons-react` appears in `frontend/package.json`.
+- `ICON_REGISTRY` contains ≥ 80 entries covering all categories above (food, household, drugstore).
+- `ICON_REGISTRY_KEYS` is a non-empty array of the same keys (used by the picker grid).
+- Every icon name in `ICON_DB` exists in `ICON_REGISTRY` (no dangling references).
+- `ICON_DB` includes bilingual EN/DE entries for household and drugstore items.
+- `EXACT_MATCH_MAP["milch"]` returns `"IconMilk"` and `EXACT_MATCH_MAP["toilettenpapier"]` returns `"IconToiletPaper"` (strings, not emojis).
+- `npm run build` passes (tree-shaking: only registered icons bundled).
+- `npm run lint` passes; `npm test` passes (cosineSimilarity tests still green).
+
+---
+
+## T-008 — Frontend: update worker + hook to return icon name and top matches
+
+### What
+The worker currently returns a single `{ icon, score }` (emoji). Update it to
+return `{ iconName, score, topMatches }` where `topMatches` is an array of the
+top-N icon names by similarity for the inline picker. Update the client and hook
+accordingly.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/workers/iconWorker.js` | `matchResult` message payload: rename `icon` → `iconName`; add `topMatches: Array<{ iconName: string, score: number }>` (top 5 entries with score ≥ 0.25, sorted descending); reference embeddings use Tabler icon names from updated `ICON_DB` |
+| `frontend/src/workers/iconWorkerClient.js` | `handleWorkerMessage`: destructure `iconName` and `topMatches` from `event.data`; `requestIconMatch` resolves with `{ iconName, score, topMatches }` |
+| `frontend/src/hooks/useIconSuggestion.js` | Return type changes to `{ iconName: string \| null, topMatches: string[], loading: boolean }`; exact-match fast path: `topMatches: []` (unambiguous — no picker needed); async path: `topMatches` from worker result; rename internal `icon` state to `iconName` |
+| `frontend/src/hooks/useIconSuggestion.test.js` | Update all assertions: `icon` → `iconName`; add case asserting `topMatches` is an array; mock worker resolves with `{ iconName, score, topMatches }` |
+
+### Acceptance criteria
+- `useIconSuggestion("milch")` returns `{ iconName: "IconMilk", topMatches: [], loading: false }`.
+- `useIconSuggestion("")` returns `{ iconName: null, topMatches: [], loading: false }`.
+- Async path returns `topMatches` with at most 5 entries, each a string.
+- Below-threshold score → `iconName: null`, `topMatches: []`.
+- Hook unit tests pass; lint clean.
+
+---
+
+## T-011 — Frontend: `IconPickerSheet` component (shared full-catalogue picker)
+
+### What
+A reusable bottom sheet that shows the complete icon registry as a scrollable
+grid. Used by both `AddItemSheet` ("Mehr anzeigen" button) and `EntryRow` edit
+mode. The currently-selected icon is highlighted; tapping any icon fires
+`onSelect(iconName)` and closes the sheet.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/IconPickerSheet.jsx` | **new** — `IconPickerSheet({ open, selectedIconName, onSelect, onClose })`; renders a `BottomSheet` with a search `<input>` (filters icon names case-insensitively against `ICON_REGISTRY_KEYS`) and a CSS grid of icon buttons; tapping a button calls `onSelect(iconName)` then `onClose()`; selected icon gets a highlight class |
+| `frontend/src/components/IconPickerSheet.test.jsx` | **new** — renders the sheet, asserts grid contains icons; search filters the list; tapping an icon fires `onSelect`; selected icon has highlight class |
+| `frontend/src/index.css` | Add `.icon-picker-grid` (CSS grid, auto-fill columns), `.icon-picker-btn` (square, borderless, hover/active state), `.icon-picker-btn--selected` (highlight), `.icon-picker-search` (full-width input) styles |
+
+### Acceptance criteria
+- All icons from `ICON_REGISTRY_KEYS` render in the grid when search is empty.
+- Typing in the search field hides non-matching icons.
+- Tapping an icon fires `onSelect` with the correct icon name.
+- Sheet closes after selection.
+- Selected icon has a visible highlight.
+- `IconPickerSheet` test suite passes; lint clean.
+
+---
+
+## T-009 — Frontend UI: inline icon picker in `AddItemSheet`
+
+### What
+Replace the single emoji-badge preview with a Tabler SVG icon preview plus an
+inline row of alternative icon suggestions (top matches). Add a "Mehr anzeigen"
+button that opens `IconPickerSheet` for manual full-catalogue selection.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/AddItemSheet.jsx` | Use `useIconSuggestion(text)` new return type; maintain `selectedIconName` local state (resets when `iconName` from hook changes); `showFullPicker` boolean state for `IconPickerSheet` open/close; render selected icon as large SVG preview via `ICON_REGISTRY`; render `topMatches` alternatives as small tappable buttons in a row; add "Mehr anzeigen" button (icon: `IconDotsCircleHorizontal` or similar) that sets `showFullPicker = true`; `<IconPickerSheet>` wired to `showFullPicker`, `selectedIconName`, and `onSelect`; `onAdd(trimmed, selectedIconName)` |
+| `frontend/src/components/AddItemSheet.test.jsx` | Update tests: SVG preview renders; alternatives row visible when `topMatches > 1`; tapping alternative updates selected; "Mehr anzeigen" button opens `IconPickerSheet`; selecting from full picker updates preview |
+| `frontend/src/index.css` | Add `.add-item-icon-picker` row styles (flex, gap) and `.add-item-icon-picker-btn` button styles (borderless, rounded, selected highlight) |
+
+### UI behaviour detail
+- **Loading**: spinner (unchanged).
+- **Exact match**: large SVG preview only; no alternatives row; "Mehr anzeigen" always visible.
+- **Semantic matches** (`topMatches.length > 0`): preview + alternatives row + "Mehr anzeigen".
+- **No match** (`iconName === null`): no preview, no alternatives row; "Mehr anzeigen" still visible so user can pick manually.
+- `selectedIconName` resets to `iconName` whenever the hook delivers a new best guess.
+- After `IconPickerSheet` selection, `selectedIconName` holds the manually chosen name (no longer tracks hook).
+
+### Acceptance criteria
+- Typing "Milch" shows `<IconMilk />` SVG preview.
+- Typing "Gemüse" shows SVG preview + alternatives row.
+- "Mehr anzeigen" opens `IconPickerSheet` in all states.
+- Selecting from `IconPickerSheet` updates the preview.
+- Submitting passes `selectedIconName` to `onAdd`.
+- Tests pass; lint clean.
+
+---
+
+## T-010 — Frontend UI: `EntryRow` SVG icon display + edit-mode icon picker
+
+### What
+Replace the emoji `<span>` in `EntryRow` with a Tabler SVG component. Extend
+the existing edit mode with an inline icon picker row (same visual style as
+`AddItemSheet`) and a "Mehr anzeigen" button that opens `IconPickerSheet`.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/EntryRow.jsx` | **View mode**: compute `const EntryIcon = ICON_REGISTRY[entry.icon] ?? FALLBACK_ICON`; replace emoji span with `<EntryIcon aria-hidden size={22} stroke={1.5} className="entry-icon" />`; apply done-state opacity. **Edit mode**: add `selectedIconName` state (initialised to `entry.icon ?? null`); render the current icon as a large preview button above/beside the text input; add a horizontal row of all `ICON_REGISTRY_KEYS` icons as small tappable buttons (scrollable, same `.add-item-icon-picker` CSS class); add "Mehr anzeigen" button opening `IconPickerSheet`; pass `selectedIconName` to `onEdit(trimmed, selectedIconName)` — **second argument added** |
+| `frontend/src/components/entry-row.test.jsx` | Update existing icon tests to check SVG presence; add tests for edit-mode: icon row renders, tapping an icon updates selection, "Mehr anzeigen" opens `IconPickerSheet` |
+| `frontend/src/pages/ListDetailPage.jsx` | `submitEditEntry(entryId, text, iconName)` — add `iconName` param; include in `updateEntry` payload |
+| `frontend/src/api/entries.js` | `updateEntry` payload already forwards arbitrary fields — confirm `icon` is passed through (no structural change expected, verify only) |
+
+### Acceptance criteria
+- View mode: EntryRow with `icon: "IconMilk"` renders `<svg>`; null/unknown → fallback SVG.
+- Edit mode: icon picker row visible with all registry icons.
+- Edit mode: tapping an icon updates the preview.
+- Edit mode: "Mehr anzeigen" opens `IconPickerSheet`.
+- Saving passes updated icon name to `onEdit`.
+- All existing entry-row tests pass; new edit-mode tests pass.
+- Lint clean; `npm run build` passes.
+
+---
+
+---
+
+## T-012 — Frontend: dual-library icon registry (Tabler primary + Lucide fallback) + `AddItemSheet` edit-mode + inline icon browser
+
+### Context
+T-009 and T-011 are committed. T-012 adds three concerns:
+1. **Dual-library registry**: Tabler Icons is primary; Lucide React fills gaps where
+   Tabler has no matching icon (e.g. `Banana`). A prop-normalization wrapper
+   eliminates the `stroke` vs. `strokeWidth` API difference between the two libraries.
+2. **"Mehr anzeigen" inline**: expands the icon browser within the same sheet
+   instead of opening `IconPickerSheet` as a second bottom sheet.
+3. **Edit mode**: `AddItemSheet` accepts `initialText`/`initialIconName`/`mode`
+   props so it can be reused for editing existing entries.
+
+### Package change
+```
+npm install lucide-react --workspace @endgame-grocery/frontend
+```
+
+### Prop-normalization design
+Tabler icons use `stroke={number}` for stroke width; Lucide icons use
+`strokeWidth={number}`. To keep rendering code uniform, every Lucide icon stored
+in `ICON_REGISTRY` is wrapped at registration time:
+
+```js
+// frontend/src/data/iconRegistry.js
+function fromLucide(LucideIcon) {
+  return function NormalizedIcon({ stroke, strokeWidth, ...rest }) {
+    return <LucideIcon strokeWidth={stroke ?? strokeWidth ?? 1.5} {...rest} />;
+  };
+}
+// Usage:
+import { Banana } from 'lucide-react';
+const registry = {
+  // Tabler (no wrapper needed — already accept `stroke`):
+  IconMilk,
+  // Lucide (wrapped):
+  Banana: fromLucide(Banana),
+};
+```
+
+All callers render icons with `<Icon size={22} stroke={1.5} />` regardless of
+source library.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/data/iconRegistry.js` | Install-and-replace: (1) add `lucide-react` imports for icons where Tabler has no equivalent; (2) add `fromLucide()` wrapper factory (see above); (3) wrap every Lucide import with `fromLucide`; (4) merge Tabler and Lucide entries into one `ICON_REGISTRY` object; (5) update `ICON_REGISTRY_KEYS`; (6) fix any dangling Tabler imports that do not exist in the installed package (banana, etc.) |
+| `frontend/src/data/iconDatabase.js` | Fix banana entry: set `icon` to whichever name is used in the updated registry (`"IconBanana"` if Tabler has it, or `"Banana"` from Lucide if not); add or fix any other entries whose icon name has no registry match |
+
+Lucide icons to add (representative — implementer verifies availability):
+
+| Gap | Lucide icon name |
+|-----|-----------------|
+| Banana | `Banana` |
+| Croissant | `Croissant` (if not in Tabler) |
+| Sandwich | `Sandwich` |
+| Milk bottle | `MilkOff` / `Milk` (if Tabler `IconMilk` insufficient) |
+| Nut/Peanut | `Nut` |
+| Citrus/Orange | `Citrus` |
+| Leaf/herb | `Leaf` (if Tabler `IconLeaf` missing) |
+| Cherry | `Cherry` (if Tabler `IconCherry` missing) |
+| Grape | `Grape` (if Tabler `IconGrapes` missing) |
+| Beef | `Beef` |
+| Egg | `Egg` (if Tabler `IconEgg` missing) |
+| Pill | `Pill` (if Tabler `IconPill` missing) |
+| Scissors | `Scissors` (if Tabler `IconScissors` missing) |
+| Trash | `Trash2` (if Tabler `IconTrash` missing) |
+
+The implementer checks each Tabler name first; only use the Lucide alternative if the Tabler name cannot be imported without a build error.
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/AddItemSheet.jsx` | Add props: `initialText` (default `""`), `initialIconName` (default `null`), `mode` (`'add'` \| `'edit'`, default `'add'`); title = "Add Item" / "Edit Item", submit button = "Add Item" / "Save Item" based on `mode`; initialise `text` and `selectedIconName` from `initialText`/`initialIconName` on open; add `showIconBrowser` boolean state; when `false` render normal form (input + suggestions row + "Mehr anzeigen" button); when `true` render inline icon browser: search `<input>` + scrollable grid of all `ICON_REGISTRY_KEYS` icons filtered case-insensitively by icon name, "Zurück" button returns to form; selected icon highlighted; tapping a grid icon sets `selectedIconName` and collapses browser; remove `<IconPickerSheet>` import and usage |
+| `frontend/src/components/AddItemSheet.test.jsx` | Update tests: edit mode pre-fills text and icon; "Mehr anzeigen" expands inline browser (no second sheet); search filters icons; selecting from browser updates preview and collapses browser; add mode still works; submit passes correct icon |
+| `frontend/src/index.css` | Add `.add-item-icon-browser` section styles (max-height, overflow-y: auto, smooth transition); `.add-item-icon-browser-grid` (CSS grid, auto-fill small columns); `.add-item-icon-browser-btn` (square, borderless, selected highlight) |
+
+### UI behaviour detail
+- **Icon browser collapsed** (default): input + top-matches row + "Mehr anzeigen" button visible.
+- **Icon browser expanded**: search input + scrollable icon grid (Tabler + Lucide entries combined); "Zurück" collapses back without losing `selectedIconName`; sheet stays open.
+- On sheet close or submit, `showIconBrowser` resets to `false`.
+
+### Acceptance criteria
+- `lucide-react` appears in `frontend/package.json`; `npm run build` passes with both libraries tree-shaken.
+- Typing "Banane" or "banana" shows a banana icon (not the fallback cart).
+- All icons in `ICON_REGISTRY` render with a consistent `stroke` prop — no prop-mismatch warnings in the console.
+- `mode="add"` (default) behaves identically to previous T-009 behaviour except "Mehr anzeigen" expands inline.
+- `mode="edit"` with `initialText="Milch"` + `initialIconName="IconMilk"` pre-fills input and shows `<IconMilk />` immediately.
+- Tapping "Mehr anzeigen" reveals inline icon grid; no second bottom sheet opens.
+- Typing in the icon search narrows the grid.
+- Tapping a grid icon updates the preview and collapses the browser.
+- Submit passes `selectedIconName` via `onAdd`.
+- `AddItemSheet` test suite passes; lint clean; no `IconPickerSheet` import.
+
+---
+
+## T-013 — Frontend: `EntryRow` inline-edit removal + edit-via-sheet wiring + `IconPickerSheet` deletion
+
+### Context
+T-010 added an inline edit form with icon picker to `EntryRow`. That form is
+now replaced: the edit button opens the refactored `AddItemSheet` (in edit
+mode) managed by `ListDetailPage`. `IconPickerSheet` is no longer used anywhere
+and must be deleted.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/EntryRow.jsx` | **Remove** all inline-edit state and JSX (`editMode`, `editText`, `cancelEdit`, `submitEdit`, inline form, `onKeyDown` handlers, icon picker row, "Mehr anzeigen" in edit mode); edit button `onClick` calls `onEdit()` with **no arguments** (signals intent to edit — `ListDetailPage` handles the rest); view-mode SVG icon rendering from T-010 stays unchanged |
+| `frontend/src/components/entry-row.test.jsx` | Remove all inline-edit tests; keep view-mode SVG icon tests and swipe-delete test; add test: tapping edit button calls `onEdit` |
+| `frontend/src/pages/ListDetailPage.jsx` | Add `editingEntry` state (null \| entry object); wire `<EntryRow onEdit={() => setEditingEntry(entry)} />`; render a second `<AddItemSheet mode="edit" initialText={editingEntry?.text ?? ""} initialIconName={editingEntry?.icon ?? null} open={!!editingEntry} onAdd={(text, icon) => { void submitEditEntry(editingEntry.id, text, icon); setEditingEntry(null); }} onClose={() => setEditingEntry(null)} />`; `submitEditEntry(entryId, text, iconName)` signature unchanged from T-010 |
+| `frontend/src/components/IconPickerSheet.jsx` | **Delete** |
+| `frontend/src/components/IconPickerSheet.test.jsx` | **Delete** |
+
+### Acceptance criteria
+- `EntryRow` has no inline edit form; the component is simpler.
+- Tapping the edit button on a list item opens `AddItemSheet` in edit mode pre-filled with the item's text and icon.
+- Submitting the edit sheet calls `updateEntry` with updated text and icon.
+- Closing the edit sheet without submitting does not change the entry.
+- `IconPickerSheet.jsx` and `IconPickerSheet.test.jsx` no longer exist in the repo.
+- All entry-row tests pass; `npm test` passes; lint clean; `npm run build` passes.
+
+---
+
+---
+
+## T-014 — Frontend: "Mehr anzeigen" icon browser as inline accordion (no view-swap)
+
+### Context
+T-012 implemented "Mehr anzeigen" as a **view-swap**: the form hides when the
+icon browser opens, and a "Zurück" button swaps back. The intended UX is
+different: the icon browser should expand **below** the "Mehr anzeigen" button
+as an accordion — the form (input, suggestion row, button) stays fully visible
+above, and the browser section appears beneath it within the same scrollable
+sheet.
+
+### What
+Replace the toggle-view pattern with an accordion/expand-below pattern:
+- `showIconBrowser` state remains, but instead of hiding the form it controls
+  the visibility of a collapsible section below the button.
+- The "Mehr anzeigen" / "Weniger anzeigen" button label toggles; no separate
+  "Zurück" button is needed.
+- The BottomSheet body scrolls naturally when both form and browser are visible.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/AddItemSheet.jsx` | Remove the form/browser view-swap (`showIconBrowser ? <browser> : <form>`); render the full form always; render the icon browser section conditionally **below** the "Mehr anzeigen" button (`{showIconBrowser && <div className="add-item-icon-browser">…</div>}`); change button label: "Mehr anzeigen" when collapsed, "Weniger anzeigen" when expanded; remove "Zurück" button |
+| `frontend/src/components/AddItemSheet.test.jsx` | Update tests: form elements (input, submit button) remain in the DOM when the browser is expanded; "Mehr anzeigen" toggles to "Weniger anzeigen" after tap; browser section mounts below the form, not instead of it |
+| `frontend/src/index.css` | Adjust `.add-item-icon-browser` — remove any `position: absolute` / full-height override that was used for the view-swap; ensure the section flows naturally in the document and the sheet body is `overflow-y: auto` |
+
+### Acceptance criteria
+- Tapping "Mehr anzeigen" expands the icon browser **below** the button; the
+  input, suggestion row, and "Mehr/Weniger anzeigen" button remain visible above.
+- The sheet body scrolls when both form and full icon grid are visible.
+- The button label reads "Weniger anzeigen" while the browser is open.
+- Tapping "Weniger anzeigen" collapses the browser; form-only layout restored.
+- Selecting an icon from the grid still updates `selectedIconName` and collapses
+  the browser (label returns to "Mehr anzeigen").
+- `AddItemSheet` tests pass; lint clean; `npm run build` passes.
+
+---
+
+---
+
+## T-015 — Frontend: fix double scrollbar when icon browser is expanded
+
+### Context
+T-014 renders the icon browser as an accordion below the form within
+`.bottom-sheet` (which already has `overflow-y: auto`). When the browser
+expands, `.add-item-icon-browser-grid` also has `overflow-y: auto`, causing
+two simultaneous scrollbars. Only the icon grid should scroll; the outer sheet
+must not.
 
 ### Root cause
-```css
-/* current — wrong */
-.entry-section-collapse {
-  padding: 0 0 var(--space-3); /* 12px bottom always, even when collapsed */
-}
-```
+`.bottom-sheet { overflow-y: auto }` scrolls the whole sheet when content
+exceeds `max-height: min(80vh, 44rem)`. The grid inside also scrolls because it
+has its own `max-height` + `overflow-y: auto`. Result: two scrollbars.
+
+### Fix strategy — flex layout with `overflow: hidden` on the sheet
+When the icon browser is open, switch the sheet to a flex column that fills the
+available height. The form is `flex-shrink: 0`; the browser section grows to
+fill the rest with `flex: 1; overflow: hidden`; only the grid inside it scrolls.
+A modifier class `.bottom-sheet--browser-open` (toggled by `AddItemSheet` via
+a `className` prop on `BottomSheet`, or directly on the wrapping element) drives
+the layout change.
 
 ### Files to change
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `frontend/src/index.css` | 1 property change + 1 new rule |
+| `frontend/src/index.css` | Add `.bottom-sheet--browser-open { overflow: hidden; display: flex; flex-direction: column; }` — disables outer scroll and enables flex; add `.bottom-sheet--browser-open .add-item-form { flex-shrink: 0; }` — form takes only the space it needs; add `.bottom-sheet--browser-open .add-item-icon-browser { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }` — browser section fills remaining height; change `.bottom-sheet--browser-open .add-item-icon-browser-grid { flex: 1; max-height: none; overflow-y: auto; }` — grid is the sole scrolling element |
+| `frontend/src/components/AddItemSheet.jsx` | Pass `className` (or equivalent prop) to `BottomSheet` when `showIconBrowser` is `true` so the modifier class is applied: e.g. `<BottomSheet className={showIconBrowser ? "bottom-sheet--browser-open" : ""} …>` |
+| `frontend/src/components/ui/BottomSheet.jsx` | Accept and forward a `className` prop onto the `.bottom-sheet` `<div>` if not already supported |
+| `frontend/src/components/AddItemSheet.test.jsx` | Add test: when browser is expanded, the sheet element has the modifier class; confirm only one scrollable container (the grid) is present |
 
-### index.css — exact changes
-
-**Step 1** — revert the padding on the collapse button to `0`:
-```css
-.entry-section-collapse {
-  /* all existing properties unchanged except padding */
-  padding: 0;
-}
-```
-
-**Step 2** — add adjacent-sibling rule directly after `.entry-section-collapse .eg-chip-success { … }`:
-```css
-.entry-section-collapse + .entry-row-wrapper {
-  margin-top: var(--space-3); /* 12px — only when entries are rendered below the DONE header */
-}
-```
-
-Result:
-- **Collapsed**: section padding (20 px) is the sole spacing on all four sides → symmetric ✓
-- **Expanded**: first `.entry-row-wrapper` gets 12 px top margin from the button → correct gap ✓
-
-### Validation
-- `npm run lint` — passes
-- `npm run build` — passes
-- `npm test` — passes (CSS-only)
-
-### Commit message
-`fix(ui): restore symmetric Done card padding by using sibling margin instead of button padding`
+### Acceptance criteria
+- Opening the icon browser shows **one** scrollbar (on the icon grid only).
+- The outer sheet does **not** display a scrollbar while the browser is open.
+- The form (input, suggestions, "Mehr/Weniger anzeigen" button) remains fully visible and non-scrolling above the grid.
+- Closing the browser restores normal sheet scroll behaviour.
+- `npm run lint` and `npm test` pass; `npm run build` succeeds.
 
 ---
 
-## T-012 — Fix Open Items card excess top spacing
+---
 
-### Objective
-The "OPEN ITEMS" label sits 36 px from the top border of the card instead of the expected ~20 px. Root cause: `.entry-section-header` has `padding: 16px 0 8px` — the 16 px top padding stacks on top of the section's own `padding: 1.25rem` (20 px), producing 36 px total.
+## T-016 — Frontend: fix `box-shadow` clipping on inputs when icon browser is open
 
-### Files to change
+### Context
+T-015 fixed the double-scrollbar by adding `overflow: hidden` to
+`.bottom-sheet--browser-open .add-item-form` and
+`.bottom-sheet--browser-open .add-item-icon-browser`.
+Both containers wrap `<input>` elements whose `box-shadow` (focus ring +
+glow) extends 3 px outside the element. `overflow: hidden` clips anything
+beyond the container's border box, so the shadow is cut off left and right.
 
-| File | Action |
-|------|--------|
-| `frontend/src/index.css` | 1 property change |
-
-### index.css — exact change
-
-Remove the top padding from `.entry-section-header`. The section's own padding already provides the correct outer gap. Keep `8px` below the header to separate it from the first entry row:
+### Root cause (confirmed from CSS)
 
 ```css
-/* before */
-.entry-section-header {
-  padding: 16px 0 8px;
+/* T-015 additions that clip shadows: */
+.bottom-sheet--browser-open .add-item-form {
+  overflow: hidden;   /* ← clips .eg-input focus ring */
 }
-
-/* after */
-.entry-section-header {
-  padding: 0 0 var(--space-2); /* 8px below label, section padding handles top */
+.bottom-sheet--browser-open .add-item-icon-browser {
+  overflow: hidden;   /* ← clips search-input focus ring */
 }
 ```
 
-### Validation
-- `npm run lint` — passes
-- `npm run build` — passes
-- `npm test` — passes (CSS-only)
+Neither container needs `overflow: hidden` for layout correctness.
+The only element that must clip its content is the scrolling grid
+(`.add-item-icon-browser-grid { overflow-y: auto }`), which is unaffected.
 
-### Commit message
-`fix(ui): remove double top padding from Open Items card header`
+### Fix — remove `overflow: hidden` from intermediate containers
+
+```css
+/* Remove from form container */
+.bottom-sheet--browser-open .add-item-form {
+  /* overflow: hidden  ← DELETE this line */
+}
+
+/* Remove from browser section container */
+.bottom-sheet--browser-open .add-item-icon-browser {
+  /* overflow: hidden  ← DELETE this line */
+}
+```
+
+The flex layout (`flex: 1; min-height: 0`) already constrains height correctly.
+The grid's `flex: 1; overflow-y: auto; max-height: none` (from T-015) still
+provides the only scrollable area. No scrollbar regression expected.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/index.css` | Remove `overflow: hidden` from `.bottom-sheet--browser-open .add-item-form` and `.bottom-sheet--browser-open .add-item-icon-browser`; keep all other flex/min-height rules unchanged |
+
+No JSX changes required.
+
+### Acceptance criteria
+- Focusing the "Add Item" input shows the full cyan focus ring (`box-shadow: 0 0 0 3px …`) on all sides — no left/right clipping.
+- Focusing the icon-search input shows the full focus ring — no clipping.
+- The "Save Item" / "Add Item" primary button glow (`box-shadow: var(--glow-purple)`) is not clipped when the browser is open.
+- The icon grid still scrolls independently; the outer sheet still shows no scrollbar.
+- `npm run lint` passes; `npm test` passes; `npm run build` passes.
+
+---
+
+---
+
+## T-017 — Frontend: fix `cursor: wait` on disabled primary buttons
+
+### Context
+Reported as Fehler 1: hovering the "Add Item" submit button when the text
+input is empty shows a loading-spinner cursor instead of a not-allowed cursor.
+
+### Root cause
+`frontend/src/index.css` lines 244-247:
+```css
+.button-primary:disabled,
+.eg-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: wait;   /* ← wrong: shows loading spinner */
+}
+```
+`cursor: wait` is semantically for "the browser is busy". A disabled button
+should use `cursor: not-allowed`.
+
+### Fix
+Change `cursor: wait` to `cursor: not-allowed`.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/index.css` | `.button-primary:disabled, .eg-btn-primary:disabled { cursor: not-allowed; }` |
+
+### Acceptance criteria
+- Hovering the disabled "Add Item" button shows a `not-allowed` cursor (circle
+  with a diagonal line), not a loading spinner.
+- No other button or state is affected.
+- `npm run lint` passes; `npm test` passes; `npm run build` passes.
+
+---
+
+---
+
+## T-018 — Frontend: fix ONNX worker crash + add worker error recovery
+
+### Context
+Reported as Fehler 4 (ONNX `registerBackend` crash) and Fehler 2 (infinite
+loading spinner). Root cause: `@xenova/transformers` 2.x requires the Web
+Worker to be bundled as an **ES module**. Vite defaults to IIFE format for
+workers, which breaks ONNX Runtime Web's module initialization sequence,
+producing `TypeError: Cannot read properties of undefined (reading 'registerBackend')`.
+Consequence: all `requestIconMatch` promises never settle → `loading` stays
+`true` permanently in `useIconSuggestion`.
+
+### Fix — two-part
+
+**Part 1 — Vite config (root cause)**
+
+The `browser` entry of `onnxruntime-web` (`ort-web.min.js`) is a UMD bundle
+that depends on `onnxruntime-common` as an *external*. In a browser/Worker
+module context there is no `require` and no `self.ort` global, so the UMD
+factory falls back to `factory(self.ort)` where `self.ort` is `undefined` →
+`registerBackend` crash. The fix is to alias `onnxruntime-web` to its
+self-contained build `ort.min.js`, which bundles `onnxruntime-common` inline and
+calls `factory()` with no external arguments.
+
+In `frontend/vite.config.js`:
+1. Add `resolve.alias: { 'onnxruntime-web': 'onnxruntime-web/dist/ort.min.js' }`
+   — redirects all imports to the self-contained bundle.
+2. Add `worker: { format: 'es' }` — forces Vite to bundle the worker as ESM
+   for production builds.
+3. Add `'onnxruntime-web'` to `optimizeDeps.exclude` alongside
+   `'@xenova/transformers'` — prevents Vite's pre-bundler from reprocessing
+   the aliased file in dev mode.
+
+```js
+// vite.config.js additions:
+resolve: {
+  alias: { 'onnxruntime-web': 'onnxruntime-web/dist/ort.min.js' },
+},
+optimizeDeps: {
+  exclude: ['@xenova/transformers', 'onnxruntime-web'],
+},
+worker: {
+  format: 'es',
+},
+```
+
+**Part 2 — Worker error recovery (defensive)**
+
+In `frontend/src/workers/iconWorkerClient.js`, after `rejectPendingRequests()`
+in `handleWorkerError`, reset `iconWorker = null`. This allows `getIconWorker()`
+to create a fresh worker instance on the next call instead of posting messages
+to a dead worker.
+
+```js
+function handleWorkerError() {
+  rejectPendingRequests(new Error("Icon worker failed."));
+  iconWorker = null;  // ← allow recreation on next getIconWorker() call
+}
+```
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/vite.config.js` | Add `worker: { format: 'es' }` top-level key; add `'onnxruntime-web'` to `optimizeDeps.exclude` array |
+| `frontend/src/workers/iconWorkerClient.js` | In `handleWorkerError`: add `iconWorker = null` after `rejectPendingRequests(...)` |
+
+### Acceptance criteria
+- No `ort-web` / `registerBackend` error in the browser JS console.
+- The icon suggestion spinner resolves (disappears) within ~1 s of typing for
+  terms with no exact match (async worker path completes successfully).
+- Opening the edit sheet for any entry no longer shows a permanent spinner.
+- If the worker were to crash after startup, `getIconWorker()` would recreate
+  it on the next call (verified by code review — no automated test needed).
+- `npm run lint` passes; `npm run build` passes; `npm test` passes.
+
+---
+
+## Implementation Order (final)
+
+```
+[done]  T-001 → T-002 → T-003 → T-004 → T-005
+[done]  T-007 → T-008 → T-011 → T-009 → T-010 → T-006
+[done]  T-012 → T-013 → T-014 → T-015
+[next]  T-016  (box-shadow clip: inputs + button — CSS only)
+        T-017  (cursor: wait → not-allowed — CSS only)
+        T-018  (ONNX worker crash + recovery — vite.config + iconWorkerClient)
+```
+
+Each task is independently committable. The implementer should run
+`npm run lint && npm run build && npm test` after every task.
+
+## Validation
+
+After all tasks are complete:
+- `npm run lint` — zero errors; no `IconPickerSheet` imports remain
+- `npm run build` — clean build; only registered Tabler icons bundled
+- `npm test` — all backend + frontend unit tests pass
+- Manual smoke:
+  - Add item: type "Milch" → `<IconMilk />` preview; tap "Mehr anzeigen" → inline grid expands; tap icon → preview updates; submit → row shows selected icon.
+  - Edit item: tap edit button on existing row → same sheet opens pre-filled; change text/icon; save → row updates.
+  - No second bottom sheet ever opens for icon selection.
