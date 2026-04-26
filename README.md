@@ -186,6 +186,8 @@ New and edited entries can be assigned icons locally in the browser without send
 
 `VITE_ICON_SIMILARITY_THRESHOLD` controls how strict that semantic fallback is. Lower values suggest icons more aggressively, while higher values require a closer match before the worker returns an automatic suggestion.
 
+The semantic matcher runs in an ES-module web worker so the ONNX runtime can initialise correctly in both development and production builds. If that worker crashes, the frontend recreates it on the next suggestion request instead of leaving the icon-loading spinner stuck indefinitely.
+
 ## AI Workflow
 
 This project uses the persistent planner/implementer/reviewer workflow defined in `AGENTS.md`.

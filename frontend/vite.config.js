@@ -5,7 +5,12 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   envDir: "..",
   optimizeDeps: {
-    exclude: ["@xenova/transformers"]
+    // Both packages ship their own worker/WASM loading path and must stay out of Vite pre-bundling.
+    exclude: ["@xenova/transformers", "onnxruntime-web"]
+  },
+  worker: {
+    // transformers.js relies on the worker bundle staying ESM so ONNX runtime can register its backend.
+    format: "es"
   },
   server: {
     proxy: {

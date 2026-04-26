@@ -774,3 +774,39 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+### T-018 — implement — 2026-04-26T15:54:43Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Forced the icon suggestion worker to build as ESM, excluded `onnxruntime-web` from Vite pre-bundling, added worker-client recovery that recreates a crashed worker on the next request, and documented the behavior. |
+| Files Changed | `frontend/vite.config.js`, `frontend/src/workers/iconWorkerClient.js`, `frontend/src/vite-config.test.js`, `frontend/src/workers/iconWorkerClient.test.js`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run test --workspace frontend -- src/vite-config.test.js src/workers/iconWorkerClient.test.js src/hooks/useIconSuggestion.test.js` (pass), `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | fix(frontend): recover icon suggestions after worker failures |
+| Next Role | review |
+
+---
+
+### T-018 — review — 2026-04-26T15:58:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed vite.config.js ESM worker config, iconWorkerClient crash-recovery changes, and 4 new test cases; all validations pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+### T-018 — commit_task — 2026-04-26T15:59:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Updated the task board to mark T-018 done and prepared the approved worker-recovery commit using the implementation handoff subject. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Commit | fix(frontend): recover icon suggestions after worker failures |
+| Next Role | none |
+
+---

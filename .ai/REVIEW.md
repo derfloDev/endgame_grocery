@@ -452,6 +452,47 @@ Reviewed: 2026-04-26
 
 ---
 
+## Task: T-018
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `frontend/src/workers/iconWorkerClient.js` line 62 — Guard changed from `=== undefined` to `== null`. This is strictly correct: `iconWorker` is initialised as `let iconWorker;` (value `undefined`) and set to `null` by `handleWorkerError`. Using `== null` covers both the initial `undefined` case and the post-crash `null` case in one check. No fix required.
+2. **nit** — `frontend/src/workers/iconWorkerClient.test.js` — The test imports `iconWorkerClient` with dynamic `await import(…)` inside each `it` block and relies on `vi.resetModules()` in `afterEach` to re-initialise module-level state (`iconWorker`, `nextRequestId`, `pendingRequests`) between tests. This is the correct pattern for testing modules with singleton state, and it works cleanly here. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/vite.config.js` — `optimizeDeps.exclude` array includes both `"@xenova/transformers"` and `"onnxruntime-web"`; `worker: { format: "es" }` present; explanatory comments added. ✅
+- Read `frontend/src/workers/iconWorkerClient.js` — `handleWorkerError` sets `iconWorker = null`; `getIconWorker` guard is `== null`; `createIconWorker` returns `null` when `Worker` is undefined (SSR-safe). ✅
+- Read `frontend/src/vite-config.test.js` — 2 tests: `optimizeDeps.exclude` includes both packages; `worker.format` equals `"es"`. Uses `// @vitest-environment node` to import the config directly. ✅
+- Read `frontend/src/workers/iconWorkerClient.test.js` — 2 tests: prime + `getIconWorker` smoke test; crash-rejection + worker recreation round-trip test. `MockWorker` class with static `instances` array and `dispatch` helper; `vi.stubGlobal("Worker", MockWorker)` + `vi.resetModules()` pattern is correct for singleton module isolation. ✅
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (`AuthContext.jsx`, unchanged). ✅
+- Ran `npm run test --workspace frontend -- src/vite-config.test.js src/workers/iconWorkerClient.test.js src/hooks/useIconSuggestion.test.js` — **9/9 pass** (2 vite-config + 2 iconWorkerClient + 5 useIconSuggestion). ✅
+- Ran `npm run build` — clean (1 upstream `onnxruntime-web` eval warning, unchanged); `iconWorker` chunk present in `dist/assets/`. ✅
+- Ran `npm test` — **44/44 frontend (8 test files, +2 from new test files) + 27/27 backend, all pass**. ✅
+
+##### Findings
+- `optimizeDeps.exclude` prevents Vite from pre-bundling ONNX packages, which ship their own WASM/worker loading path incompatible with esbuild. ✅
+- `worker: { format: "es" }` ensures the icon worker bundle is emitted as an ESM module, which is required for `@xenova/transformers` to register the ONNX runtime backend. Without this the `registerBackend` error occurs at runtime. ✅
+- Worker crash recovery path: `handleWorkerError` rejects all pending requests immediately, sets `iconWorker = null`, then the next `getIconWorker()` call rebuilds a fresh worker instance. Test confirms that after crash: (a) the in-flight promise rejects with `"Icon worker failed."`, (b) `getIconWorker()` returns a new distinct instance, (c) subsequent requests on the new worker resolve correctly. ✅
+- `nextRequestId` continues incrementing across the crash (id 0 → crash → id 1) — correct: IDs are process-global counters and the new worker handles the next batch independently. ✅
+- `primeIconWorker` eagerly calls `getIconWorker()` + posts `{ type: "init" }` to warm up the transformer pipeline before the user types. This prevents the spinner appearing on the first keystroke. ✅
+- Test coverage: vite-config contract (2), worker singleton lifecycle (2), hook debounce/exact-match/async paths (5) — all critical code paths covered. ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-012
 
 ### Review Round 1

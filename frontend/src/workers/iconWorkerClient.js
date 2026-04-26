@@ -39,6 +39,8 @@ function handleWorkerMessage(event) {
 
 function handleWorkerError() {
   rejectPendingRequests(new Error("Icon worker failed."));
+  // Drop the crashed instance so the next request can bootstrap a fresh worker.
+  iconWorker = null;
 }
 
 function createIconWorker() {
@@ -57,7 +59,7 @@ function createIconWorker() {
 }
 
 export function getIconWorker() {
-  if (iconWorker === undefined) {
+  if (iconWorker == null) {
     iconWorker = createIconWorker();
   }
 
