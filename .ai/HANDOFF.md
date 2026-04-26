@@ -574,3 +574,47 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-014 — plan — 2026-04-26T09:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-014: replace view-swap pattern in AddItemSheet with accordion/expand-below pattern — form stays fully visible, icon browser expands below "Mehr anzeigen" button; button label toggles "Mehr/Weniger anzeigen"; no "Zurück" button needed. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+### T-014 — implement — 2026-04-26T11:38:03Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Reworked `AddItemSheet` so "Mehr anzeigen" expands an inline accordion below the toggle instead of swapping away the form, while keeping icon selection and submit behavior intact. |
+| Files Changed | `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/index.css`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): expand the item-sheet icon browser inline |
+| Next Role | review |
+
+---
+### T-014 — review — 2026-04-26T11:42:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed accordion icon browser refactor: form always visible, browser expands below toggle button, label toggles Mehr/Weniger, "Zurück" absent, sheet scrolls; all acceptance criteria met. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+### T-014 — implement — 2026-04-26T11:42:02Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-014 inline accordion browser changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

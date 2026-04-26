@@ -480,19 +480,57 @@ and must be deleted.
 
 ---
 
+---
+
+## T-014 — Frontend: "Mehr anzeigen" icon browser as inline accordion (no view-swap)
+
+### Context
+T-012 implemented "Mehr anzeigen" as a **view-swap**: the form hides when the
+icon browser opens, and a "Zurück" button swaps back. The intended UX is
+different: the icon browser should expand **below** the "Mehr anzeigen" button
+as an accordion — the form (input, suggestion row, button) stays fully visible
+above, and the browser section appears beneath it within the same scrollable
+sheet.
+
+### What
+Replace the toggle-view pattern with an accordion/expand-below pattern:
+- `showIconBrowser` state remains, but instead of hiding the form it controls
+  the visibility of a collapsible section below the button.
+- The "Mehr anzeigen" / "Weniger anzeigen" button label toggles; no separate
+  "Zurück" button is needed.
+- The BottomSheet body scrolls naturally when both form and browser are visible.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/AddItemSheet.jsx` | Remove the form/browser view-swap (`showIconBrowser ? <browser> : <form>`); render the full form always; render the icon browser section conditionally **below** the "Mehr anzeigen" button (`{showIconBrowser && <div className="add-item-icon-browser">…</div>}`); change button label: "Mehr anzeigen" when collapsed, "Weniger anzeigen" when expanded; remove "Zurück" button |
+| `frontend/src/components/AddItemSheet.test.jsx` | Update tests: form elements (input, submit button) remain in the DOM when the browser is expanded; "Mehr anzeigen" toggles to "Weniger anzeigen" after tap; browser section mounts below the form, not instead of it |
+| `frontend/src/index.css` | Adjust `.add-item-icon-browser` — remove any `position: absolute` / full-height override that was used for the view-swap; ensure the section flows naturally in the document and the sheet body is `overflow-y: auto` |
+
+### Acceptance criteria
+- Tapping "Mehr anzeigen" expands the icon browser **below** the button; the
+  input, suggestion row, and "Mehr/Weniger anzeigen" button remain visible above.
+- The sheet body scrolls when both form and full icon grid are visible.
+- The button label reads "Weniger anzeigen" while the browser is open.
+- Tapping "Weniger anzeigen" collapses the browser; form-only layout restored.
+- Selecting an icon from the grid still updates `selectedIconName` and collapses
+  the browser (label returns to "Mehr anzeigen").
+- `AddItemSheet` tests pass; lint clean; `npm run build` passes.
+
+---
+
 ## Implementation Order (final)
 
 ```
 [done]  T-001 → T-002 → T-003 → T-004 → T-005
 [done]  T-007 → T-008 → T-011 → T-009 → T-010 → T-006
-[next]  T-012 → T-013
-          ↑        ↑
-      AddItemSheet  EntryRow cleanup
-      edit+inline   + delete IconPickerSheet
-      browser       + ListDetailPage wiring
+[done]  T-012 → T-013
+[next]  T-014
+          ↑
+      AddItemSheet
+      accordion fix
 ```
-
-T-012 must land before T-013 (which imports the refactored AddItemSheet).
 
 Each task is independently committable. The implementer should run
 `npm run lint && npm run build && npm test` after every task.

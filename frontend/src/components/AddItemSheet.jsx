@@ -32,16 +32,9 @@ export default function AddItemSheet({
   const sheetTitle = isEditMode ? "Edit Item" : "Add Item";
   const inputLabel = isEditMode ? "Edit item" : "Add item";
   const submitLabel = isEditMode ? "Save Item" : "Add Item";
+  const iconBrowserToggleLabel = showIconBrowser ? "Weniger anzeigen" : "Mehr anzeigen";
 
   useEffect(() => {
-    if (open) {
-      setText(initialText);
-      setSelectedIconName(initialIconName);
-      setShowIconBrowser(false);
-      setIconBrowserSearchText("");
-      return;
-    }
-
     setText(initialText);
     setSelectedIconName(initialIconName);
     setShowIconBrowser(false);
@@ -78,108 +71,108 @@ export default function AddItemSheet({
 
   return (
     <BottomSheet open={open} title={sheetTitle} onClose={onClose}>
-      {showIconBrowser ? (
-        <div className="add-item-icon-browser">
-          <label className="visually-hidden" htmlFor={iconSearchInputId}>
-            Search icons
-          </label>
+      <form className="add-item-form" onSubmit={handleSubmit}>
+        <div className="eg-field">
+          <label htmlFor={textInputId}>{inputLabel}</label>
           <input
-            id={iconSearchInputId}
-            autoFocus
+            id={textInputId}
+            autoFocus={!showIconBrowser}
             className="eg-input"
-            placeholder="Search icons"
-            value={iconBrowserSearchText}
-            onChange={(event) => setIconBrowserSearchText(event.target.value)}
+            placeholder="Add milk, lemons, bread..."
+            value={text}
+            onChange={(event) => setText(event.target.value)}
           />
+          {loading ? (
+            <div aria-live="polite" className="add-item-preview add-item-preview-loading">
+              <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
+            </div>
+          ) : PreviewIcon ? (
+            <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
+              <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
+            </div>
+          ) : null}
+        </div>
 
-          <div className="add-item-icon-browser-grid">
-            {visibleIconNames.map((browserIconName) => {
-              const BrowserIcon = ICON_REGISTRY[browserIconName];
+        {suggestedIconNames.length > 0 ? (
+          <div className="add-item-icon-picker" role="group" aria-label="Suggested icons">
+            {suggestedIconNames.map((suggestedIconName) => {
+              const SuggestedIcon = ICON_REGISTRY[suggestedIconName];
 
               return (
                 <button
-                  key={browserIconName}
-                  aria-label={`Browse ${browserIconName}`}
-                  className={`add-item-icon-browser-btn ${
-                    selectedIconName === browserIconName ? "add-item-icon-browser-btn--selected" : ""
+                  key={suggestedIconName}
+                  aria-label={`Choose ${suggestedIconName}`}
+                  className={`add-item-icon-picker-btn ${
+                    selectedIconName === suggestedIconName ? "add-item-icon-picker-btn--selected" : ""
                   }`}
                   type="button"
-                  onClick={() => {
-                    setSelectedIconName(browserIconName);
-                    setShowIconBrowser(false);
-                    setIconBrowserSearchText("");
-                  }}
+                  onClick={() => setSelectedIconName(suggestedIconName)}
                 >
-                  <BrowserIcon aria-hidden="true" size={22} stroke={1.6} />
-                  <span className="icon-picker-btn-label">{browserIconName}</span>
+                  <SuggestedIcon aria-hidden="true" size={20} stroke={1.6} />
                 </button>
               );
             })}
           </div>
+        ) : null}
 
-          <button className="eg-btn-ghost add-item-more-btn" type="button" onClick={() => setShowIconBrowser(false)}>
-            Zurück
-          </button>
-        </div>
-      ) : (
-        <form className="add-item-form" onSubmit={handleSubmit}>
-          <div className="eg-field">
-            <label htmlFor={textInputId}>{inputLabel}</label>
+        <button
+          className="eg-btn-ghost add-item-more-btn"
+          type="button"
+          onClick={() => setShowIconBrowser((currentValue) => !currentValue)}
+        >
+          {iconBrowserToggleLabel}
+        </button>
+
+        {showIconBrowser ? (
+          <div className="add-item-icon-browser">
+            <label className="visually-hidden" htmlFor={iconSearchInputId}>
+              Search icons
+            </label>
             <input
-              id={textInputId}
+              id={iconSearchInputId}
               autoFocus
               className="eg-input"
-              placeholder="Add milk, lemons, bread..."
-              value={text}
-              onChange={(event) => setText(event.target.value)}
+              placeholder="Search icons"
+              value={iconBrowserSearchText}
+              onChange={(event) => setIconBrowserSearchText(event.target.value)}
             />
-            {loading ? (
-              <div aria-live="polite" className="add-item-preview add-item-preview-loading">
-                <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
-              </div>
-            ) : PreviewIcon ? (
-              <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
-                <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
-              </div>
-            ) : null}
-          </div>
 
-          {suggestedIconNames.length > 0 ? (
-            <div className="add-item-icon-picker" role="group" aria-label="Suggested icons">
-              {suggestedIconNames.map((suggestedIconName) => {
-                const SuggestedIcon = ICON_REGISTRY[suggestedIconName];
+            <div className="add-item-icon-browser-grid">
+              {visibleIconNames.map((browserIconName) => {
+                const BrowserIcon = ICON_REGISTRY[browserIconName];
 
                 return (
                   <button
-                    key={suggestedIconName}
-                    aria-label={`Choose ${suggestedIconName}`}
-                    className={`add-item-icon-picker-btn ${
-                      selectedIconName === suggestedIconName ? "add-item-icon-picker-btn--selected" : ""
+                    key={browserIconName}
+                    aria-label={`Browse ${browserIconName}`}
+                    className={`add-item-icon-browser-btn ${
+                      selectedIconName === browserIconName ? "add-item-icon-browser-btn--selected" : ""
                     }`}
                     type="button"
-                    onClick={() => setSelectedIconName(suggestedIconName)}
+                    onClick={() => {
+                      setSelectedIconName(browserIconName);
+                      setShowIconBrowser(false);
+                      setIconBrowserSearchText("");
+                    }}
                   >
-                    <SuggestedIcon aria-hidden="true" size={20} stroke={1.6} />
+                    <BrowserIcon aria-hidden="true" size={22} stroke={1.6} />
+                    <span className="icon-picker-btn-label">{browserIconName}</span>
                   </button>
                 );
               })}
             </div>
-          ) : null}
-
-          <button className="eg-btn-ghost add-item-more-btn" type="button" onClick={() => setShowIconBrowser(true)}>
-            Mehr anzeigen
-          </button>
-
-          <div className="button-row">
-            <button className="eg-btn-ghost" type="button" onClick={onClose}>
-              Cancel
-            </button>
-            <button className="eg-btn-primary" disabled={!text.trim()} type="submit">
-              {submitLabel}
-            </button>
           </div>
-        </form>
-      )}
+        ) : null}
+
+        <div className="button-row">
+          <button className="eg-btn-ghost" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="eg-btn-primary" disabled={!text.trim()} type="submit">
+            {submitLabel}
+          </button>
+        </div>
+      </form>
     </BottomSheet>
   );
 }

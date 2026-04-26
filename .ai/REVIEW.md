@@ -573,3 +573,44 @@ Reviewed: 2026-04-26
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-014
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **nit** — `frontend/src/components/AddItemSheet.jsx` — `autoFocus` on the text input is now `autoFocus={!showIconBrowser}`. This prevents the text input reclaiming focus when the browser section is open, which is correct. However when the browser opens, the search `<input>` carries a static `autoFocus` attribute and will grab focus — good UX, though not explicitly called out in the plan. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/AddItemSheet.jsx` diff — view-swap removed; form always rendered; icon browser section conditionally rendered below toggle button; "Mehr anzeigen" / "Weniger anzeigen" label toggle; "Zurück" button absent; dead-code `if (open)` branch in `useEffect` cleaned up (T-012 nit resolved).
+- Read `frontend/src/components/AddItemSheet.test.jsx` diff — accordion assertions added: form elements present when browser open; "Weniger anzeigen" visible; "Zurück" absent; "Mehr anzeigen" restored after browser collapses.
+- Read `frontend/src/index.css` diff — bottom sheet container gains `max-height: min(80vh, 44rem)` + `overflow-y: auto` for natural scroll; browser section gains subtle top border; browser grid max-height adjusted to `min(38vh, 20rem)`.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` — **19/19 pass** (4 AddItemSheet + 15 app).
+- Ran `npm run build` — clean (1 upstream `onnxruntime-web` eval warning, unchanged).
+- Ran `npm test` — **38/38 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- Form always visible — input, suggestion row, toggle button, Cancel/Submit buttons all present in DOM when browser is open. ✅
+- "Mehr anzeigen" → "Weniger anzeigen" on expand; restored to "Mehr anzeigen" after browser icon selection. ✅
+- "Zurück" button absent from DOM entirely. ✅
+- Browser section rendered with `{showIconBrowser ? <div className="add-item-icon-browser">…</div> : null}` — natural document flow below the button. ✅
+- Selecting a browser icon sets `selectedIconName`, collapses browser, clears search text. ✅
+- Bottom sheet `overflow-y: auto` + constrained `max-height` enables scrolling when form + full grid are both visible. ✅
+- T-012 nit (dead `if (open)` branches in reset `useEffect`) resolved as a bonus cleanup. ✅
+- All four acceptance criteria fully met.
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`
