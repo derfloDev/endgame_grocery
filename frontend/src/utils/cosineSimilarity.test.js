@@ -19,9 +19,11 @@ describe("icon registry and database", () => {
     }
   });
 
-  it("resolves known English and German exact matches to Tabler icon names", () => {
+  it("resolves known English and German exact matches to registry icon names", () => {
     expect(EXACT_MATCH_MAP.milk).toBe("IconMilk");
     expect(EXACT_MATCH_MAP.milch).toBe("IconMilk");
+    expect(EXACT_MATCH_MAP.banana).toBe("Banana");
+    expect(EXACT_MATCH_MAP.banane).toBe("Banana");
     expect(EXACT_MATCH_MAP.cheese).toBe("IconCheese");
     expect(EXACT_MATCH_MAP["käse"]).toBe("IconCheese");
     expect(EXACT_MATCH_MAP.water).toBe("IconDroplet");

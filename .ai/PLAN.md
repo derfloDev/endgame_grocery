@@ -355,18 +355,144 @@ the existing edit mode with an inline icon picker row (same visual style as
 
 ---
 
-## Implementation Order (revised)
+---
+
+## T-012 — Frontend: dual-library icon registry (Tabler primary + Lucide fallback) + `AddItemSheet` edit-mode + inline icon browser
+
+### Context
+T-009 and T-011 are committed. T-012 adds three concerns:
+1. **Dual-library registry**: Tabler Icons is primary; Lucide React fills gaps where
+   Tabler has no matching icon (e.g. `Banana`). A prop-normalization wrapper
+   eliminates the `stroke` vs. `strokeWidth` API difference between the two libraries.
+2. **"Mehr anzeigen" inline**: expands the icon browser within the same sheet
+   instead of opening `IconPickerSheet` as a second bottom sheet.
+3. **Edit mode**: `AddItemSheet` accepts `initialText`/`initialIconName`/`mode`
+   props so it can be reused for editing existing entries.
+
+### Package change
+```
+npm install lucide-react --workspace @endgame-grocery/frontend
+```
+
+### Prop-normalization design
+Tabler icons use `stroke={number}` for stroke width; Lucide icons use
+`strokeWidth={number}`. To keep rendering code uniform, every Lucide icon stored
+in `ICON_REGISTRY` is wrapped at registration time:
+
+```js
+// frontend/src/data/iconRegistry.js
+function fromLucide(LucideIcon) {
+  return function NormalizedIcon({ stroke, strokeWidth, ...rest }) {
+    return <LucideIcon strokeWidth={stroke ?? strokeWidth ?? 1.5} {...rest} />;
+  };
+}
+// Usage:
+import { Banana } from 'lucide-react';
+const registry = {
+  // Tabler (no wrapper needed — already accept `stroke`):
+  IconMilk,
+  // Lucide (wrapped):
+  Banana: fromLucide(Banana),
+};
+```
+
+All callers render icons with `<Icon size={22} stroke={1.5} />` regardless of
+source library.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/data/iconRegistry.js` | Install-and-replace: (1) add `lucide-react` imports for icons where Tabler has no equivalent; (2) add `fromLucide()` wrapper factory (see above); (3) wrap every Lucide import with `fromLucide`; (4) merge Tabler and Lucide entries into one `ICON_REGISTRY` object; (5) update `ICON_REGISTRY_KEYS`; (6) fix any dangling Tabler imports that do not exist in the installed package (banana, etc.) |
+| `frontend/src/data/iconDatabase.js` | Fix banana entry: set `icon` to whichever name is used in the updated registry (`"IconBanana"` if Tabler has it, or `"Banana"` from Lucide if not); add or fix any other entries whose icon name has no registry match |
+
+Lucide icons to add (representative — implementer verifies availability):
+
+| Gap | Lucide icon name |
+|-----|-----------------|
+| Banana | `Banana` |
+| Croissant | `Croissant` (if not in Tabler) |
+| Sandwich | `Sandwich` |
+| Milk bottle | `MilkOff` / `Milk` (if Tabler `IconMilk` insufficient) |
+| Nut/Peanut | `Nut` |
+| Citrus/Orange | `Citrus` |
+| Leaf/herb | `Leaf` (if Tabler `IconLeaf` missing) |
+| Cherry | `Cherry` (if Tabler `IconCherry` missing) |
+| Grape | `Grape` (if Tabler `IconGrapes` missing) |
+| Beef | `Beef` |
+| Egg | `Egg` (if Tabler `IconEgg` missing) |
+| Pill | `Pill` (if Tabler `IconPill` missing) |
+| Scissors | `Scissors` (if Tabler `IconScissors` missing) |
+| Trash | `Trash2` (if Tabler `IconTrash` missing) |
+
+The implementer checks each Tabler name first; only use the Lucide alternative if the Tabler name cannot be imported without a build error.
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/AddItemSheet.jsx` | Add props: `initialText` (default `""`), `initialIconName` (default `null`), `mode` (`'add'` \| `'edit'`, default `'add'`); title = "Add Item" / "Edit Item", submit button = "Add Item" / "Save Item" based on `mode`; initialise `text` and `selectedIconName` from `initialText`/`initialIconName` on open; add `showIconBrowser` boolean state; when `false` render normal form (input + suggestions row + "Mehr anzeigen" button); when `true` render inline icon browser: search `<input>` + scrollable grid of all `ICON_REGISTRY_KEYS` icons filtered case-insensitively by icon name, "Zurück" button returns to form; selected icon highlighted; tapping a grid icon sets `selectedIconName` and collapses browser; remove `<IconPickerSheet>` import and usage |
+| `frontend/src/components/AddItemSheet.test.jsx` | Update tests: edit mode pre-fills text and icon; "Mehr anzeigen" expands inline browser (no second sheet); search filters icons; selecting from browser updates preview and collapses browser; add mode still works; submit passes correct icon |
+| `frontend/src/index.css` | Add `.add-item-icon-browser` section styles (max-height, overflow-y: auto, smooth transition); `.add-item-icon-browser-grid` (CSS grid, auto-fill small columns); `.add-item-icon-browser-btn` (square, borderless, selected highlight) |
+
+### UI behaviour detail
+- **Icon browser collapsed** (default): input + top-matches row + "Mehr anzeigen" button visible.
+- **Icon browser expanded**: search input + scrollable icon grid (Tabler + Lucide entries combined); "Zurück" collapses back without losing `selectedIconName`; sheet stays open.
+- On sheet close or submit, `showIconBrowser` resets to `false`.
+
+### Acceptance criteria
+- `lucide-react` appears in `frontend/package.json`; `npm run build` passes with both libraries tree-shaken.
+- Typing "Banane" or "banana" shows a banana icon (not the fallback cart).
+- All icons in `ICON_REGISTRY` render with a consistent `stroke` prop — no prop-mismatch warnings in the console.
+- `mode="add"` (default) behaves identically to previous T-009 behaviour except "Mehr anzeigen" expands inline.
+- `mode="edit"` with `initialText="Milch"` + `initialIconName="IconMilk"` pre-fills input and shows `<IconMilk />` immediately.
+- Tapping "Mehr anzeigen" reveals inline icon grid; no second bottom sheet opens.
+- Typing in the icon search narrows the grid.
+- Tapping a grid icon updates the preview and collapses the browser.
+- Submit passes `selectedIconName` via `onAdd`.
+- `AddItemSheet` test suite passes; lint clean; no `IconPickerSheet` import.
+
+---
+
+## T-013 — Frontend: `EntryRow` inline-edit removal + edit-via-sheet wiring + `IconPickerSheet` deletion
+
+### Context
+T-010 added an inline edit form with icon picker to `EntryRow`. That form is
+now replaced: the edit button opens the refactored `AddItemSheet` (in edit
+mode) managed by `ListDetailPage`. `IconPickerSheet` is no longer used anywhere
+and must be deleted.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/components/EntryRow.jsx` | **Remove** all inline-edit state and JSX (`editMode`, `editText`, `cancelEdit`, `submitEdit`, inline form, `onKeyDown` handlers, icon picker row, "Mehr anzeigen" in edit mode); edit button `onClick` calls `onEdit()` with **no arguments** (signals intent to edit — `ListDetailPage` handles the rest); view-mode SVG icon rendering from T-010 stays unchanged |
+| `frontend/src/components/entry-row.test.jsx` | Remove all inline-edit tests; keep view-mode SVG icon tests and swipe-delete test; add test: tapping edit button calls `onEdit` |
+| `frontend/src/pages/ListDetailPage.jsx` | Add `editingEntry` state (null \| entry object); wire `<EntryRow onEdit={() => setEditingEntry(entry)} />`; render a second `<AddItemSheet mode="edit" initialText={editingEntry?.text ?? ""} initialIconName={editingEntry?.icon ?? null} open={!!editingEntry} onAdd={(text, icon) => { void submitEditEntry(editingEntry.id, text, icon); setEditingEntry(null); }} onClose={() => setEditingEntry(null)} />`; `submitEditEntry(entryId, text, iconName)` signature unchanged from T-010 |
+| `frontend/src/components/IconPickerSheet.jsx` | **Delete** |
+| `frontend/src/components/IconPickerSheet.test.jsx` | **Delete** |
+
+### Acceptance criteria
+- `EntryRow` has no inline edit form; the component is simpler.
+- Tapping the edit button on a list item opens `AddItemSheet` in edit mode pre-filled with the item's text and icon.
+- Submitting the edit sheet calls `updateEntry` with updated text and icon.
+- Closing the edit sheet without submitting does not change the entry.
+- `IconPickerSheet.jsx` and `IconPickerSheet.test.jsx` no longer exist in the repo.
+- All entry-row tests pass; `npm test` passes; lint clean; `npm run build` passes.
+
+---
+
+## Implementation Order (final)
 
 ```
 [done]  T-001 → T-002 → T-003 → T-004 → T-005
-[next]  T-007 → T-008 → T-011 → T-009 → T-010 → T-006
-          ↑        ↑       ↑       ↑        ↑       ↑
-        data    hook/   shared  sheet   row+edit  config
-       +install worker  picker  wiring  wiring    +docs
+[done]  T-007 → T-008 → T-011 → T-009 → T-010 → T-006
+[next]  T-012 → T-013
+          ↑        ↑
+      AddItemSheet  EntryRow cleanup
+      edit+inline   + delete IconPickerSheet
+      browser       + ListDetailPage wiring
 ```
 
-T-011 (shared `IconPickerSheet`) must land before T-009 and T-010 which both
-import it. T-006 (docs) is last so README reflects the final Tabler state.
+T-012 must land before T-013 (which imports the refactored AddItemSheet).
 
 Each task is independently committable. The implementer should run
 `npm run lint && npm run build && npm test` after every task.
@@ -374,9 +500,10 @@ Each task is independently committable. The implementer should run
 ## Validation
 
 After all tasks are complete:
-- `npm run lint` — zero errors
-- `npm run build` — frontend bundle produced; only registered Tabler icons bundled
+- `npm run lint` — zero errors; no `IconPickerSheet` imports remain
+- `npm run build` — clean build; only registered Tabler icons bundled
 - `npm test` — all backend + frontend unit tests pass
-- Manual smoke: open Add-Item sheet, type "Milch" → `<IconMilk />` SVG appears;
-  type "Gemüse" → SVG preview + picker row with alternatives; submit → list row
-  shows the correct Tabler SVG icon; unknown items show `IconShoppingCart`.
+- Manual smoke:
+  - Add item: type "Milch" → `<IconMilk />` preview; tap "Mehr anzeigen" → inline grid expands; tap icon → preview updates; submit → row shows selected icon.
+  - Edit item: tap edit button on existing row → same sheet opens pre-filled; change text/icon; save → row updates.
+  - No second bottom sheet ever opens for icon selection.

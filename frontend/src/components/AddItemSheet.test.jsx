@@ -9,6 +9,10 @@ vi.mock("../hooks/useIconSuggestion", () => ({
       return { iconName: "IconMilk", topMatches: [], loading: false };
     }
 
+    if (text === "Banane") {
+      return { iconName: "Banana", topMatches: [], loading: false };
+    }
+
     if (text === "Gemüse") {
       return {
         iconName: "IconSalad",
@@ -44,7 +48,7 @@ describe("AddItemSheet", () => {
     expect(onAdd).toHaveBeenCalledWith("Milch", "IconMilk");
   });
 
-  it("shows alternative icons, opens the full picker, and submits the manually selected icon", async () => {
+  it("expands the inline icon browser, filters icons, and submits the manually selected icon", async () => {
     const onAdd = vi.fn();
     const { container } = render(<AddItemSheet open onAdd={onAdd} onClose={vi.fn()} />);
 
@@ -57,16 +61,53 @@ describe("AddItemSheet", () => {
     expect(container.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Mehr anzeigen" }));
-    expect(await screen.findByRole("dialog", { name: "Choose Icon" })).toBeTruthy();
-
-    await userEvent.click(screen.getByRole("button", { name: "Select IconTrash" }));
-
     expect(screen.queryByRole("dialog", { name: "Choose Icon" })).toBeNull();
+    expect(screen.getByLabelText("Search icons")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Zurück" })).toBeTruthy();
+
+    await userEvent.type(screen.getByLabelText("Search icons"), "trash");
+    expect(screen.queryByRole("button", { name: "Browse IconMilk" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Browse IconTrash" })).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Browse IconTrash" }));
+
+    expect(screen.queryByLabelText("Search icons")).toBeNull();
     expect(container.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
     expect(onAdd).toHaveBeenCalledWith("Gemüse", "IconTrash");
+  });
+
+  it("supports edit mode with prefilled text and icon state", async () => {
+    const onAdd = vi.fn();
+    const { container } = render(
+      <AddItemSheet
+        initialIconName="IconMilk"
+        initialText="Milch"
+        mode="edit"
+        open
+        onAdd={onAdd}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("dialog", { name: "Edit Item" })).toBeTruthy();
+    expect(screen.getByLabelText("Edit item").value).toBe("Milch");
+    expect(container.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save Item" })).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Mehr anzeigen" }));
+    expect(screen.getByLabelText("Search icons")).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Search icons"), "banana");
+    await userEvent.click(screen.getByRole("button", { name: "Browse Banana" }));
+
+    expect(screen.queryByLabelText("Search icons")).toBeNull();
+    expect(container.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Save Item" }));
+
+    expect(onAdd).toHaveBeenCalledWith("Milch", "Banana");
   });
 
   it("shows a loading indicator while the icon suggestion is resolving", async () => {

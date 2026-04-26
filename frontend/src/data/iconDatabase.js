@@ -33,7 +33,7 @@ export const ICON_DB = [
 
   // Produce
   { label: "apple", icon: "IconApple", tags: ["apfel", "apples", "äpfel", "aepfel"] },
-  { label: "banana", icon: "IconCherry", tags: ["banane", "bananas", "bananen"] },
+  { label: "banana", icon: "Banana", tags: ["banane", "bananas", "bananen"] },
   { label: "tomato", icon: "IconSalad", tags: ["tomate", "tomatoes", "tomaten"] },
   { label: "carrot", icon: "IconCarrot", tags: ["karotte", "karotten", "möhre", "moehre", "möhren", "moehren"] },
   { label: "cucumber", icon: "IconSalad", tags: ["gurke", "gurken"] },

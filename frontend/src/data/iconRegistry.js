@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import {
   IconApple,
   IconAvocado,
@@ -88,8 +89,23 @@ import {
   IconWashDryclean,
   IconWashMachine
 } from "@tabler/icons-react";
+import { Banana } from "lucide-react";
+
+function fromLucide(LucideIcon) {
+  function NormalizedIcon({ stroke, strokeWidth, ...rest }) {
+    return createElement(LucideIcon, {
+      ...rest,
+      strokeWidth: stroke ?? strokeWidth ?? 1.5
+    });
+  }
+
+  NormalizedIcon.displayName = `Normalized${LucideIcon.displayName ?? LucideIcon.name ?? "LucideIcon"}`;
+
+  return NormalizedIcon;
+}
 
 export const ICON_REGISTRY = Object.freeze({
+  Banana: fromLucide(Banana),
   IconApple,
   IconAvocado,
   IconBabyBottle,

@@ -449,3 +449,81 @@ Reviewed: 2026-04-26
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-012
+
+### Review Round 1
+
+Status: **FAIL**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **major** — `frontend/src/components/AddItemSheet.jsx` line 114 — "Zurück" button is rendered as `"Zuruck"` (missing the umlaut `ü`). The plan explicitly specifies `"Zurück"` as the back-button label. This is a user-visible German text error. **Required fix.**
+2. **nit** — `frontend/src/components/AddItemSheet.jsx` lines 34–47 — The `useEffect` has identical code in both the `if (open) { …; return; }` branch and the fallthrough branch. The `open` check and early `return` are dead code — the same four state resets execute regardless of the `open` value. Harmless but confusing. No fix required.
+3. **nit** — `frontend/src/components/AddItemSheet.jsx` lines 49–51 — The `useIconSuggestion` → `setSelectedIconName(iconName)` sync effect still fires in edit mode and will overwrite `initialIconName` if the hook returns a different suggestion for `initialText`. Pre-existing design pattern from T-009; acceptable. No fix required.
+
+#### Required Fixes
+
+1. **`frontend/src/components/AddItemSheet.jsx` line 114**: Change `"Zuruck"` → `"Zurück"`.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/AddItemSheet.jsx` — full component reviewed.
+- Read `frontend/src/components/AddItemSheet.test.jsx` — all 4 test cases reviewed.
+- Read `frontend/src/data/iconRegistry.js` — `fromLucide` wrapper, `Banana` import, registry merge reviewed.
+- Verified `Banana` entry in `frontend/src/data/iconDatabase.js` uses `icon: "Banana"` matching the registry key.
+- Verified `lucide-react: "^1.11.0"` in `frontend/package.json`.
+- Verified new CSS classes `add-item-icon-browser`, `add-item-icon-browser-grid`, `add-item-icon-browser-btn`, `add-item-icon-browser-btn--selected` in `frontend/src/index.css`.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js src/hooks/useIconSuggestion.test.js src/components/AddItemSheet.test.jsx` — **16/16 pass**.
+- Ran `npm run build` — clean (both libraries tree-shaken; 1 upstream `onnxruntime-web` eval warning, unchanged; main bundle grew ~5 kB for Lucide).
+- Ran `npm test` — **41/41 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- `fromLucide` wrapper correctly translates `stroke` → `strokeWidth` and sets `displayName` for dev tooling. All callers use `stroke={…}` uniformly — correct.
+- `Banana` from `lucide-react` wrapped and keyed as `"Banana"` in `ICON_REGISTRY`; `iconDatabase.js` banana entry uses `icon: "Banana"` — exact-match and build both work.
+- `initialText`/`initialIconName`/`mode` props correctly drive title (`"Edit Item"` / `"Add Item"`), input label, and submit button label via `isEditMode`.
+- Inline icon browser rendered within the same `<BottomSheet>` — no second sheet opened; `<IconPickerSheet>` import removed — plan criterion met.
+- Browser search filters `ICON_REGISTRY_KEYS` case-insensitively; clicking a browser icon sets `selectedIconName` and collapses the browser — correct.
+- "Mehr anzeigen" back-navigation renders `"Zuruck"` — **incorrect; should be `"Zurück"`**.
+- `aria-label="Browse {iconName}"` distinguishes browser buttons from the former `"Select {iconName}"` labels used by `IconPickerSheet` — tests updated accordingly.
+- Add-mode submit clears `text` and resets `selectedIconName`; edit-mode submit preserves text and icon state — correct per plan.
+- Test suite updated: inline browser test replaces second-sheet test; new edit-mode test exercises pre-fill, browser selection, and `"Save Item"` submit path.
+
+##### Risks
+- Minor: in edit mode, the `useIconSuggestion` hook runs on every keystroke and will overwrite `selectedIconName` via the sync effect if the debounce suggestion changes. A user editing text in edit mode may see their originally-set icon replaced mid-edit (see nit #3). Not a blocker for this task.
+
+#### Verdict
+`FAIL`
+
+### Review Round 2
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Required Fix Verification
+
+- `frontend/src/components/AddItemSheet.jsx` line 114: confirmed `"Zuruck"` corrected to `"Zurück"` ✅
+
+#### Verification
+
+##### Steps
+- Ran `grep -n "Zuruck\|Zurück"` — only `"Zurück"` present; fix confirmed.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js src/hooks/useIconSuggestion.test.js src/components/AddItemSheet.test.jsx` — **16/16 pass**.
+- Ran `npm test` — **41/41 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- All Round 1 findings addressed. No new issues introduced.
+
+##### Risks
+- None beyond those noted in Round 1.
+
+#### Verdict
+`PASS`

@@ -1,24 +1,50 @@
 import { useEffect, useState } from "react";
-import { ICON_REGISTRY } from "../data/iconRegistry";
+import { ICON_REGISTRY, ICON_REGISTRY_KEYS } from "../data/iconRegistry";
 import { useIconSuggestion } from "../hooks/useIconSuggestion";
-import IconPickerSheet from "./IconPickerSheet";
 import { BottomSheet } from "./ui";
 
-export default function AddItemSheet({ open, onAdd, onClose }) {
-  const [text, setText] = useState("");
-  const [selectedIconName, setSelectedIconName] = useState(null);
-  const [showFullPicker, setShowFullPicker] = useState(false);
+function normalizeSearchTerm(value) {
+  return value.trim().toLowerCase();
+}
+
+export default function AddItemSheet({
+  initialIconName = null,
+  initialText = "",
+  mode = "add",
+  open,
+  onAdd,
+  onClose
+}) {
+  const [text, setText] = useState(initialText);
+  const [selectedIconName, setSelectedIconName] = useState(initialIconName);
+  const [showIconBrowser, setShowIconBrowser] = useState(false);
+  const [iconBrowserSearchText, setIconBrowserSearchText] = useState("");
   const { iconName, topMatches, loading } = useIconSuggestion(text);
   const PreviewIcon = selectedIconName ? ICON_REGISTRY[selectedIconName] : null;
   const suggestedIconNames = [...new Set(topMatches)].filter((candidate) => Boolean(ICON_REGISTRY[candidate]));
+  const normalizedIconBrowserSearchText = normalizeSearchTerm(iconBrowserSearchText);
+  const visibleIconNames = ICON_REGISTRY_KEYS.filter((candidate) =>
+    candidate.toLowerCase().includes(normalizedIconBrowserSearchText)
+  );
+  const isEditMode = mode === "edit";
+  const sheetTitle = isEditMode ? "Edit Item" : "Add Item";
+  const inputLabel = isEditMode ? "Edit item" : "Add item";
+  const submitLabel = isEditMode ? "Save Item" : "Add Item";
 
   useEffect(() => {
-    if (!open) {
-      setText("");
-      setSelectedIconName(null);
-      setShowFullPicker(false);
+    if (open) {
+      setText(initialText);
+      setSelectedIconName(initialIconName);
+      setShowIconBrowser(false);
+      setIconBrowserSearchText("");
+      return;
     }
-  }, [open]);
+
+    setText(initialText);
+    setSelectedIconName(initialIconName);
+    setShowIconBrowser(false);
+    setIconBrowserSearchText("");
+  }, [initialIconName, initialText, open]);
 
   useEffect(() => {
     setSelectedIconName(iconName);
@@ -34,15 +60,64 @@ export default function AddItemSheet({ open, onAdd, onClose }) {
     }
 
     onAdd?.(trimmed, selectedIconName);
-    setText("");
+    setShowIconBrowser(false);
+    setIconBrowserSearchText("");
+
+    if (!isEditMode) {
+      setText("");
+      setSelectedIconName(null);
+    }
   }
 
   return (
-    <>
-      <BottomSheet open={open} title="Add Item" onClose={onClose}>
+    <BottomSheet open={open} title={sheetTitle} onClose={onClose}>
+      {showIconBrowser ? (
+        <div className="add-item-icon-browser">
+          <label className="visually-hidden" htmlFor="add-item-icon-browser-search">
+            Search icons
+          </label>
+          <input
+            id="add-item-icon-browser-search"
+            autoFocus
+            className="eg-input"
+            placeholder="Search icons"
+            value={iconBrowserSearchText}
+            onChange={(event) => setIconBrowserSearchText(event.target.value)}
+          />
+
+          <div className="add-item-icon-browser-grid">
+            {visibleIconNames.map((browserIconName) => {
+              const BrowserIcon = ICON_REGISTRY[browserIconName];
+
+              return (
+                <button
+                  key={browserIconName}
+                  aria-label={`Browse ${browserIconName}`}
+                  className={`add-item-icon-browser-btn ${
+                    selectedIconName === browserIconName ? "add-item-icon-browser-btn--selected" : ""
+                  }`}
+                  type="button"
+                  onClick={() => {
+                    setSelectedIconName(browserIconName);
+                    setShowIconBrowser(false);
+                    setIconBrowserSearchText("");
+                  }}
+                >
+                  <BrowserIcon aria-hidden="true" size={22} stroke={1.6} />
+                  <span className="icon-picker-btn-label">{browserIconName}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button className="eg-btn-ghost add-item-more-btn" type="button" onClick={() => setShowIconBrowser(false)}>
+            Zurück
+          </button>
+        </div>
+      ) : (
         <form className="add-item-form" onSubmit={handleSubmit}>
           <div className="eg-field">
-            <label htmlFor="add-item-sheet-text">Add item</label>
+            <label htmlFor="add-item-sheet-text">{inputLabel}</label>
             <input
               id="add-item-sheet-text"
               autoFocus
@@ -84,7 +159,7 @@ export default function AddItemSheet({ open, onAdd, onClose }) {
             </div>
           ) : null}
 
-          <button className="eg-btn-ghost add-item-more-btn" type="button" onClick={() => setShowFullPicker(true)}>
+          <button className="eg-btn-ghost add-item-more-btn" type="button" onClick={() => setShowIconBrowser(true)}>
             Mehr anzeigen
           </button>
 
@@ -93,18 +168,11 @@ export default function AddItemSheet({ open, onAdd, onClose }) {
               Cancel
             </button>
             <button className="eg-btn-primary" disabled={!text.trim()} type="submit">
-              Add Item
+              {submitLabel}
             </button>
           </div>
         </form>
-      </BottomSheet>
-
-      <IconPickerSheet
-        open={showFullPicker}
-        selectedIconName={selectedIconName}
-        onClose={() => setShowFullPicker(false)}
-        onSelect={setSelectedIconName}
-      />
-    </>
+      )}
+    </BottomSheet>
   );
 }

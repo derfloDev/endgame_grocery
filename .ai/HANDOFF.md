@@ -460,3 +460,84 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-012 — plan — 2026-04-26T08:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Extended T-012 to dual-library icon registry: Tabler primary, Lucide React as fallback for gaps (banana, etc.); added `fromLucide()` prop-normalisation wrapper (`stroke` vs `strokeWidth`); install `lucide-react`; banana fix now uses Lucide `Banana` if Tabler has no equivalent; all Tabler+Lucide entries merged in single `ICON_REGISTRY` with consistent render API. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-012..T-013 — plan — 2026-04-26T08:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-012 (AddItemSheet edit-mode + inline icon browser replacing external IconPickerSheet for "Mehr anzeigen") and T-013 (EntryRow inline-edit removal, edit-via-sheet wiring in ListDetailPage, IconPickerSheet file deletion); both supersede the UX from T-009/T-010/T-011. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-012 — implement — 2026-04-26T09:06:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added a Lucide-backed banana fallback to the shared icon registry and refactored `AddItemSheet` to support edit-mode prefills and an inline "Mehr anzeigen" icon browser inside the same sheet. |
+| Files Changed | `frontend/package.json`, `package-lock.json`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconDatabase.js`, `frontend/src/hooks/useIconSuggestion.test.js`, `frontend/src/utils/cosineSimilarity.test.js`, `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/index.css`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm install lucide-react --workspace @endgame-grocery/frontend` (pass), `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js src/hooks/useIconSuggestion.test.js src/components/AddItemSheet.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): browse more grocery icons without leaving the item sheet |
+| Next Role | review |
+
+---
+### T-012 — review — 2026-04-26T11:12:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed dual-library registry, fromLucide wrapper, AddItemSheet edit-mode and inline browser; one required fix: "Zuruck" back-button label must be corrected to "Zurück". |
+| Verdict | FAIL |
+| Blocking Findings | 1. `frontend/src/components/AddItemSheet.jsx` line 114 — "Zuruck" must be "Zurück" |
+| Next Role | implement |
+
+---
+
+### T-012 — implement — 2026-04-26T09:14:11Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Addressed the T-012 review finding by correcting the inline-browser back button text to "Zurück" and extending the sheet test to lock that label in place. |
+| Files Changed | `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js src/hooks/useIconSuggestion.test.js src/components/AddItemSheet.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): browse more grocery icons without leaving the item sheet |
+| Next Role | review |
+
+---
+### T-012 — review — 2026-04-26T11:17:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Round 2: confirmed "Zuruck" → "Zurück" fix applied; all validation passes; no new issues. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-012 — implement — 2026-04-26T09:18:07Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-012 dual-library icon and inline browser changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

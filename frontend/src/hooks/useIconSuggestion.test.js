@@ -39,6 +39,15 @@ describe("useIconSuggestion", () => {
     expect(requestIconMatch).not.toHaveBeenCalled();
   });
 
+  it("returns the banana exact match immediately without calling the worker", () => {
+    render(createElement(HookHarness, { text: "Banane" }));
+
+    expect(screen.getByTestId("icon-name").textContent).toBe("Banana");
+    expect(screen.getByTestId("top-matches").textContent).toBe("[]");
+    expect(screen.getByTestId("loading").textContent).toBe("false");
+    expect(requestIconMatch).not.toHaveBeenCalled();
+  });
+
   it("returns null and not loading for empty input", () => {
     render(createElement(HookHarness, { text: "   " }));
 
