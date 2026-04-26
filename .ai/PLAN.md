@@ -679,15 +679,28 @@ Consequence: all `requestIconMatch` promises never settle → `loading` stays
 
 **Part 1 — Vite config (root cause)**
 
+The `browser` entry of `onnxruntime-web` (`ort-web.min.js`) is a UMD bundle
+that depends on `onnxruntime-common` as an *external*. In a browser/Worker
+module context there is no `require` and no `self.ort` global, so the UMD
+factory falls back to `factory(self.ort)` where `self.ort` is `undefined` →
+`registerBackend` crash. The fix is to alias `onnxruntime-web` to its
+self-contained build `ort.min.js`, which bundles `onnxruntime-common` inline and
+calls `factory()` with no external arguments.
+
 In `frontend/vite.config.js`:
-1. Add `worker: { format: 'es' }` — forces Vite to bundle the worker as ESM,
-   which is required by `@xenova/transformers` / `onnxruntime-web`.
-2. Add `'onnxruntime-web'` to `optimizeDeps.exclude` alongside
-   `'@xenova/transformers'` — prevents Vite's dev-mode pre-bundler from
-   reprocessing the already-ESM ONNX runtime package.
+1. Add `resolve.alias: { 'onnxruntime-web': 'onnxruntime-web/dist/ort.min.js' }`
+   — redirects all imports to the self-contained bundle.
+2. Add `worker: { format: 'es' }` — forces Vite to bundle the worker as ESM
+   for production builds.
+3. Add `'onnxruntime-web'` to `optimizeDeps.exclude` alongside
+   `'@xenova/transformers'` — prevents Vite's pre-bundler from reprocessing
+   the aliased file in dev mode.
 
 ```js
 // vite.config.js additions:
+resolve: {
+  alias: { 'onnxruntime-web': 'onnxruntime-web/dist/ort.min.js' },
+},
 optimizeDeps: {
   exclude: ['@xenova/transformers', 'onnxruntime-web'],
 },

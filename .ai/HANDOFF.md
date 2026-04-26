@@ -674,6 +674,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-018 — implement — 2026-04-26T16:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Diagnosed root cause of `registerBackend` crash: Vite serves `ort-web.min.js` raw; its UMD wrapper calls `factory(self.ort)` in Worker context where `self.ort` is undefined. Fixed by aliasing `onnxruntime-web` to `ort.min.js` (self-contained build that calls `factory()` with no external deps); added vite-config test asserting the alias. |
+| Files Changed | `frontend/vite.config.js`, `frontend/src/vite-config.test.js`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning); `npm run build` (pass); `npm test` (pass, 44 frontend + 27 backend) |
+| Commit | `4d8b38a fix(frontend): alias onnxruntime-web to self-contained build to fix Worker crash` |
+| Next Role | none |
+
+---
+
 ### T-016..T-018 — plan — 2026-04-26T16:10:00Z
 
 | Field | Value |
