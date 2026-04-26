@@ -4,6 +4,15 @@ import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   envDir: "..",
+  resolve: {
+    // ort-web.min.js (the "browser" entry of onnxruntime-web) depends on onnxruntime-common as an
+    // external UMD parameter — self.ort — which is never set in a Worker module context, causing the
+    // "registerBackend" crash. ort.min.js is the self-contained build: it bundles onnxruntime-common
+    // inline and calls its factory with no arguments, so it works in any context without globals.
+    alias: {
+      "onnxruntime-web": "onnxruntime-web/dist/ort.min.js"
+    }
+  },
   optimizeDeps: {
     // Both packages ship their own worker/WASM loading path and must stay out of Vite pre-bundling.
     exclude: ["@xenova/transformers", "onnxruntime-web"]
