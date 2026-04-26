@@ -697,3 +697,70 @@ None.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-017
+
+### Review Round 1
+
+Status: **FAIL**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+1. **blocker** — `frontend/src/components/AddItemSheet.test.jsx` line 9 — `process.cwd()` uses the `process` Node.js global, which is not declared in the ESLint browser environment config. `npm run lint` exits with error: `'process' is not defined  no-undef`. The acceptance criteria explicitly requires `npm run lint` to pass. **Required fix.**
+
+#### Required Fixes
+
+1. **`frontend/src/components/AddItemSheet.test.jsx` line 9**: Replace `process.cwd()` with an ESM-safe alternative. Options:
+   - `new URL("../index.css", import.meta.url)` with `fileURLToPath` + `readFileSync`
+   - `import.meta.dirname` (Node 20.11+)
+   - Or simply read the CSS relative to `import.meta.url`: `readFileSync(new URL("../index.css", import.meta.url), "utf8")` and remove the separate `path.resolve` call.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/index.css` diff — `cursor: wait` → `cursor: not-allowed` at line 246, inside `.button-primary:disabled, .eg-btn-primary:disabled`. Correct fix. ✅
+- Read `frontend/src/components/AddItemSheet.test.jsx` diff — new test added: imports `readFileSync`, `path`, `../index.css`; reads CSS via `process.cwd()`; asserts disabled button's `disabled` property and CSS cursor rule via regex.
+- Ran `npm run lint` — **1 error: `'process' is not defined` at `AddItemSheet.test.jsx:9:45`**. FAIL.
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx` — **5/5 pass** (Vitest runs in Node env where `process` is available).
+
+##### Findings
+- CSS change is correct: single character change, right rule, right value. ✅
+- New test's approach (reading CSS source and asserting the rule text) is creative and verifies the actual stylesheet, but the `process.cwd()` call fails ESLint's `no-undef` rule.
+- Tests pass at runtime (Vitest exposes `process`) but ESLint's static analysis rejects the global.
+
+##### Risks
+- None beyond the lint blocker.
+
+#### Verdict
+`FAIL`
+
+### Review Round 2
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Required Fix Verification
+
+- `frontend/src/components/AddItemSheet.test.jsx` line 9: `process.cwd()` replaced with `import.meta.dirname` — `process` reference removed. ✅
+
+#### Verification
+
+##### Steps
+- Confirmed `import.meta.dirname` at line 9; `path` import retained (used in the `path.resolve` call); no remaining `process` reference.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged). ✅
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` — **20/20 pass** (5 AddItemSheet + 15 app). ✅
+- Ran `npm test` — **40/40 frontend (6 files) + 27/27 backend, all pass**. ✅
+
+##### Findings
+- All Round 1 findings addressed. No new issues introduced.
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`

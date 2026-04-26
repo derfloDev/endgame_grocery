@@ -1,7 +1,12 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import "../index.css";
 import AddItemSheet from "./AddItemSheet";
+
+const cssSource = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
 
 vi.mock("../hooks/useIconSuggestion", () => ({
   useIconSuggestion: vi.fn((text) => {
@@ -127,5 +132,16 @@ describe("AddItemSheet", () => {
 
     expect(screen.getByLabelText("Loading icon suggestion")).toBeTruthy();
     expect(screen.queryByTestId("add-item-icon-preview")).toBeNull();
+  });
+
+  it("uses a not-allowed cursor for the disabled submit button", () => {
+    render(<AddItemSheet open onAdd={vi.fn()} onClose={vi.fn()} />);
+
+    const submitButton = screen.getByRole("button", { name: "Add Item" });
+
+    expect(submitButton.disabled).toBe(true);
+    expect(cssSource).toMatch(
+      /\.button-primary:disabled,\s*\.eg-btn-primary:disabled\s*\{[^}]*cursor:\s*not-allowed;/s
+    );
   });
 });
