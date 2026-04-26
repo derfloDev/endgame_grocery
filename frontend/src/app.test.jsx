@@ -342,7 +342,8 @@ describe("authentication shell", () => {
     expect(await screen.findByRole("dialog", { name: "Add Item" })).toBeTruthy();
 
     await userEvent.type(screen.getByLabelText("Add item"), "Milch");
-    expect(screen.getAllByText("IconMilk")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Mehr anzeigen" })).toBeTruthy();
+    expect(document.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
     await waitFor(() => {

@@ -354,3 +354,39 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-009 — implement — 2026-04-26T07:41:03Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Reworked `AddItemSheet` to show SVG previews, inline semantic icon alternatives, and the shared full-catalogue picker, while preserving the icon-name submit flow. |
+| Files Changed | `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/app.test.jsx`, `frontend/src/index.css`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | feat(frontend): add inline icon picking to the add-item sheet |
+| Next Role | review |
+
+---
+
+### T-009 — review — 2026-04-25T09:53:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed AddItemSheet SVG preview, inline alternatives row, "Mehr anzeigen" → IconPickerSheet integration; all acceptance criteria met. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-009 — implement — 2026-04-26T07:54:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-009 add-item inline icon picker changes after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

@@ -324,3 +324,45 @@ Reviewed: 2026-04-25
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-009
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-25
+
+#### Findings
+
+1. **nit** — `frontend/src/components/AddItemSheet.jsx` line 87 — "Mehr anzeigen" button is always rendered, even when there are no `topMatches` and no semantic alternatives to show. A user typing "Milch" (exact match, `topMatches: []`) will see the button but opening `IconPickerSheet` is still functional, so this is not a blocker. Acceptable UX trade-off. No fix required.
+2. **nit** — `frontend/src/components/AddItemSheet.jsx` lines 23–25 — The `useEffect` that syncs `iconName` → `selectedIconName` runs whenever `iconName` changes, which will overwrite a user's manual alternative selection if the debounce fires after they click an alternative. In practice the 300 ms debounce window is short enough that this race is unlikely, and the plan does not require protection against it. No fix required.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/components/AddItemSheet.jsx` — full component reviewed.
+- Read `frontend/src/components/AddItemSheet.test.jsx` — all 3 test cases reviewed.
+- Ran `git diff HEAD -- frontend/src/components/AddItemSheet.jsx frontend/src/components/AddItemSheet.test.jsx frontend/src/index.css` — confirmed scope of changes.
+- Verified CSS classes `add-item-icon-picker`, `add-item-icon-picker-btn`, `add-item-icon-picker-btn--selected`, `add-item-more-btn`, `add-item-preview-svg` are present in `frontend/src/index.css`.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` — **18/18 pass**.
+- Ran `npm run build` — clean (1 upstream `onnxruntime-web` eval warning, unchanged).
+- Ran `npm test` — **38/38 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- `selectedIconName` local state added; initialised from `useIconSuggestion`'s `iconName` via a dedicated `useEffect`; user alternative clicks and full-picker selection both update it; `onAdd` passes `selectedIconName` — all correct.
+- `PreviewIcon` resolves via `ICON_REGISTRY[selectedIconName]` and renders as an SVG `<PreviewIcon>` component with `data-testid="add-item-icon-preview"`. Confirmed by test assertion `container.querySelector("[data-testid='add-item-icon-preview'] svg")`.
+- `suggestedIconNames` deduplicated with `Set` and filtered through `ICON_REGISTRY` guard — safe against unknown names returned from the worker.
+- `showFullPicker` boolean gates `IconPickerSheet`; picker `onSelect` calls `setSelectedIconName`; picker `onClose` resets `showFullPicker` to false. Round-trip test (`Gemüse` → alternatives → picker → `IconTrash` → submit) passes and asserts `onAdd("Gemüse", "IconTrash")`.
+- Reset on close (`open` → false) clears `text`, `selectedIconName`, and `showFullPicker` — no stale state between uses.
+- Loading state renders spinner with `aria-label="Loading icon suggestion"` and hides the preview — correct.
+- Tests use `vi.mock` for `useIconSuggestion` with three controlled branches: exact match (`Milch`), semantic with alternatives (`Gemüse`), and loading (`Mil`). All three branches exercised.
+
+##### Risks
+- Minor: if the ML worker debounce fires after a user clicks an alternative icon, `selectedIconName` is overwritten (see nit #2). Unlikely in typical use and not in scope for this task.
+
+#### Verdict
+`PASS`

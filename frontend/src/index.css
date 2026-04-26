@@ -818,9 +818,8 @@ p {
   min-width: 3rem;
 }
 
-.add-item-preview-icon {
-  font-size: 1.5rem;
-  line-height: 1;
+.add-item-preview-svg {
+  display: block;
 }
 
 .add-item-preview-spinner {
@@ -830,6 +829,42 @@ p {
   border-top-color: var(--neon-cyan);
   border-radius: 999px;
   animation: spin 0.75s linear infinite;
+}
+
+.add-item-icon-picker {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.add-item-icon-picker-btn {
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(139, 43, 226, 0.18);
+  border-radius: 999px;
+  background: rgba(20, 24, 50, 0.72);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color var(--duration-micro), background var(--duration-micro), transform var(--duration-micro);
+}
+
+.add-item-icon-picker-btn:hover {
+  border-color: rgba(0, 229, 255, 0.4);
+  background: rgba(0, 229, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.add-item-icon-picker-btn--selected {
+  border-color: rgba(0, 229, 255, 0.48);
+  background: rgba(0, 229, 255, 0.12);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.14);
+}
+
+.add-item-more-btn {
+  width: fit-content;
 }
 
 .entry-row-wrapper {
