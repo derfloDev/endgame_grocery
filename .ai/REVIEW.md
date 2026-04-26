@@ -659,3 +659,41 @@ Reviewed: 2026-04-26
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-016
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-26
+
+#### Findings
+
+None.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/index.css` diff — exactly two lines removed: `overflow: hidden` from `.bottom-sheet--browser-open .add-item-form` and `overflow: hidden` from `.bottom-sheet--browser-open .add-item-icon-browser`; all other rules (flex, flex-direction, min-height, flex: 1) unchanged.
+- Confirmed no JSX changes (`git diff HEAD -- AddItemSheet.jsx AddItemSheet.test.jsx` → empty).
+- Verified the scrolling element `.add-item-icon-browser-grid { overflow-y: auto }` is unaffected — still the sole scroll container.
+- Ran `npm run lint` — 0 errors, 1 pre-existing frontend warning (unchanged).
+- Ran `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` — **19/19 pass**.
+- Ran `npm run build` — clean.
+- Ran `npm test` — **39/39 frontend + 27/27 backend, all pass**.
+
+##### Findings
+- `overflow: hidden` removed from `add-item-form` — input focus ring (and button glow) no longer clipped. ✅
+- `overflow: hidden` removed from `add-item-icon-browser` — search input focus ring no longer clipped. ✅
+- Flex height constraints preserved (`flex: 1; min-height: 0` on both containers) — no layout regression. ✅
+- Grid sole-scroll behaviour preserved — `overflow-y: auto` on `.add-item-icon-browser-grid` unchanged. ✅
+- No new tests needed — the fix is a CSS-only visual correction; existing tests continue to assert modifier class presence and single-grid presence. ✅
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`

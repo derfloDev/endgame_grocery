@@ -762,7 +762,6 @@ p {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 .bottom-sheet--browser-open .add-item-form > :not(.add-item-icon-browser) {
@@ -899,7 +898,6 @@ p {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 .add-item-icon-browser-grid {

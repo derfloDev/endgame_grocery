@@ -662,3 +662,58 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-016 — plan — 2026-04-26T16:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-016: remove `overflow: hidden` from `.bottom-sheet--browser-open .add-item-form` and `.bottom-sheet--browser-open .add-item-icon-browser` to fix focus-ring clipping on inputs and glow clipping on the "Save Item" button when the icon browser is open; AC expanded from previous session to explicitly cover button shadow (Fehler 3). |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-016..T-018 — plan — 2026-04-26T16:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Diagnosed four user-reported bugs: Fehler 1 (`cursor: wait` on disabled button → T-017), Fehler 2 (infinite spinner — consequence of Fehler 4), Fehler 3 (button shadow clipped — covered by T-016 AC expansion), Fehler 4 (ONNX `registerBackend` crash from IIFE worker format → T-018); added T-017 and T-018 as ready_for_implement; updated T-016 AC to mention Save button shadow. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+### T-016 — implement — 2026-04-26T16:15:47Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed the browser-open overflow clipping from the shared item-sheet containers so input focus rings and primary-button glow render fully while preserving the single-scroll grid layout from T-015. |
+| Files Changed | `frontend/src/index.css`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` (pass, 1 existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` (pass), `npm run build` (pass, 1 upstream `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | fix(frontend): restore unclipped focus rings in the item sheet |
+| Next Role | review |
+
+---
+### T-016 — review — 2026-04-26T16:25:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed box-shadow clipping fix: two overflow:hidden lines removed from intermediate flex containers; flex layout intact; sole-scroll grid unaffected; no regressions. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+### T-016 — implement — 2026-04-26T16:25:04Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the approved T-016 focus-ring clipping fix after review sign-off. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | none |
+
+---

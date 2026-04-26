@@ -562,17 +562,181 @@ the layout change.
 
 ---
 
+---
+
+## T-016 — Frontend: fix `box-shadow` clipping on inputs when icon browser is open
+
+### Context
+T-015 fixed the double-scrollbar by adding `overflow: hidden` to
+`.bottom-sheet--browser-open .add-item-form` and
+`.bottom-sheet--browser-open .add-item-icon-browser`.
+Both containers wrap `<input>` elements whose `box-shadow` (focus ring +
+glow) extends 3 px outside the element. `overflow: hidden` clips anything
+beyond the container's border box, so the shadow is cut off left and right.
+
+### Root cause (confirmed from CSS)
+
+```css
+/* T-015 additions that clip shadows: */
+.bottom-sheet--browser-open .add-item-form {
+  overflow: hidden;   /* ← clips .eg-input focus ring */
+}
+.bottom-sheet--browser-open .add-item-icon-browser {
+  overflow: hidden;   /* ← clips search-input focus ring */
+}
+```
+
+Neither container needs `overflow: hidden` for layout correctness.
+The only element that must clip its content is the scrolling grid
+(`.add-item-icon-browser-grid { overflow-y: auto }`), which is unaffected.
+
+### Fix — remove `overflow: hidden` from intermediate containers
+
+```css
+/* Remove from form container */
+.bottom-sheet--browser-open .add-item-form {
+  /* overflow: hidden  ← DELETE this line */
+}
+
+/* Remove from browser section container */
+.bottom-sheet--browser-open .add-item-icon-browser {
+  /* overflow: hidden  ← DELETE this line */
+}
+```
+
+The flex layout (`flex: 1; min-height: 0`) already constrains height correctly.
+The grid's `flex: 1; overflow-y: auto; max-height: none` (from T-015) still
+provides the only scrollable area. No scrollbar regression expected.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/index.css` | Remove `overflow: hidden` from `.bottom-sheet--browser-open .add-item-form` and `.bottom-sheet--browser-open .add-item-icon-browser`; keep all other flex/min-height rules unchanged |
+
+No JSX changes required.
+
+### Acceptance criteria
+- Focusing the "Add Item" input shows the full cyan focus ring (`box-shadow: 0 0 0 3px …`) on all sides — no left/right clipping.
+- Focusing the icon-search input shows the full focus ring — no clipping.
+- The "Save Item" / "Add Item" primary button glow (`box-shadow: var(--glow-purple)`) is not clipped when the browser is open.
+- The icon grid still scrolls independently; the outer sheet still shows no scrollbar.
+- `npm run lint` passes; `npm test` passes; `npm run build` passes.
+
+---
+
+---
+
+## T-017 — Frontend: fix `cursor: wait` on disabled primary buttons
+
+### Context
+Reported as Fehler 1: hovering the "Add Item" submit button when the text
+input is empty shows a loading-spinner cursor instead of a not-allowed cursor.
+
+### Root cause
+`frontend/src/index.css` lines 244-247:
+```css
+.button-primary:disabled,
+.eg-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: wait;   /* ← wrong: shows loading spinner */
+}
+```
+`cursor: wait` is semantically for "the browser is busy". A disabled button
+should use `cursor: not-allowed`.
+
+### Fix
+Change `cursor: wait` to `cursor: not-allowed`.
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/src/index.css` | `.button-primary:disabled, .eg-btn-primary:disabled { cursor: not-allowed; }` |
+
+### Acceptance criteria
+- Hovering the disabled "Add Item" button shows a `not-allowed` cursor (circle
+  with a diagonal line), not a loading spinner.
+- No other button or state is affected.
+- `npm run lint` passes; `npm test` passes; `npm run build` passes.
+
+---
+
+---
+
+## T-018 — Frontend: fix ONNX worker crash + add worker error recovery
+
+### Context
+Reported as Fehler 4 (ONNX `registerBackend` crash) and Fehler 2 (infinite
+loading spinner). Root cause: `@xenova/transformers` 2.x requires the Web
+Worker to be bundled as an **ES module**. Vite defaults to IIFE format for
+workers, which breaks ONNX Runtime Web's module initialization sequence,
+producing `TypeError: Cannot read properties of undefined (reading 'registerBackend')`.
+Consequence: all `requestIconMatch` promises never settle → `loading` stays
+`true` permanently in `useIconSuggestion`.
+
+### Fix — two-part
+
+**Part 1 — Vite config (root cause)**
+
+In `frontend/vite.config.js`:
+1. Add `worker: { format: 'es' }` — forces Vite to bundle the worker as ESM,
+   which is required by `@xenova/transformers` / `onnxruntime-web`.
+2. Add `'onnxruntime-web'` to `optimizeDeps.exclude` alongside
+   `'@xenova/transformers'` — prevents Vite's dev-mode pre-bundler from
+   reprocessing the already-ESM ONNX runtime package.
+
+```js
+// vite.config.js additions:
+optimizeDeps: {
+  exclude: ['@xenova/transformers', 'onnxruntime-web'],
+},
+worker: {
+  format: 'es',
+},
+```
+
+**Part 2 — Worker error recovery (defensive)**
+
+In `frontend/src/workers/iconWorkerClient.js`, after `rejectPendingRequests()`
+in `handleWorkerError`, reset `iconWorker = null`. This allows `getIconWorker()`
+to create a fresh worker instance on the next call instead of posting messages
+to a dead worker.
+
+```js
+function handleWorkerError() {
+  rejectPendingRequests(new Error("Icon worker failed."));
+  iconWorker = null;  // ← allow recreation on next getIconWorker() call
+}
+```
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `frontend/vite.config.js` | Add `worker: { format: 'es' }` top-level key; add `'onnxruntime-web'` to `optimizeDeps.exclude` array |
+| `frontend/src/workers/iconWorkerClient.js` | In `handleWorkerError`: add `iconWorker = null` after `rejectPendingRequests(...)` |
+
+### Acceptance criteria
+- No `ort-web` / `registerBackend` error in the browser JS console.
+- The icon suggestion spinner resolves (disappears) within ~1 s of typing for
+  terms with no exact match (async worker path completes successfully).
+- Opening the edit sheet for any entry no longer shows a permanent spinner.
+- If the worker were to crash after startup, `getIconWorker()` would recreate
+  it on the next call (verified by code review — no automated test needed).
+- `npm run lint` passes; `npm run build` passes; `npm test` passes.
+
+---
+
 ## Implementation Order (final)
 
 ```
 [done]  T-001 → T-002 → T-003 → T-004 → T-005
 [done]  T-007 → T-008 → T-011 → T-009 → T-010 → T-006
-[done]  T-012 → T-013
-[done]  T-014
-[next]  T-015
-          ↑
-      double-scrollbar
-      CSS fix
+[done]  T-012 → T-013 → T-014 → T-015
+[next]  T-016  (box-shadow clip: inputs + button — CSS only)
+        T-017  (cursor: wait → not-allowed — CSS only)
+        T-018  (ONNX worker crash + recovery — vite.config + iconWorkerClient)
 ```
 
 Each task is independently committable. The implementer should run
