@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import { ICON_REGISTRY, ICON_REGISTRY_KEYS } from "../data/iconRegistry";
+import { useAutocomplete } from "../hooks/useAutocomplete";
 import { useIconSuggestion } from "../hooks/useIconSuggestion";
+import AutocompleteSuggestions from "./AutocompleteSuggestions";
 import { BottomSheet } from "./ui";
 
 function normalizeSearchTerm(value) {
@@ -10,23 +13,26 @@ function normalizeSearchTerm(value) {
 export default function AddItemSheet({
   initialIconName = null,
   initialText = "",
+  listId = "",
   mode = "add",
   open,
   onAdd,
   onClose
 }) {
+  const { token } = useAuth();
   const [text, setText] = useState(initialText);
   const [selectedIconName, setSelectedIconName] = useState(initialIconName);
   const [showIconBrowser, setShowIconBrowser] = useState(false);
   const [iconBrowserSearchText, setIconBrowserSearchText] = useState("");
   const { iconName, topMatches, loading } = useIconSuggestion(text);
+  const isEditMode = mode === "edit";
+  const { suggestions } = useAutocomplete(listId, isEditMode ? "" : text, token);
   const PreviewIcon = selectedIconName ? ICON_REGISTRY[selectedIconName] : null;
   const suggestedIconNames = [...new Set(topMatches)].filter((candidate) => Boolean(ICON_REGISTRY[candidate]));
   const normalizedIconBrowserSearchText = normalizeSearchTerm(iconBrowserSearchText);
   const visibleIconNames = ICON_REGISTRY_KEYS.filter((candidate) =>
     candidate.toLowerCase().includes(normalizedIconBrowserSearchText)
   );
-  const isEditMode = mode === "edit";
   const textInputId = isEditMode ? "edit-item-sheet-text" : "add-item-sheet-text";
   const iconSearchInputId = isEditMode ? "edit-item-icon-browser-search" : "add-item-icon-browser-search";
   const sheetTitle = isEditMode ? "Edit Item" : "Add Item";
@@ -45,6 +51,26 @@ export default function AddItemSheet({
   useEffect(() => {
     setSelectedIconName(iconName);
   }, [iconName]);
+
+  async function handleQuickAdd(suggestedText, suggestedIconName) {
+    const trimmed = suggestedText.trim();
+
+    if (!trimmed) {
+      return;
+    }
+
+    // Keep the add sheet open after a successful chip tap so users can continue adding items.
+    const submitResult = await onAdd?.(trimmed, suggestedIconName);
+
+    if (submitResult === false) {
+      return;
+    }
+
+    setShowIconBrowser(false);
+    setIconBrowserSearchText("");
+    setText("");
+    setSelectedIconName(null);
+  }
 
   async function handleSubmit(event) {
     event?.preventDefault();
@@ -93,6 +119,8 @@ export default function AddItemSheet({
             </div>
           ) : null}
         </div>
+
+        {!isEditMode ? <AutocompleteSuggestions suggestions={suggestions} onSelect={handleQuickAdd} /> : null}
 
         {suggestedIconNames.length > 0 ? (
           <div className="add-item-icon-picker" role="group" aria-label="Suggested icons">

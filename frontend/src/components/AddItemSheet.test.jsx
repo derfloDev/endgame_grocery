@@ -8,6 +8,31 @@ import AddItemSheet from "./AddItemSheet";
 
 const cssSource = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
 
+vi.mock("../context/AuthContext", () => ({
+  useAuth: vi.fn(() => ({
+    token: "token-1"
+  }))
+}));
+
+vi.mock("../hooks/useAutocomplete", () => ({
+  useAutocomplete: vi.fn((listId, text) => {
+    if (listId === "list-1" && text === "Tom") {
+      return {
+        suggestions: [
+          { text: "Tomaten", icon: "IconSalad" },
+          { text: "Tomatenmark", icon: "IconBottle" }
+        ],
+        loading: false
+      };
+    }
+
+    return {
+      suggestions: [],
+      loading: false
+    };
+  })
+}));
+
 vi.mock("../hooks/useIconSuggestion", () => ({
   useIconSuggestion: vi.fn((text) => {
     if (text === "Milch") {
@@ -41,7 +66,7 @@ describe("AddItemSheet", () => {
 
   it("shows the resolved icon preview and submits it with the item text", async () => {
     const onAdd = vi.fn();
-    const { container } = render(<AddItemSheet open onAdd={onAdd} onClose={vi.fn()} />);
+    const { container } = render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText("Add item"), "Milch");
 
@@ -55,7 +80,7 @@ describe("AddItemSheet", () => {
 
   it("expands the inline icon browser, filters icons, and submits the manually selected icon", async () => {
     const onAdd = vi.fn();
-    const { container } = render(<AddItemSheet open onAdd={onAdd} onClose={vi.fn()} />);
+    const { container } = render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText("Add item"), "Gemüse");
 
@@ -97,6 +122,7 @@ describe("AddItemSheet", () => {
       <AddItemSheet
         initialIconName="IconMilk"
         initialText="Milch"
+        listId="list-1"
         mode="edit"
         open
         onAdd={onAdd}
@@ -126,7 +152,7 @@ describe("AddItemSheet", () => {
   });
 
   it("shows a loading indicator while the icon suggestion is resolving", async () => {
-    render(<AddItemSheet open onAdd={vi.fn()} onClose={vi.fn()} />);
+    render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText("Add item"), "Mil");
 
@@ -135,7 +161,7 @@ describe("AddItemSheet", () => {
   });
 
   it("uses a not-allowed cursor for the disabled submit button", () => {
-    render(<AddItemSheet open onAdd={vi.fn()} onClose={vi.fn()} />);
+    render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
 
     const submitButton = screen.getByRole("button", { name: "Add Item" });
 
@@ -143,5 +169,21 @@ describe("AddItemSheet", () => {
     expect(cssSource).toMatch(
       /\.button-primary:disabled,\s*\.eg-btn-primary:disabled\s*\{[^}]*cursor:\s*not-allowed;/s
     );
+  });
+
+  it("renders autocomplete chips for typed input and adds the selected suggestion without closing the sheet", async () => {
+    const onAdd = vi.fn().mockResolvedValue(true);
+    render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText("Add item"), "Tom");
+
+    expect(screen.getByRole("listbox", { name: "Autocomplete suggestions" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Tomaten" })).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("option", { name: "Tomaten" }));
+
+    expect(onAdd).toHaveBeenCalledWith("Tomaten", "IconSalad");
+    expect(screen.getByRole("dialog", { name: "Add Item" })).toBeTruthy();
+    expect(screen.getByLabelText("Add item").value).toBe("");
   });
 });

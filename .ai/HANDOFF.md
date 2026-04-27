@@ -151,3 +151,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — review — 2026-04-27T12:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 AutocompleteSuggestions component, AddItemSheet integration, ListDetailPage wiring, and CSS; all plan requirements verified; 59/59 frontend + 37/37 backend tests pass. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-27T12:48:17Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the autocomplete suggestion chip component, integrated it into the add-item sheet and list detail flow, updated the UI styles and tests, and aligned the app integration test with the keep-open add-sheet behavior. |
+| Files Changed | .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/components/AddItemSheet.jsx, frontend/src/components/AddItemSheet.test.jsx, frontend/src/components/AutocompleteSuggestions.jsx, frontend/src/components/AutocompleteSuggestions.test.jsx, frontend/src/index.css, frontend/src/pages/ListDetailPage.jsx |
+| Validation | `npm run test --workspace frontend -- src/components/AutocompleteSuggestions.test.jsx src/components/AddItemSheet.test.jsx` PASS; `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
+| Commit | pending feat(ui): add autocomplete suggestion chips to add item flow |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-04-27T13:07:50Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-004 done and prepared the reviewed autocomplete UI changes for commit using the recorded Conventional Commit message. |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md |
+| Validation | reused prior reviewed evidence; no new validation run during `commit_task` |
+| Commit | pending feat(ui): add autocomplete suggestion chips to add item flow |
+| Next Role | none |
+
+---

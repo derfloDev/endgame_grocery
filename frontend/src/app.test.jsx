@@ -369,6 +369,10 @@ describe("authentication shell", () => {
     });
 
     expect(await screen.findByText("Milch")).toBeTruthy();
+    const addItemDialog = screen.getByRole("dialog", { name: "Add Item" });
+    expect(addItemDialog).toBeTruthy();
+    expect(within(addItemDialog).getByLabelText("Add item").value).toBe("");
+    await userEvent.click(within(addItemDialog).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog", { name: "Add Item" })).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));

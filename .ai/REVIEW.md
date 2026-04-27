@@ -91,6 +91,52 @@ No blockers, majors, or minors found.
 
 ---
 
+## Task: T-004 — Frontend: `AutocompleteSuggestions` Component + `AddItemSheet` Integration
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-27
+
+#### Findings
+
+| # | Severity | File | Description | Required Fix |
+|---|----------|------|-------------|--------------|
+| 1 | nit | `frontend/src/components/AutocompleteSuggestions.jsx:12` | Chip key includes array index (`${text}-${icon}-${index}`). Index-in-key is a code smell, but acceptable here since the suggestions list is never reordered client-side after render. | No |
+| 2 | nit | `frontend/src/components/AddItemSheet.jsx:55–73` | The plan says "do not clear or close after" for `handleQuickAdd`. The implementation does clear text and icon state after a successful chip tap — matching the `handleSubmit` add-mode reset path exactly. Behaviour is correct and intentional (sheet stays open, text cleared for next item); the wording in the plan was ambiguous about what "do not clear" meant in context. | No |
+
+No blockers, majors, or minors found.
+
+#### Verification
+
+##### Steps
+1. Read `AutocompleteSuggestions.jsx` against plan spec (props, render-null, role attrs, icon registry lookup, tap target).
+2. Read `index.css` autocomplete section (lines 900–928) — verified `.autocomplete-suggestions` flex/overflow, `.autocomplete-chip` min-height, hover/focus styles.
+3. Read `AddItemSheet.jsx` — verified `listId` prop, `useAutocomplete` call (edit mode passes `""`), `<AutocompleteSuggestions>` placement between text input and icon picker, `handleQuickAdd` keeps sheet open.
+4. Read `ListDetailPage.jsx` — verified both `<AddItemSheet>` instances receive `listId={id}`.
+5. Read `AutocompleteSuggestions.test.jsx` — 4 required tests: empty renders null, chip count, chip click, null-icon chip with 44px CSS assertion.
+6. Read `AddItemSheet.test.jsx` — verified new 6th test: "Tom" input shows listbox, chip tap calls `onAdd("Tomaten","IconSalad")`, sheet stays open, input cleared.
+7. Ran `npm run lint` — PASS (1 pre-existing warning in AuthContext, unrelated).
+8. Ran `npm run build` — PASS.
+9. Ran `cd frontend && npm test` — 59/59 PASS (11 test files; 4 new AutocompleteSuggestions tests, 1 new AddItemSheet test).
+10. Ran `cd backend && npm test` — 37/37 PASS.
+
+##### Findings
+- `AutocompleteSuggestions`: renders `null` for empty array ✅; `role="listbox"` on container, `role="option"` + `aria-label={text}` per chip ✅; icon skipped when `null` or not in `ICON_REGISTRY` ✅.
+- CSS: `.autocomplete-chip { min-height: 44px; }` confirmed at line 912; flex row, gap, overflow-x auto, hover/focus-visible highlight all present ✅.
+- `AddItemSheet`: `listId` prop wired; hook called with `""` in edit mode to suppress suggestions; `<AutocompleteSuggestions>` rendered only for `!isEditMode` between text field and icon picker ✅; `handleQuickAdd` calls `onAdd?.(trimmed, icon)`, guards on `false` return, resets local form state, never calls `onClose` — sheet stays open ✅.
+- `ListDetailPage`: both `<AddItemSheet>` usages receive `listId={id}` ✅.
+- All plan acceptance criteria verified: typing ≥ 2 chars shows chips; chip tap triggers `onAdd`; sheet stays open; chips ≥ 44 px; empty suggestions → null render.
+
+##### Risks
+- None introduced.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-002 — Backend: Suggestions Endpoint + Entry Upsert
 
 ### Review Round 1
