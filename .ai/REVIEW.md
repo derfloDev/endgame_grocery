@@ -131,6 +131,51 @@ No blockers, majors, or minors found.
 
 ---
 
+## Task: T-006 — Frontend: Autocomplete Anchor Fix + Click-Outside Close + Icon-Preview Spacing
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-27
+
+#### Findings
+
+| # | Severity | File | Description | Required Fix |
+|---|----------|------|-------------|--------------|
+| 1 | nit | `frontend/src/components/AddItemSheet.jsx:86` | `handleInputFocus` adds an `!isEditMode` guard not in the plan spec. This is a correct defensive addition (edit mode already passes `""` to `useAutocomplete`), not a deviation. | No |
+
+No blockers, majors, or minors found.
+
+#### Verification
+
+##### Steps
+1. Read `AddItemSheet.jsx` in full — verified all three fixes: anchor isolation (inner `.eg-input-anchor` + ref, preview moved outside), click-outside effect (`mousedown` + `touchstart` on document, early return when hidden, cleanup), new handlers (`handleInputChange`, `handleInputFocus`), `showSuggestions` state gating, all close call-sites updated.
+2. Read `index.css` lines 900–949 — verified `.eg-input-wrap` changed to `display: flex; flex-direction: column; gap: 10px` (no longer `position: relative`); `.eg-input-anchor { position: relative; }` added; `.autocomplete-suggestions` position rules unchanged.
+3. Read updated `AddItemSheet.test.jsx` (lines 174–228):
+   - Existing chip test: now uses `within(inputAnchor)` instead of `within(inputWrap)`; verifies listbox gone after chip tap; CSS assertions updated for new `eg-input-wrap` flex rules and `eg-input-anchor` relative positioning.
+   - New "closes on outside click" test: types "Tom" → listbox visible; clicks "Mehr anzeigen" (outside anchor) → listbox gone.
+   - New "preview icon outside anchor" test: DOM structure assertions — `inputWrap.children[0] === inputAnchor`, `inputWrap.children[1] === preview`, `!inputAnchor.contains(preview)`.
+4. Ran `npm run lint` — PASS.
+5. Ran `npm run build` — PASS.
+6. Ran `cd frontend && npm test` — 61/61 PASS (2 new tests in `AddItemSheet.test.jsx`).
+7. Ran `cd backend && npm test` — 37/37 PASS.
+
+##### Findings
+- **Fix 1 (anchor):** `<div className="eg-input-anchor" ref={inputAnchorRef}>` wraps only `<input>`; `<AutocompleteSuggestions>` inside; preview icon is a sibling in `.eg-input-wrap` — DOM structure verified by the new structural test ✅.
+- **Fix 2 (click-outside):** Effect fires only when `showSuggestions` is true (early return guard); registers `mousedown` + `touchstart` on `document`; uses `inputAnchorRef.current.contains()` for containment check; cleaned up in effect return ✅. `handleInputChange`, `handleInputFocus`, `handleQuickAdd`, `handleSubmit`, and reset effect all call `setShowSuggestions(false)` at the right moments ✅.
+- **Fix 3 (spacing):** `.eg-input-wrap { display: flex; flex-direction: column; gap: 10px; }` provides controlled 10 px gap between input and preview icon ✅.
+- CSS: `position: relative` correctly moved from `.eg-input-wrap` to `.eg-input-anchor`; dropdown `top: calc(100% + 2px)` is now relative to the input element height only ✅.
+- All three plan acceptance criteria met: flush dropdown, outside-click close, chip-tap close, 10 px preview spacing.
+
+##### Risks
+- None introduced. The `document` event listeners are scoped behind the `showSuggestions` guard and reliably removed on cleanup.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-004 — Frontend: `AutocompleteSuggestions` Component + `AddItemSheet` Integration
 
 ### Review Round 1

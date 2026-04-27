@@ -240,3 +240,53 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-006 — plan — 2026-04-27T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned three coordinated fixes: isolate position-anchor to input-only via .eg-input-anchor, add showSuggestions state + click-outside handler to close dropdown, fix icon-preview spacing via flex column gap on .eg-input-wrap. |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-04-27T13:39:13Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Fixed the autocomplete dropdown anchor to track the input only, added outside-click dismissal and controlled suggestion visibility, restored preview spacing beneath the input, tightened the AddItemSheet tests, and updated README wording for the new behavior. |
+| Files Changed | .ai/TASKS.md, README.md, frontend/src/components/AddItemSheet.jsx, frontend/src/components/AddItemSheet.test.jsx, frontend/src/index.css |
+| Validation | `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/components/AutocompleteSuggestions.test.jsx` PASS; `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
+| Commit | pending fix(ui): anchor autocomplete dropdown to input |
+| Next Role | review |
+
+---
+
+### T-006 — review — 2026-04-27T13:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-006 anchor isolation, click-outside close, and preview-spacing fixes; all three problems correctly resolved; DOM structure, CSS, event listeners, and state gating verified; 61/61 frontend + 37/37 backend pass. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-04-27T14:07:01Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-006 done and prepared the reviewed anchor-and-dismissal autocomplete changes for commit using the recorded Conventional Commit message. |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md |
+| Validation | reused prior reviewed evidence; no new validation run during `commit_task` |
+| Commit | pending fix(ui): anchor autocomplete dropdown to input |
+| Next Role | none |
+
+---

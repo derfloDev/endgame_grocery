@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { ICON_REGISTRY, ICON_REGISTRY_KEYS } from "../data/iconRegistry";
 import { useAutocomplete } from "../hooks/useAutocomplete";
@@ -24,6 +24,8 @@ export default function AddItemSheet({
   const [selectedIconName, setSelectedIconName] = useState(initialIconName);
   const [showIconBrowser, setShowIconBrowser] = useState(false);
   const [iconBrowserSearchText, setIconBrowserSearchText] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputAnchorRef = useRef(null);
   const { iconName, topMatches, loading } = useIconSuggestion(text);
   const isEditMode = mode === "edit";
   const { suggestions } = useAutocomplete(listId, isEditMode ? "" : text, token);
@@ -46,11 +48,45 @@ export default function AddItemSheet({
     setSelectedIconName(initialIconName);
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
+    setShowSuggestions(false);
   }, [initialIconName, initialText, open]);
 
   useEffect(() => {
     setSelectedIconName(iconName);
   }, [iconName]);
+
+  useEffect(() => {
+    if (!showSuggestions) {
+      return;
+    }
+
+    function handlePointerOutside(event) {
+      if (inputAnchorRef.current && !inputAnchorRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerOutside);
+    document.addEventListener("touchstart", handlePointerOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerOutside);
+      document.removeEventListener("touchstart", handlePointerOutside);
+    };
+  }, [showSuggestions]);
+
+  function handleInputChange(event) {
+    const value = event.target.value;
+
+    setText(value);
+    setShowSuggestions(value.trim().length >= 2);
+  }
+
+  function handleInputFocus() {
+    if (!isEditMode && text.trim().length >= 2) {
+      setShowSuggestions(true);
+    }
+  }
 
   async function handleQuickAdd(suggestedText, suggestedIconName) {
     const trimmed = suggestedText.trim();
@@ -66,6 +102,7 @@ export default function AddItemSheet({
       return;
     }
 
+    setShowSuggestions(false);
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
     setText("");
@@ -87,6 +124,7 @@ export default function AddItemSheet({
       return;
     }
 
+    setShowSuggestions(false);
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
 
@@ -102,15 +140,21 @@ export default function AddItemSheet({
         <div className="eg-field">
           <label htmlFor={textInputId}>{inputLabel}</label>
           <div className="eg-input-wrap">
-            <input
-              id={textInputId}
-              autoComplete="off"
-              autoFocus={!showIconBrowser}
-              className="eg-input"
-              placeholder="Add milk, lemons, bread..."
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-            />
+            <div className="eg-input-anchor" ref={inputAnchorRef}>
+              <input
+                id={textInputId}
+                autoComplete="off"
+                autoFocus={!showIconBrowser}
+                className="eg-input"
+                placeholder="Add milk, lemons, bread..."
+                value={text}
+                onFocus={handleInputFocus}
+                onChange={handleInputChange}
+              />
+              {showSuggestions && !isEditMode ? (
+                <AutocompleteSuggestions suggestions={suggestions} onSelect={handleQuickAdd} />
+              ) : null}
+            </div>
             {loading ? (
               <div aria-live="polite" className="add-item-preview add-item-preview-loading">
                 <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
@@ -120,7 +164,6 @@ export default function AddItemSheet({
                 <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
               </div>
             ) : null}
-            {!isEditMode ? <AutocompleteSuggestions suggestions={suggestions} onSelect={handleQuickAdd} /> : null}
           </div>
         </div>
 

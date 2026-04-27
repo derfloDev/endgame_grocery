@@ -398,6 +398,240 @@ Remove the old `transform: translateY(-1px)` hover effect — it looks wrong on 
 
 ---
 
+---
+
+## T-006 — Frontend: Autocomplete Anchor Fix + Click-Outside Close + Icon-Preview Spacing
+
+### Root Causes
+
+| # | Problem | Cause |
+|---|---------|-------|
+| 1 | Dropdown not flush with input when preview icon is visible | `position: relative` lives on `.eg-input-wrap`, which grows taller when the preview icon renders; `top: 100%` is therefore calculated from the bottom of the wrapper (below the icon), not from the bottom of the input. |
+| 2 | Dropdown stays open on outside click/touch | No click-outside handler; suggestions are rendered whenever `suggestions.length > 0` with no visibility gate. |
+| 3 | Wrong spacing between input and preview icon | `.eg-input-wrap` has no explicit layout direction or gap; children stack without controlled spacing. |
+
+---
+
+### Fix 1 — Isolate the position anchor to the input only
+
+Introduce an inner `.eg-input-anchor` div that wraps **only** the `<input>` element. Place `<AutocompleteSuggestions>` inside `.eg-input-anchor`. Move the preview icon **outside** `.eg-input-anchor` so it does not affect the `top: 100%` calculation.
+
+New JSX structure inside `.eg-field`:
+
+```jsx
+<div className="eg-field">
+  <label htmlFor={textInputId}>{inputLabel}</label>
+  <div className="eg-input-wrap">
+    <div className="eg-input-anchor" ref={inputAnchorRef}>
+      <input
+        id={textInputId}
+        autoComplete="off"
+        autoFocus={!showIconBrowser}
+        className="eg-input"
+        placeholder="Add milk, lemons, bread..."
+        value={text}
+        onFocus={handleInputFocus}
+        onChange={handleInputChange}
+      />
+      {showSuggestions && !isEditMode
+        ? <AutocompleteSuggestions suggestions={suggestions} onSelect={handleQuickAdd} />
+        : null}
+    </div>
+
+    {/* Preview icon — sibling of anchor, does not affect dropdown position */}
+    {loading ? (
+      <div aria-live="polite" className="add-item-preview add-item-preview-loading">
+        <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
+      </div>
+    ) : PreviewIcon ? (
+      <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
+        <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
+      </div>
+    ) : null}
+  </div>
+</div>
+```
+
+CSS changes:
+
+```css
+/* Outer wrapper: flex column so input and preview stack with controlled gap */
+.eg-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Inner anchor: sole position:relative container for the dropdown */
+.eg-input-anchor {
+  position: relative;
+}
+
+/* Dropdown: unchanged position rules, now correctly relative to .eg-input-anchor */
+.autocomplete-suggestions {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  /* ... rest of existing dropdown styles unchanged ... */
+}
+```
+
+---
+
+### Fix 2 — Click-outside closes the dropdown
+
+Add `showSuggestions` state + `inputAnchorRef` + document event listeners.
+
+**New state and ref in `AddItemSheet`:**
+
+```js
+import { useEffect, useRef, useState } from "react";
+// ...
+const [showSuggestions, setShowSuggestions] = useState(false);
+const inputAnchorRef = useRef(null);
+```
+
+**Event handler helpers** (replace direct `setText` call):
+
+```js
+function handleInputChange(event) {
+  const value = event.target.value;
+  setText(value);
+  setShowSuggestions(value.trim().length >= 2);
+}
+
+function handleInputFocus() {
+  if (text.trim().length >= 2) {
+    setShowSuggestions(true);
+  }
+}
+```
+
+**Click-outside `useEffect`:**
+
+```js
+useEffect(() => {
+  if (!showSuggestions) return;
+
+  function handlePointerOutside(event) {
+    if (inputAnchorRef.current && !inputAnchorRef.current.contains(event.target)) {
+      setShowSuggestions(false);
+    }
+  }
+
+  document.addEventListener("mousedown", handlePointerOutside);
+  document.addEventListener("touchstart", handlePointerOutside);
+
+  return () => {
+    document.removeEventListener("mousedown", handlePointerOutside);
+    document.removeEventListener("touchstart", handlePointerOutside);
+  };
+}, [showSuggestions]);
+```
+
+**Close dropdown in existing handlers:**
+
+- `handleQuickAdd`: add `setShowSuggestions(false)` after a successful add (before the state resets).
+- `handleSubmit`: add `setShowSuggestions(false)` alongside the existing `setShowIconBrowser(false)` call.
+- Reset `useEffect` (on `open`/`initialText`/`initialIconName`): add `setShowSuggestions(false)`.
+
+---
+
+### Fix 3 — Controlled icon-preview spacing
+
+`.eg-input-wrap { display: flex; flex-direction: column; gap: 10px; }` (see Fix 1 CSS above) gives the preview icon a consistent 10 px gap below the input. No additional changes needed.
+
+---
+
+### Files to change
+- `frontend/src/components/AddItemSheet.jsx`
+  - Add `useRef` import
+  - Add `showSuggestions` state + `inputAnchorRef`
+  - Replace inline `onChange` arrow with `handleInputChange`; add `onFocus={handleInputFocus}`
+  - Add click-outside `useEffect`
+  - Close dropdown in `handleQuickAdd`, `handleSubmit`, and reset `useEffect`
+  - Wrap `<input>` in `<div className="eg-input-anchor" ref={inputAnchorRef}>`; gate `<AutocompleteSuggestions>` on `showSuggestions`
+  - Move preview icon outside `.eg-input-anchor` (sibling inside `.eg-input-wrap`)
+- `frontend/src/index.css`
+  - Add `.eg-input-wrap { display: flex; flex-direction: column; gap: 10px; }`
+  - Add `.eg-input-anchor { position: relative; }`
+  - Remove `position: relative` from `.eg-input-wrap` (moved to `.eg-input-anchor`)
+- `frontend/src/components/AddItemSheet.test.jsx`
+  - Add test: dropdown closes when clicking outside `.eg-input-anchor`
+  - Add test: preview icon does not shift dropdown position (snapshot or structural assertion)
+
+### Acceptance Criteria
+- Dropdown appears flush below the `<input>` border regardless of whether the loading spinner or preview icon is visible.
+- Dropdown closes when the user clicks or touches anywhere outside the input area.
+- Dropdown closes after a chip tap (quick-add).
+- Preview icon (or loading spinner) is visible with ~10 px gap below the input, not crammed against it.
+- `npm run lint`, `npm run build`, `npm test` all pass.
+
+---
+
+---
+
+## T-007 — Frontend: Item-Icon Preview to the Right of the Input
+
+### What
+Move the item icon preview (and loading spinner) from below the input field to the right side, inline with it.
+
+### Current layout (after T-006)
+`.eg-input-wrap` is `flex-direction: column` — input stacks above preview icon with 10 px gap.
+
+### Target layout
+```
+[ input field ················· ] [ 🥛 ]
+```
+`.eg-input-wrap` becomes a **row**, preview icon sits as a flex sibling to the right of the input anchor.
+
+### CSS changes — `frontend/src/index.css`
+
+```css
+/* Before (T-006) */
+.eg-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eg-input-anchor {
+  position: relative;
+}
+
+/* After (T-007) */
+.eg-input-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.eg-input-anchor {
+  flex: 1;          /* input takes all remaining width */
+  position: relative;
+}
+```
+
+No JSX changes required. The preview icon (`.add-item-preview`) and the anchor (`.eg-input-anchor`) are already flex siblings inside `.eg-input-wrap` — changing the flex direction is sufficient.
+
+The dropdown (`autocomplete-suggestions`) uses `left: 0; right: 0` relative to `.eg-input-anchor`. Because `.eg-input-anchor` is now `flex: 1` (input width only, not including the icon), the dropdown correctly spans the input width and no wider.
+
+### Files to change
+- `frontend/src/index.css` — update `.eg-input-wrap` to `flex-direction: row; align-items: center;`; add `flex: 1` to `.eg-input-anchor`
+- `frontend/src/components/AddItemSheet.test.jsx` — add/update structural test: preview icon renders as sibling of `.eg-input-anchor`, not a descendant
+
+### Acceptance Criteria
+- Icon preview and loading spinner appear to the **right** of the input, vertically centred.
+- Input field takes all available width left of the icon (no shrinking).
+- Autocomplete dropdown spans the input width only (not extending under the icon).
+- When no icon is available, the input occupies full row width.
+- `npm run lint`, `npm run build`, `npm test` all pass.
+
+---
+
 ## Validation
 
 Run after every task and again before the final commit:

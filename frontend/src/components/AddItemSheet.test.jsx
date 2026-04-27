@@ -178,17 +178,51 @@ describe("AddItemSheet", () => {
     await userEvent.type(screen.getByLabelText("Add item"), "Tom");
 
     const inputWrap = container.querySelector(".eg-input-wrap");
+    const inputAnchor = container.querySelector(".eg-input-anchor");
     expect(inputWrap).toBeTruthy();
+    expect(inputAnchor).toBeTruthy();
     expect(screen.getByLabelText("Add item").getAttribute("autocomplete")).toBe("off");
-    expect(within(inputWrap).getByRole("listbox", { name: "Autocomplete suggestions" })).toBeTruthy();
-    expect(within(inputWrap).getByRole("option", { name: "Tomaten" })).toBeTruthy();
+    expect(within(inputAnchor).getByRole("listbox", { name: "Autocomplete suggestions" })).toBeTruthy();
+    expect(within(inputAnchor).getByRole("option", { name: "Tomaten" })).toBeTruthy();
 
-    await userEvent.click(within(inputWrap).getByRole("option", { name: "Tomaten" }));
+    await userEvent.click(within(inputAnchor).getByRole("option", { name: "Tomaten" }));
 
     expect(onAdd).toHaveBeenCalledWith("Tomaten", "IconSalad");
     expect(screen.getByRole("dialog", { name: "Add Item" })).toBeTruthy();
     expect(screen.getByLabelText("Add item").value).toBe("");
-    expect(cssSource).toMatch(/\.eg-input-wrap\s*\{[^}]*position:\s*relative;/s);
+    expect(screen.queryByRole("listbox", { name: "Autocomplete suggestions" })).toBeNull();
+    expect(cssSource).toMatch(/\.eg-input-wrap\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*gap:\s*10px;/s);
+    expect(cssSource).toMatch(/\.eg-input-anchor\s*\{[^}]*position:\s*relative;/s);
     expect(cssSource).toMatch(/\.autocomplete-suggestions\s*\{[^}]*position:\s*absolute;[^}]*top:\s*calc\(100%\s*\+\s*2px\);[^}]*left:\s*0;[^}]*right:\s*0;/s);
+  });
+
+  it("closes the dropdown when clicking outside the input anchor", async () => {
+    const { container } = render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText("Add item"), "Tom");
+
+    const inputAnchor = container.querySelector(".eg-input-anchor");
+    expect(within(inputAnchor).getByRole("listbox", { name: "Autocomplete suggestions" })).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Mehr anzeigen" }));
+
+    expect(screen.queryByRole("listbox", { name: "Autocomplete suggestions" })).toBeNull();
+  });
+
+  it("keeps the preview icon outside the dropdown anchor and uses spacing below the input", async () => {
+    const { container } = render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText("Add item"), "Milch");
+
+    const inputWrap = container.querySelector(".eg-input-wrap");
+    const inputAnchor = container.querySelector(".eg-input-anchor");
+    const preview = container.querySelector("[data-testid='add-item-icon-preview']");
+
+    expect(inputWrap).toBeTruthy();
+    expect(inputAnchor).toBeTruthy();
+    expect(preview).toBeTruthy();
+    expect(inputWrap.children[0]).toBe(inputAnchor);
+    expect(inputWrap.children[1]).toBe(preview);
+    expect(inputAnchor.contains(preview)).toBe(false);
   });
 });
