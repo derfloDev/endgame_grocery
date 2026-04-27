@@ -47,6 +47,50 @@ No blockers, majors, or minors found.
 
 ---
 
+## Task: T-003 — Frontend: `useAutocomplete` Hook + `fetchSuggestions` API Client
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-27
+
+#### Findings
+
+| # | Severity | File | Description | Required Fix |
+|---|----------|------|-------------|--------------|
+| 1 | nit | `frontend/src/hooks/useAutocomplete.js:85–88` | `loading` is set to `true` before the 300 ms debounce fires. The plan does not define loading behaviour during the debounce window, and this is a reasonable UX choice, but it means consumers will see `loading: true` before any network activity starts. | No |
+| 2 | nit | `frontend/src/hooks/useAutocomplete.js:59–63` | `filterOfflineSuggestions` slices to 5 after filtering. Sensible and consistent with the backend `LIMIT 5`, but not explicitly required by the plan. | No |
+
+No blockers, majors, or minors found.
+
+#### Verification
+
+##### Steps
+1. Read `frontend/src/api/suggestions.js` — verified function signature, URL template, `createCacheKey` usage, `offlineFallbackMessage`.
+2. Read `frontend/src/api/client.js` — confirmed `createCacheKey`, `sendJsonRequest`, and offline `{ ...cachedValue, offline: true }` return shape.
+3. Read `frontend/src/hooks/useAutocomplete.js` in full — verified debounce (300 ms), short-input guard (< 2 chars), online/offline/error branches, Levenshtein implementation, request-sequence stale-guard, cleanup return.
+4. Read `frontend/src/hooks/useAutocomplete.test.js` — verified all 4 required test cases are present and exercised.
+5. Ran `npm run lint` (workspace root) — PASS.
+6. Ran `npm run build` (workspace root) — PASS.
+7. Ran `npm test` (backend, workspace root) — 37/37 PASS.
+8. Ran `cd frontend && npm test` — 54/54 PASS (4 new `useAutocomplete` tests all green).
+
+##### Findings
+- `fetchSuggestions`: URL, `cacheKey: createCacheKey("suggestions", listId)`, `offlineFallbackMessage` — all match plan exactly.
+- `useAutocomplete`: `inputText.trim().length < 2` guard resets state immediately; debounce via `window.setTimeout(…, 300)` with cleanup `window.clearTimeout`; online path sets `suggestions` from `result.suggestions`; offline path (`result?.offline`) applies `filterOfflineSuggestions` (substring + Levenshtein, sorted by `useCount DESC`); error path silently resets to `[]`.
+- Levenshtein: two-row iterative, O(m·n) time / O(m) space — no external library; `maxDistance = Math.floor(query.length / 4) + 1` matches plan formula.
+- Request-sequence ref guards against stale responses from rapid input (good defensive addition, not over-engineered).
+- All 4 plan-required tests pass; debounce test verifies exactly 299 ms = no call, 300 ms = 1 call; offline test confirms "Milch" is excluded and "Schokolade" entries survive fuzzy match.
+
+##### Risks
+- None introduced. The `loading: true` during the debounce window (nit #1) is a cosmetic UX detail only.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-002 — Backend: Suggestions Endpoint + Entry Upsert
 
 ### Review Round 1
