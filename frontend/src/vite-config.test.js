@@ -19,4 +19,8 @@ describe("vite worker config", () => {
     // registerBackend crash. ort.min.js bundles everything inline with no external deps.
     expect(viteConfig.resolve.alias["onnxruntime-web"]).toBe("onnxruntime-web/dist/ort.min.js");
   });
+
+  it("defines the app version from the root package.json", () => {
+    expect(viteConfig.define.__APP_VERSION__).toBe(JSON.stringify("0.2.0"));
+  });
 });

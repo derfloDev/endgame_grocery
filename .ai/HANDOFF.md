@@ -71,3 +71,52 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — plan — 2026-04-27T00:01:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned InfoSheet feature: settings icon button in OverviewPage top-right opens bottom sheet with logout, app version, and GPL v3 license link |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-002 — review — 2026-04-27T10:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed InfoSheet feature — all acceptance criteria met, 50 frontend + 30 backend tests pass, lint and build clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-27T07:01:09Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Replaced the overview logout icon with a settings-triggered InfoSheet that shows logout, the injected app version, and the GPL link, with tests covering the new UI and config. |
+| Files Changed | `frontend/src/components/InfoSheet.jsx`, `frontend/src/components/InfoSheet.test.jsx`, `frontend/src/pages/OverviewPage.jsx`, `frontend/src/components/ui/Icon.jsx`, `frontend/src/index.css`, `frontend/vite.config.js`, `frontend/src/vite-config.test.js`, `frontend/src/app.test.jsx`, `.ai/TASKS.md` |
+| Validation | `npm run lint` PASS with one pre-existing frontend warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with an existing Vite warning about `onnxruntime-web/dist/ort.min.js` using `eval`; `npm test` PASS |
+| Commit | pending `feat(ui): add overview info and settings sheet` |
+| Next Role | review |
+
+---
+
+### T-002 — implement — 2026-04-27T10:17:18Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Finalized the reviewed InfoSheet task and prepared the repository state for the task commit. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md` |
+| Validation | none; commit step only |
+| Commit | pending `feat(ui): add overview info and settings sheet` |
+| Next Role | none |
+
+---

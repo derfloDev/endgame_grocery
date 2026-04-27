@@ -21,3 +21,4 @@ Command expectations:
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
 | T-001 | Add GNU GPL v3 license | done | LICENSE exists at root with full GPL v3 text; package.json has `"license": "GPL-3.0-or-later"`; README.md has GPL-3.0 badge and `## License` section | `npm run test --workspace backend -- src/license.test.js`; `npm run lint`; `npm run build`; `npm test` | none |
+| T-002 | InfoSheet: settings button & info bottom sheet | done | Settings icon button top-right in OverviewPage replaces logout button; clicking opens bottom sheet titled "Info & Settings" with logout action, version row, and GPL v3 license link; lint + build + tests pass | `npm run lint`; `npm run build`; `npm test` | none |

@@ -1,9 +1,18 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+const currentDir = dirname(fileURLToPath(import.meta.url));
+const rootPackageJson = JSON.parse(readFileSync(resolve(currentDir, "../package.json"), "utf8"));
+
 export default defineConfig({
   envDir: "..",
+  define: {
+    __APP_VERSION__: JSON.stringify(rootPackageJson.version)
+  },
   resolve: {
     // ort-web.min.js (the "browser" entry of onnxruntime-web) depends on onnxruntime-common as an
     // external UMD parameter — self.ort — which is never set in a Worker module context, causing the

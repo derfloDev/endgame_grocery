@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
 import { writeCachedResource } from "../api/offlineStore";
 import { createList, deleteList, fetchLists, renameList } from "../api/lists";
+import InfoSheet from "../components/InfoSheet";
 import ListCardHome from "../components/ListCardHome";
 import NewListSheet from "../components/NewListSheet";
 import { EmptyState, ErrorState, FAB, Icon, LoadingState } from "../components/ui";
@@ -14,12 +15,13 @@ const LISTS_CACHE_KEY = "lists";
 
 export default function OverviewPage() {
   const navigate = useNavigate();
-  const { logout, token } = useAuth();
+  const { token } = useAuth();
   const { syncVersion } = useOfflineQueue();
   const [lists, setLists] = useState([]);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [view, setView] = useState("active");
+  const [showInfo, setShowInfo] = useState(false);
   const [showNew, setShowNew] = useState(false);
 
   const loadLists = useCallback(async () => {
@@ -155,8 +157,8 @@ export default function OverviewPage() {
           </div>
           <div className="overview-actions">
             <img alt="Endgame Grocery" className="overview-logo" src={logo} />
-            <button aria-label="Log out" className="eg-icon-btn" type="button" onClick={logout}>
-              <Icon name="logOut" color="var(--text-secondary)" size={18} />
+            <button aria-label="Settings" className="eg-icon-btn" type="button" onClick={() => setShowInfo(true)}>
+              <Icon name="settings" color="var(--text-secondary)" size={18} />
             </button>
           </div>
         </div>
@@ -207,6 +209,7 @@ export default function OverviewPage() {
       </div>
 
       <FAB onClick={() => setShowNew(true)} />
+      <InfoSheet open={showInfo} onClose={() => setShowInfo(false)} />
       <NewListSheet
         open={showNew}
         onAdd={(name) => void createListByName(name)}
