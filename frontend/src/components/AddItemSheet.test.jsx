@@ -191,8 +191,10 @@ describe("AddItemSheet", () => {
     expect(screen.getByRole("dialog", { name: "Add Item" })).toBeTruthy();
     expect(screen.getByLabelText("Add item").value).toBe("");
     expect(screen.queryByRole("listbox", { name: "Autocomplete suggestions" })).toBeNull();
-    expect(cssSource).toMatch(/\.eg-input-wrap\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*gap:\s*10px;/s);
-    expect(cssSource).toMatch(/\.eg-input-anchor\s*\{[^}]*position:\s*relative;/s);
+    expect(cssSource).toMatch(
+      /\.eg-input-wrap\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*row;[^}]*align-items:\s*center;[^}]*gap:\s*10px;/s
+    );
+    expect(cssSource).toMatch(/\.eg-input-anchor\s*\{[^}]*flex:\s*1;[^}]*position:\s*relative;/s);
     expect(cssSource).toMatch(/\.autocomplete-suggestions\s*\{[^}]*position:\s*absolute;[^}]*top:\s*calc\(100%\s*\+\s*2px\);[^}]*left:\s*0;[^}]*right:\s*0;/s);
   });
 
@@ -209,7 +211,7 @@ describe("AddItemSheet", () => {
     expect(screen.queryByRole("listbox", { name: "Autocomplete suggestions" })).toBeNull();
   });
 
-  it("keeps the preview icon outside the dropdown anchor and uses spacing below the input", async () => {
+  it("keeps the preview icon outside the dropdown anchor and inline to the right of the input", async () => {
     const { container } = render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText("Add item"), "Milch");
@@ -224,5 +226,9 @@ describe("AddItemSheet", () => {
     expect(inputWrap.children[0]).toBe(inputAnchor);
     expect(inputWrap.children[1]).toBe(preview);
     expect(inputAnchor.contains(preview)).toBe(false);
+    expect(cssSource).toMatch(
+      /\.eg-input-wrap\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*row;[^}]*align-items:\s*center;/s
+    );
+    expect(cssSource).toMatch(/\.eg-input-anchor\s*\{[^}]*flex:\s*1;[^}]*position:\s*relative;/s);
   });
 });

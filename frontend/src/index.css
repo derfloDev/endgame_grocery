@@ -899,11 +899,13 @@ p {
 
 .eg-input-wrap {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: 10px;
 }
 
 .eg-input-anchor {
+  flex: 1;
   position: relative;
 }
 

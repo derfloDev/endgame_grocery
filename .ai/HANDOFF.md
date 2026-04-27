@@ -290,3 +290,53 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-007 — plan — 2026-04-27T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned icon-preview repositioning: change .eg-input-wrap to flex-direction row + align-items center, add flex:1 to .eg-input-anchor so the input expands and the preview icon sits inline to the right. CSS-only change, no JSX required. |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-007 — implement — 2026-04-27T14:10:59Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Moved the add-item icon preview and loading spinner inline to the right of the input by switching the wrapper to a row layout, tightened the AddItemSheet assertions around the input anchor, and updated the feature overview wording. |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, frontend/src/components/AddItemSheet.test.jsx, frontend/src/index.css |
+| Validation | `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/components/AutocompleteSuggestions.test.jsx` PASS; `npm run lint` PASS (1 existing warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS; `npm test` PASS |
+| Commit | pending fix(ui): move add-item preview icon inline with input |
+| Next Role | review |
+
+---
+
+### T-007 — review — 2026-04-27T13:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-007 CSS-only row-layout change; `.eg-input-wrap` now flex-row with `align-items: center`, `.eg-input-anchor` gains `flex: 1`; no JSX changed; test assertions updated to match; 61/61 frontend + 37/37 backend pass with no findings. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-007 — implement — 2026-04-27T14:16:21Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-007 done and prepared the reviewed inline preview-layout changes for commit using the recorded Conventional Commit message. |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md |
+| Validation | reused prior reviewed evidence; no new validation run during `commit_task` |
+| Commit | pending fix(ui): move add-item preview icon inline with input |
+| Next Role | none |
+
+---

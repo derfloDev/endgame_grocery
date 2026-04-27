@@ -131,6 +131,46 @@ No blockers, majors, or minors found.
 
 ---
 
+## Task: T-007 — Frontend: Item-Icon Preview to the Right of the Input
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-27
+
+#### Findings
+
+No blockers, majors, minors, or nits found.
+
+#### Verification
+
+##### Steps
+1. Confirmed changed files via `git diff` and `git status`: only `frontend/src/index.css` and `frontend/src/components/AddItemSheet.test.jsx` — exactly the two files specified in the plan. No JSX changes (as plan states "No JSX changes required").
+2. Read `index.css` lines 900–910 — verified `.eg-input-wrap` changed from `flex-direction: column` to `flex-direction: row; align-items: center; gap: 10px`; `.eg-input-anchor` gained `flex: 1` alongside `position: relative`.
+3. Read `git diff` of `AddItemSheet.test.jsx`:
+   - Chip test CSS assertion updated: checks `flex-direction: row; align-items: center; gap: 10px` on `.eg-input-wrap` and `flex: 1; position: relative` on `.eg-input-anchor`.
+   - Structural test renamed "…inline to the right of the input" (was "…spacing below the input").
+   - Structural test gains two CSS assertions: `flex-direction: row; align-items: center` on wrapper, `flex: 1; position: relative` on anchor.
+4. Ran `npm run lint` — PASS (1 pre-existing warning in AuthContext, unrelated).
+5. Ran `npm run build` — PASS.
+6. Ran `cd frontend && npm test` — 61/61 PASS.
+7. Ran `cd backend && npm test` — 37/37 PASS.
+
+##### Findings
+- CSS change is a minimal two-property swap: `flex-direction: column → row` + `align-items: center` on `.eg-input-wrap`; `flex: 1` added to `.eg-input-anchor` so input takes all available width. Both match the plan spec exactly.
+- The dropdown (`left: 0; right: 0`) is relative to `.eg-input-anchor` (which is now `flex: 1` width), so it correctly spans the input width only and does not extend under the preview icon ✅.
+- When no icon is present, `.eg-input-anchor` fills the full row width because it is the only flex child ✅.
+- Test assertions precisely guard the new CSS values; DOM structural assertions (sibling order, containment) from T-006 are preserved unchanged ✅.
+
+##### Risks
+- None. Change is CSS-only, JSX is untouched, all existing tests continue to pass.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-006 — Frontend: Autocomplete Anchor Fix + Click-Outside Close + Icon-Preview Spacing
 
 ### Review Round 1
