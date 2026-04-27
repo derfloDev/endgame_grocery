@@ -90,6 +90,24 @@ export function createEntryRouter({
         [req.params.id, text.trim(), icon ?? null]
       );
 
+      try {
+        // Autocomplete history should not block successful item creation.
+        await pool.query(
+          `
+            INSERT INTO autocomplete_history (user_id, list_id, text, icon, use_count, last_used_at)
+            VALUES ($1, $2, $3, $4, 1, NOW())
+            ON CONFLICT (user_id, list_id, text)
+            DO UPDATE SET
+              icon = EXCLUDED.icon,
+              use_count = autocomplete_history.use_count + 1,
+              last_used_at = NOW()
+          `,
+          [req.user.sub, req.params.id, text.trim(), icon ?? null]
+        );
+      } catch (historyError) {
+        console.error("Failed to upsert autocomplete history.", historyError);
+      }
+
       res.status(201).json({
         entry: result.rows[0]
       });

@@ -18,7 +18,7 @@ describe("repository license metadata", () => {
 
   it("ships the full GPL v3 license text at the repository root", () => {
     const licensePath = path.join(repoRootDir, "LICENSE");
-    const licenseText = fs.readFileSync(licensePath, "utf8");
+    const licenseText = fs.readFileSync(licensePath, "utf8").replace(/\r\n/g, "\n");
 
     assert.ok(
       licenseText.startsWith(

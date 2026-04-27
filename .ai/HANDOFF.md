@@ -73,3 +73,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-04-27T12:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 suggestions endpoint and entry upsert against plan; all SQL, auth/access guards, response shape, best-effort upsert, and test coverage verified; 37/37 tests pass. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-27T11:24:18Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the authenticated suggestions endpoint, wired autocomplete-history upserts into entry creation as a best-effort write, expanded backend tests, and hardened the license test so repo-wide validation passes on Windows line endings. |
+| Files Changed | .ai/TASKS.md, README.md, backend/src/app.js, backend/src/entries.test.js, backend/src/license.test.js, backend/src/routes/entries.js, backend/src/routes/suggestions.js, backend/src/suggestions.test.js |
+| Validation | `npm run test --workspace backend -- src/entries.test.js` PASS; `npm run test --workspace backend -- src/suggestions.test.js` PASS; `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
+| Commit | pending feat(api): add ranked autocomplete suggestions |
+| Next Role | review |
+
+---
+
+### T-002 — implement — 2026-04-27T11:28:47Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and prepared the reviewed backend autocomplete changes for commit using the recorded Conventional Commit message. |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md |
+| Validation | reused prior reviewed evidence; no new validation run during `commit_task` |
+| Commit | pending feat(api): add ranked autocomplete suggestions |
+| Next Role | none |
+
+---

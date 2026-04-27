@@ -180,6 +180,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - Lists support create, rename, delete, ownership, and shared-access visibility.
 - The list detail view uses a sticky top bar, a more-options flyout for rename and sharing, a bottom-sheet add-item flow, swipe-to-delete entry rows, and collapsible done items.
 - Entries support add, edit, toggle, and delete actions with open and done grouping.
+- The backend tracks per-list autocomplete history and exposes ranked, typo-tolerant suggestions for upcoming add-item autocomplete flows.
 - Sharing supports inviting registered users by email and revoking member access.
 - Offline support caches successful reads and queues failed writes for replay after reconnect.
 
