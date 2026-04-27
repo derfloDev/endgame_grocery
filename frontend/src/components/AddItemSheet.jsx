@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import { ICON_REGISTRY, ICON_REGISTRY_KEYS } from "../data/iconRegistry";
+import { useAutocomplete } from "../hooks/useAutocomplete";
 import { useIconSuggestion } from "../hooks/useIconSuggestion";
+import AutocompleteSuggestions from "./AutocompleteSuggestions";
 import { BottomSheet } from "./ui";
 
 function normalizeSearchTerm(value) {
@@ -10,23 +13,29 @@ function normalizeSearchTerm(value) {
 export default function AddItemSheet({
   initialIconName = null,
   initialText = "",
+  listId = "",
   mode = "add",
   open,
   onAdd,
   onClose
 }) {
+  const { token } = useAuth();
   const [text, setText] = useState(initialText);
   const [selectedIconName, setSelectedIconName] = useState(initialIconName);
   const [showIconBrowser, setShowIconBrowser] = useState(false);
   const [iconBrowserSearchText, setIconBrowserSearchText] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputAnchorRef = useRef(null);
+  const iconSearchRef = useRef(null);
   const { iconName, topMatches, loading } = useIconSuggestion(text);
+  const isEditMode = mode === "edit";
+  const { suggestions } = useAutocomplete(listId, isEditMode ? "" : text, token);
   const PreviewIcon = selectedIconName ? ICON_REGISTRY[selectedIconName] : null;
   const suggestedIconNames = [...new Set(topMatches)].filter((candidate) => Boolean(ICON_REGISTRY[candidate]));
   const normalizedIconBrowserSearchText = normalizeSearchTerm(iconBrowserSearchText);
   const visibleIconNames = ICON_REGISTRY_KEYS.filter((candidate) =>
     candidate.toLowerCase().includes(normalizedIconBrowserSearchText)
   );
-  const isEditMode = mode === "edit";
   const textInputId = isEditMode ? "edit-item-sheet-text" : "add-item-sheet-text";
   const iconSearchInputId = isEditMode ? "edit-item-icon-browser-search" : "add-item-icon-browser-search";
   const sheetTitle = isEditMode ? "Edit Item" : "Add Item";
@@ -40,11 +49,80 @@ export default function AddItemSheet({
     setSelectedIconName(initialIconName);
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
+    setShowSuggestions(false);
   }, [initialIconName, initialText, open]);
 
   useEffect(() => {
     setSelectedIconName(iconName);
   }, [iconName]);
+
+  useEffect(() => {
+    if (!showSuggestions) {
+      return;
+    }
+
+    function handlePointerOutside(event) {
+      if (inputAnchorRef.current && !inputAnchorRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerOutside);
+    document.addEventListener("touchstart", handlePointerOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerOutside);
+      document.removeEventListener("touchstart", handlePointerOutside);
+    };
+  }, [showSuggestions]);
+
+  useEffect(() => {
+    if (!showIconBrowser) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      iconSearchRef.current?.focus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [showIconBrowser]);
+
+  function handleInputChange(event) {
+    const value = event.target.value;
+
+    setText(value);
+    setShowSuggestions(value.trim().length >= 2);
+  }
+
+  function handleInputFocus() {
+    if (!isEditMode && text.trim().length >= 2) {
+      setShowSuggestions(true);
+    }
+  }
+
+  async function handleQuickAdd(suggestedText, suggestedIconName) {
+    const trimmed = suggestedText.trim();
+
+    if (!trimmed) {
+      return;
+    }
+
+    // Keep the add sheet open after a successful chip tap so users can continue adding items.
+    const submitResult = await onAdd?.(trimmed, suggestedIconName);
+
+    if (submitResult === false) {
+      return;
+    }
+
+    setShowSuggestions(false);
+    setShowIconBrowser(false);
+    setIconBrowserSearchText("");
+    setText("");
+    setSelectedIconName(null);
+  }
 
   async function handleSubmit(event) {
     event?.preventDefault();
@@ -61,6 +139,7 @@ export default function AddItemSheet({
       return;
     }
 
+    setShowSuggestions(false);
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
 
@@ -75,23 +154,32 @@ export default function AddItemSheet({
       <form className="add-item-form" onSubmit={handleSubmit}>
         <div className="eg-field">
           <label htmlFor={textInputId}>{inputLabel}</label>
-          <input
-            id={textInputId}
-            autoFocus={!showIconBrowser}
-            className="eg-input"
-            placeholder="Add milk, lemons, bread..."
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-          />
-          {loading ? (
-            <div aria-live="polite" className="add-item-preview add-item-preview-loading">
-              <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
+          <div className="eg-input-wrap">
+            <div className="eg-input-anchor" ref={inputAnchorRef}>
+              <input
+                id={textInputId}
+                autoComplete="off"
+                autoFocus={!showIconBrowser}
+                className="eg-input"
+                placeholder="Add milk, lemons, bread..."
+                value={text}
+                onFocus={handleInputFocus}
+                onChange={handleInputChange}
+              />
+              {showSuggestions && !isEditMode ? (
+                <AutocompleteSuggestions suggestions={suggestions} onSelect={handleQuickAdd} />
+              ) : null}
             </div>
-          ) : PreviewIcon ? (
-            <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
-              <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
-            </div>
-          ) : null}
+            {loading ? (
+              <div aria-live="polite" className="add-item-preview add-item-preview-loading">
+                <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
+              </div>
+            ) : PreviewIcon ? (
+              <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
+                <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {suggestedIconNames.length > 0 ? (
@@ -124,14 +212,18 @@ export default function AddItemSheet({
           {iconBrowserToggleLabel}
         </button>
 
-        {showIconBrowser ? (
-          <div className="add-item-icon-browser">
+        <div
+          aria-hidden={!showIconBrowser}
+          className={`add-item-icon-browser${showIconBrowser ? " add-item-icon-browser--open" : ""}`}
+          inert={!showIconBrowser || undefined}
+        >
+          <div className="add-item-icon-browser-inner">
             <label className="visually-hidden" htmlFor={iconSearchInputId}>
               Search icons
             </label>
             <input
+              ref={iconSearchRef}
               id={iconSearchInputId}
-              autoFocus
               className="eg-input"
               placeholder="Search icons"
               value={iconBrowserSearchText}
@@ -163,7 +255,7 @@ export default function AddItemSheet({
               })}
             </div>
           </div>
-        ) : null}
+        </div>
 
         <div className="button-row">
           <button className="eg-btn-ghost" type="button" onClick={onClose}>

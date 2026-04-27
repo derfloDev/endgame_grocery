@@ -55,12 +55,21 @@ describe("entry routes", () => {
           return { rows: [{ id: "list-1" }] };
         }
 
-        assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon\)/);
-        assert.deepEqual(params, ["list-1", "Milk", "🥛"]);
+        if (callCount === 2) {
+          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon\)/);
+          assert.deepEqual(params, ["list-1", "Milk", "🥛"]);
 
-        return {
-          rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛" }]
-        };
+          return {
+            rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛" }]
+          };
+        }
+
+        assert.match(sql, /INSERT INTO autocomplete_history/);
+        assert.match(sql, /ON CONFLICT \(user_id, list_id, text\)/);
+        assert.match(sql, /use_count\s*=\s*autocomplete_history\.use_count \+ 1/);
+        assert.deepEqual(params, ["user-1", "list-1", "Milk", "🥛"]);
+
+        return { rows: [] };
       }
     };
 
@@ -72,6 +81,49 @@ describe("entry routes", () => {
     assert.equal(response.status, 201);
     assert.equal(response.body.entry.status, "open");
     assert.equal(response.body.entry.icon, "🥛");
+  });
+
+  it("still creates the entry when autocomplete history upsert fails", async () => {
+    let callCount = 0;
+    const loggedErrors = [];
+    const originalConsoleError = console.error;
+    console.error = (...args) => {
+      loggedErrors.push(args);
+    };
+
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        if (callCount === 2) {
+          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon\)/);
+          assert.deepEqual(params, ["list-1", "Milk", null]);
+
+          return {
+            rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: null }]
+          };
+        }
+
+        throw new Error("history write failed");
+      }
+    };
+
+    try {
+      const response = await request(createAuthedApp(pool)).post("/api/lists/list-1/entries").send({
+        text: "Milk"
+      });
+
+      assert.equal(response.status, 201);
+      assert.equal(response.body.entry.id, "entry-1");
+      assert.equal(loggedErrors.length, 1);
+      assert.match(String(loggedErrors[0][0]), /autocomplete history/i);
+    } finally {
+      console.error = originalConsoleError;
+    }
   });
 
   it("updates entry text and status", async () => {

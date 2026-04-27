@@ -361,21 +361,15 @@ export default function ListDetailPage() {
 
       {list ? <FAB onClick={() => setShowAddItem(true)} /> : null}
       <AddItemSheet
+        listId={id}
         open={showAddItem}
-        onAdd={async (text, icon) => {
-          const didAddEntry = await addEntryByText(text, icon);
-
-          if (didAddEntry) {
-            setShowAddItem(false);
-          }
-
-          return didAddEntry;
-        }}
+        onAdd={addEntryByText}
         onClose={() => setShowAddItem(false)}
       />
       <AddItemSheet
         initialIconName={editingEntry?.icon ?? null}
         initialText={editingEntry?.text ?? ""}
+        listId={id}
         mode="edit"
         open={Boolean(editingEntry)}
         onAdd={async (text, icon) => {

@@ -897,6 +897,59 @@ p {
   flex-wrap: wrap;
 }
 
+.eg-input-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.eg-input-anchor {
+  flex: 1;
+  position: relative;
+}
+
+.autocomplete-suggestions {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--bg-raised);
+  border: 1.5px solid rgba(139, 43, 226, 0.45);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.autocomplete-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 10px 12px;
+  text-align: left;
+  transition: background var(--duration-micro);
+}
+
+.autocomplete-chip:hover,
+.autocomplete-chip:focus-visible {
+  background: rgba(0, 229, 255, 0.1);
+  outline: none;
+}
+
 .add-item-icon-picker-btn {
   width: 42px;
   height: 42px;
@@ -929,16 +982,36 @@ p {
 
 .add-item-icon-browser {
   display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.22s ease;
+}
+
+.add-item-icon-browser-inner {
+  overflow: hidden;
+  display: grid;
   gap: 16px;
   padding-top: 4px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.add-item-icon-browser--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
 .bottom-sheet--browser-open .add-item-icon-browser {
-  min-height: 0;
   flex: 1;
+  min-height: 0;
+}
+
+.bottom-sheet--browser-open .add-item-icon-browser-inner {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
 }
 
 .add-item-icon-browser-grid {
