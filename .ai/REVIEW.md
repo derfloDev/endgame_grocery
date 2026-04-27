@@ -47,6 +47,46 @@ No blockers, majors, or minors found.
 
 ---
 
+## Task: T-005 — Frontend: Autocomplete Dropdown Positioning + Styling
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-27
+
+#### Findings
+
+No blockers, majors, minors, or nits found.
+
+#### Verification
+
+##### Steps
+1. Read `AddItemSheet.jsx` — verified `<div className="eg-input-wrap">` wraps input + preview, `autoComplete="off"` on text input, `<AutocompleteSuggestions>` moved inside wrapper, standalone line between `.eg-field` and icon picker removed.
+2. Read `index.css` lines 900–943 — verified `.eg-input-wrap { position: relative; }`, new `.autocomplete-suggestions` absolute-positioned dropdown spec, new `.autocomplete-chip` full-width row spec, `transform: translateY(-1px)` removed from hover.
+3. Read updated `AutocompleteSuggestions.test.jsx` — CSS assertion extended to `min-height: 44px` **and** `width: 100%`.
+4. Read updated `AddItemSheet.test.jsx` last test — verifies `.eg-input-wrap` exists, `autocomplete="off"`, listbox/option queried `within(inputWrap)`, CSS assertions for `position: relative` on wrapper and `position: absolute; top: calc(100% + 2px); left: 0; right: 0` on suggestions panel.
+5. Ran `npm run lint` — PASS.
+6. Ran `npm run build` — PASS.
+7. Ran `cd frontend && npm test` — 59/59 PASS.
+8. Ran `cd backend && npm test` — 37/37 PASS.
+
+##### Findings
+- `.eg-input-wrap { position: relative; }` correctly establishes the containing block for the absolute dropdown.
+- `.autocomplete-suggestions`: `position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 200` — positions flush below input (2 px gap), same width as wrapper, overlays form content. All plan values match exactly.
+- `.autocomplete-chip`: `display: flex; align-items: center; gap: 8px; min-height: 44px; width: 100%; border: none; border-radius: var(--radius-md); background: transparent; ...` — full-width rows, 44 px touch target, no pill border. All plan values match.
+- Hover/focus: `background: rgba(0, 229, 255, 0.10); outline: none;` — `transform: translateY(-1px)` correctly removed.
+- `autoComplete="off"` suppresses native browser autocomplete as required.
+- Test: `within(inputWrap).getByRole("listbox")` confirms DOM placement inside wrapper; CSS regex assertions confirm the two key new rules are present.
+
+##### Risks
+- None introduced. `z-index: 200` is a reasonable layer for a transient overlay within the BottomSheet; the sheet itself sits above page content and this value is local to the sheet's stacking context.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-003 — Frontend: `useAutocomplete` Hook + `fetchSuggestions` API Client
 
 ### Review Round 1

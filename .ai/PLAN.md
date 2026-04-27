@@ -278,6 +278,126 @@ Add styles in `frontend/src/index.css` (or a component-scoped file if that patte
 
 ---
 
+---
+
+## T-005 — Frontend: Autocomplete Dropdown Positioning + Styling
+
+### Problem
+`AutocompleteSuggestions` is rendered as a normal grid child of `.add-item-form` (`display: grid; gap: 16px`). This causes:
+- A full 16 px gap between the input and the suggestion list (should be flush / near-flush).
+- The suggestions push all subsequent form content downward (layout shift) instead of overlaying it.
+- The horizontal chip row doesn't match the input width or look like a dropdown.
+
+### Fix: two coordinated changes
+
+#### 1. `AddItemSheet.jsx` — move suggestions inside the input wrapper
+
+Wrap the `<input>` element and the preview icon in a new `<div className="eg-input-wrap">`. Place `<AutocompleteSuggestions>` **inside** that wrapper, after the input:
+
+```jsx
+<div className="eg-field">
+  <label htmlFor={textInputId}>{inputLabel}</label>
+  <div className="eg-input-wrap">
+    <input
+      id={textInputId}
+      autoComplete="off"
+      autoFocus={!showIconBrowser}
+      className="eg-input"
+      placeholder="Add milk, lemons, bread..."
+      value={text}
+      onChange={(event) => setText(event.target.value)}
+    />
+    {loading ? (
+      <div aria-live="polite" className="add-item-preview add-item-preview-loading">
+        <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
+      </div>
+    ) : PreviewIcon ? (
+      <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
+        <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
+      </div>
+    ) : null}
+    {!isEditMode ? <AutocompleteSuggestions suggestions={suggestions} onSelect={handleQuickAdd} /> : null}
+  </div>
+</div>
+```
+
+Remove the standalone `{!isEditMode ? <AutocompleteSuggestions … /> : null}` line that currently sits between `.eg-field` and the icon picker.
+
+#### 2. `index.css` — dropdown styles
+
+**New rule — `.eg-input-wrap`:**
+```css
+.eg-input-wrap {
+  position: relative;
+}
+```
+
+**Replace `.autocomplete-suggestions`** (currently a horizontal flex row) with an absolute-positioned dropdown panel:
+```css
+.autocomplete-suggestions {
+  position: absolute;
+  top: calc(100% + 2px);   /* flush below input, 2 px breathing room */
+  left: 0;
+  right: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--bg-raised);
+  border: 1.5px solid rgba(139, 43, 226, 0.45);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+```
+
+**Replace `.autocomplete-chip`** — full-width rows instead of pills:
+```css
+.autocomplete-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 10px 12px;
+  text-align: left;
+  transition: background var(--duration-micro);
+}
+
+.autocomplete-chip:hover,
+.autocomplete-chip:focus-visible {
+  background: rgba(0, 229, 255, 0.10);
+  outline: none;
+}
+```
+
+Remove the old `transform: translateY(-1px)` hover effect — it looks wrong on a list row.
+
+### Files to change
+- `frontend/src/components/AddItemSheet.jsx` — add `autoComplete="off"` to the text input; wrap input + preview in `.eg-input-wrap`; move `<AutocompleteSuggestions>` inside that wrapper
+- `frontend/src/index.css` — add `.eg-input-wrap`; replace `.autocomplete-suggestions` and `.autocomplete-chip` rules
+- `frontend/src/components/AddItemSheet.test.jsx` — verify suggestions render inside the input wrapper (query within `.eg-input-wrap`)
+- `frontend/src/components/AutocompleteSuggestions.test.jsx` — no structural changes needed; chip click test still valid
+
+### Acceptance Criteria
+- Native browser autocomplete is suppressed (`autoComplete="off"`) — only one suggestion list visible.
+- Suggestion list appears **directly below** the text input with no extra gap (≤ 4 px).
+- Suggestion list has the **same width** as the input field (left-aligned, full width of the wrapper).
+- Suggestion list **overlays** content below it — the icon picker and buttons do not shift when suggestions appear or disappear.
+- Each suggestion row is ≥ 44 px tall and spans the full dropdown width.
+- Empty suggestions → dropdown not rendered, no layout impact.
+- `npm run lint`, `npm run build`, `npm test` all pass.
+
+---
+
 ## Validation
 
 Run after every task and again before the final commit:

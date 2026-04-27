@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "../index.css";
@@ -173,17 +173,22 @@ describe("AddItemSheet", () => {
 
   it("renders autocomplete chips for typed input and adds the selected suggestion without closing the sheet", async () => {
     const onAdd = vi.fn().mockResolvedValue(true);
-    render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
+    const { container } = render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
 
     await userEvent.type(screen.getByLabelText("Add item"), "Tom");
 
-    expect(screen.getByRole("listbox", { name: "Autocomplete suggestions" })).toBeTruthy();
-    expect(screen.getByRole("option", { name: "Tomaten" })).toBeTruthy();
+    const inputWrap = container.querySelector(".eg-input-wrap");
+    expect(inputWrap).toBeTruthy();
+    expect(screen.getByLabelText("Add item").getAttribute("autocomplete")).toBe("off");
+    expect(within(inputWrap).getByRole("listbox", { name: "Autocomplete suggestions" })).toBeTruthy();
+    expect(within(inputWrap).getByRole("option", { name: "Tomaten" })).toBeTruthy();
 
-    await userEvent.click(screen.getByRole("option", { name: "Tomaten" }));
+    await userEvent.click(within(inputWrap).getByRole("option", { name: "Tomaten" }));
 
     expect(onAdd).toHaveBeenCalledWith("Tomaten", "IconSalad");
     expect(screen.getByRole("dialog", { name: "Add Item" })).toBeTruthy();
     expect(screen.getByLabelText("Add item").value).toBe("");
+    expect(cssSource).toMatch(/\.eg-input-wrap\s*\{[^}]*position:\s*relative;/s);
+    expect(cssSource).toMatch(/\.autocomplete-suggestions\s*\{[^}]*position:\s*absolute;[^}]*top:\s*calc\(100%\s*\+\s*2px\);[^}]*left:\s*0;[^}]*right:\s*0;/s);
   });
 });

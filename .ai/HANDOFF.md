@@ -190,3 +190,53 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-005 — plan — 2026-04-27T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned autocomplete dropdown fix: wrap input in `.eg-input-wrap` (position relative), move AutocompleteSuggestions inside the wrapper, replace horizontal chip row CSS with absolute-positioned dropdown panel styling. |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-005 — implement — 2026-04-27T13:39:13Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Reworked autocomplete suggestions into an absolute-positioned input dropdown, moved the list into an input wrapper, disabled native browser autocomplete, tightened the focused tests, and updated README wording for the new behavior. |
+| Files Changed | .ai/TASKS.md, README.md, frontend/src/components/AddItemSheet.jsx, frontend/src/components/AddItemSheet.test.jsx, frontend/src/components/AutocompleteSuggestions.test.jsx, frontend/src/index.css |
+| Validation | `npm run test --workspace frontend -- src/components/AutocompleteSuggestions.test.jsx src/components/AddItemSheet.test.jsx` PASS; `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
+| Commit | pending fix(ui): position autocomplete as input dropdown |
+| Next Role | review |
+
+---
+
+### T-005 — review — 2026-04-27T13:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 dropdown positioning changes; `.eg-input-wrap` containment, absolute-positioned suggestions panel, full-width chip rows, and all test assertions verified; 59/59 frontend + 37/37 backend pass with no findings. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — implement — 2026-04-27T13:53:27Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-005 done and prepared the reviewed dropdown-positioning changes for commit using the recorded Conventional Commit message. |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md |
+| Validation | reused prior reviewed evidence; no new validation run during `commit_task` |
+| Commit | pending fix(ui): position autocomplete as input dropdown |
+| Next Role | none |
+
+---

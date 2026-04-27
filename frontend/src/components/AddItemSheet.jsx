@@ -101,26 +101,28 @@ export default function AddItemSheet({
       <form className="add-item-form" onSubmit={handleSubmit}>
         <div className="eg-field">
           <label htmlFor={textInputId}>{inputLabel}</label>
-          <input
-            id={textInputId}
-            autoFocus={!showIconBrowser}
-            className="eg-input"
-            placeholder="Add milk, lemons, bread..."
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-          />
-          {loading ? (
-            <div aria-live="polite" className="add-item-preview add-item-preview-loading">
-              <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
-            </div>
-          ) : PreviewIcon ? (
-            <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
-              <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
-            </div>
-          ) : null}
+          <div className="eg-input-wrap">
+            <input
+              id={textInputId}
+              autoComplete="off"
+              autoFocus={!showIconBrowser}
+              className="eg-input"
+              placeholder="Add milk, lemons, bread..."
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+            />
+            {loading ? (
+              <div aria-live="polite" className="add-item-preview add-item-preview-loading">
+                <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
+              </div>
+            ) : PreviewIcon ? (
+              <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
+                <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
+              </div>
+            ) : null}
+            {!isEditMode ? <AutocompleteSuggestions suggestions={suggestions} onSelect={handleQuickAdd} /> : null}
+          </div>
         </div>
-
-        {!isEditMode ? <AutocompleteSuggestions suggestions={suggestions} onSelect={handleQuickAdd} /> : null}
 
         {suggestedIconNames.length > 0 ? (
           <div className="add-item-icon-picker" role="group" aria-label="Suggested icons">
