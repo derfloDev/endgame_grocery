@@ -20,4 +20,7 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
+| T-001 | DB migration: `autocomplete_history` table + `pg_trgm` extension | done | Migration runs up/down without error; lint and build pass | `backend/src/db/migrations.test.js` pass; `npm run lint` pass; `npm run build` pass; `npm test` fails in existing `backend/src/license.test.js` license header assertion | none |
+| T-002 | Backend: `GET /suggestions` endpoint + upsert on `POST /entries` | ready_for_implement | Suggestions ranked by use_count; typo-tolerant; upsert increments count; all tests pass | n/a | implement |
+| T-003 | Frontend: `useAutocomplete` hook + `fetchSuggestions` API client | ready_for_implement | Hook debounces 300 ms; skips < 2 chars; offline fuzzy filter; tests pass | n/a | implement |
+| T-004 | Frontend: `AutocompleteSuggestions` component + `AddItemSheet` integration | ready_for_implement | Chips ≥ 44 px; tap adds item directly; empty = no render; tests pass | n/a | implement |

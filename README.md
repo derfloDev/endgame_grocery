@@ -51,7 +51,7 @@ docker compose up -d
 npm run migrate
 ```
 
-This command loads environment variables from the project-root `.env` file automatically, then creates the tables used by authentication, grocery lists, entries, and sharing.
+This command loads environment variables from the project-root `.env` file automatically, then creates the tables used by authentication, grocery lists, entries, sharing, and autocomplete history.
 
 ### 5. Optionally load demo data
 

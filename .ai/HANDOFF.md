@@ -22,3 +22,54 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | plan \| implement \| review \| none |
 
 ---
+
+
+### T-001..T-004 — plan — 2026-04-27T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned smart autocomplete feature: 4 tasks covering DB migration, backend suggestions endpoint + history upsert, frontend hook with offline cache, and UI chip component wired into AddItemSheet. |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-001 — implement — 2026-04-27T10:52:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the autocomplete history migration, covered its schema operations with a migration test, and updated setup documentation for the new table. |
+| Files Changed | .ai/TASKS.md, README.md, backend/src/db/migrations.test.js, backend/src/db/migrations/1713902400000_add_autocomplete_history.cjs |
+| Validation | `npm run test --workspace backend -- src/db/migrations.test.js` PASS; `npm run lint` PASS; `npm run build` PASS; `npm test` FAIL (`backend/src/license.test.js` existing LICENSE header assertion) |
+| Commit | pending feat(db): add autocomplete history migration |
+| Next Role | review |
+
+---
+
+### T-001 — review — 2026-04-27T12:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-001 migration against plan spec; all schema objects, constraints, and index are correct; migration and existing backend tests pass (only pre-existing license test failure unrelated to this task). |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-001 — implement — 2026-04-27T11:07:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-001 done and prepared the reviewed migration changes for commit using the recorded Conventional Commit message. |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md |
+| Validation | reused prior reviewed evidence; no new validation run during `commit_task` |
+| Commit | pending feat(db): add autocomplete history migration |
+| Next Role | none |
+
+---
