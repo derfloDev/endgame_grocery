@@ -235,7 +235,7 @@ describe("authentication shell", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
 
-  it("logs out from the redesigned overview header", async () => {
+  it("opens the overview info sheet and logs out from it", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch.mockResolvedValueOnce({
       ok: true,
@@ -245,6 +245,12 @@ describe("authentication shell", () => {
     renderApp(["/"]);
 
     expect(await screen.findByText("ENDGAME")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(await screen.findByRole("dialog", { name: "Info & Settings" })).toBeTruthy();
+    expect(screen.getByText("v0.2.0")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "GNU GPL v3.0" })).toBeTruthy();
+
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
 
     expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();

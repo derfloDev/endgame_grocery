@@ -4,6 +4,9 @@
 
 <p align="center">
   <img src="https://github.com/DerFloDev/endgame_grocery/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/License-GPL%20v3-blue.svg" alt="License: GPL v3" />
+  </a>
 </p>
 
 # endgame_grocery
@@ -191,3 +194,7 @@ The semantic matcher runs in an ES-module web worker so the ONNX runtime can ini
 ## AI Workflow
 
 This project uses the persistent planner/implementer/reviewer workflow defined in `AGENTS.md`.
+
+## License
+
+This project is licensed under the [GNU General Public License v3.0](./LICENSE).
