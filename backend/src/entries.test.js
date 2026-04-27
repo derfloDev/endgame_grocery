@@ -64,12 +64,7 @@ describe("entry routes", () => {
           };
         }
 
-        assert.match(sql, /INSERT INTO autocomplete_history/);
-        assert.match(sql, /ON CONFLICT \(user_id, list_id, text\)/);
-        assert.match(sql, /use_count\s*=\s*autocomplete_history\.use_count \+ 1/);
-        assert.deepEqual(params, ["user-1", "list-1", "Milk", "🥛"]);
-
-        return { rows: [] };
+        assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
 
@@ -81,16 +76,11 @@ describe("entry routes", () => {
     assert.equal(response.status, 201);
     assert.equal(response.body.entry.status, "open");
     assert.equal(response.body.entry.icon, "🥛");
+    assert.equal(callCount, 2);
   });
 
-  it("still creates the entry when autocomplete history upsert fails", async () => {
+  it("creates the entry without writing autocomplete history", async () => {
     let callCount = 0;
-    const loggedErrors = [];
-    const originalConsoleError = console.error;
-    console.error = (...args) => {
-      loggedErrors.push(args);
-    };
-
     const pool = {
       async query(sql, params) {
         callCount += 1;
@@ -108,37 +98,44 @@ describe("entry routes", () => {
           };
         }
 
-        throw new Error("history write failed");
+        assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
 
-    try {
-      const response = await request(createAuthedApp(pool)).post("/api/lists/list-1/entries").send({
-        text: "Milk"
-      });
+    const response = await request(createAuthedApp(pool)).post("/api/lists/list-1/entries").send({
+      text: "Milk"
+    });
 
-      assert.equal(response.status, 201);
-      assert.equal(response.body.entry.id, "entry-1");
-      assert.equal(loggedErrors.length, 1);
-      assert.match(String(loggedErrors[0][0]), /autocomplete history/i);
-    } finally {
-      console.error = originalConsoleError;
-    }
+    assert.equal(response.status, 201);
+    assert.equal(response.body.entry.id, "entry-1");
+    assert.equal(callCount, 2);
   });
 
-  it("updates entry text and status", async () => {
+  it("writes autocomplete history when an entry is marked done", async () => {
     let callCount = 0;
     const pool = {
-      async query() {
+      async query(sql, params) {
         callCount += 1;
 
         if (callCount === 1) {
           return { rows: [{ id: "list-1" }] };
         }
 
-        return {
-          rows: [{ id: "entry-1", list_id: "list-1", text: "Oat milk", status: "done" }]
-        };
+        if (callCount === 2) {
+          assert.match(sql, /UPDATE entries/);
+          assert.deepEqual(params, ["Oat milk", "done", null, "entry-1", "list-1"]);
+
+          return {
+            rows: [{ id: "entry-1", list_id: "list-1", text: "Oat milk", status: "done", icon: null }]
+          };
+        }
+
+        assert.match(sql, /INSERT INTO autocomplete_history/);
+        assert.match(sql, /ON CONFLICT \(user_id, list_id, text\)/);
+        assert.match(sql, /use_count\s*=\s*autocomplete_history\.use_count \+ 1/);
+        assert.deepEqual(params, ["user-1", "list-1", "Oat milk", null]);
+
+        return { rows: [] };
       }
     };
 
@@ -152,6 +149,42 @@ describe("entry routes", () => {
     assert.equal(response.status, 200);
     assert.equal(response.body.entry.text, "Oat milk");
     assert.equal(response.body.entry.status, "done");
+    assert.equal(callCount, 3);
+  });
+
+  it("does not write autocomplete history when the entry stays open", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        if (callCount === 2) {
+          assert.match(sql, /UPDATE entries/);
+          assert.deepEqual(params, ["Oat milk", "open", null, "entry-1", "list-1"]);
+
+          return {
+            rows: [{ id: "entry-1", list_id: "list-1", text: "Oat milk", status: "open", icon: null }]
+          };
+        }
+
+        assert.fail(`Unexpected query ${callCount}: ${sql}`);
+      }
+    };
+
+    const response = await request(createAuthedApp(pool))
+      .patch("/api/lists/list-1/entries/entry-1")
+      .send({
+        text: "Oat milk",
+        status: "open"
+      });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.entry.status, "open");
+    assert.equal(callCount, 2);
   });
 
   it("updates an entry icon without requiring text or status", async () => {
@@ -181,24 +214,43 @@ describe("entry routes", () => {
 
     assert.equal(response.status, 200);
     assert.equal(response.body.entry.icon, "🥛");
+    assert.equal(callCount, 2);
   });
 
-  it("deletes an entry", async () => {
+  it("writes autocomplete history when an entry is deleted", async () => {
     let callCount = 0;
     const pool = {
-      async query() {
+      async query(sql, params) {
         callCount += 1;
 
         if (callCount === 1) {
           return { rows: [{ id: "list-1" }] };
         }
 
-        return { rows: [{ id: "entry-1" }] };
+        if (callCount === 2) {
+          assert.match(sql, /SELECT text, icon/);
+          assert.deepEqual(params, ["entry-1", "list-1"]);
+
+          return { rows: [{ text: "Milk", icon: "🥛" }] };
+        }
+
+        if (callCount === 3) {
+          assert.match(sql, /DELETE FROM entries/);
+          assert.deepEqual(params, ["entry-1", "list-1"]);
+
+          return { rows: [{ id: "entry-1" }] };
+        }
+
+        assert.match(sql, /INSERT INTO autocomplete_history/);
+        assert.deepEqual(params, ["user-1", "list-1", "Milk", "🥛"]);
+
+        return { rows: [] };
       }
     };
 
     const response = await request(createAuthedApp(pool)).delete("/api/lists/list-1/entries/entry-1");
 
     assert.equal(response.status, 204);
+    assert.equal(callCount, 4);
   });
 });
