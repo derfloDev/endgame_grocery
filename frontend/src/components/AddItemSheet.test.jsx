@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "../index.css";
@@ -95,19 +95,32 @@ describe("AddItemSheet", () => {
     expect(screen.queryByRole("dialog", { name: "Choose Icon" })).toBeNull();
     expect(screen.getByLabelText("Add item")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Add Item" })).toBeTruthy();
-    expect(screen.getByLabelText("Search icons")).toBeTruthy();
+    const iconBrowser = container.querySelector(".add-item-icon-browser");
+    const iconBrowserInner = container.querySelector(".add-item-icon-browser-inner");
+    const iconSearchInput = screen.getByLabelText("Search icons");
+    expect(iconBrowser).toBeTruthy();
+    expect(iconBrowserInner).toBeTruthy();
+    expect(iconBrowser.className).toContain("add-item-icon-browser--open");
+    expect(iconBrowser.getAttribute("aria-hidden")).toBe("false");
+    expect(iconBrowser.hasAttribute("inert")).toBe(false);
+    await waitFor(() => {
+      expect(document.activeElement).toBe(iconSearchInput);
+    });
     expect(screen.getByRole("button", { name: "Weniger anzeigen" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Zurück" })).toBeNull();
     expect(container.querySelectorAll(".add-item-icon-browser-grid").length).toBe(1);
 
-    await userEvent.type(screen.getByLabelText("Search icons"), "trash");
+    await userEvent.type(iconSearchInput, "trash");
     expect(screen.queryByRole("button", { name: "Browse IconMilk" })).toBeNull();
     expect(screen.getByRole("button", { name: "Browse IconTrash" })).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Browse IconTrash" }));
 
-    expect(screen.queryByLabelText("Search icons")).toBeNull();
+    expect(screen.getByLabelText("Search icons")).toBeTruthy();
     expect(screen.getByRole("dialog", { name: "Add Item" }).className).not.toContain("bottom-sheet--browser-open");
+    expect(iconBrowser.className).not.toContain("add-item-icon-browser--open");
+    expect(iconBrowser.getAttribute("aria-hidden")).toBe("true");
+    expect(iconBrowser.getAttribute("inert")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Mehr anzeigen" })).toBeTruthy();
     expect(container.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
 
@@ -138,12 +151,18 @@ describe("AddItemSheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Mehr anzeigen" }));
     expect(screen.getByLabelText("Edit item").value).toBe("Milch");
     expect(screen.getByRole("button", { name: "Save Item" })).toBeTruthy();
-    expect(screen.getByLabelText("Search icons")).toBeTruthy();
+    const iconBrowser = container.querySelector(".add-item-icon-browser");
+    const iconSearchInput = screen.getByLabelText("Search icons");
+    expect(iconBrowser.className).toContain("add-item-icon-browser--open");
     expect(screen.getByRole("button", { name: "Weniger anzeigen" })).toBeTruthy();
-    await userEvent.type(screen.getByLabelText("Search icons"), "banana");
+    await waitFor(() => {
+      expect(document.activeElement).toBe(iconSearchInput);
+    });
+    await userEvent.type(iconSearchInput, "banana");
     await userEvent.click(screen.getByRole("button", { name: "Browse Banana" }));
 
-    expect(screen.queryByLabelText("Search icons")).toBeNull();
+    expect(screen.getByLabelText("Search icons")).toBeTruthy();
+    expect(iconBrowser.className).not.toContain("add-item-icon-browser--open");
     expect(container.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Save Item" }));
@@ -230,5 +249,23 @@ describe("AddItemSheet", () => {
       /\.eg-input-wrap\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*row;[^}]*align-items:\s*center;/s
     );
     expect(cssSource).toMatch(/\.eg-input-anchor\s*\{[^}]*flex:\s*1;[^}]*position:\s*relative;/s);
+  });
+
+  it("keeps the icon browser mounted while collapsed and marks it inert until opened", async () => {
+    const { container } = render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
+
+    const iconBrowser = container.querySelector(".add-item-icon-browser");
+    const iconBrowserInner = container.querySelector(".add-item-icon-browser-inner");
+
+    expect(iconBrowser).toBeTruthy();
+    expect(iconBrowserInner).toBeTruthy();
+    expect(iconBrowser.className).not.toContain("add-item-icon-browser--open");
+    expect(iconBrowser.getAttribute("aria-hidden")).toBe("true");
+    expect(iconBrowser.getAttribute("inert")).not.toBeNull();
+    expect(cssSource).toMatch(
+      /\.add-item-icon-browser\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*0fr;[^}]*opacity:\s*0;[^}]*transition:\s*[^;]*grid-template-rows/s
+    );
+    expect(cssSource).toMatch(/\.add-item-icon-browser-inner\s*\{[^}]*overflow:\s*hidden;[^}]*display:\s*grid;[^}]*gap:\s*16px;/s);
+    expect(cssSource).toMatch(/\.add-item-icon-browser--open\s*\{[^}]*grid-template-rows:\s*1fr;[^}]*opacity:\s*1;/s);
   });
 });

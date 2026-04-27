@@ -632,6 +632,144 @@ The dropdown (`autocomplete-suggestions`) uses `left: 0; right: 0` relative to `
 
 ---
 
+---
+
+## T-008 — Frontend: Smooth Slide Animation for Icon Browser Open/Close
+
+### Root Cause
+
+`{showIconBrowser ? <div className="add-item-icon-browser"> … </div> : null}` mounts and unmounts the element in the same render tick as `sheetClassName` switching between `""` and `"bottom-sheet--browser-open"`. The browser has no painted frame to transition from/to, so both the content appearance and the sheet height growth are instantaneous — a visual jump.
+
+### Approach: CSS grid-row expand/collapse trick
+
+Rather than a fixed `max-height` value (which causes non-linear easing because the transition runs over the max value, not the actual height), use `grid-template-rows: 0fr → 1fr`. This animates the actual rendered height regardless of content size, with accurate easing in both directions.
+
+**Why not `max-height` transition?**  
+`transition: max-height 0.3s` on a value like `38vh` means the animation "burns through" the invisible portion between the actual height and `38vh` before it begins to look right. With `grid-template-rows`, the transition is always proportional to actual content height.
+
+### Changes
+
+#### `AddItemSheet.jsx`
+
+1. **Always render `.add-item-icon-browser`** — remove the `{showIconBrowser ? … : null}` conditional so the element stays in the DOM for the exit animation.
+
+2. **Class-driven open state** — pass `showIconBrowser` as an extra CSS class:
+   ```jsx
+   <div className={`add-item-icon-browser${showIconBrowser ? " add-item-icon-browser--open" : ""}`}>
+     <div className="add-item-icon-browser-inner">
+       {/* all existing children: label, input, grid */}
+     </div>
+   </div>
+   ```
+
+3. **Focus the search input on open** — `autoFocus` only fires on mount, and the element is now always mounted. Replace with a `useRef` + `useEffect`:
+   ```js
+   const iconSearchRef = useRef(null);
+
+   useEffect(() => {
+     if (showIconBrowser) {
+       // Start focus after the animation frame so the element is not clipped
+       const id = window.setTimeout(() => iconSearchRef.current?.focus(), 50);
+       return () => window.clearTimeout(id);
+     }
+   }, [showIconBrowser]);
+   ```
+   Remove `autoFocus` from the icon search `<input>`. Pass `ref={iconSearchRef}` to it.
+
+4. **Prevent keyboard access when collapsed** — add `aria-hidden={!showIconBrowser}` to `.add-item-icon-browser` and `inert={!showIconBrowser ? true : undefined}` (or `tabIndex={-1}` on focusable children). Prefer the `inert` boolean attribute: when truthy it blocks focus, pointer, and AT access in one attribute.
+
+   ```jsx
+   <div
+     aria-hidden={!showIconBrowser}
+     className={`add-item-icon-browser${showIconBrowser ? " add-item-icon-browser--open" : ""}`}
+     inert={!showIconBrowser ? "" : undefined}
+   >
+   ```
+   Note: React passes `inert=""` as the HTML boolean attribute. When `undefined`, the attribute is omitted.
+
+#### `index.css`
+
+Replace the existing `.add-item-icon-browser` rules with the grid-trick pattern:
+
+```css
+/* Collapsed state — outer shell is a single-row grid at 0fr height */
+.add-item-icon-browser {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.22s ease;
+}
+
+/* Single mandatory child wrapper — overflow:hidden collapses to 0 when grid-row is 0fr */
+.add-item-icon-browser-inner {
+  overflow: hidden;
+  display: grid;
+  gap: 16px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Open state */
+.add-item-icon-browser--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+```
+
+Update the flex-layout override for `.bottom-sheet--browser-open`:
+
+```css
+/* When sheet is expanded, allow the inner wrapper to grow and fill available space */
+.bottom-sheet--browser-open .add-item-icon-browser {
+  flex: 1;
+  min-height: 0;
+}
+
+.bottom-sheet--browser-open .add-item-icon-browser-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.bottom-sheet--browser-open .add-item-icon-browser-grid {
+  flex: 1;
+  max-height: none;
+}
+```
+
+The `.add-item-icon-browser-grid` rule outside the `--browser-open` context keeps its existing `max-height: min(38vh, 20rem)` on `.add-item-icon-browser-inner` overflow — no change needed there.
+
+### Files to change
+
+- `frontend/src/components/AddItemSheet.jsx`
+  - Add `useRef` import (already imported after T-006; confirm it's there)
+  - Add `iconSearchRef` ref
+  - Add `useEffect` for deferred focus
+  - Remove `autoFocus` from icon search input; add `ref={iconSearchRef}`
+  - Remove `{showIconBrowser ? … : null}` conditional; always render `.add-item-icon-browser` with `--open` class and `inert`/`aria-hidden` attributes
+  - Wrap browser children in `.add-item-icon-browser-inner`
+- `frontend/src/index.css`
+  - Replace `.add-item-icon-browser` base rules with grid-trick pattern
+  - Add `.add-item-icon-browser-inner` rules
+  - Add `.add-item-icon-browser--open` rule
+  - Update `.bottom-sheet--browser-open .add-item-icon-browser` and related rules
+- `frontend/src/components/AddItemSheet.test.jsx`
+  - Existing tests must still pass (icon browser shown/hidden via class, not mount/unmount)
+  - Update any test that asserts the browser div is absent from DOM — it is now always present; assert `--open` class instead
+
+### Acceptance Criteria
+- Clicking "Mehr anzeigen" expands the icon browser with a smooth downward slide (~320 ms).
+- Clicking it again collapses the browser with a smooth upward slide.
+- The BottomSheet itself grows/shrinks in sync with the content — no abrupt jump in either direction.
+- Icon search input receives focus automatically after the animation starts.
+- When collapsed, the icon browser is not keyboard-accessible and not announced by screen readers.
+- `npm run lint`, `npm run build`, `npm test` all pass.
+
+---
+
 ## Validation
 
 Run after every task and again before the final commit:

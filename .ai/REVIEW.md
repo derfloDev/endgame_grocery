@@ -131,6 +131,52 @@ No blockers, majors, or minors found.
 
 ---
 
+## Task: T-008 — Frontend: Smooth Slide Animation for Icon Browser Open/Close
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-27
+
+#### Findings
+
+| # | Severity | File | Description | Required Fix |
+|---|----------|------|-------------|--------------|
+| 1 | nit | `frontend/src/components/AddItemSheet.jsx:86` | Focus deferred with `setTimeout(…, 0)` rather than the plan's suggested 50 ms. A 0 ms timeout defers to the next macrotask (after the current render), which is sufficient in practice. The plan's 50 ms rationale was "so the element is not clipped", which does not apply with a CSS-only grid transition. No functional difference. | No |
+| 2 | nit | `frontend/src/components/AddItemSheet.jsx:218` | `inert={!showIconBrowser \|\| undefined}` passes boolean `true` when collapsed. The plan shows `inert={!showIconBrowser ? "" : undefined}` which passes string `""`. Both result in the HTML boolean attribute `inert=""` in the DOM. The test confirms the attribute is present either way. | No |
+
+No blockers, majors, or minors found.
+
+#### Verification
+
+##### Steps
+1. Read `AddItemSheet.jsx` — verified: `iconSearchRef` added; deferred focus `useEffect` on `showIconBrowser`; `autoFocus` removed from icon search input, `ref={iconSearchRef}` added; `.add-item-icon-browser` always rendered; `aria-hidden`, `--open` class, and `inert` attributes correctly wired; `.add-item-icon-browser-inner` wrapper present.
+2. Read `index.css` lines 983–1029 — verified all grid-trick CSS rules match plan spec exactly: collapsed state `grid-template-rows: 0fr; opacity: 0`, inner wrapper `overflow: hidden`, open state `1fr; opacity: 1`, `bottom-sheet--browser-open` overrides.
+3. Read `git diff` of `AddItemSheet.test.jsx`:
+   - Existing icon-browser expansion test: checks `--open` class, `aria-hidden="false"`, no `inert` when open, `waitFor` for focus; after collapse checks `aria-hidden="true"`, `inert` present; element stays in DOM throughout (`getByLabelText` not `queryByLabelText`).
+   - Edit mode test: same pattern.
+   - New test "keeps the icon browser mounted while collapsed and marks it inert until opened": DOM assertions + CSS regex assertions for `grid-template-rows: 0fr`, `overflow: hidden`, `grid-template-rows: 1fr`.
+4. Read `git diff` of `app.test.jsx`: large integration test refactored to use `fetch.mockImplementation` with a queue array; `/suggestions?` URL intercept returns `{ suggestions: [] }` without consuming queued responses; test timeout raised to 10000 ms. This is a correct fix for the autocomplete hook firing fetch calls in the integration test.
+5. Ran `npm run lint` — PASS (1 pre-existing warning).
+6. Ran `npm run build` — PASS.
+7. Ran `cd frontend && npm test` — 62/62 PASS (9 `AddItemSheet` tests; large integration test passes within timeout).
+8. Ran `cd backend && npm test` — 37/37 PASS.
+
+##### Findings
+- Grid-trick CSS pattern is correctly implemented: outer shell collapses to 0 height via `grid-template-rows: 0fr`, inner wrapper clips with `overflow: hidden`, transition on `grid-template-rows` and `opacity` for smooth enter/exit.
+- `aria-hidden` + `inert` correctly gate AT and keyboard access when collapsed ✅.
+- `app.test.jsx` `fetch.mockImplementation` correctly isolates suggestion fetch calls from the ordered mock queue — integration test is more robust now ✅.
+- All plan acceptance criteria met: always-mounted browser, class-driven open state, deferred focus, keyboard access blocked when collapsed.
+
+##### Risks
+- None introduced. The `setTimeout(…, 0)` focus delay is sufficient; if jsdom focus ordering ever changes, the `waitFor` assertion in tests will catch it.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-007 — Frontend: Item-Icon Preview to the Right of the Input
 
 ### Review Round 1

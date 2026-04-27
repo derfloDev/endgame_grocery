@@ -26,6 +26,7 @@ export default function AddItemSheet({
   const [iconBrowserSearchText, setIconBrowserSearchText] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputAnchorRef = useRef(null);
+  const iconSearchRef = useRef(null);
   const { iconName, topMatches, loading } = useIconSuggestion(text);
   const isEditMode = mode === "edit";
   const { suggestions } = useAutocomplete(listId, isEditMode ? "" : text, token);
@@ -74,6 +75,20 @@ export default function AddItemSheet({
       document.removeEventListener("touchstart", handlePointerOutside);
     };
   }, [showSuggestions]);
+
+  useEffect(() => {
+    if (!showIconBrowser) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      iconSearchRef.current?.focus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [showIconBrowser]);
 
   function handleInputChange(event) {
     const value = event.target.value;
@@ -197,14 +212,18 @@ export default function AddItemSheet({
           {iconBrowserToggleLabel}
         </button>
 
-        {showIconBrowser ? (
-          <div className="add-item-icon-browser">
+        <div
+          aria-hidden={!showIconBrowser}
+          className={`add-item-icon-browser${showIconBrowser ? " add-item-icon-browser--open" : ""}`}
+          inert={!showIconBrowser || undefined}
+        >
+          <div className="add-item-icon-browser-inner">
             <label className="visually-hidden" htmlFor={iconSearchInputId}>
               Search icons
             </label>
             <input
+              ref={iconSearchRef}
               id={iconSearchInputId}
-              autoFocus
               className="eg-input"
               placeholder="Search icons"
               value={iconBrowserSearchText}
@@ -236,7 +255,7 @@ export default function AddItemSheet({
               })}
             </div>
           </div>
-        ) : null}
+        </div>
 
         <div className="button-row">
           <button className="eg-btn-ghost" type="button" onClick={onClose}>

@@ -340,3 +340,53 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-008 — plan — 2026-04-27T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned smooth slide animation for icon browser: always-rendered element with grid-template-rows 0fr→1fr transition, class-driven open state, inert attribute when collapsed, deferred focus via ref+useEffect. |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-008 — review — 2026-04-27T13:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-008 grid-row slide animation; always-rendered icon browser panel, class/inert/aria-hidden driven open state, deferred search focus via useEffect+ref, integration test mock queue refactor; 62/62 frontend + 37/37 backend pass. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-008 — implement — 2026-04-27T14:27:57Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Reworked the add-item icon browser into an always-mounted animated panel with grid-based open/close transitions, deferred search focus, inert collapsed state, updated component coverage, and a deterministic app integration stub for autocomplete requests. |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/components/AddItemSheet.jsx, frontend/src/components/AddItemSheet.test.jsx, frontend/src/index.css |
+| Validation | `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx` PASS; `npm run lint` PASS (1 existing warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS; `npm test` PASS |
+| Commit | pending fix(ui): animate add-item icon browser transitions |
+| Next Role | review |
+
+---
+
+### T-008 — implement — 2026-04-27T14:37:54Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-008 done and prepared the reviewed animated icon-browser changes for commit using the recorded Conventional Commit message. |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md |
+| Validation | reused prior reviewed evidence; no new validation run during `commit_task` |
+| Commit | pending fix(ui): animate add-item icon browser transitions |
+| Next Role | none |
+
+---

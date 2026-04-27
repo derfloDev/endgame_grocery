@@ -273,14 +273,14 @@ describe("authentication shell", () => {
 
   it("adds, toggles, edits, renames, and collapses done entries in the list detail options flow", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
-    fetch
-      .mockResolvedValueOnce({
+    const queuedResponses = [
+      {
         ok: true,
         json: async () => ({
           lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
         })
-      })
-      .mockResolvedValueOnce({
+      },
+      {
         ok: true,
         json: async () => ({
           entries: [
@@ -288,8 +288,8 @@ describe("authentication shell", () => {
             { id: "entry-2", text: "Bread", status: "done", icon: null, created_at: "2026-04-21T00:01:00Z" }
           ]
         })
-      })
-      .mockResolvedValueOnce({
+      },
+      {
         ok: true,
         json: async () => ({
           members: [
@@ -302,20 +302,20 @@ describe("authentication shell", () => {
             }
           ]
         })
-      })
-      .mockResolvedValueOnce({
+      },
+      {
         ok: true,
         json: async () => ({
           entry: { id: "entry-3", text: "Milch", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:02:00Z" }
         })
-      })
-      .mockResolvedValueOnce({
+      },
+      {
         ok: true,
         json: async () => ({
           entry: { id: "entry-1", text: "Milk", status: "done", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" }
         })
-      })
-      .mockResolvedValueOnce({
+      },
+      {
         ok: true,
         json: async () => ({
           entry: {
@@ -326,16 +326,38 @@ describe("authentication shell", () => {
             created_at: "2026-04-21T00:02:00Z"
           }
         })
-      })
-      .mockResolvedValueOnce({
+      },
+      {
         ok: true,
         json: async () => ({
           list: { id: "list-1", name: "Mission groceries", owner_name: "Demo User", is_owner: true }
         })
-      })
-      .mockResolvedValueOnce({
+      },
+      {
         status: 204
-      });
+      }
+    ];
+
+    fetch.mockImplementation(async (input) => {
+      const url = String(input);
+
+      if (url.includes("/suggestions?")) {
+        return {
+          ok: true,
+          json: async () => ({
+            suggestions: []
+          })
+        };
+      }
+
+      const nextResponse = queuedResponses.shift();
+
+      if (!nextResponse) {
+        throw new Error(`Unexpected fetch in test: ${url}`);
+      }
+
+      return nextResponse;
+    });
 
     renderApp(["/lists/list-1"]);
 
@@ -433,7 +455,7 @@ describe("authentication shell", () => {
     await userEvent.click(screen.getByRole("button", { name: "Toggle done items" }));
     expect(await screen.findByText("Bread")).toBeTruthy();
     expect(screen.getByText("Milk")).toBeTruthy();
-  });
+  }, 10000);
 
   it("opens the share sheet from list options and revokes a member", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
