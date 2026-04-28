@@ -72,3 +72,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — implement — 2026-04-27T16:46:01Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the recently used panel to list detail, removed the Done section, and wired the frontend to the new history API endpoints |
+| Files Changed | `frontend/src/api/history.js`, `frontend/src/components/RecentlyUsedSection.jsx`, `frontend/src/components/RecentlyUsedSection.test.jsx`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/index.css`, `frontend/src/app.test.jsx`, `README.md`, `.ai/TASKS.md` |
+| Validation | `npm run lint` (pass with existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run build` (pass), `npm test` (pass outside sandbox) |
+| Commit | TBD feat(ui): add recently used list detail panel |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-04-28T06:25:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the frontend Recently Used panel; all five acceptance criteria met, Done section fully removed, all tests pass, lint and build clean. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-28T04:29:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed frontend recently used panel changes for T-002 |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/api/history.js`, `frontend/src/app.test.jsx`, `frontend/src/components/RecentlyUsedSection.jsx`, `frontend/src/components/RecentlyUsedSection.test.jsx`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.jsx` |
+| Validation | reused reviewed validation: `npm run lint`, `npm run build`, `npm test` |
+| Commit | TBD feat(ui): add recently used list detail panel |
+| Next Role | none |
+
+---

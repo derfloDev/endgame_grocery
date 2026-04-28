@@ -54,3 +54,57 @@ None.
 #### Verdict
 
 `PASS`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `frontend/src/pages/ListDetailPage.jsx:313` | `visibleRecentlyUsed` passes `openEntries` (already filtered to `status === "open"`) into `filterRecentlyUsed`, which runs `.filter((entry) => entry.status === "open")` again. The second filter is a no-op; harmless but slightly redundant. | No |
+| 2 | nit | `frontend/src/components/RecentlyUsedSection.jsx:11` | `resolveIconName` returns `FALLBACK_ICON_NAME` when an icon string is unknown, then line 29 further guards with `?? FALLBACK_ICON`. Double-fallback is belt-and-suspenders but adds a small amount of complexity; both imports are used. | No |
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps Performed
+
+1. Re-read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm T-002 scope and acceptance criteria.
+2. Read all new/changed files: `frontend/src/api/history.js`, `frontend/src/components/RecentlyUsedSection.jsx`, `frontend/src/components/RecentlyUsedSection.test.jsx`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/index.css` (diff), `frontend/src/app.test.jsx` (diff).
+3. Verified `git diff HEAD -- frontend/src/pages/ListDetailPage.jsx` removes all of: `doneOpen` state, `doneEntries` derivation, and the Done `<section>` JSX block. No Done-related lines added.
+4. Confirmed `filterRecentlyUsed` is applied both at load time (`setRecentlyUsed(filterRecentlyUsed(...))`) and at render time (`visibleRecentlyUsed = filterRecentlyUsed(recentlyUsed, openEntries)`).
+5. Confirmed `fetchRecentlyUsed` error is caught inline (`return { history: [] }`) so a history API failure does not break the page load.
+6. Confirmed `handleAddFromHistory` has rollback logic: if `addEntryByText` returns false, the chip is re-inserted into the panel.
+7. Ran `npm run lint` — 0 errors; 1 pre-existing warning in unrelated file.
+8. Ran `npm run build` — succeeded.
+9. Ran `npm test` — 63/63 frontend tests pass (new `RecentlyUsedSection.test.jsx` + updated `app.test.jsx`); 45/45 backend tests pass.
+
+##### Findings
+
+| AC | Description | Status |
+|----|-------------|--------|
+| 6 | Recently Used section below Open Items when history non-empty; hidden when empty (`items.length === 0` guard in component). | ✅ |
+| 7 | Chip tap: optimistic remove → `addEntryByText` → rollback on failure. E2E test confirms chip disappears after tap. | ✅ |
+| 8 | Dismiss button: optimistic remove → `deleteFromHistory` fire-and-forget. E2E test confirms DELETE is called with correct body. | ✅ |
+| 9 | Done section fully removed: `doneOpen`, `doneEntries`, all Done JSX deleted. E2E asserts `queryByText("DONE")` is null. | ✅ |
+| 10 | Open items excluded: server-side `NOT EXISTS` filter (T-001) + client-side `filterRecentlyUsed` at load and on render. | ✅ |
+
+##### Risks
+
+- Low: double `filterRecentlyUsed` call (load + render) is harmless but slightly redundant.
+- Low: history fetch errors are silently swallowed — intentional per plan ("best-effort"), but means transient failures are invisible to the user.
+
+#### Verdict
+
+`PASS`

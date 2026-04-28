@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
 import { createEntry, deleteEntry, fetchEntries, updateEntry } from "../api/entries";
+import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
 import { writeCachedResource } from "../api/offlineStore";
 import { fetchLists, renameList } from "../api/lists";
 import { fetchListMembers, revokeListMember, shareListWithMember } from "../api/sharing";
 import AddItemSheet from "../components/AddItemSheet";
 import EntryRow from "../components/EntryRow";
 import ListOptionsSheet from "../components/ListOptionsSheet";
+import RecentlyUsedSection from "../components/RecentlyUsedSection";
 import RenameListSheet from "../components/RenameListSheet";
 import ShareListSheet from "../components/ShareListSheet";
 import { EmptyState, FAB, Icon, LoadingState, TopBar } from "../components/ui";
@@ -22,6 +24,7 @@ export default function ListDetailPage() {
   const [list, setList] = useState(null);
   const [entries, setEntries] = useState([]);
   const [members, setMembers] = useState([]);
+  const [recentlyUsed, setRecentlyUsed] = useState([]);
   const [shareEmail, setShareEmail] = useState("");
   const [entryError, setEntryError] = useState("");
   const [shareError, setShareError] = useState("");
@@ -29,7 +32,6 @@ export default function ListDetailPage() {
   const [isSharingLoading, setIsSharingLoading] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
-  const [doneOpen, setDoneOpen] = useState(true);
   const [showOptions, setShowOptions] = useState(false);
   const [showRename, setShowRename] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -41,9 +43,17 @@ export default function ListDetailPage() {
       setEntryError("");
       setShareError("");
       setIsLoading(true);
+      setRecentlyUsed([]);
 
       try {
-        const [listsResult, entriesResult] = await Promise.all([fetchLists(token), fetchEntries(id, token)]);
+        const [listsResult, entriesResult, historyResult] = await Promise.all([
+          fetchLists(token),
+          fetchEntries(id, token),
+          fetchRecentlyUsed(id, token).catch((error) => {
+            console.error("Failed to load recently used history.", error);
+            return { history: [] };
+          })
+        ]);
         const activeList = (listsResult.lists ?? []).find((candidate) => candidate.id === id);
 
         if (!isMounted) {
@@ -55,11 +65,14 @@ export default function ListDetailPage() {
           setList(null);
           setEntries([]);
           setMembers([]);
+          setRecentlyUsed([]);
           return;
         }
 
         setList(activeList);
-        setEntries(entriesResult.entries ?? []);
+        const nextEntries = entriesResult.entries ?? [];
+        setEntries(nextEntries);
+        setRecentlyUsed(filterRecentlyUsed(historyResult?.history ?? [], nextEntries));
 
         if (activeList.is_owner) {
           setIsSharingLoading(true);
@@ -80,6 +93,7 @@ export default function ListDetailPage() {
           setList(null);
           setEntries([]);
           setMembers([]);
+          setRecentlyUsed([]);
         }
       } finally {
         if (isMounted) {
@@ -212,6 +226,31 @@ export default function ListDetailPage() {
     }
   }
 
+  async function handleAddFromHistory(text, icon) {
+    const historyItem = recentlyUsed.find((item) => item.text === text);
+    setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
+
+    const didAdd = await addEntryByText(text, icon);
+
+    if (!didAdd && historyItem) {
+      setRecentlyUsed((currentItems) => {
+        if (currentItems.some((item) => item.text === historyItem.text)) {
+          return currentItems;
+        }
+
+        return filterRecentlyUsed([historyItem, ...currentItems], entries);
+      });
+    }
+  }
+
+  function handleDismissFromHistory(text) {
+    setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
+
+    void deleteFromHistory(id, text, token).catch((error) => {
+      console.error("Failed to delete recently used history item.", error);
+    });
+  }
+
   async function handleRename(newName) {
     try {
       setEntryError("");
@@ -271,7 +310,7 @@ export default function ListDetailPage() {
   }
 
   const openEntries = entries.filter((entry) => entry.status === "open");
-  const doneEntries = entries.filter((entry) => entry.status === "done");
+  const visibleRecentlyUsed = filterRecentlyUsed(recentlyUsed, openEntries);
 
   return (
     <div className="detail-page">
@@ -329,32 +368,11 @@ export default function ListDetailPage() {
               )}
             </section>
 
-            {doneEntries.length > 0 ? (
-              <section className="entry-section">
-                <button
-                  aria-label="Toggle done items"
-                  className="entry-section-collapse"
-                  type="button"
-                  onClick={() => setDoneOpen((currentValue) => !currentValue)}
-                >
-                  <span className="detail-section-label detail-section-label-done">DONE</span>
-                  <span className="eg-chip-success">{doneEntries.length}</span>
-                  <Icon color="var(--color-success)" name={doneOpen ? "chevronDown" : "chevronRight"} size={16} />
-                </button>
-
-                {doneOpen
-                  ? doneEntries.map((entry) => (
-                      <EntryRow
-                        key={entry.id}
-                        entry={entry}
-                        onDelete={() => void handleDeleteEntry(entry.id)}
-                        onEdit={() => setEditingEntry(entry)}
-                        onToggle={() => void toggleStatus(entry)}
-                      />
-                    ))
-                  : null}
-              </section>
-            ) : null}
+            <RecentlyUsedSection
+              items={visibleRecentlyUsed}
+              onAdd={(text, icon) => void handleAddFromHistory(text, icon)}
+              onDismiss={handleDismissFromHistory}
+            />
           </>
         ) : null}
       </div>
@@ -423,4 +441,12 @@ function sortEntries(entries) {
 
     return left.status === "open" ? -1 : 1;
   });
+}
+
+function filterRecentlyUsed(historyItems, entriesOrOpenEntries) {
+  const openTexts = new Set(
+    entriesOrOpenEntries.filter((entry) => entry.status === "open").map((entry) => entry.text)
+  );
+
+  return historyItems.filter((item) => !openTexts.has(item.text));
 }
