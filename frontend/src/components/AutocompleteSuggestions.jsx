@@ -1,4 +1,4 @@
-import { FALLBACK_ICON, ICON_REGISTRY } from "../data/iconRegistry";
+import { FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 
 export default function AutocompleteSuggestions({ suggestions, onSelect }) {
   if (!suggestions.length) {
@@ -8,8 +8,8 @@ export default function AutocompleteSuggestions({ suggestions, onSelect }) {
   return (
     <div className="autocomplete-suggestions" role="listbox" aria-label="Autocomplete suggestions">
       {suggestions.map((suggestion, index) => {
-        // Always render an icon so rows keep the same visual structure and touch target.
-        const SuggestionIcon = (suggestion.icon ? ICON_REGISTRY[suggestion.icon] : null) ?? FALLBACK_ICON;
+        const resolvedIconName = resolveIconName(suggestion.icon) ?? FALLBACK_ICON_NAME;
+        const SuggestionIcon = ICON_REGISTRY[resolvedIconName];
         const key = `${suggestion.text}-${suggestion.icon ?? "none"}-${index}`;
 
         return (

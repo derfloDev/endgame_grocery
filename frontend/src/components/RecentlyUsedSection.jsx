@@ -1,15 +1,5 @@
-import { FALLBACK_ICON, ICON_REGISTRY } from "../data/iconRegistry";
+import { FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 import { Icon } from "./ui";
-
-const FALLBACK_ICON_NAME = "IconShoppingCart";
-
-function resolveIconName(iconName) {
-  if (!iconName) {
-    return FALLBACK_ICON_NAME;
-  }
-
-  return ICON_REGISTRY[iconName] ? iconName : FALLBACK_ICON_NAME;
-}
 
 export default function RecentlyUsedSection({ items, onAdd, onDismiss }) {
   if (!items.length) {
@@ -25,9 +15,8 @@ export default function RecentlyUsedSection({ items, onAdd, onDismiss }) {
 
       <div className="recently-used-list">
         {items.map((item) => {
-          const resolvedIconName = resolveIconName(item.icon);
-          // Keep a stable icon slot even when history items do not have a persisted icon.
-          const ItemIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
+          const resolvedIconName = resolveIconName(item.icon) ?? FALLBACK_ICON_NAME;
+          const ItemIcon = ICON_REGISTRY[resolvedIconName];
 
           return (
             <div key={item.text} className="recently-used-chip-row">

@@ -275,6 +275,153 @@ Note: Where an entry is "replacing" an existing one, update the `icon` field of 
 
 **No new test files are required** — `iconRegistry.js` and `iconDatabase.js` are static data modules tested implicitly by the icon browser and suggestion hook tests. Verify that all newly imported names resolve without build error (`npm run build`) and that existing tests still pass (`npm test`).
 
+### Phase 5 — T-005: Resilient icon resolution
+
+**Context:**  
+Icon names are stored as strings in the DB. If a name changes (library upgrade, registry refactor), entries show the fallback cart icon instead of the intended one. The fix is a single shared resolution layer with an alias map, so one `ICON_ALIASES` entry handles any future rename without touching components.
+
+`resolveIconName(name)` contract:
+- `null` / `undefined` → `null` (preserves "no icon set" semantics)
+- known name in `ICON_REGISTRY` → return as-is
+- name in `ICON_ALIASES` whose target is in `ICON_REGISTRY` → return canonical name
+- anything else (unknown, no alias) → `null`
+
+Callers that must always render an icon (chips) use `resolveIconName(x) ?? FALLBACK_ICON_NAME`.  
+Callers that allow no-icon (EntryRow) use `ICON_REGISTRY[resolveIconName(x)] ?? FALLBACK_ICON`.
+
+**Files to change:**
+
+#### `frontend/src/data/iconRegistry.js`
+- Export `FALLBACK_ICON_NAME = "IconShoppingCart"` (removes hardcoded duplicates in components).
+- Export `ICON_ALIASES = Object.freeze({})` — starts empty; developers add one entry per rename, e.g.:
+  ```js
+  // When IconEgg is renamed to EggFresh:
+  // IconEgg: "EggFresh"
+  ```
+- Export `resolveIconName(name)`:
+  ```js
+  export function resolveIconName(name) {
+    if (name == null) return null;
+    if (ICON_REGISTRY[name]) return name;
+    const alias = ICON_ALIASES[name];
+    return alias && ICON_REGISTRY[alias] ? alias : null;
+  }
+  ```
+  Place this function after the `ICON_REGISTRY` and `ICON_ALIASES` declarations.
+- Export `formatIconName(name)` — produces a human-readable label for display in the icon picker:
+  ```js
+  export function formatIconName(name) {
+    // Strip leading "Icon" prefix (Tabler icons)
+    const stripped = name.startsWith("Icon") ? name.slice(4) : name;
+    return stripped
+      // Split on lowercase→uppercase boundary: "IceCream" → "Ice Cream"
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      // Split on sequence of caps followed by cap+lowercase: "HTMLParser" → "HTML Parser"
+      .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+      // Split on letter→digit boundary: "IceCream2" → "Ice Cream 2"
+      .replace(/([a-zA-Z])(\d)/g, "$1 $2")
+      // Split on digit→letter boundary: "2D" → "2 D" (edge case)
+      .replace(/(\d)([a-zA-Z])/g, "$1 $2")
+      .trim();
+  }
+  ```
+  Examples: `"IconMilk"` → `"Milk"`, `"IconIceCream2"` → `"Ice Cream 2"`, `"CakeSlice"` → `"Cake Slice"`, `"ForkKnife"` → `"Fork Knife"`, `"Banana"` → `"Banana"`.
+
+#### `frontend/src/components/EntryRow.jsx`
+- Add `FALLBACK_ICON_NAME, resolveIconName` to the `iconRegistry` import; remove `FALLBACK_ICON` import if it becomes unused.
+- Delete the local `normalizeSelectedIconName` function and its `FALLBACK_ICON_NAME` constant.
+- Replace usage:
+  ```js
+  const resolvedIconName = resolveIconName(entry.icon);
+  const EntryIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
+  // data-icon-name={resolvedIconName ?? FALLBACK_ICON_NAME}  ← unchanged
+  ```
+
+#### `frontend/src/components/RecentlyUsedSection.jsx`
+- Add `FALLBACK_ICON_NAME, resolveIconName` to the `iconRegistry` import; remove `FALLBACK_ICON` import.
+- Delete the local `resolveIconName` function and its `FALLBACK_ICON_NAME` constant.
+- Replace usage:
+  ```js
+  const resolvedIconName = resolveIconName(item.icon) ?? FALLBACK_ICON_NAME;
+  const ItemIcon = ICON_REGISTRY[resolvedIconName];
+  ```
+
+#### `frontend/src/components/AutocompleteSuggestions.jsx`
+- Add `FALLBACK_ICON_NAME, resolveIconName` to the `iconRegistry` import; remove `FALLBACK_ICON` import.
+- Replace inline resolution:
+  ```js
+  const resolvedIconName = resolveIconName(suggestion.icon) ?? FALLBACK_ICON_NAME;
+  const SuggestionIcon = ICON_REGISTRY[resolvedIconName];
+  ```
+
+#### `frontend/src/components/AddItemSheet.jsx`
+- Import `resolveIconName` and `formatIconName` from `iconRegistry`.
+- In `useState` initialiser: `useState(resolveIconName(initialIconName))` — normalises aliased names from DB on first render.
+- In the `useEffect` for `[initialIconName, initialText, open]`: `setSelectedIconName(resolveIconName(initialIconName))` — same normalisation on re-open.
+- Icon browser labels: replace `{browserIconName}` (the raw key) with `{formatIconName(browserIconName)}` in both the `aria-label` and the visible `<span>`. Example: `aria-label={`Browse ${formatIconName(browserIconName)}`}`.
+- Suggested-icon picker labels: replace `{suggestedIconName}` in `aria-label={`Choose ${suggestedIconName}`}` with `formatIconName(suggestedIconName)`.
+- No other changes; the picker only ever writes valid current registry names as the stored value.
+
+#### `frontend/src/data/iconRegistry.test.js` *(new file)*
+- Test `resolveIconName`:
+  - `null` → `null`
+  - `undefined` → `null`
+  - known name (e.g. `"IconMilk"`) → `"IconMilk"`
+  - unknown name with no alias → `null`
+- The alias branch (`ICON_ALIASES` lookup) cannot be tested against the frozen production map. Document in a comment that adding a real alias must be accompanied by a test entry using `vi.mock` or a local alias fixture.
+- Test `formatIconName`:
+  - `"IconMilk"` → `"Milk"`
+  - `"IconIceCream2"` → `"Ice Cream 2"`
+  - `"CakeSlice"` → `"Cake Slice"`
+  - `"ForkKnife"` → `"Fork Knife"`
+  - `"Banana"` → `"Banana"`
+  - `"IconBowlChopsticks"` → `"Bowl Chopsticks"`
+
+#### Existing tests
+- `entry-row.test.jsx`: no changes expected — `data-icon-name` assertions still pass because `resolveIconName("IconMilk")` → `"IconMilk"` and `resolveIconName(null) ?? FALLBACK_ICON_NAME` → `"IconShoppingCart"`.
+- `RecentlyUsedSection.test.jsx`, `AutocompleteSuggestions.test.jsx`: no changes expected — behaviour is identical, only the source of the logic moved.
+- `AddItemSheet.test.jsx`: **aria-label assertions must be updated** — e.g. `"Choose IconLeaf"` → `"Choose Leaf"`, `"Browse IconTrash"` → `"Browse Trash"`, `"Browse Banana"` → `"Browse Banana"` (unchanged), `"Browse IconMilk"` → `"Browse Milk"`. Update all `getByRole("button", { name: "Browse ..." })` and `"Choose ..."` lookups to use the formatted name.
+
+### Phase 6 — T-006: PWA manifest credentials for Cloudflare Access
+
+**Context:**  
+When the app is hosted behind Cloudflare Access, the browser fetches `manifest.webmanifest` in `no-cors` mode without sending the `CF_Authorization` cookie. CF Access redirects the request to its login page; the browser receives HTML instead of JSON and silently fails to register the PWA. Setting `useCredentials: true` in VitePWA causes the injected manifest link to include `crossorigin="use-credentials"`, which makes the browser send credentials with the manifest fetch.
+
+The service worker scripts (`/sw.js`, `/workbox-*.js`) are fetched by `navigator.serviceWorker.register()` without credentials and cannot be fixed from the client side alone — a CF Access bypass policy is required for those paths. This is documented but not automated.
+
+**Files to change:**
+
+#### `frontend/vite.config.js`
+- Add `useCredentials: true` inside the `VitePWA({...})` options object (top-level option, alongside `registerType`).
+- Add an inline comment above it:
+  ```js
+  // Required when the app is served behind Cloudflare Access: sends the CF_Authorization
+  // cookie with the manifest fetch so Access does not redirect it to the login page.
+  // Note: /sw.js and /workbox-*.js must be bypassed in CF Access separately (see README).
+  useCredentials: true,
+  ```
+
+#### `README.md`
+- Under the **Docker Deployment** section, add a new subsection **"Cloudflare Access"** after the Environment variables table:
+
+  ```markdown
+  ### Cloudflare Access
+
+  If you host the app behind Cloudflare Access, two bypass policies are required so the
+  PWA can install correctly:
+
+  | Path pattern | Reason |
+  | --- | --- |
+  | `/sw.js` | Service worker script — fetched without credentials by the browser's SW registration API |
+  | `/workbox-*.js` | Workbox runtime chunks loaded by the service worker |
+
+  The manifest (`/manifest.webmanifest`) does not need a bypass policy: the app already
+  sets `crossorigin="use-credentials"` on the manifest link so the browser sends the
+  `CF_Authorization` cookie with that request.
+  ```
+
+**No tests required** — `vite.config.js` changes are build-time configuration and verified by `npm run build` producing an `index.html` whose injected manifest link contains `crossorigin="use-credentials"`.
+
 ## Validation
 
 ```

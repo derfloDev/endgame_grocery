@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { ICON_REGISTRY, ICON_REGISTRY_KEYS } from "../data/iconRegistry";
+import { formatIconName, ICON_REGISTRY, ICON_REGISTRY_KEYS, resolveIconName } from "../data/iconRegistry";
 import { useAutocomplete } from "../hooks/useAutocomplete";
 import { useIconSuggestion } from "../hooks/useIconSuggestion";
 import AutocompleteSuggestions from "./AutocompleteSuggestions";
@@ -23,7 +23,7 @@ export default function AddItemSheet({
   const { token } = useAuth();
   const [text, setText] = useState(initialText);
   const [details, setDetails] = useState(initialDetails);
-  const [selectedIconName, setSelectedIconName] = useState(initialIconName);
+  const [selectedIconName, setSelectedIconName] = useState(resolveIconName(initialIconName));
   const [showIconBrowser, setShowIconBrowser] = useState(false);
   const [iconBrowserSearchText, setIconBrowserSearchText] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -50,7 +50,7 @@ export default function AddItemSheet({
   useEffect(() => {
     setText(initialText);
     setDetails(initialDetails);
-    setSelectedIconName(initialIconName);
+    setSelectedIconName(resolveIconName(initialIconName));
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
     setShowSuggestions(false);
@@ -207,7 +207,7 @@ export default function AddItemSheet({
               return (
                 <button
                   key={suggestedIconName}
-                  aria-label={`Choose ${suggestedIconName}`}
+                  aria-label={`Choose ${formatIconName(suggestedIconName)}`}
                   className={`add-item-icon-picker-btn ${
                     selectedIconName === suggestedIconName ? "add-item-icon-picker-btn--selected" : ""
                   }`}
@@ -254,7 +254,7 @@ export default function AddItemSheet({
                 return (
                   <button
                     key={browserIconName}
-                    aria-label={`Browse ${browserIconName}`}
+                    aria-label={`Browse ${formatIconName(browserIconName)}`}
                     className={`add-item-icon-browser-btn ${
                       selectedIconName === browserIconName ? "add-item-icon-browser-btn--selected" : ""
                     }`}
@@ -266,7 +266,7 @@ export default function AddItemSheet({
                     }}
                   >
                     <BrowserIcon aria-hidden="true" size={22} stroke={1.6} />
-                    <span className="icon-picker-btn-label">{browserIconName}</span>
+                    <span className="icon-picker-btn-label">{formatIconName(browserIconName)}</span>
                   </button>
                 );
               })}

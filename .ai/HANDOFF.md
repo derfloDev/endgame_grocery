@@ -99,6 +99,28 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-006 — plan — 2026-04-28T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned PWA manifest credentials fix for Cloudflare Access: `useCredentials: true` in VitePWA + README bypass documentation. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-005 — plan — 2026-04-28T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned shared `resolveIconName` + `ICON_ALIASES` + `formatIconName` layer in iconRegistry; refactors four components; icon picker shows human-readable labels without "Icon" prefix. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
 ### T-004 — plan — 2026-04-28T00:00:00Z
 
 | Field | Value |
@@ -208,6 +230,45 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `frontend/src/data/iconDatabase.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/utils/cosineSimilarity.test.js` |
 | Validation | Reused prior passing validation from the approved review state: `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js`, `npm run lint` (pass with existing frontend warning), `npm run build`, `npm test` |
 | Commit | `pending feat(ui): expand grocery, household, and health icon catalog` |
+| Next Role | none |
+
+---
+
+### T-005 — review — 2026-04-28T13:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed shared icon resolution layer (resolveIconName, formatIconName, ICON_ALIASES) and component refactors; all acceptance criteria met, 78 tests pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — implement — 2026-04-28T13:00:18Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Centralized icon-name resolution and display formatting in `iconRegistry`, then updated the entry row, history chips, autocomplete chips, and icon picker to consume the shared helpers and show human-readable labels. |
+| Files Changed | `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `frontend/src/components/EntryRow.jsx`, `frontend/src/components/RecentlyUsedSection.jsx`, `frontend/src/components/AutocompleteSuggestions.jsx`, `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `README.md`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- src/data/iconRegistry.test.js src/components/AddItemSheet.test.jsx src/components/entry-row.test.jsx src/components/RecentlyUsedSection.test.jsx src/components/AutocompleteSuggestions.test.jsx` pass (required escalation because sandbox blocked `esbuild` spawn); `npm run lint` pass with existing frontend warning in `frontend/src/context/AuthContext.jsx`; `npm run build` pass; `npm test` pass |
+| Commit | `pending feat(ui): share icon resolution and picker labels` |
+| Next Role | review |
+
+---
+
+### T-005 — implement — 2026-04-28T13:08:18Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-005 done and prepared the reviewed shared icon-resolution work for commit with the recorded Conventional Commit message. Per the explicit retry, this commit includes the current pending worktree state staged by `git add -A`. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/PLAN.md`, `ROADMAP.md`, `README.md`, `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/components/AutocompleteSuggestions.jsx`, `frontend/src/components/EntryRow.jsx`, `frontend/src/components/RecentlyUsedSection.jsx`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `frontend/vite.config.js` |
+| Validation | Reused prior passing validation from the approved review state: `npm run test --workspace frontend -- src/data/iconRegistry.test.js src/components/AddItemSheet.test.jsx src/components/entry-row.test.jsx src/components/RecentlyUsedSection.test.jsx src/components/AutocompleteSuggestions.test.jsx`, `npm run lint` (pass with existing frontend warning), `npm run build`, `npm test` |
+| Commit | `pending feat(ui): share icon resolution and picker labels` |
 | Next Role | none |
 
 ---

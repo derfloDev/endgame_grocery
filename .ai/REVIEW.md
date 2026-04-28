@@ -221,3 +221,69 @@ No blocking or major findings.
 #### Verdict
 
 `PASS`
+
+---
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **approved**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `iconRegistry.js:310` | `formatIconName` defensively guards `typeof name !== "string"` → returns `""`. Plan does not specify this but it is a sound defensive addition. | No |
+
+#### Verification
+
+##### Steps
+
+1. Read `.ai/PLAN.md` Phase 5 (T-005) acceptance criteria and contracts.
+2. Verified `iconRegistry.js` exports:
+   - `FALLBACK_ICON_NAME = "IconShoppingCart"` ✓
+   - `ICON_ALIASES = Object.freeze({})` ✓
+   - `resolveIconName(name)`: null/undefined→null, known→same, alias→canonical, unknown→null ✓
+   - `formatIconName(name)`: strips `Icon` prefix, splits PascalCase, handles digit boundaries ✓
+   - `FALLBACK_ICON` re-derived from `ICON_REGISTRY[FALLBACK_ICON_NAME]` (no hardcoded reference) ✓
+3. Verified `EntryRow.jsx`:
+   - Local `normalizeSelectedIconName` and `FALLBACK_ICON_NAME` constant removed ✓
+   - Now uses `resolveIconName(entry.icon)` + `ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON` ✓
+4. Verified `RecentlyUsedSection.jsx`:
+   - Local `resolveIconName` function and `FALLBACK_ICON_NAME` constant removed ✓
+   - Now uses shared `resolveIconName(item.icon) ?? FALLBACK_ICON_NAME` ✓
+5. Verified `AutocompleteSuggestions.jsx`:
+   - `FALLBACK_ICON` import replaced with `FALLBACK_ICON_NAME` + `resolveIconName` ✓
+   - Uses `resolveIconName(suggestion.icon) ?? FALLBACK_ICON_NAME` ✓
+6. Verified `AddItemSheet.jsx`:
+   - `useState(resolveIconName(initialIconName))` ✓
+   - `useEffect` uses `setSelectedIconName(resolveIconName(initialIconName))` ✓
+   - Suggested-icon picker: `aria-label={\`Choose ${formatIconName(suggestedIconName)}\`}` ✓
+   - Icon browser: `aria-label={\`Browse ${formatIconName(browserIconName)}\`}` and visible label ✓
+7. Verified `iconRegistry.test.js`:
+   - `resolveIconName`: null, undefined, known, unknown, alias-documentation cases ✓
+   - `formatIconName`: all 6 plan-specified examples ✓
+8. Verified `AddItemSheet.test.jsx` aria-label updates: `"Choose Leaf"`, `"Browse Trash"`, `"Browse Banana"` etc. ✓
+9. Ran `npm run lint` — 0 errors (pre-existing frontend warning only) ✓
+10. Ran `npm run build` — succeeded ✓
+11. Ran `npm test` — 78 frontend + 50 backend tests pass (14 test files, +1 new `iconRegistry.test.js`, +5 new tests) ✓
+
+##### Findings
+
+- All acceptance criteria satisfied.
+- Shared `resolveIconName` / `formatIconName` are clean pure functions with no side effects.
+- Alias branch correctly returns `null` when alias target is not in registry — safe fallback.
+- `FALLBACK_ICON` now derived from `FALLBACK_ICON_NAME` rather than a separate import, keeping the single source of truth.
+
+##### Risks
+
+- None.
+
+#### Verdict
+
+`PASS`

@@ -92,9 +92,9 @@ describe("AddItemSheet", () => {
     await userEvent.type(screen.getByLabelText("Add item"), "Gemüse");
 
     expect(screen.getByRole("group", { name: "Suggested icons" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Choose IconLeaf" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Choose Leaf" })).toBeTruthy();
 
-    await userEvent.click(screen.getByRole("button", { name: "Choose IconLeaf" }));
+    await userEvent.click(screen.getByRole("button", { name: "Choose Leaf" }));
     expect(container.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Mehr anzeigen" }));
@@ -118,10 +118,10 @@ describe("AddItemSheet", () => {
     expect(container.querySelectorAll(".add-item-icon-browser-grid").length).toBe(1);
 
     await userEvent.type(iconSearchInput, "trash");
-    expect(screen.queryByRole("button", { name: "Browse IconMilk" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Browse IconTrash" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Browse Milk" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Browse Trash" })).toBeTruthy();
 
-    await userEvent.click(screen.getByRole("button", { name: "Browse IconTrash" }));
+    await userEvent.click(screen.getByRole("button", { name: "Browse Trash" }));
 
     expect(screen.getByLabelText("Search icons")).toBeTruthy();
     expect(screen.getByRole("dialog", { name: "Add Item" }).className).not.toContain("bottom-sheet--browser-open");

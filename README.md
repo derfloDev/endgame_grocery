@@ -187,7 +187,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 
 ### Icon Assignment
 
-New and edited entries can be assigned icons locally in the browser without sending item text to an external AI service. Exact EN/DE matches resolve immediately from the curated Tabler and Lucide icon catalogue, while broader terms fall back to a local `transformers.js` similarity check that suggests from the same expanded food, household, and health icon set.
+New and edited entries can be assigned icons locally in the browser without sending item text to an external AI service. Exact EN/DE matches resolve immediately from the curated Tabler and Lucide icon catalogue, while broader terms fall back to a local `transformers.js` similarity check that suggests from the same expanded food, household, and health icon set. The picker shows human-readable labels such as `Ice Cream 2` instead of raw registry keys.
 
 `VITE_ICON_SIMILARITY_THRESHOLD` controls how strict that semantic fallback is. Lower values suggest icons more aggressively, while higher values require a closer match before the worker returns an automatic suggestion.
 

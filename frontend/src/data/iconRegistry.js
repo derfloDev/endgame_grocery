@@ -288,6 +288,38 @@ export const ICON_REGISTRY = Object.freeze({
   Wine: fromLucide(Wine)
 });
 
+export const FALLBACK_ICON_NAME = "IconShoppingCart";
+// Future icon renames should add one alias entry here instead of patching each caller.
+export const ICON_ALIASES = Object.freeze({});
 export const ICON_REGISTRY_KEYS = Object.freeze(Object.keys(ICON_REGISTRY));
 
-export const FALLBACK_ICON = IconShoppingCart;
+export function resolveIconName(name) {
+  if (name == null) {
+    return null;
+  }
+
+  if (ICON_REGISTRY[name]) {
+    return name;
+  }
+
+  const alias = ICON_ALIASES[name];
+
+  return alias && ICON_REGISTRY[alias] ? alias : null;
+}
+
+export function formatIconName(name) {
+  if (typeof name !== "string") {
+    return "";
+  }
+
+  const stripped = name.startsWith("Icon") ? name.slice(4) : name;
+
+  return stripped
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/([a-zA-Z])(\d)/g, "$1 $2")
+    .replace(/(\d)([a-zA-Z])/g, "$1 $2")
+    .trim();
+}
+
+export const FALLBACK_ICON = ICON_REGISTRY[FALLBACK_ICON_NAME];
