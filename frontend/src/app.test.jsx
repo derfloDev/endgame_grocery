@@ -372,7 +372,7 @@ describe("authentication shell", () => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/lists/list-1/entries",
         expect.objectContaining({
-          body: JSON.stringify({ text: "Tomatoes", icon: "IconSalad" }),
+          body: JSON.stringify({ text: "Tomatoes", icon: "IconSalad", details: "" }),
           method: "POST"
         })
       );
@@ -501,6 +501,153 @@ describe("authentication shell", () => {
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label"));
     expect(chipLabelsAfterDelete.indexOf("Cheese")).toBeLessThan(chipLabelsAfterDelete.indexOf("Milk"));
+  });
+
+  it("adds and edits entry details from the list detail sheet", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+
+    fetch.mockImplementation(async (input, init = {}) => {
+      const url = String(input);
+      const method = init.method ?? "GET";
+
+      if (url.includes("/suggestions?")) {
+        return {
+          ok: true,
+          json: async () => ({
+            suggestions: []
+          })
+        };
+      }
+
+      if (url === "/api/lists") {
+        return {
+          ok: true,
+          json: async () => ({
+            lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+          })
+        };
+      }
+
+      if (url === "/api/lists/list-1/entries" && method === "GET") {
+        return {
+          ok: true,
+          json: async () => ({
+            entries: [
+              { id: "entry-1", text: "X", status: "open", icon: null, details: "2L", created_at: "2026-04-21T00:00:00Z" }
+            ]
+          })
+        };
+      }
+
+      if (url === "/api/lists/list-1/history") {
+        return {
+          ok: true,
+          json: async () => ({
+            history: []
+          })
+        };
+      }
+
+      if (url === "/api/lists/list-1/members") {
+        return {
+          ok: true,
+          json: async () => ({
+            members: [
+              {
+                user_id: "user-1",
+                display_name: "Demo User",
+                email: "demo@example.com",
+                joined_at: "2026-04-21T00:00:00Z",
+                is_owner: true
+              }
+            ]
+          })
+        };
+      }
+
+      if (url === "/api/lists/list-1/entries" && method === "POST") {
+        expect(JSON.parse(init.body)).toMatchObject({ text: "Y", details: "500 g" });
+
+        return {
+          ok: true,
+          json: async () => ({
+            entry: {
+              id: "entry-2",
+              text: "Y",
+              status: "open",
+              icon: null,
+              details: "500 g",
+              created_at: "2026-04-21T00:01:00Z"
+            }
+          })
+        };
+      }
+
+      if (url === "/api/lists/list-1/entries/entry-1" && method === "PATCH") {
+        expect(JSON.parse(init.body)).toMatchObject({ text: "X", details: "3L" });
+
+        return {
+          ok: true,
+          json: async () => ({
+            entry: {
+              id: "entry-1",
+              text: "X",
+              status: "open",
+              icon: null,
+              details: "3L",
+              created_at: "2026-04-21T00:00:00Z"
+            }
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch in test: ${method} ${url}`);
+    });
+
+    renderApp(["/lists/list-1"]);
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+    expect(screen.getByText("2L")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    const addDialog = await screen.findByRole("dialog", { name: "Add Item" });
+    await userEvent.type(within(addDialog).getByLabelText("Add item"), "Y");
+    await userEvent.type(within(addDialog).getByLabelText("Details (optional)"), "500 g");
+    await userEvent.click(within(addDialog).getByRole("button", { name: "Add Item" }));
+
+    await waitFor(() => {
+      const addCall = fetch.mock.calls.find(
+        ([url, init]) => url === "/api/lists/list-1/entries" && init?.method === "POST"
+      );
+
+      expect(addCall).toBeTruthy();
+      expect(JSON.parse(addCall[1].body)).toMatchObject({ text: "Y", details: "500 g" });
+    });
+    expect(await screen.findByText("500 g")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit X" }));
+
+    const editDialog = await screen.findByRole("dialog", { name: "Edit Item" });
+    const editDetailsInput = within(editDialog).getByLabelText("Details (optional)");
+    expect(editDetailsInput.value).toBe("2L");
+
+    await userEvent.clear(editDetailsInput);
+    await userEvent.type(editDetailsInput, "3L");
+    await userEvent.click(within(editDialog).getByRole("button", { name: "Save Item" }));
+
+    await waitFor(() => {
+      const editCall = fetch.mock.calls.find(
+        ([url, init]) => url === "/api/lists/list-1/entries/entry-1" && init?.method === "PATCH"
+      );
+
+      expect(editCall).toBeTruthy();
+      expect(JSON.parse(editCall[1].body)).toMatchObject({ text: "X", details: "3L" });
+    });
+    await waitFor(() => {
+      expect(screen.getByText("3L")).toBeTruthy();
+      expect(screen.queryByText("2L")).toBeNull();
+    });
   });
 
   it("opens the share sheet from list options and revokes a member", async () => {

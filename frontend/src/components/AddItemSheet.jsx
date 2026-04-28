@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { ICON_REGISTRY, ICON_REGISTRY_KEYS } from "../data/iconRegistry";
+import { formatIconName, ICON_REGISTRY, ICON_REGISTRY_KEYS, resolveIconName } from "../data/iconRegistry";
 import { useAutocomplete } from "../hooks/useAutocomplete";
 import { useIconSuggestion } from "../hooks/useIconSuggestion";
 import AutocompleteSuggestions from "./AutocompleteSuggestions";
@@ -11,6 +11,7 @@ function normalizeSearchTerm(value) {
 }
 
 export default function AddItemSheet({
+  initialDetails = "",
   initialIconName = null,
   initialText = "",
   listId = "",
@@ -21,7 +22,8 @@ export default function AddItemSheet({
 }) {
   const { token } = useAuth();
   const [text, setText] = useState(initialText);
-  const [selectedIconName, setSelectedIconName] = useState(initialIconName);
+  const [details, setDetails] = useState(initialDetails);
+  const [selectedIconName, setSelectedIconName] = useState(resolveIconName(initialIconName));
   const [showIconBrowser, setShowIconBrowser] = useState(false);
   const [iconBrowserSearchText, setIconBrowserSearchText] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -37,6 +39,7 @@ export default function AddItemSheet({
     candidate.toLowerCase().includes(normalizedIconBrowserSearchText)
   );
   const textInputId = isEditMode ? "edit-item-sheet-text" : "add-item-sheet-text";
+  const detailsInputId = isEditMode ? "edit-item-sheet-details" : "add-item-sheet-details";
   const iconSearchInputId = isEditMode ? "edit-item-icon-browser-search" : "add-item-icon-browser-search";
   const sheetTitle = isEditMode ? "Edit Item" : "Add Item";
   const inputLabel = isEditMode ? "Edit item" : "Add item";
@@ -46,11 +49,12 @@ export default function AddItemSheet({
 
   useEffect(() => {
     setText(initialText);
-    setSelectedIconName(initialIconName);
+    setDetails(initialDetails);
+    setSelectedIconName(resolveIconName(initialIconName));
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
     setShowSuggestions(false);
-  }, [initialIconName, initialText, open]);
+  }, [initialDetails, initialIconName, initialText, open]);
 
   useEffect(() => {
     setSelectedIconName(iconName);
@@ -111,7 +115,7 @@ export default function AddItemSheet({
     }
 
     // Keep the add sheet open after a successful chip tap so users can continue adding items.
-    const submitResult = await onAdd?.(trimmed, suggestedIconName);
+    const submitResult = await onAdd?.(trimmed, suggestedIconName, "");
 
     if (submitResult === false) {
       return;
@@ -120,6 +124,7 @@ export default function AddItemSheet({
     setShowSuggestions(false);
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
+    setDetails("");
     setText("");
     setSelectedIconName(null);
   }
@@ -133,7 +138,7 @@ export default function AddItemSheet({
       return;
     }
 
-    const submitResult = await onAdd?.(trimmed, selectedIconName);
+    const submitResult = await onAdd?.(trimmed, selectedIconName, details);
 
     if (submitResult === false) {
       return;
@@ -144,6 +149,7 @@ export default function AddItemSheet({
     setIconBrowserSearchText("");
 
     if (!isEditMode) {
+      setDetails("");
       setText("");
       setSelectedIconName(null);
     }
@@ -182,6 +188,17 @@ export default function AddItemSheet({
           </div>
         </div>
 
+        <div className="eg-field">
+          <label htmlFor={detailsInputId}>Details (optional)</label>
+          <input
+            id={detailsInputId}
+            className="eg-input"
+            placeholder="Beschreibung, Menge..."
+            value={details}
+            onChange={(event) => setDetails(event.target.value)}
+          />
+        </div>
+
         {suggestedIconNames.length > 0 ? (
           <div className="add-item-icon-picker" role="group" aria-label="Suggested icons">
             {suggestedIconNames.map((suggestedIconName) => {
@@ -190,7 +207,7 @@ export default function AddItemSheet({
               return (
                 <button
                   key={suggestedIconName}
-                  aria-label={`Choose ${suggestedIconName}`}
+                  aria-label={`Choose ${formatIconName(suggestedIconName)}`}
                   className={`add-item-icon-picker-btn ${
                     selectedIconName === suggestedIconName ? "add-item-icon-picker-btn--selected" : ""
                   }`}
@@ -237,7 +254,7 @@ export default function AddItemSheet({
                 return (
                   <button
                     key={browserIconName}
-                    aria-label={`Browse ${browserIconName}`}
+                    aria-label={`Browse ${formatIconName(browserIconName)}`}
                     className={`add-item-icon-browser-btn ${
                       selectedIconName === browserIconName ? "add-item-icon-browser-btn--selected" : ""
                     }`}
@@ -249,7 +266,7 @@ export default function AddItemSheet({
                     }}
                   >
                     <BrowserIcon aria-hidden="true" size={22} stroke={1.6} />
-                    <span className="icon-picker-btn-label">{browserIconName}</span>
+                    <span className="icon-picker-btn-label">{formatIconName(browserIconName)}</span>
                   </button>
                 );
               })}

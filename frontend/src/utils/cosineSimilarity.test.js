@@ -4,13 +4,13 @@ import { ICON_REGISTRY, ICON_REGISTRY_KEYS } from "../data/iconRegistry";
 import { cosineSimilarity } from "./cosineSimilarity";
 
 describe("icon registry and database", () => {
-  it("defines at least 80 curated Tabler icons and exports matching keys", () => {
-    expect(ICON_REGISTRY_KEYS.length).toBeGreaterThanOrEqual(80);
+  it("defines an expanded curated icon registry and exports matching keys", () => {
+    expect(ICON_REGISTRY_KEYS.length).toBeGreaterThanOrEqual(125);
     expect(ICON_REGISTRY_KEYS).toEqual(Object.keys(ICON_REGISTRY));
   });
 
-  it("defines at least 80 bilingual grocery and household entries", () => {
-    expect(ICON_DB.length).toBeGreaterThanOrEqual(80);
+  it("defines an expanded bilingual grocery and household icon database", () => {
+    expect(ICON_DB.length).toBeGreaterThanOrEqual(110);
   });
 
   it("only uses icon names that exist in the registry", () => {
@@ -36,6 +36,16 @@ describe("icon registry and database", () => {
     expect(EXACT_MATCH_MAP["olivenöl"]).toBe("IconBottle");
     expect(EXACT_MATCH_MAP.chocolate).toBe("IconCandy");
     expect(EXACT_MATCH_MAP.schokolade).toBe("IconCandy");
+    expect(EXACT_MATCH_MAP.croissant).toBe("Croissant");
+    expect(EXACT_MATCH_MAP.schinken).toBe("Ham");
+    expect(EXACT_MATCH_MAP.shrimp).toBe("Shrimp");
+    expect(EXACT_MATCH_MAP.garnele).toBe("Shrimp");
+    expect(EXACT_MATCH_MAP.popcorn).toBe("Popcorn");
+    expect(EXACT_MATCH_MAP.tee).toBe("IconTeapot");
+    expect(EXACT_MATCH_MAP.wine).toBe("Wine");
+    expect(EXACT_MATCH_MAP.wein).toBe("Wine");
+    expect(EXACT_MATCH_MAP.nuts).toBe("IconNut");
+    expect(EXACT_MATCH_MAP.seed).toBe("IconSeedling");
   });
 });
 

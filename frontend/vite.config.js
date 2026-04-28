@@ -39,6 +39,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // Required when the app is served behind Cloudflare Access: sends the CF_Authorization
+      // cookie with the manifest fetch so Access does not redirect it to the login page.
+      // Note: /sw.js and /workbox-*.js must be bypassed in CF Access separately (see README).
+      useCredentials: true,
       includeAssets: ["icon-192.png", "icon-512.png"],
       manifest: {
         name: "Endgame Grocery",

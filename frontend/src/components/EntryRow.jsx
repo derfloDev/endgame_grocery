@@ -1,23 +1,13 @@
 import { useRef, useState } from "react";
-import { FALLBACK_ICON, ICON_REGISTRY } from "../data/iconRegistry";
+import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 import { Icon } from "./ui";
-
-const FALLBACK_ICON_NAME = "IconShoppingCart";
-
-function normalizeSelectedIconName(iconName) {
-  if (iconName == null) {
-    return null;
-  }
-
-  return ICON_REGISTRY[iconName] ? iconName : FALLBACK_ICON_NAME;
-}
 
 export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
   const startX = useRef(0);
   const currentDx = useRef(0);
-  const resolvedIconName = normalizeSelectedIconName(entry.icon);
+  const resolvedIconName = resolveIconName(entry.icon);
   const EntryIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
 
   function handleTouchStart(event) {
@@ -88,6 +78,7 @@ export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
 
         <div className="entry-row-copy">
           <p className={`entry-row-text ${entry.status === "done" ? "entry-row-text-done" : ""}`}>{entry.text}</p>
+          {entry.details ? <p className="entry-row-details">{entry.details}</p> : null}
           {entry.is_pending_sync ? <span className="eg-chip-queued entry-row-chip">Queued</span> : null}
         </div>
 

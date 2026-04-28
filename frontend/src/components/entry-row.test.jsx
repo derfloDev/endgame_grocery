@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import EntryRow from "./EntryRow";
+
+const cssSource = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
 
 describe("EntryRow", () => {
   afterEach(() => {
@@ -32,6 +36,35 @@ describe("EntryRow", () => {
     );
 
     expect(screen.getByTestId("entry-row-icon-entry-2").getAttribute("data-icon-name")).toBe("IconShoppingCart");
+  });
+
+  it("renders a subordinate details line when details are present", () => {
+    render(
+      <EntryRow
+        entry={{ id: "entry-2b", text: "Bread", status: "open", icon: null, details: "Whole grain" }}
+        onDelete={vi.fn()}
+        onEdit={vi.fn()}
+        onToggle={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Whole grain").className).toContain("entry-row-details");
+    expect(cssSource).toMatch(
+      /\.entry-row-details\s*\{[^}]*font-size:\s*0\.8rem;[^}]*color:\s*var\(--text-secondary\);[^}]*margin:\s*0;/s
+    );
+  });
+
+  it("omits the details line when details are empty", () => {
+    render(
+      <EntryRow
+        entry={{ id: "entry-2c", text: "Bread", status: "open", icon: null, details: null }}
+        onDelete={vi.fn()}
+        onEdit={vi.fn()}
+        onToggle={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText("Whole grain")).toBeNull();
   });
 
   it("calls onEdit when the edit button is pressed", async () => {

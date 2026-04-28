@@ -56,7 +56,7 @@ describe("AutocompleteSuggestions", () => {
     );
 
     expect(screen.getByRole("option", { name: "Milch" })).toBeTruthy();
-    expect(container.querySelector(".autocomplete-chip svg")).toBeNull();
+    expect(container.querySelector(".autocomplete-chip svg")).toBeTruthy();
     expect(cssSource).toMatch(/\.autocomplete-chip\s*\{[^}]*min-height:\s*44px;[^}]*width:\s*100%;/s);
   });
 });

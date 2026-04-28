@@ -1,4 +1,4 @@
-import { ICON_REGISTRY } from "../data/iconRegistry";
+import { FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 
 export default function AutocompleteSuggestions({ suggestions, onSelect }) {
   if (!suggestions.length) {
@@ -8,7 +8,8 @@ export default function AutocompleteSuggestions({ suggestions, onSelect }) {
   return (
     <div className="autocomplete-suggestions" role="listbox" aria-label="Autocomplete suggestions">
       {suggestions.map((suggestion, index) => {
-        const SuggestionIcon = suggestion.icon ? ICON_REGISTRY[suggestion.icon] : null;
+        const resolvedIconName = resolveIconName(suggestion.icon) ?? FALLBACK_ICON_NAME;
+        const SuggestionIcon = ICON_REGISTRY[resolvedIconName];
         const key = `${suggestion.text}-${suggestion.icon ?? "none"}-${index}`;
 
         return (
@@ -20,7 +21,7 @@ export default function AutocompleteSuggestions({ suggestions, onSelect }) {
             type="button"
             onClick={() => onSelect?.(suggestion.text, suggestion.icon ?? null)}
           >
-            {SuggestionIcon ? <SuggestionIcon aria-hidden="true" size={18} stroke={1.6} /> : null}
+            <SuggestionIcon aria-hidden="true" size={18} stroke={1.6} />
             <span>{suggestion.text}</span>
           </button>
         );

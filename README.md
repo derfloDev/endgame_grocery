@@ -109,6 +109,20 @@ The repository's checked-in `docker-compose.yml` is intentionally kept for local
 | `JWT_EXPIRES_IN` | JWT lifetime accepted by the backend. | `7d` |
 | `VITE_ICON_SIMILARITY_THRESHOLD` | Build-time similarity cutoff for local icon assignment in the frontend worker. Use a value from `0` to `1`; higher values require closer semantic matches before an icon is suggested. | `0.5` |
 
+### Cloudflare Access
+
+If you host the app behind Cloudflare Access, two bypass policies are required so the
+PWA can install correctly:
+
+| Path pattern | Reason |
+| --- | --- |
+| `/sw.js` | Service worker script — fetched without credentials by the browser's SW registration API |
+| `/workbox-*.js` | Workbox runtime chunks loaded by the service worker |
+
+The manifest (`/manifest.webmanifest`) does not need a bypass policy: the app already
+sets `crossorigin="use-credentials"` on the manifest link so the browser sends the
+`CF_Authorization` cookie with that request.
+
 ## Validation
 
 Run these checks before merging changes:
@@ -178,15 +192,16 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
 - Authentication supports register and login flows backed by JWT access tokens.
 - Lists support create, rename, delete, ownership, and shared-access visibility.
-- The list detail view uses a sticky top bar, a more-options flyout for rename and sharing, a bottom-sheet add-item flow with an overlaid autocomplete suggestion dropdown that anchors to the input, an inline icon preview to the right of the field, a smoothly sliding icon browser, outside-tap dismissal, swipe-to-delete entry rows, and a recently used panel that updates immediately when items are completed or deleted.
-- Entries support add, edit, toggle, and delete actions with open and done grouping.
+- The list detail view uses a sticky top bar, a more-options flyout for rename and sharing, a bottom-sheet add-item flow with an overlaid autocomplete suggestion dropdown that anchors to the input, an inline icon preview to the right of the field, a smoothly sliding icon browser, outside-tap dismissal, swipe-to-delete entry rows with optional detail text, and a recently used panel that updates immediately when items are completed or deleted.
+- Entries support add, edit, toggle, and delete actions with open and done grouping, optional icons, and free-text details for quantities, brands, or similar context.
 - The backend tracks per-list autocomplete history from completed and deleted items, exposes ranked typo-tolerant suggestions, and provides per-list recently used history endpoints.
+- History chips and autocomplete suggestions fall back to the cart icon when no specific saved icon is available, so list rows keep a consistent visual layout.
 - Sharing supports inviting registered users by email and revoking member access.
 - Offline support caches successful reads and queues failed writes for replay after reconnect.
 
 ### Icon Assignment
 
-New and edited entries can be assigned icons locally in the browser without sending item text to an external AI service. Exact EN/DE matches resolve immediately from the curated icon catalogue, while broader terms fall back to a local `transformers.js` similarity check that suggests Tabler icon names.
+New and edited entries can be assigned icons locally in the browser without sending item text to an external AI service. Exact EN/DE matches resolve immediately from the curated Tabler and Lucide icon catalogue, while broader terms fall back to a local `transformers.js` similarity check that suggests from the same expanded food, household, and health icon set. The picker shows human-readable labels such as `Ice Cream 2` instead of raw registry keys.
 
 `VITE_ICON_SIMILARITY_THRESHOLD` controls how strict that semantic fallback is. Lower values suggest icons more aggressively, while higher values require a closer match before the worker returns an automatic suggestion.
 

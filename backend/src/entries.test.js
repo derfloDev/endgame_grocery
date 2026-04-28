@@ -24,12 +24,26 @@ describe("entry routes", () => {
           return { rows: [{ id: "list-1" }] };
         }
 
-        assert.match(sql, /SELECT id, list_id, text, status, icon, created_at, updated_at/);
+        assert.match(sql, /SELECT id, list_id, text, status, icon, details, created_at, updated_at/);
 
         return {
           rows: [
-            { id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛" },
-            { id: "entry-2", list_id: "list-1", text: "Bread", status: "done", icon: null }
+            {
+              id: "entry-1",
+              list_id: "list-1",
+              text: "Milk",
+              status: "open",
+              icon: "🥛",
+              details: "2L"
+            },
+            {
+              id: "entry-2",
+              list_id: "list-1",
+              text: "Bread",
+              status: "done",
+              icon: null,
+              details: null
+            }
           ]
         };
       }
@@ -40,8 +54,8 @@ describe("entry routes", () => {
     assert.equal(response.status, 200);
     assert.equal(response.body.entries.length, 2);
     assert.deepEqual(response.body.entries, [
-      { id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛" },
-      { id: "entry-2", list_id: "list-1", text: "Bread", status: "done", icon: null }
+      { id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛", details: "2L" },
+      { id: "entry-2", list_id: "list-1", text: "Bread", status: "done", icon: null, details: null }
     ]);
   });
 
@@ -56,11 +70,20 @@ describe("entry routes", () => {
         }
 
         if (callCount === 2) {
-          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon\)/);
-          assert.deepEqual(params, ["list-1", "Milk", "🥛"]);
+          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details\)/);
+          assert.deepEqual(params, ["list-1", "Milk", "🥛", null]);
 
           return {
-            rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛" }]
+            rows: [
+              {
+                id: "entry-1",
+                list_id: "list-1",
+                text: "Milk",
+                status: "open",
+                icon: "🥛",
+                details: null
+              }
+            ]
           };
         }
 
@@ -90,11 +113,11 @@ describe("entry routes", () => {
         }
 
         if (callCount === 2) {
-          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon\)/);
-          assert.deepEqual(params, ["list-1", "Milk", null]);
+          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details\)/);
+          assert.deepEqual(params, ["list-1", "Milk", null, null]);
 
           return {
-            rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: null }]
+            rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: null, details: null }]
           };
         }
 
@@ -111,6 +134,56 @@ describe("entry routes", () => {
     assert.equal(callCount, 2);
   });
 
+  it("stores and returns entry details on create", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        if (callCount === 2) {
+          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details\)/);
+          assert.deepEqual(params, ["list-1", "Milk", "🥛", "2L"]);
+
+          return {
+            rows: [
+              {
+                id: "entry-1",
+                list_id: "list-1",
+                text: "Milk",
+                status: "open",
+                icon: "🥛",
+                details: "2L"
+              }
+            ]
+          };
+        }
+
+        assert.fail(`Unexpected query ${callCount}: ${sql}`);
+      }
+    };
+
+    const response = await request(createAuthedApp(pool)).post("/api/lists/list-1/entries").send({
+      text: "Milk",
+      icon: "🥛",
+      details: " 2L "
+    });
+
+    assert.equal(response.status, 201);
+    assert.deepEqual(response.body.entry, {
+      id: "entry-1",
+      list_id: "list-1",
+      text: "Milk",
+      status: "open",
+      icon: "🥛",
+      details: "2L"
+    });
+    assert.equal(callCount, 2);
+  });
+
   it("writes autocomplete history when an entry is marked done", async () => {
     let callCount = 0;
     const pool = {
@@ -123,10 +196,19 @@ describe("entry routes", () => {
 
         if (callCount === 2) {
           assert.match(sql, /UPDATE entries/);
-          assert.deepEqual(params, ["Oat milk", "done", null, "entry-1", "list-1"]);
+          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "entry-1", "list-1"]);
 
           return {
-            rows: [{ id: "entry-1", list_id: "list-1", text: "Oat milk", status: "done", icon: null }]
+            rows: [
+              {
+                id: "entry-1",
+                list_id: "list-1",
+                text: "Oat milk",
+                status: "done",
+                icon: null,
+                details: "Barista"
+              }
+            ]
           };
         }
 
@@ -149,6 +231,7 @@ describe("entry routes", () => {
     assert.equal(response.status, 200);
     assert.equal(response.body.entry.text, "Oat milk");
     assert.equal(response.body.entry.status, "done");
+    assert.equal(response.body.entry.details, "Barista");
     assert.equal(callCount, 3);
   });
 
@@ -164,10 +247,10 @@ describe("entry routes", () => {
 
         if (callCount === 2) {
           assert.match(sql, /UPDATE entries/);
-          assert.deepEqual(params, ["Oat milk", "open", null, "entry-1", "list-1"]);
+          assert.deepEqual(params, ["Oat milk", "open", null, false, null, "entry-1", "list-1"]);
 
           return {
-            rows: [{ id: "entry-1", list_id: "list-1", text: "Oat milk", status: "open", icon: null }]
+            rows: [{ id: "entry-1", list_id: "list-1", text: "Oat milk", status: "open", icon: null, details: null }]
           };
         }
 
@@ -198,10 +281,10 @@ describe("entry routes", () => {
         }
 
         assert.match(sql, /icon = COALESCE\(\$3, icon\)/);
-        assert.deepEqual(params, [null, null, "🥛", "entry-1", "list-1"]);
+        assert.deepEqual(params, [null, null, "🥛", false, null, "entry-1", "list-1"]);
 
         return {
-          rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛" }]
+          rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛", details: null }]
         };
       }
     };
@@ -214,6 +297,106 @@ describe("entry routes", () => {
 
     assert.equal(response.status, 200);
     assert.equal(response.body.entry.icon, "🥛");
+    assert.equal(callCount, 2);
+  });
+
+  it("updates entry details when the details field is present", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        assert.match(sql, /details = CASE WHEN \$4 THEN \$5 ELSE details END/);
+        assert.deepEqual(params, [null, "open", null, true, "1kg", "entry-1", "list-1"]);
+
+        return {
+          rows: [{ id: "entry-1", list_id: "list-1", text: "Rice", status: "open", icon: null, details: "1kg" }]
+        };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool))
+      .patch("/api/lists/list-1/entries/entry-1")
+      .send({
+        status: "open",
+        details: " 1kg "
+      });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.entry.details, "1kg");
+    assert.equal(callCount, 2);
+  });
+
+  it("preserves entry details when the details field is absent", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        assert.deepEqual(params, ["Rice", "open", null, false, null, "entry-1", "list-1"]);
+
+        return {
+          rows: [
+            {
+              id: "entry-1",
+              list_id: "list-1",
+              text: "Rice",
+              status: "open",
+              icon: null,
+              details: "keep existing"
+            }
+          ]
+        };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool))
+      .patch("/api/lists/list-1/entries/entry-1")
+      .send({
+        text: "Rice",
+        status: "open"
+      });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.entry.details, "keep existing");
+    assert.equal(callCount, 2);
+  });
+
+  it("clears entry details when the details field is blank", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        assert.deepEqual(params, [null, "open", null, true, null, "entry-1", "list-1"]);
+
+        return {
+          rows: [{ id: "entry-1", list_id: "list-1", text: "Rice", status: "open", icon: null, details: null }]
+        };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool))
+      .patch("/api/lists/list-1/entries/entry-1")
+      .send({
+        status: "open",
+        details: "   "
+      });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.entry.details, null);
     assert.equal(callCount, 2);
   });
 

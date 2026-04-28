@@ -8,9 +8,14 @@ import {
   IconBasket,
   IconBattery,
   IconBeer,
+  IconBlender,
+  IconBone,
   IconBottle,
   IconBread,
   IconBrush,
+  IconBowl,
+  IconBowlChopsticks,
+  IconBowlSpoon,
   IconBucket,
   IconBucketDroplet,
   IconBulb,
@@ -19,6 +24,7 @@ import {
   IconCakeRoll,
   IconCandy,
   IconCarrot,
+  IconChefHat,
   IconCheese,
   IconCherry,
   IconCoffee,
@@ -29,6 +35,7 @@ import {
   IconDroplet,
   IconDroplets,
   IconEgg,
+  IconEggCracked,
   IconEggFried,
   IconEggs,
   IconEye,
@@ -50,23 +57,30 @@ import {
   IconLeaf2,
   IconLemon,
   IconLemon2,
+  IconLollipop,
   IconMedicalCross,
   IconMedicineSyrup,
   IconMeat,
+  IconMelon,
   IconMilk,
   IconMilkshake,
+  IconMicrowave,
   IconMug,
   IconMushroom,
+  IconNut,
   IconPepper,
   IconPerfume,
   IconPill,
   IconPills,
   IconPizza,
+  IconPlant,
+  IconPlant2,
   IconRazor,
   IconSalad,
   IconSalt,
   IconSausage,
   IconScissors,
+  IconSeedling,
   IconShoppingCart,
   IconShirt,
   IconSnowflake,
@@ -74,8 +88,10 @@ import {
   IconSparkles,
   IconSpray,
   IconStethoscope,
+  IconSunglasses,
   IconSun,
   IconSunHigh,
+  IconTeapot,
   IconThermometer,
   IconToiletPaper,
   IconToolsKitchen,
@@ -87,9 +103,40 @@ import {
   IconWash,
   IconWashDry,
   IconWashDryclean,
-  IconWashMachine
+  IconWashMachine,
+  IconWheat
 } from "@tabler/icons-react";
-import { Banana } from "lucide-react";
+import {
+  Banana,
+  CakeSlice,
+  CandyCane,
+  Cigarette,
+  Citrus,
+  CookingPot,
+  Croissant,
+  CupSoda,
+  Dessert,
+  Donut,
+  Drumstick,
+  FishSymbol,
+  ForkKnife,
+  GlassWater,
+  Ham,
+  Hamburger,
+  Hop,
+  IceCreamBowl,
+  IceCreamCone,
+  Martini,
+  PillBottle,
+  Popcorn,
+  Refrigerator,
+  Sandwich,
+  Shrimp,
+  Syringe,
+  UtensilsCrossed,
+  Vegan,
+  Wine
+} from "lucide-react";
 
 function fromLucide(LucideIcon) {
   function NormalizedIcon({ stroke, strokeWidth, ...rest }) {
@@ -106,6 +153,22 @@ function fromLucide(LucideIcon) {
 
 export const ICON_REGISTRY = Object.freeze({
   Banana: fromLucide(Banana),
+  CakeSlice: fromLucide(CakeSlice),
+  CandyCane: fromLucide(CandyCane),
+  Cigarette: fromLucide(Cigarette),
+  Citrus: fromLucide(Citrus),
+  CookingPot: fromLucide(CookingPot),
+  Croissant: fromLucide(Croissant),
+  CupSoda: fromLucide(CupSoda),
+  Dessert: fromLucide(Dessert),
+  Donut: fromLucide(Donut),
+  Drumstick: fromLucide(Drumstick),
+  FishSymbol: fromLucide(FishSymbol),
+  ForkKnife: fromLucide(ForkKnife),
+  GlassWater: fromLucide(GlassWater),
+  Ham: fromLucide(Ham),
+  Hamburger: fromLucide(Hamburger),
+  Hop: fromLucide(Hop),
   IconApple,
   IconAvocado,
   IconBabyBottle,
@@ -114,9 +177,14 @@ export const ICON_REGISTRY = Object.freeze({
   IconBasket,
   IconBattery,
   IconBeer,
+  IconBlender,
+  IconBone,
   IconBottle,
   IconBread,
   IconBrush,
+  IconBowl,
+  IconBowlChopsticks,
+  IconBowlSpoon,
   IconBucket,
   IconBucketDroplet,
   IconBulb,
@@ -125,6 +193,7 @@ export const ICON_REGISTRY = Object.freeze({
   IconCakeRoll,
   IconCandy,
   IconCarrot,
+  IconChefHat,
   IconCheese,
   IconCherry,
   IconCoffee,
@@ -135,6 +204,7 @@ export const ICON_REGISTRY = Object.freeze({
   IconDroplet,
   IconDroplets,
   IconEgg,
+  IconEggCracked,
   IconEggFried,
   IconEggs,
   IconEye,
@@ -149,6 +219,8 @@ export const ICON_REGISTRY = Object.freeze({
   IconGlassFull,
   IconHanger,
   IconHome,
+  IceCreamBowl: fromLucide(IceCreamBowl),
+  IceCreamCone: fromLucide(IceCreamCone),
   IconIceCream,
   IconIceCream2,
   IconIroning,
@@ -156,23 +228,36 @@ export const ICON_REGISTRY = Object.freeze({
   IconLeaf2,
   IconLemon,
   IconLemon2,
+  IconLollipop,
   IconMedicalCross,
   IconMedicineSyrup,
   IconMeat,
+  IconMelon,
   IconMilk,
   IconMilkshake,
+  IconMicrowave,
+  Martini: fromLucide(Martini),
   IconMug,
   IconMushroom,
+  IconNut,
   IconPepper,
   IconPerfume,
   IconPill,
   IconPills,
+  PillBottle: fromLucide(PillBottle),
   IconPizza,
+  IconPlant,
+  IconPlant2,
+  Popcorn: fromLucide(Popcorn),
   IconRazor,
+  Refrigerator: fromLucide(Refrigerator),
   IconSalad,
   IconSalt,
+  Sandwich: fromLucide(Sandwich),
   IconSausage,
   IconScissors,
+  IconSeedling,
+  Shrimp: fromLucide(Shrimp),
   IconShoppingCart,
   IconShirt,
   IconSnowflake,
@@ -180,22 +265,61 @@ export const ICON_REGISTRY = Object.freeze({
   IconSparkles,
   IconSpray,
   IconStethoscope,
+  IconSunglasses,
+  Syringe: fromLucide(Syringe),
   IconSun,
   IconSunHigh,
+  IconTeapot,
   IconThermometer,
   IconToiletPaper,
   IconToolsKitchen,
   IconToolsKitchen2,
   IconToolsKitchen3,
   IconTrash,
+  UtensilsCrossed: fromLucide(UtensilsCrossed),
   IconVaccine,
   IconVaccineBottle,
+  Vegan: fromLucide(Vegan),
   IconWash,
   IconWashDry,
   IconWashDryclean,
-  IconWashMachine
+  IconWashMachine,
+  IconWheat,
+  Wine: fromLucide(Wine)
 });
 
+export const FALLBACK_ICON_NAME = "IconShoppingCart";
+// Future icon renames should add one alias entry here instead of patching each caller.
+export const ICON_ALIASES = Object.freeze({});
 export const ICON_REGISTRY_KEYS = Object.freeze(Object.keys(ICON_REGISTRY));
 
-export const FALLBACK_ICON = IconShoppingCart;
+export function resolveIconName(name) {
+  if (name == null) {
+    return null;
+  }
+
+  if (ICON_REGISTRY[name]) {
+    return name;
+  }
+
+  const alias = ICON_ALIASES[name];
+
+  return alias && ICON_REGISTRY[alias] ? alias : null;
+}
+
+export function formatIconName(name) {
+  if (typeof name !== "string") {
+    return "";
+  }
+
+  const stripped = name.startsWith("Icon") ? name.slice(4) : name;
+
+  return stripped
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/([a-zA-Z])(\d)/g, "$1 $2")
+    .replace(/(\d)([a-zA-Z])/g, "$1 $2")
+    .trim();
+}
+
+export const FALLBACK_ICON = ICON_REGISTRY[FALLBACK_ICON_NAME];
