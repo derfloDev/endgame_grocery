@@ -35,6 +35,15 @@ function upsertAutocompleteHistory(pool, { userId, listId, text, icon }) {
   );
 }
 
+function normalizeDetails(details) {
+  if (typeof details !== "string") {
+    return null;
+  }
+
+  const trimmedDetails = details.trim();
+  return trimmedDetails ? trimmedDetails : null;
+}
+
 export function createEntryRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth
@@ -59,7 +68,7 @@ export function createEntryRouter({
 
       const result = await pool.query(
         `
-          SELECT id, list_id, text, status, icon, created_at, updated_at
+          SELECT id, list_id, text, status, icon, details, created_at, updated_at
           FROM entries
           WHERE list_id = $1
           ORDER BY status ASC, created_at ASC
@@ -76,7 +85,7 @@ export function createEntryRouter({
   });
 
   router.post("/", async (req, res, next) => {
-    const { text, icon } = req.body ?? {};
+    const { text, icon, details } = req.body ?? {};
 
     if (!text?.trim()) {
       res.status(400).json({ error: "Entry text is required." });
@@ -98,11 +107,11 @@ export function createEntryRouter({
 
       const result = await pool.query(
         `
-          INSERT INTO entries (list_id, text, status, icon)
-          VALUES ($1, $2, 'open', $3)
-          RETURNING id, list_id, text, status, icon, created_at, updated_at
+          INSERT INTO entries (list_id, text, status, icon, details)
+          VALUES ($1, $2, 'open', $3, $4)
+          RETURNING id, list_id, text, status, icon, details, created_at, updated_at
         `,
-        [req.params.id, text.trim(), icon ?? null]
+        [req.params.id, text.trim(), icon ?? null, normalizeDetails(details)]
       );
 
       res.status(201).json({
@@ -114,7 +123,8 @@ export function createEntryRouter({
   });
 
   router.patch("/:entryId", async (req, res, next) => {
-    const { text, status, icon } = req.body ?? {};
+    const { text, status, icon, details } = req.body ?? {};
+    const hasDetails = "details" in (req.body ?? {});
 
     if (!text?.trim() && !status && icon === undefined) {
       res.status(400).json({ error: "At least one entry update field is required." });
@@ -146,11 +156,20 @@ export function createEntryRouter({
             text = COALESCE($1, text),
             status = COALESCE($2, status),
             icon = COALESCE($3, icon),
+            details = CASE WHEN $4 THEN $5 ELSE details END,
             updated_at = NOW()
-          WHERE id = $4 AND list_id = $5
-          RETURNING id, list_id, text, status, icon, created_at, updated_at
+          WHERE id = $6 AND list_id = $7
+          RETURNING id, list_id, text, status, icon, details, created_at, updated_at
         `,
-        [text?.trim() || null, status ?? null, icon ?? null, req.params.entryId, req.params.id]
+        [
+          text?.trim() || null,
+          status ?? null,
+          icon ?? null,
+          hasDetails,
+          hasDetails ? normalizeDetails(details) : null,
+          req.params.entryId,
+          req.params.id
+        ]
       );
 
       if (!result.rows[0]) {

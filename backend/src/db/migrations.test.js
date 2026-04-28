@@ -6,6 +6,7 @@ import path from "node:path";
 const autocompleteHistoryMigrationPath = path.resolve(
   "src/db/migrations/1713902400000_add_autocomplete_history.cjs"
 );
+const detailsMigrationPath = path.resolve("src/db/migrations/1713906000000_add_details_to_entries.cjs");
 
 function createPgmSpy() {
   const calls = [];
@@ -25,8 +26,14 @@ function createPgmSpy() {
     createIndex(...args) {
       calls.push(["createIndex", ...args]);
     },
+    addColumns(...args) {
+      calls.push(["addColumns", ...args]);
+    },
     dropIndex(...args) {
       calls.push(["dropIndex", ...args]);
+    },
+    dropColumns(...args) {
+      calls.push(["dropColumns", ...args]);
     },
     dropTable(...args) {
       calls.push(["dropTable", ...args]);
@@ -54,6 +61,30 @@ describe("database migrations", () => {
 
     assert.equal(typeof migration.up, "function");
     assert.equal(typeof migration.down, "function");
+  });
+
+  it("adds and removes the details column on entries", async () => {
+    const migration = await import(pathToFileURL(detailsMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "addColumns",
+        "entries",
+        {
+          details: {
+            type: "text",
+            notNull: false
+          }
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [["dropColumns", "entries", ["details"]]]);
   });
 
   it("creates and removes autocomplete history schema objects", async () => {

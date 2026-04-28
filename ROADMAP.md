@@ -1,29 +1,13 @@
 # ROADMAP
 
-Goal: define and deliver the scope for this cycle.
-
-Delete any unused example sections below. Only the Goal and one concrete priority are required.
+Goal: Add a free-text details field to grocery entries so users can note quantities, units, brands, or any other context without a rigid format.
 
 ## Priority 1
 
-Objective: replace with objective.
+Objective: Persist and display a `details` field on every entry.
 
-- Replace with planned outcome.
-
-## Examples
-
-These example sections are optional illustrations, not required structure.
-
-<!-- Example: remove or replace this section -->
-## Priority 2
-
-Objective: optional second objective.
-
-- Replace with optional planned outcome.
-
-<!-- Example: remove or replace this section -->
-## Priority 3
-
-Objective: optional third objective.
-
-- Replace with optional planned outcome.
+- DB migration adds a nullable `details` column to the `entries` table.
+- Backend `POST /entries` and `PATCH /entries/:entryId` accept and return `details`.
+- `autocomplete_history` is unchanged — `details` is intentionally excluded (details are per-occasion context, not reusable history).
+- `AddItemSheet` (add & edit mode) exposes a second optional text input labelled **"Details (optional)"** with placeholder `Beschreibung, Menge...`.
+- `EntryRow` renders details as a second, visually subordinate line below the entry name (smaller / dimmed text), shown only when details are non-empty.

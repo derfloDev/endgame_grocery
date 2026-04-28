@@ -20,4 +20,5 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
+| T-001 | DB migration + backend API: add `details` column to `entries`; expose in GET, POST, PATCH routes | done | Migration file exists; GET returns `details`; POST stores it; PATCH preserves when absent, updates when present, clears when blank; all entry tests pass | `npm run lint` (pass with existing frontend warning), `npm run build`, `npm test`, `npm run test --workspace backend -- src/entries.test.js`, `npm run test --workspace backend -- src/db/migrations.test.js` | none |
+| T-002 | Frontend: `details` field in AddItemSheet, display in EntryRow, wired through ListDetailPage and API client | ready_for_implement | AddItemSheet renders "Details (optional)" input with correct placeholder; onAdd called with details as 3rd arg; edit mode pre-fills from initialDetails; EntryRow shows subordinate details line when non-empty; ListDetailPage passes details through add/edit paths; all frontend tests pass | n/a | implement |
