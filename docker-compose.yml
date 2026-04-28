@@ -3,6 +3,17 @@ services:
     image: postgres:16
     container_name: endgame_grocery_postgres
     restart: unless-stopped
+    # Backend mail settings are read from the project-root .env file during local development:
+    # SMTP_HOST=localhost
+    # SMTP_PORT=1025
+    # SMTP_USER=
+    # SMTP_PASS=
+    # SMTP_FROM=noreply@example.com
+    # SMTP_FROM_NAME=Endgame Grocery
+    # APP_BASE_URL=http://localhost:5173
+    # VAPID_PUBLIC_KEY=
+    # VAPID_PRIVATE_KEY=
+    # VAPID_CONTACT=mailto:notifications@example.com
     environment:
       POSTGRES_DB: endgame_grocery
       POSTGRES_USER: postgres

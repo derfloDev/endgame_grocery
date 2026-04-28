@@ -15,9 +15,12 @@
     "bcrypt": "^5.1.1",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "handlebars": "^4.7.9",
     "jsonwebtoken": "^9.0.2",
     "node-pg-migrate": "^7.9.1",
-    "pg": "^8.14.1"
+    "nodemailer": "^7.0.13",
+    "pg": "^8.14.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.1.10",

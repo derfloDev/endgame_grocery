@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 
@@ -7,11 +7,13 @@ export default function LoginPage() {
   const { login, token } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const redirectTo = location.state?.from ?? "/";
+  const redirectTo = searchParams.get("redirect") ?? location.state?.from ?? "/";
+  const successMessage = location.state?.message ?? "";
 
   if (token) {
     return <Navigate to={redirectTo} replace />;
@@ -45,6 +47,7 @@ export default function LoginPage() {
         <h1>Welcome Back</h1>
         <p>Sign in to access your mission.</p>
         <form className="auth-form" onSubmit={handleSubmit}>
+          {successMessage ? <p className="eg-success-banner">{successMessage}</p> : null}
           {error ? <p className="eg-error-banner">{error}</p> : null}
           <div className="eg-field">
             <label htmlFor="login-email">Email</label>
@@ -76,6 +79,9 @@ export default function LoginPage() {
             <button className="eg-btn-primary" disabled={isSubmitting} type="submit">
               {isSubmitting ? "Signing in..." : "Log in"}
             </button>
+            <Link className="eg-link" to="/forgot-password">
+              Forgot password?
+            </Link>
             <Link className="eg-link" to="/register">
               Create an account
             </Link>

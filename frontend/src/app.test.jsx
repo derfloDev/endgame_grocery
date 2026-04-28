@@ -28,6 +28,40 @@ function renderApp(initialEntries = ["/"]) {
 describe("authentication shell", () => {
   beforeEach(async () => {
     vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("Notification", {
+      permission: "granted",
+      requestPermission: vi.fn(async () => "granted")
+    });
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        ready: Promise.resolve({
+          pushManager: {
+            async getSubscription() {
+              return null;
+            },
+            async subscribe() {
+              return {
+                endpoint: "https://push.example.com/subscriptions/1",
+                keys: {
+                  p256dh: "p256dh-key",
+                  auth: "auth-key"
+                },
+                async unsubscribe() {
+                  return true;
+                },
+                toJSON() {
+                  return {
+                    endpoint: this.endpoint,
+                    keys: this.keys
+                  };
+                }
+              };
+            }
+          }
+        })
+      }
+    });
     window.localStorage.clear();
     await resetOfflineStateForTests();
     setNavigatorOnline(true);
@@ -127,20 +161,11 @@ describe("authentication shell", () => {
     expect(screen.getByRole("button", { name: "Lists" }).getAttribute("aria-current")).toBe("page");
   });
 
-  it("submits the register form", async () => {
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ user: { id: "user-1" } })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ token: createFakeJwt("user-1") })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ lists: [] })
-      });
+  it("submits the register form and redirects to email verification", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: "Verification email sent." })
+    });
 
     renderApp(["/register"]);
 
@@ -150,8 +175,7 @@ describe("authentication shell", () => {
     await userEvent.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenNthCalledWith(
-        1,
+      expect(fetch).toHaveBeenCalledWith(
         "/api/auth/register",
         expect.objectContaining({
           method: "POST"
@@ -159,7 +183,248 @@ describe("authentication shell", () => {
       );
     });
 
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("heading", { name: "Check your inbox" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Resend verification email" })).toBeTruthy();
+  });
+
+  it("registers a user from an invite and redirects directly to the shared list", async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: createFakeJwt("user-5"), listId: "list-1" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ entries: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ history: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ publicKey: "dGVzdA" })
+      });
+
+    renderApp(["/register?invite=invite-token-1"]);
+
+    await userEvent.type(screen.getByLabelText("Display name"), "Demo User");
+    await userEvent.type(screen.getByLabelText("Email"), "demo@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/register",
+        expect.objectContaining({
+          body: JSON.stringify({
+            display_name: "Demo User",
+            email: "demo@example.com",
+            password: "password123",
+            invite_token: "invite-token-1"
+          }),
+          method: "POST"
+        })
+      );
+    });
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+    expect(window.localStorage.getItem("endgame_grocery.auth_token")).toBe(createFakeJwt("user-5"));
+  });
+
+  it("verifies the email token, stores the jwt, and redirects into the protected app", async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: createFakeJwt("user-1") })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ lists: [] })
+      });
+
+    renderApp(["/verify-email?token=valid-token"]);
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/verify-email?token=valid-token",
+        expect.objectContaining({
+          method: "GET"
+        })
+      );
+    });
+
     expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    expect(window.localStorage.getItem("endgame_grocery.auth_token")).toBe(createFakeJwt("user-1"));
+  });
+
+  it("redirects invite links through login and accepts the invite after authentication", async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: createFakeJwt("user-1") })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ listId: "list-1" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ entries: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ history: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ publicKey: "dGVzdA" })
+      });
+
+    renderApp(["/invite/invite-token-1"]);
+
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Email"), "demo@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/login",
+        expect.objectContaining({
+          body: JSON.stringify({ email: "demo@example.com", password: "password123" }),
+          method: "POST"
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/invites/invite-token-1",
+        expect.objectContaining({
+          method: "GET"
+        })
+      );
+    });
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+  });
+
+  it("shows verification errors when the token is invalid or expired", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: "Verification link is invalid or has expired." })
+    });
+
+    renderApp(["/verify-email?token=expired-token"]);
+
+    expect(await screen.findByText("Verification link is invalid or has expired.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Resend verification email" })).toBeTruthy();
+  });
+
+  it("resends the verification email from the public verify page", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: "If your account is pending verification, a new email has been sent." })
+    });
+
+    renderApp([{ pathname: "/verify-email", state: { email: "demo@example.com" } }]);
+
+    expect(await screen.findByRole("heading", { name: "Check your inbox" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Resend verification email" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/resend-verification",
+        expect.objectContaining({
+          body: JSON.stringify({ email: "demo@example.com" }),
+          method: "POST"
+        })
+      );
+    });
+
+    expect(await screen.findByText("A fresh verification email is on its way if your account is still pending.")).toBeTruthy();
+  });
+
+  it("links to forgot password from login and submits the request with a generic success message", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: "If an account exists, you will receive an email." })
+    });
+
+    renderApp(["/login"]);
+
+    expect(await screen.findByRole("link", { name: "Forgot password?" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("link", { name: "Forgot password?" }));
+
+    expect(await screen.findByRole("heading", { name: "Reset your password" })).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Email"), "demo@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Send reset email" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/forgot-password",
+        expect.objectContaining({
+          body: JSON.stringify({ email: "demo@example.com" }),
+          method: "POST"
+        })
+      );
+    });
+
+    expect(await screen.findByText("If the account exists, a reset email is on its way.")).toBeTruthy();
+  });
+
+  it("shows reset-password errors for invalid or expired tokens", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: "Password reset link is invalid or has expired." })
+    });
+
+    renderApp(["/reset-password?token=expired-reset"]);
+
+    await userEvent.type(screen.getByLabelText("New password"), "new-password-123");
+    await userEvent.click(screen.getByRole("button", { name: "Update password" }));
+
+    expect(await screen.findByText("Password reset link is invalid or has expired.")).toBeTruthy();
+  });
+
+  it("submits a new password and returns to login with a success message", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: "Password updated." })
+    });
+
+    renderApp(["/reset-password?token=valid-reset"]);
+
+    expect(await screen.findByRole("heading", { name: "Choose a new password" })).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("New password"), "new-password-123");
+    await userEvent.click(screen.getByRole("button", { name: "Update password" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/reset-password",
+        expect.objectContaining({
+          body: JSON.stringify({ token: "valid-reset", password: "new-password-123" }),
+          method: "POST"
+        })
+      );
+    });
+
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    expect(screen.getByText("Password updated. Please log in with your new password.")).toBeTruthy();
   });
 
   it("creates, renames, and deletes a list from the overview", async () => {
@@ -650,7 +915,7 @@ describe("authentication shell", () => {
     });
   });
 
-  it("opens the share sheet from list options and revokes a member", async () => {
+  it("opens the share sheet, sends an invite notice, and revokes an existing member", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch
       .mockResolvedValueOnce({
@@ -681,19 +946,29 @@ describe("authentication shell", () => {
               email: "demo@example.com",
               joined_at: "2026-04-21T00:00:00Z",
               is_owner: true
+            },
+            {
+              user_id: "user-2",
+              display_name: "Alex",
+              email: "alex@example.com",
+              joined_at: "2026-04-21T01:00:00Z",
+              is_owner: false
             }
           ]
         })
       })
       .mockResolvedValueOnce({
         ok: true,
+        json: async () => ({ publicKey: "dGVzdA" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         json: async () => ({
-          member: {
-            user_id: "user-2",
-            display_name: "Alex",
-            email: "alex@example.com",
-            joined_at: "2026-04-21T01:00:00Z",
-            is_owner: false
+          invite: {
+            id: "invite-1",
+            invited_email: "sam@example.com",
+            status: "pending",
+            expires_at: "2026-04-28T00:00:00Z"
           }
         })
       })
@@ -710,18 +985,87 @@ describe("authentication shell", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Share list/ }));
 
     expect(await screen.findByRole("dialog", { name: "Share List" })).toBeTruthy();
-    expect(screen.getByText("SQUAD (1)")).toBeTruthy();
+    expect(screen.getByText("SQUAD (2)")).toBeTruthy();
+    expect(screen.getByText("Alex")).toBeTruthy();
 
-    await userEvent.type(screen.getByLabelText("Add member by email"), "alex@example.com");
-    await userEvent.click(screen.getByRole("button", { name: "Add Member" }));
+    await userEvent.type(screen.getByLabelText("Invite member by email"), "sam@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Send Invite" }));
 
-    expect(await screen.findByText("Alex")).toBeTruthy();
+    expect(await screen.findByText("Invitation sent to sam@example.com.")).toBeTruthy();
+    expect(screen.queryByText("sam@example.com")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Revoke" }));
 
     await waitFor(() => {
       expect(screen.queryByText("Alex")).toBeNull();
     });
+  });
+
+  it("shows the notifications toggle only for shared lists", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Solo groceries", owner_name: "Demo User", is_owner: true }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ entries: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ history: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          members: [
+            {
+              user_id: "user-1",
+              display_name: "Demo User",
+              email: "demo@example.com",
+              joined_at: "2026-04-21T00:00:00Z",
+              is_owner: true
+            }
+          ]
+        })
+      });
+
+    const rendered = renderApp(["/lists/list-1"]);
+
+    expect(await screen.findByText("Solo groceries")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Enable notifications" })).toBeNull();
+
+    rendered.unmount();
+    fetch.mockReset();
+
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-2", name: "BBQ party", owner_name: "Alex", is_owner: false }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ entries: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ history: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ publicKey: "test-public-key" })
+      });
+
+    renderApp(["/lists/list-2"]);
+
+    expect(await screen.findByText("BBQ party")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Enable notifications" })).toBeTruthy();
   });
 
   it("shows the redesigned list detail loading and error states", async () => {

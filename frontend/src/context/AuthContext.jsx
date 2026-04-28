@@ -40,8 +40,10 @@ export function AuthProvider({ children }) {
       return;
     }
 
+    const sub = parseJwtSubject(token);
+
     window.localStorage.setItem(STORAGE_KEY, token);
-    setUser({ id: parseJwtSubject(token) });
+    setUser(sub ? { id: sub } : null);
   }, [token]);
 
   async function login(credentials) {
@@ -51,12 +53,7 @@ export function AuthProvider({ children }) {
   }
 
   async function register(payload) {
-    await registerUser(payload);
-
-    return login({
-      email: payload.email,
-      password: payload.password
-    });
+    return registerUser(payload);
   }
 
   function logout() {
@@ -68,6 +65,7 @@ export function AuthProvider({ children }) {
     user,
     login,
     register,
+    setAuthToken: setToken,
     logout
   };
 

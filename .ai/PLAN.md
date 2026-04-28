@@ -1,429 +1,495 @@
-# Plan
+# Plan — Notifications & Mail Support
 
-Status: **ready** (T-001/T-002 done; T-003 newly planned)
+Status: **ready_for_implement**
 
-Goal: Add a free-text `details` field to grocery entries (ROADMAP.md — Priority 1).
+Goal: implement the five modules defined in `ROADMAP.md` — e-mail verification, password reset, list-sharing invitations, shared mail design system, and push notifications.
+
+---
 
 ## Scope
 
-- DB: nullable `details` column on `entries`.
-- Backend: `GET`, `POST`, `PATCH` entry routes expose `details`; `autocomplete_history` is not changed.
-- Frontend API client: `createEntry` forwards `details`; `updateEntry` already forwards a generic payload.
-- `AddItemSheet`: new optional "Details (optional)" input; `onAdd` callback gains a third `details` argument.
-- `EntryRow`: renders a dimmed second line for `details` when non-empty.
-- `ListDetailPage`: wires `details` through add, edit, and optimistic-update paths.
+Six deliverables in dependency order:
 
-## Acceptance Criteria
-
-1. A `details` column (nullable TEXT) exists on `entries` after migration.
-2. `POST /api/lists/:id/entries` stores `details` and returns it in the response body.
-3. `GET /api/lists/:id/entries` returns `details` for every entry.
-4. `PATCH /api/lists/:id/entries/:entryId`:
-   - When `details` key is **absent** from the body → existing value is preserved.
-   - When `details` key is **present** (including `""` or `null`) → value is trimmed and stored as `null` if blank, otherwise stored as-is.
-5. `AddItemSheet` (add mode) renders a second input with `label="Details (optional)"` and `placeholder="Beschreibung, Menge..."`.
-6. `AddItemSheet` (edit mode) pre-fills the details input from `initialDetails` prop.
-7. Submitting the sheet calls `onAdd(text, icon, details)` with `details` as the third argument (empty string when blank).
-8. `EntryRow` renders `entry.details` in a visually subordinate line (CSS class `entry-row-details`) when the value is non-empty; line is absent when details is null/empty.
-9. All existing tests continue to pass; new tests cover the `details` field at every layer.
-
-## Implementation Phases
-
-### Phase 1 — T-001: DB migration + backend
-
-**Files to change:**
-- `backend/src/db/migrations/<next_timestamp>_add_details_to_entries.cjs` *(new)*
-  - `up`: `pgm.addColumns("entries", { details: { type: "text", notNull: false } })`
-  - `down`: `pgm.dropColumns("entries", ["details"])`
-- `backend/src/routes/entries.js`
-  - `GET`: add `details` to `SELECT` column list.
-  - `POST`: destructure `details` from body; pass `details?.trim() || null` as new query param; add to INSERT columns and RETURNING list.
-  - `PATCH`: destructure `details` from body; detect presence via `'details' in (req.body ?? {})`; when present, include `details = $n` (direct assignment, not COALESCE) in the SET clause; add `details` to RETURNING list. Use a boolean flag param to conditionally update the column (e.g. `details = CASE WHEN $n THEN $n+1 ELSE details END`).
-  - Validation: the `details` field is always optional; its presence alone does not satisfy the "at least one field" guard — that guard already covers `text`, `status`, `icon`.
-- `backend/src/entries.test.js`
-  - Update the SQL assertion regex in "returns entries" test to include `details`.
-  - Update the INSERT assertion to include `details` and its param.
-  - Update all `params` deep-equal assertions that reference the fixed param array to include `details`.
-  - Add test: `POST` with `details` stores and returns it.
-  - Add test: `PATCH` with `details` present updates the column.
-  - Add test: `PATCH` without `details` key preserves the existing column value.
-  - Add test: `PATCH` with `details: ""` clears the column to null.
-
-### Phase 2 — T-002: Frontend
-
-**Files to change:**
-- `frontend/src/api/entries.js`
-  - `createEntry({ text, icon, details })`: include `details` in the POST payload.
-- `frontend/src/components/AddItemSheet.jsx`
-  - Add prop `initialDetails = ""`.
-  - Add state `const [details, setDetails] = useState(initialDetails)`.
-  - Reset `details` in the `open` / `initialDetails` `useEffect`.
-  - Add a second `<div className="eg-field">` block after the existing text field:
-    ```jsx
-    <label htmlFor={detailsInputId}>Details (optional)</label>
-    <input
-      id={detailsInputId}
-      className="eg-input"
-      placeholder="Beschreibung, Menge..."
-      value={details}
-      onChange={(e) => setDetails(e.target.value)}
-    />
-    ```
-  - `handleSubmit`: call `onAdd(trimmed, selectedIconName, details)`.
-  - `handleQuickAdd`: call `onAdd(trimmed, suggestedIconName, "")` (quick-add has no details).
-- `frontend/src/components/AddItemSheet.test.jsx`
-  - Update all `expect(onAdd).toHaveBeenCalledWith(text, icon)` assertions to `(text, icon, "")` (empty details) or the appropriate details value.
-  - Add test: renders "Details (optional)" label and correct placeholder.
-  - Add test: submitting with details text calls `onAdd` with that details string.
-  - Add test (edit mode): pre-fills details input from `initialDetails` prop.
-- `frontend/src/components/EntryRow.jsx`
-  - Inside `.entry-row-copy`, after the `<p>` for `entry.text`, add:
-    ```jsx
-    {entry.details ? <p className="entry-row-details">{entry.details}</p> : null}
-    ```
-- `frontend/src/components/entry-row.test.jsx`
-  - Add test: renders `.entry-row-details` when `entry.details` is non-empty.
-  - Add test: does not render `.entry-row-details` when `entry.details` is null/undefined.
-- `frontend/src/pages/ListDetailPage.jsx`
-  - `addEntryByText(text, icon, details)`: pass `details` to `createEntry` and to the optimistic `temporaryEntry`.
-  - `submitEditEntry(entryId, text, iconName, details)`: pass `details` in the `updateEntry` payload and in the optimistic update.
-  - Edit-mode `AddItemSheet`: add `initialDetails={editingEntry?.details ?? ""}` prop; update `onAdd` callback signature to `(text, icon, details)` and forward to `submitEditEntry`.
-  - Add-mode `AddItemSheet`: update `onAdd` callback signature to `(text, icon, details)` and forward to `addEntryByText`.
-- `frontend/src/index.css`
-  - Add `.entry-row-details` rule: smaller font size (e.g. `0.8rem`), muted color (`var(--text-secondary)` or similar), `margin: 0`, no extra top margin (tight to the name line).
-
-### Phase 3 — T-003: Fallback icon in chips
-
-**Context:**  
-`RecentlyUsedSection` and `AutocompleteSuggestions` both omit the icon element entirely when `item.icon` / `suggestion.icon` is null or unknown. Both should always render the fallback `IconShoppingCart` instead.
-
-**Files to change:**
-- `frontend/src/components/RecentlyUsedSection.jsx`
-  - Change `resolveIconName`: replace `return null` with `return FALLBACK_ICON_NAME` when `iconName` is falsy.
-  - Result: `ItemIcon` is never null → the conditional `{ItemIcon ? ... : null}` always renders the icon. The conditional can be simplified to an unconditional render.
-- `frontend/src/components/AutocompleteSuggestions.jsx`
-  - Import `FALLBACK_ICON` from `../data/iconRegistry`.
-  - Change icon resolution to: `const SuggestionIcon = (suggestion.icon ? ICON_REGISTRY[suggestion.icon] : null) ?? FALLBACK_ICON;`
-  - Replace `{SuggestionIcon ? <SuggestionIcon ... /> : null}` with an unconditional `<SuggestionIcon ... />`.
-- `frontend/src/components/AutocompleteSuggestions.test.jsx`
-  - Update the existing test **"renders a suggestion without an icon and keeps the dropdown row full-width with a 44px touch target"**:
-    - Remove the assertion `expect(container.querySelector(".autocomplete-chip svg")).toBeNull()`.
-    - Add assertion that the fallback icon SVG **is** rendered, e.g. `expect(container.querySelector(".autocomplete-chip svg")).toBeTruthy()`.
-    - Retain the CSS assertions for `min-height: 44px` and `width: 100%`.
-- `frontend/src/components/RecentlyUsedSection.test.jsx`
-  - Add test: when an item has `icon: null`, the chip still renders an SVG icon (fallback).
-  - Verify via `container.querySelector(".recently-used-chip-icon")` being truthy.
-
-### Phase 4 — T-004: Icon registry expansion
-
-**Context:**  
-`iconRegistry.js` currently holds ~80 icons. 45 new icons are to be added from Tabler (primary) and Lucide (secondary, wrapped via `fromLucide()`). `iconDatabase.js` maps text keywords to icon names for the suggestion engine and must be updated in sync.
-
-**Files to change:**
-
-#### `frontend/src/data/iconRegistry.js`
-
-1. **New Tabler imports** — add to the existing `@tabler/icons-react` import block (alphabetical order):
-   ```
-   IconBlender, IconBone, IconBowl, IconBowlChopsticks, IconBowlSpoon,
-   IconChefHat, IconEggCracked, IconLollipop, IconMelon, IconMicrowave,
-   IconNut, IconPlant, IconPlant2, IconSeeding, IconSunglasses,
-   IconTeapot, IconWheat
-   ```
-
-2. **New Lucide imports** — add to the existing `lucide-react` import block (alphabetical order):
-   ```
-   CakeSlice, CandyCane, Citrus, CookingPot, Croissant, CupSoda,
-   Dessert, Donut, Drumstick, FishSymbol, ForkKnife, GlassWater,
-   Ham, Hamburger, Hop, IceCreamBowl, IceCreamCone, Martini,
-   Popcorn, Refrigerator, Sandwich, Shrimp, UtensilsCrossed,
-   Vegan, Wine, Cigarette, Syringe, PillBottle
-   ```
-
-3. **ICON_REGISTRY** — add all new icons in alphabetical order, Tabler ones as direct references, Lucide ones wrapped with `fromLucide()`:
-   ```js
-   CakeSlice: fromLucide(CakeSlice),
-   CandyCane: fromLucide(CandyCane),
-   Cigarette: fromLucide(Cigarette),
-   Citrus: fromLucide(Citrus),
-   CookingPot: fromLucide(CookingPot),
-   Croissant: fromLucide(Croissant),
-   CupSoda: fromLucide(CupSoda),
-   Dessert: fromLucide(Dessert),
-   Donut: fromLucide(Donut),
-   Drumstick: fromLucide(Drumstick),
-   FishSymbol: fromLucide(FishSymbol),
-   ForkKnife: fromLucide(ForkKnife),
-   GlassWater: fromLucide(GlassWater),
-   Ham: fromLucide(Ham),
-   Hamburger: fromLucide(Hamburger),
-   Hop: fromLucide(Hop),
-   IceCreamBowl: fromLucide(IceCreamBowl),
-   IceCreamCone: fromLucide(IceCreamCone),
-   IconBlender,
-   IconBone,
-   IconBowl,
-   IconBowlChopsticks,
-   IconBowlSpoon,
-   IconChefHat,
-   IconEggCracked,
-   IconLollipop,
-   IconMelon,
-   IconMicrowave,
-   IconNut,
-   IconPlant,
-   IconPlant2,
-   IconSeeding,
-   IconSunglasses,
-   IconTeapot,
-   IconWheat,
-   Martini: fromLucide(Martini),
-   PillBottle: fromLucide(PillBottle),
-   Popcorn: fromLucide(Popcorn),
-   Refrigerator: fromLucide(Refrigerator),
-   Sandwich: fromLucide(Sandwich),
-   Shrimp: fromLucide(Shrimp),
-   Syringe: fromLucide(Syringe),
-   UtensilsCrossed: fromLucide(UtensilsCrossed),
-   Vegan: fromLucide(Vegan),
-   Wine: fromLucide(Wine),
-   ```
-   Insert each entry in its correct alphabetical position within the existing registry object.
-
-#### `frontend/src/data/iconDatabase.js`
-
-**Update existing entries** to use the better, more specific new icons:
-
-| Entry label | Old icon | New icon |
+| Task | Module | Depends on |
 |---|---|---|
-| croissant | `IconCakeRoll` | `Croissant` |
-| ham | `IconSausage` | `Ham` |
-| shrimp | `IconFishBone` | `Shrimp` |
-| ice cream | `IconIceCream2` | `IceCreamBowl` |
-| ice cream cone | `IconIceCream` | `IceCreamCone` |
-| nuts | `IconLeaf2` | `IconNut` |
-| popcorn | `IconCandy` | `Popcorn` |
-| tea | `IconCup` | `IconTeapot` |
-| wine | `IconGlassChampagne` | `Wine` |
+| T-001 | Mail + package infrastructure (M4 base) | — |
+| T-002 | E-mail verification (M1) | T-001 |
+| T-003 | Password reset (M2) | T-001 |
+| T-004 | List sharing via invitation (M3) | T-001 |
+| T-005 | Push notifications (M5) | — |
+| T-006 | Fix Docker publish pipeline (CI/CD) | — |
 
-**Add new keyword entries** for icons that have no existing entry (insert under the most appropriate category comment):
+---
 
+## Architecture Notes
+
+### SMTP / Mailer module
+- Single `backend/src/mail/mailer.js` module that owns the Nodemailer transport.
+- `createMailer({ config })` factory (matches the project's dependency-injection pattern).
+- `mailer.send({ to, subject, template, context })` — renders a Handlebars template from `backend/src/mail/templates/` and sends.
+- Templates extend `base.hbs` via Handlebars partials (`{{> base content=...}}`).
+- `APP_BASE_URL` env var used to build all links inside mails.
+
+### Auth route extensions (T-002, T-003)
+All new endpoints are added to the existing `createAuthRouter` in `backend/src/routes/auth.js`.
+
+### Email-verified guard
+Login (`POST /api/auth/login`) checks `email_verified`; if `false`, returns `403 { error: "Please verify your email before logging in." }`.
+JWT issuance itself enforces the gate — no extra DB hit in middleware.
+
+### Existing-user migration (T-002)
+The `email_verified` column is added as `DEFAULT true` so existing rows are auto-verified. New registrations insert `email_verified = false`.
+
+### Invite + registration fusion (T-004)
+If `POST /api/auth/register` receives a valid `invite_token` body field:
+- The new user is inserted with `email_verified = true` (email ownership proved via invite link).
+- The invite is consumed and the user is added to the list.
+- A JWT is returned directly (skipping the normal verify-email flow).
+
+### Service worker for push (T-005)
+`vite-plugin-pwa` is switched from `generateSW` (current) to `injectManifest` mode.
+A custom SW entry `frontend/src/sw/service-worker.js` is created; it imports Workbox precaching plus a `push` event handler.
+The existing `frontend/src/sw/register.js` is unchanged.
+
+---
+
+## Phase 1 — T-001: Mail + Package Infrastructure
+
+### What to build
+1. Install packages: `nodemailer`, `handlebars` (production); update root `package.json`.
+2. `backend/src/mail/mailer.js` — Nodemailer transport factory + `send()` helper.
+3. `backend/src/mail/templates/base.hbs` — shared responsive HTML layout (header with app name, content slot, CTA button partial, footer). Inline CSS for e-mail client compatibility.
+4. `backend/src/env.js` — add `smtpHost`, `smtpPort`, `smtpUser`, `smtpPass`, `smtpFrom`, `smtpFromName`, `appBaseUrl` to `getConfig()`.
+5. `docker-compose.yml` — add commented env var block for the backend service documenting all seven new vars (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_FROM_NAME`, `APP_BASE_URL`).
+
+### Files to change
+| File | Action |
+|---|---|
+| `package.json` | add `nodemailer`, `handlebars` to dependencies |
+| `backend/src/mail/mailer.js` | create |
+| `backend/src/mail/templates/base.hbs` | create |
+| `backend/src/env.js` | extend `getConfig()` |
+| `docker-compose.yml` | add commented SMTP env block |
+
+### Acceptance Criteria
+- `mailer.send()` resolves without throwing when pointed at a real SMTP server.
+- `getConfig()` returns all seven new fields.
+- `docker-compose.yml` contains all seven env var names as comments.
+- `npm run lint` passes.
+
+---
+
+## Phase 2 — T-002: E-Mail Verification
+
+### What to build
+
+**DB migration** `<ts>_add_email_verification.cjs`
+- `ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT true` (existing rows auto-verified).
+- New table `email_verification_tokens(id uuid PK, user_id uuid FK→users ON DELETE CASCADE, token uuid UNIQUE, expires_at timestamptz, created_at timestamptz DEFAULT NOW())`.
+
+**Backend** (`backend/src/routes/auth.js`)
+- `POST /register`: insert user with `email_verified = false`; do **not** return a JWT; call `mailer.send()` with `verification.hbs`; return `201 { message: "Verification email sent." }`.
+- `POST /login`: add check — if `email_verified = false`, return `403 { error: "Please verify your email before logging in." }`.
+- `GET /verify-email?token=<uuid>`: look up token in `email_verification_tokens`, check expiry, set `email_verified = true`, delete token row, return `200 { token: <JWT> }`. Invalid/expired → `400`.
+- `POST /resend-verification`: accept `{ email }` body; look up user; if unverified, delete old tokens for that user, create new token, send mail; always return `200`.
+
+**Mail template** `backend/src/mail/templates/verification.hbs`
+- Subject: "Bitte bestätige deine E-Mail-Adresse"
+- Body: welcome greeting, app name, single CTA "E-Mail bestätigen" linking to `APP_BASE_URL/verify-email?token=<token>`.
+
+**Frontend**
+- `frontend/src/api/auth.js` — add `verifyEmail(token)` (`GET /api/auth/verify-email?token=`), `resendVerification(email)` (`POST /api/auth/resend-verification`).
+- `frontend/src/context/AuthContext.jsx` — `register()` no longer calls `login()` after register; returns the raw API response (implementer: no token to store).
+- `frontend/src/pages/RegisterPage.jsx` — after successful `register()`, `navigate("/verify-email")` instead of `"/"`.
+- `frontend/src/pages/VerifyEmailPage.jsx` — new public page:
+  - No `?token` in URL → shows "Check your inbox" message + "Resend" button (calls `resendVerification`).
+  - `?token=<uuid>` in URL → on mount calls `verifyEmail(token)`; on success stores JWT via `AuthContext` + `navigate("/")`.  On error shows message + resend option.
+- `frontend/src/App.jsx` — add `/verify-email` as a public route (outside `ProtectedLayout`).
+
+### Files to change
+| File | Action |
+|---|---|
+| `backend/src/db/migrations/<ts>_add_email_verification.cjs` | create |
+| `backend/src/routes/auth.js` | modify register + login; add verify-email + resend |
+| `backend/src/mail/templates/verification.hbs` | create |
+| `frontend/src/api/auth.js` | add `verifyEmail`, `resendVerification` |
+| `frontend/src/context/AuthContext.jsx` | update `register()` |
+| `frontend/src/pages/RegisterPage.jsx` | update post-register redirect |
+| `frontend/src/pages/VerifyEmailPage.jsx` | create |
+| `frontend/src/App.jsx` | add `/verify-email` route |
+
+### Acceptance Criteria
+- New registration sends exactly one verification e-mail and returns no JWT.
+- Login with unverified account → 403.
+- Valid token → JWT issued, `email_verified = true` in DB.
+- Expired/invalid token → 400, error shown on `VerifyEmailPage`.
+- Resend creates new token, deletes old ones.
+- Existing DB users (migration) remain `email_verified = true`.
+
+---
+
+## Phase 3 — T-003: Password Reset
+
+### What to build
+
+**DB migration** `<ts>_add_password_reset_tokens.cjs`
+- New table `password_reset_tokens(id uuid PK, user_id uuid FK→users ON DELETE CASCADE, token uuid UNIQUE, expires_at timestamptz, used boolean NOT NULL DEFAULT false, created_at timestamptz DEFAULT NOW())`.
+
+**Backend** (`backend/src/routes/auth.js`)
+- `POST /forgot-password`: accept `{ email }`; look up user; if found and `email_verified = true`, insert token with `expires_at = NOW() + 60 min`, send `password-reset.hbs`; **always** return `200 { message: "If an account exists, you will receive an email." }`.
+- `POST /reset-password`: accept `{ token, password }`; validate token (exists, not expired, not used); hash new password; update user; mark token `used = true`; return `200 { message: "Password updated." }`. Invalid → `400`.
+
+**Mail template** `backend/src/mail/templates/password-reset.hbs`
+- Subject: "Passwort zurücksetzen"
+- Body: single CTA "Passwort zurücksetzen" → `APP_BASE_URL/reset-password?token=<token>`, note that link expires in 60 minutes.
+
+**Frontend**
+- `frontend/src/api/auth.js` — add `forgotPassword(email)`, `resetPassword(token, newPassword)`.
+- `frontend/src/pages/ForgotPasswordPage.jsx` — email input form; on submit shows static success message regardless of outcome.
+- `frontend/src/pages/ResetPasswordPage.jsx` — reads `?token` from URL; new-password form; on success `navigate("/login")` with success message.
+- `frontend/src/pages/LoginPage.jsx` — add "Passwort vergessen?" link to `/forgot-password`.
+- `frontend/src/App.jsx` — add `/forgot-password` and `/reset-password` as public routes.
+
+### Files to change
+| File | Action |
+|---|---|
+| `backend/src/db/migrations/<ts>_add_password_reset_tokens.cjs` | create |
+| `backend/src/routes/auth.js` | add forgot-password + reset-password |
+| `backend/src/mail/templates/password-reset.hbs` | create |
+| `frontend/src/api/auth.js` | add `forgotPassword`, `resetPassword` |
+| `frontend/src/pages/ForgotPasswordPage.jsx` | create |
+| `frontend/src/pages/ResetPasswordPage.jsx` | create |
+| `frontend/src/pages/LoginPage.jsx` | add forgot-password link |
+| `frontend/src/App.jsx` | add `/forgot-password`, `/reset-password` routes |
+
+### Acceptance Criteria
+- `POST /forgot-password` with unknown e-mail returns 200 and sends no mail.
+- Reset link expires after 60 minutes → `400` on the endpoint.
+- Used token cannot be reused.
+- Successful reset: user can log in with new password.
+
+---
+
+## Phase 4 — T-004: List Sharing via Invitation
+
+### What to build
+
+**DB migration** `<ts>_add_list_invites.cjs`
+- New table `list_invites(id uuid PK, list_id uuid FK→lists ON DELETE CASCADE, invited_email text NOT NULL, invited_by uuid FK→users ON DELETE CASCADE, token uuid UNIQUE NOT NULL DEFAULT gen_random_uuid(), status text NOT NULL DEFAULT 'pending', expires_at timestamptz NOT NULL, created_at timestamptz DEFAULT NOW())`.
+- Constraint: `status IN ('pending', 'accepted', 'declined')`.
+- Unique index on `(list_id, invited_email)` where `status = 'pending'` (partial index) — enforces one active invite per email+list.
+
+**Backend — sharing route** (`backend/src/routes/sharing.js`)
+- `POST /` (invite): **replace** current direct-add with invite flow:
+  - Check list ownership (unchanged).
+  - Look up user by email to determine Scenario A vs B.
+  - Upsert `list_invites` — if a `pending` row already exists for `(list_id, invited_email)`: update `token = gen_random_uuid()`, `expires_at = NOW() + 7d`; otherwise insert.
+  - Send `invite-existing.hbs` (Scenario A: user exists) or `invite-new.hbs` (Scenario B: no user).
+  - Return `201 { invite: { id, invited_email, status, expires_at } }`.
+- `DELETE /:uid` (revoke): after successful member deletion, fetch removed user's email + list name, send `revocation.hbs`.
+
+**Backend — invites route** (new `backend/src/routes/invites.js`)
+- `GET /api/invites/:token` (`requireAuth` middleware):
+  - Look up invite by token; check expiry and `status = 'pending'`.
+  - Verify `req.user` email matches `invited_email` (or skip check — implementer's choice based on security posture; recommended: skip to keep UX simple, token is the secret).
+  - Insert into `list_members`; mark invite `accepted`.
+  - Return `200 { listId }` (frontend redirects to `/lists/:listId`).
+  - Already-a-member: return `200 { listId }` (idempotent).
+
+**Backend — register with invite** (`backend/src/routes/auth.js`)
+- `POST /register`: if body contains `invite_token`:
+  - Look up invite; if valid `pending` invite: insert user with `email_verified = true`, consume invite (add to `list_members`, mark `accepted`), return JWT directly.
+  - If invite invalid/expired: continue with normal register flow (no JWT, send verification mail).
+
+**Backend — app.js**: register `GET /api/invites/:token` via new invites router.
+
+**Mail templates**
+- `backend/src/mail/templates/invite-existing.hbs` — "[Sender] hat die Liste '[Name]' mit dir geteilt." + CTA "Liste ansehen" → `APP_BASE_URL/invite/:token`.
+- `backend/src/mail/templates/invite-new.hbs` — "[Sender] lädt dich ein, die Liste '[Name]' zu sehen." + CTA "Registrieren" → `APP_BASE_URL/register?invite=<token>`.
+- `backend/src/mail/templates/revocation.hbs` — "Deine Zusammenarbeit an der Liste '[Name]' wurde beendet."
+
+**Frontend**
+- `frontend/src/pages/InviteAcceptPage.jsx` — new public page at `/invite/:token`:
+  - If `token` in context (user logged in): on mount calls `acceptInvite(token)`; on success `navigate("/lists/:listId")`.
+  - If user not logged in: `navigate("/login?redirect=/invite/:token")` (login page handles `?redirect` param).
+- `frontend/src/pages/RegisterPage.jsx` — read `?invite=<token>` from URL; pass `invite_token` to `registerUser()`; after successful registration with invite (response contains `token`), store JWT and `navigate("/lists/:listId")`; without invite, keep existing flow.
+- `frontend/src/pages/LoginPage.jsx` — after login, check for `?redirect=` param and navigate there.
+- `frontend/src/api/sharing.js` — add `acceptInvite(token)` (`GET /api/invites/:token`); update `shareListWithMember` JSDoc to reflect new response shape.
+- `frontend/src/api/auth.js` — `registerUser` accepts optional `invite_token` in payload.
+- `frontend/src/App.jsx` — add `/invite/:token` as a public route (renders `InviteAcceptPage`).
+- `frontend/src/components/ShareListSheet.jsx` (or wherever sharing UI lives) — update to handle `invite` response shape (show "Invitation sent to [email]" instead of adding member to list immediately).
+
+### Files to change
+| File | Action |
+|---|---|
+| `backend/src/db/migrations/<ts>_add_list_invites.cjs` | create |
+| `backend/src/routes/sharing.js` | replace POST logic; extend DELETE with revocation mail |
+| `backend/src/routes/invites.js` | create |
+| `backend/src/routes/auth.js` | extend register with invite_token handling |
+| `backend/src/app.js` | register invites router |
+| `backend/src/mail/templates/invite-existing.hbs` | create |
+| `backend/src/mail/templates/invite-new.hbs` | create |
+| `backend/src/mail/templates/revocation.hbs` | create |
+| `frontend/src/pages/InviteAcceptPage.jsx` | create |
+| `frontend/src/pages/RegisterPage.jsx` | handle `?invite=` param |
+| `frontend/src/pages/LoginPage.jsx` | handle `?redirect=` param |
+| `frontend/src/api/sharing.js` | add `acceptInvite`; update JSDoc |
+| `frontend/src/api/auth.js` | extend `registerUser` payload |
+| `frontend/src/App.jsx` | add `/invite/:token` route |
+| `frontend/src/components/ShareListSheet.jsx` | update for invite response shape |
+
+### Acceptance Criteria
+- `POST /api/lists/:id/members` no longer adds the member directly; creates invite row + sends mail.
+- Existing user clicks invite link → added to list, redirected to list.
+- New user registers via `?invite=<token>` → `email_verified = true`, JWT returned, redirected to list.
+- Invite tokens expire after 7 days.
+- Duplicate invite to same email on same list resets the token and resends.
+- Revoked member receives revocation mail.
+- ShareListSheet shows "invitation sent" state.
+
+---
+
+## Phase 5 — T-005: Push Notifications
+
+### What to build
+
+**Package**
+- Install `web-push` (production dependency); update root `package.json`.
+
+**DB migration** `<ts>_add_push_tables.cjs`
+- `push_subscriptions(id uuid PK, user_id uuid FK→users ON DELETE CASCADE, endpoint text NOT NULL, p256dh text NOT NULL, auth text NOT NULL, created_at timestamptz DEFAULT NOW())`.
+- Unique constraint on `(user_id, endpoint)`.
+- `pending_push_jobs(id uuid PK, list_id uuid FK→lists ON DELETE CASCADE, actor_user_id uuid FK→users ON DELETE CASCADE, fire_at timestamptz NOT NULL, items jsonb NOT NULL DEFAULT '[]', created_at timestamptz DEFAULT NOW())`.
+- Unique constraint on `(list_id, actor_user_id)`.
+- `push_cooldowns(list_id uuid PK FK→lists ON DELETE CASCADE, last_sent_at timestamptz NOT NULL)`.
+
+**Backend — push route** (new `backend/src/routes/push.js`)
+- `GET /api/push/vapid-public-key` (no auth): returns `{ publicKey: config.vapidPublicKey }`.
+- `POST /api/push/subscribe` (`requireAuth`): upsert into `push_subscriptions`.
+- `DELETE /api/push/subscribe` (`requireAuth`): delete row matching `(user_id, endpoint)`.
+
+**Backend — push worker** (new `backend/src/workers/pushWorker.js`)
+- Exports `startPushWorker({ pool, config })`.
+- `setInterval` every 5 seconds:
+  1. `SELECT ... FROM pending_push_jobs WHERE fire_at <= NOW() FOR UPDATE SKIP LOCKED` — process one batch at a time.
+  2. For each job:
+     - Check `push_cooldowns` for `(list_id)`: if `last_sent_at > NOW() - 15 min` AND actor is same user — skip (cooldown active).
+     - Fetch all list members except `actor_user_id` (owner + `list_members`).
+     - Fetch `push_subscriptions` for those users.
+     - Compose notification body (1-item vs multi-item format).
+     - Send Web Push via `webpush.sendNotification()` to each subscriber; swallow 410 Gone (remove stale subscriptions).
+     - Delete job row.
+     - Upsert `push_cooldowns`.
+
+**Backend — env.js**: add `vapidPublicKey`, `vapidPrivateKey`, `vapidContact` to `getConfig()`.
+
+**Backend — entries route** (`backend/src/routes/entries.js`)
+- In `POST /` handler, after successful entry insertion: call `enqueuePushJob({ pool, listId, actorUserId, entryText })` (extracted helper, importable).
+- Helper: upsert `pending_push_jobs` — if row exists for `(list_id, actor_user_id)` with `fire_at > NOW()`: append entry to `items` JSONB, update `fire_at = NOW() + 5 min`; else: insert new row.
+
+**Backend — app.js**: register push router; call `startPushWorker()` (skip in test env: `if (process.env.NODE_ENV !== 'test')`).
+
+**docker-compose.yml**: add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_CONTACT` commented env vars.
+
+**Frontend — Vite config** (`frontend/vite.config.js`)
+- Switch `VitePWA` from `generateSW` to `injectManifest` mode:
+  ```js
+  strategies: 'injectManifest',
+  srcDir: 'src/sw',
+  filename: 'service-worker.js',
+  ```
+- Remove `workbox` key; add `injectManifest: { globPatterns: [...] }`.
+
+**Frontend — custom SW** (new `frontend/src/sw/service-worker.js`)
+- Import and call `precacheAndRoute(self.__WB_MANIFEST)` (Workbox precaching, replaces current generated SW behaviour).
+- Add `push` event listener: parse `event.data.json()`, call `self.registration.showNotification(title, { body, icon })`.
+- Add `notificationclick` listener: focus/open the app.
+
+**Frontend — push API** (new `frontend/src/api/push.js`)
+- `fetchVapidPublicKey()` — `GET /api/push/vapid-public-key`.
+- `subscribePush(token, subscription)` — `POST /api/push/subscribe`.
+- `unsubscribePush(token, endpoint)` — `DELETE /api/push/subscribe`.
+
+**Frontend — hook** (new `frontend/src/hooks/usePushNotifications.js`)
+- Fetches VAPID key on mount.
+- `subscribe()`: requests `Notification.permission`, creates `PushSubscription`, calls `subscribePush`.
+- `unsubscribe()`: calls browser `unsubscribe()` + `unsubscribePush`.
+- Exposes `{ isSubscribed, isSupported, subscribe, unsubscribe }`.
+
+**Frontend — ListDetailPage** (`frontend/src/pages/ListDetailPage.jsx`)
+- Use `usePushNotifications` hook.
+- Show "Benachrichtigungen aktivieren / deaktivieren" toggle in the top bar area, **only** when the list has other members (i.e., it is a shared list and `members.length > 1`).
+
+### Files to change
+| File | Action |
+|---|---|
+| `package.json` | add `web-push` to dependencies |
+| `backend/src/db/migrations/<ts>_add_push_tables.cjs` | create |
+| `backend/src/routes/push.js` | create |
+| `backend/src/workers/pushWorker.js` | create |
+| `backend/src/routes/entries.js` | add push job enqueue after POST |
+| `backend/src/app.js` | register push router + start push worker |
+| `backend/src/env.js` | add VAPID fields |
+| `docker-compose.yml` | add VAPID env vars |
+| `frontend/vite.config.js` | switch to injectManifest mode |
+| `frontend/src/sw/service-worker.js` | create (custom SW entry) |
+| `frontend/src/api/push.js` | create |
+| `frontend/src/hooks/usePushNotifications.js` | create |
+| `frontend/src/pages/ListDetailPage.jsx` | add push opt-in toggle |
+
+### Acceptance Criteria
+- `GET /api/push/vapid-public-key` returns the public key.
+- Subscribe/unsubscribe endpoints persist/remove rows.
+- One entry added → single push notification fired after ≤ 10 minutes.
+- Three entries within 5-minute window → one notification with "2 weitere Artikel" text.
+- Actor does not receive their own notification.
+- Second push within 15-minute cooldown window for same list is suppressed.
+- Push opt-in toggle only visible on shared lists.
+- `npm run build` succeeds with injectManifest mode.
+
+---
+
+---
+
+## Hotfix — T-008: Fix E2E Tests for Email-Verification Flow
+
+### Root Cause
+T-002 changed two behaviours that the existing E2E tests were not updated for:
+
+1. `POST /api/auth/register` no longer returns a JWT — registration redirects to `/verify-email`. Tests asserting `toHaveURL(/\/$/)` after clicking "Create account" now fail.
+2. Users created via the API are `email_verified = false`. Any test that registers via API and immediately logs in gets a 403, because login blocks unverified accounts.
+
+### What to build
+
+**`backend/src/mail/mailer.js`** — guard against unconfigured SMTP
+- In `send()`, check `config.smtpHost` before attempting delivery:
+  ```js
+  if (!config.smtpHost) {
+    console.warn(`[mailer] SMTP not configured — skipping mail to ${to} (${subject})`);
+    return;
+  }
+  ```
+- This prevents Nodemailer from opening a TCP connection to an empty hostname during E2E tests (and any other environment where SMTP vars are absent).
+- Consistent with the push-worker pattern (`setVapidDetails` is skipped when VAPID keys are missing).
+
+**`backend/src/routes/test.js`** — new test-only router
+- Export `createTestRouter({ pool, bcryptLib, jwtLib, config })`.
+- Guard: if `process.env.NODE_ENV === 'production'` the router returns 404 on all routes.
+- `POST /api/test/create-verified-user` — accepts `{ display_name, email, password }`:
+  - Hashes password, inserts user with `email_verified = true`.
+  - Returns `{ token: <JWT> }` immediately (same shape as the login endpoint).
+  - Returns 409 if email already exists.
+- This endpoint exists solely to give E2E tests a way to create a ready-to-use account without going through the email flow.
+
+**`backend/src/app.js`**
+- Import and mount `createTestRouter` at `/api/test` when `process.env.NODE_ENV !== 'production'`.
+
+**`e2e/auth.spec.js`**
+- `registerByApi` helper: change from `POST /api/auth/register` to `POST /api/test/create-verified-user`. This helper is only used by tests that need a pre-existing user for setup (login tests), not for testing the registration UI itself.
+- `"registers a new user and lands on the protected overview"`: update assertion from `toHaveURL(/\/$/)` to `toHaveURL(/\/verify-email$/)` and add `expect(page.getByText(/check your inbox/i)).toBeVisible()`.
+- `"shows an error when the email is already registered"`: change `toHaveURL(/\/$/)` (first registration outcome) to `toHaveURL(/\/verify-email$/)`.
+
+**`e2e/lists.spec.js`**
+- `setupLoggedInUser`: replace the separate `POST /api/auth/register` + `POST /api/auth/login` pair with a single call to `POST /api/test/create-verified-user` which returns the JWT directly.
+
+### Files to change
+| File | Action |
+|---|---|
+| `backend/src/mail/mailer.js` | Add `smtpHost` guard in `send()` |
+| `backend/src/mail/mailer.test.js` | Add test: `send()` resolves without transport call when `smtpHost` is empty |
+| `backend/src/routes/test.js` | Create |
+| `backend/src/app.js` | Mount test router conditionally |
+| `e2e/auth.spec.js` | Update `registerByApi`; fix two URL assertions |
+| `e2e/lists.spec.js` | Update `setupLoggedInUser` |
+
+### Acceptance Criteria
+- All 9 E2E tests pass locally and in CI without requiring SMTP configuration.
+- `send()` returns without calling `transport.sendMail` when `smtpHost` is empty; a warning is logged.
+- Registration UI test asserts redirect to `/verify-email` (correct new behaviour).
+- `POST /api/test/create-verified-user` returns 404 when `NODE_ENV=production`.
+- No changes to production auth routes.
+- `npm run lint` passes.
+
+---
+
+## Hotfix — T-007: Fix `pending_push_jobs` Migration
+
+### Root Cause
+`node-pg-migrate` rendered `items jsonb DEFAULT '[]'` as `DEFAULT ARRAY[]` in the generated SQL. PostgreSQL rejects `ARRAY[]` without a type annotation (`42P18: cannot determine type of empty array`).
+
+### What to change
+**`backend/src/db/migrations/1713920400000_add_push_tables.cjs`**
+
+In the `pgm.createTable("pending_push_jobs", ...)` call, change the `items` column default from:
 ```js
-// Produce / new
-{ label: "melon", icon: "IconMelon", tags: ["melone", "cantaloup", "honeydew"] },
-{ label: "wheat", icon: "IconWheat", tags: ["weizen"] },
-{ label: "plant", icon: "IconPlant", tags: ["pflanze", "blume"] },
-
-// Bakery / new
-{ label: "croissant", icon: "Croissant", tags: ["croissants", "gipfel"] },  // replaces existing CakeRoll entry
-{ label: "donut", icon: "Donut", tags: ["doughnut", "berliner"] },
-
-// Meat and fish / new
-{ label: "shrimp", icon: "Shrimp", tags: ["garnele", "garnelen", "prawn", "prawns"] },  // replaces existing FishBone entry
-{ label: "drumstick", icon: "Drumstick", tags: ["hähnchenkeule", "haehnchenkeule", "chicken leg"] },
-{ label: "ham", icon: "Ham", tags: ["schinken"] },  // replaces existing Sausage entry
-
-// Beverages / new
-{ label: "wine", icon: "Wine", tags: ["wein", "rotwein", "weißwein", "weisswein"] },  // replaces existing entry
-{ label: "martini", icon: "Martini", tags: ["cocktail"] },
-{ label: "soda", icon: "CupSoda", tags: ["cola", "softdrink", "limonade", "limo"] },
-{ label: "glass of water", icon: "GlassWater", tags: ["glas wasser"] },
-
-// Snacks / new
-{ label: "sandwich", icon: "Sandwich", tags: ["sandwich", "belegtes brot"] },
-{ label: "hamburger", icon: "Hamburger", tags: ["burger", "cheeseburger"] },
-{ label: "popcorn", icon: "Popcorn", tags: ["popcorn", "kinoschnack"] },  // replaces existing Candy entry
-{ label: "ice cream", icon: "IceCreamBowl", tags: ["eis", "speiseeis"] },  // replaces existing entry
-{ label: "ice cream cone", icon: "IceCreamCone", tags: ["softeis", "soft serve"] },  // replaces existing entry
-
-// Kitchen appliances / new
-{ label: "refrigerator", icon: "Refrigerator", tags: ["kühlschrank", "kuehlschrank", "fridge"] },
-{ label: "microwave", icon: "IconMicrowave", tags: ["mikrowelle"] },
-{ label: "blender", icon: "IconBlender", tags: ["mixer", "standmixer"] },
-{ label: "cooking pot", icon: "CookingPot", tags: ["kochtopf", "pot"] },
-
-// Fruit & veg specialties / new
-{ label: "citrus", icon: "Citrus", tags: ["zitrusfrucht", "orange", "grapefruit"] },
-{ label: "cake slice", icon: "CakeSlice", tags: ["tortenstück", "kuchenstück"] },
-{ label: "candy cane", icon: "CandyCane", tags: ["zuckerstange"] },
-{ label: "lollipop", icon: "IconLollipop", tags: ["lutscher"] },
-{ label: "dessert", icon: "Dessert", tags: ["nachtisch", "nachspeise"] },
-
-// Misc food / new
-{ label: "bowl", icon: "IconBowl", tags: ["schüssel", "schale", "müslischale"] },
-{ label: "fork and knife", icon: "ForkKnife", tags: ["besteck", "cutlery"] },
-{ label: "utensils", icon: "UtensilsCrossed", tags: ["küchenutensilien"] },
-{ label: "vegan", icon: "Vegan", tags: ["vegetarisch", "plant-based"] },
-{ label: "hop", icon: "Hop", tags: ["hopfen", "craft beer"] },
-{ label: "fish symbol", icon: "FishSymbol", tags: ["fisch symbol"] },
-{ label: "chef hat", icon: "IconChefHat", tags: ["kochmütze", "kochmuetze"] },
-{ label: "bone", icon: "IconBone", tags: ["knochen", "dog treat"] },
-
-// Health / new
-{ label: "syringe", icon: "Syringe", tags: ["spritze", "impfung", "injection"] },
-{ label: "pill bottle", icon: "PillBottle", tags: ["pillendose", "medikamentenflasche"] },
-{ label: "cigarette", icon: "Cigarette", tags: ["zigarette", "zigaretten", "tabak"] },
-{ label: "sunglasses", icon: "IconSunglasses", tags: ["sonnenbrille"] },
-
-// Seeds & plants / new  
-{ label: "seed", icon: "IconSeeding", tags: ["samen", "saat"] },
-{ label: "nuts", icon: "IconNut", tags: ["nüsse", "nuesse", "mixed nuts"] },  // replaces existing Leaf2 entry
-{ label: "tea", icon: "IconTeapot", tags: ["tee", "teekanne"] },  // replaces existing Cup entry
+default: pgm.func("ARRAY[]")   // or however it is currently expressed
+```
+to:
+```js
+default: "'[]'::jsonb"
 ```
 
-Note: Where an entry is "replacing" an existing one, update the `icon` field of the existing row rather than adding a duplicate. The label + tags remain the same.
+The column definition should read:
+```js
+items: {
+  type: "jsonb",
+  notNull: true,
+  default: "'[]'::jsonb"
+}
+```
 
-**No new test files are required** — `iconRegistry.js` and `iconDatabase.js` are static data modules tested implicitly by the icon browser and suggestion hook tests. Verify that all newly imported names resolve without build error (`npm run build`) and that existing tests still pass (`npm test`).
+### Files to change
+| File | Action |
+|---|---|
+| `backend/src/db/migrations/1713920400000_add_push_tables.cjs` | Fix `items` column default to `'[]'::jsonb` |
 
-### Phase 5 — T-005: Resilient icon resolution
+### Acceptance Criteria
+- `npm run migrate` runs to completion without error on a clean DB.
+- Migration test suite (`npm run test --workspace backend -- src/db/migrations.test.js`) passes.
 
-**Context:**  
-Icon names are stored as strings in the DB. If a name changes (library upgrade, registry refactor), entries show the fallback cart icon instead of the intended one. The fix is a single shared resolution layer with an alias map, so one `ICON_ALIASES` entry handles any future rename without touching components.
+---
 
-`resolveIconName(name)` contract:
-- `null` / `undefined` → `null` (preserves "no icon set" semantics)
-- known name in `ICON_REGISTRY` → return as-is
-- name in `ICON_ALIASES` whose target is in `ICON_REGISTRY` → return canonical name
-- anything else (unknown, no alias) → `null`
+## Phase 6 — T-006: Fix Docker Publish Pipeline
 
-Callers that must always render an icon (chips) use `resolveIconName(x) ?? FALLBACK_ICON_NAME`.  
-Callers that allow no-icon (EntryRow) use `ICON_REGISTRY[resolveIconName(x)] ?? FALLBACK_ICON`.
+### Root Cause
+`release-please-action@v5` (v17.6.0) creates the GitHub Release and git tag **when the release PR is opened**, not when it is merged. By the time the user merges the release PR and CI triggers the release-please workflow, the release already exists → `release_created` output is never `'true'` → `docker-publish` job is permanently skipped.
 
-**Files to change:**
+### What to build
 
-#### `frontend/src/data/iconRegistry.js`
-- Export `FALLBACK_ICON_NAME = "IconShoppingCart"` (removes hardcoded duplicates in components).
-- Export `ICON_ALIASES = Object.freeze({})` — starts empty; developers add one entry per rename, e.g.:
-  ```js
-  // When IconEgg is renamed to EggFresh:
-  // IconEgg: "EggFresh"
-  ```
-- Export `resolveIconName(name)`:
-  ```js
-  export function resolveIconName(name) {
-    if (name == null) return null;
-    if (ICON_REGISTRY[name]) return name;
-    const alias = ICON_ALIASES[name];
-    return alias && ICON_REGISTRY[alias] ? alias : null;
-  }
-  ```
-  Place this function after the `ICON_REGISTRY` and `ICON_ALIASES` declarations.
-- Export `formatIconName(name)` — produces a human-readable label for display in the icon picker:
-  ```js
-  export function formatIconName(name) {
-    // Strip leading "Icon" prefix (Tabler icons)
-    const stripped = name.startsWith("Icon") ? name.slice(4) : name;
-    return stripped
-      // Split on lowercase→uppercase boundary: "IceCream" → "Ice Cream"
-      .replace(/([a-z])([A-Z])/g, "$1 $2")
-      // Split on sequence of caps followed by cap+lowercase: "HTMLParser" → "HTML Parser"
-      .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-      // Split on letter→digit boundary: "IceCream2" → "Ice Cream 2"
-      .replace(/([a-zA-Z])(\d)/g, "$1 $2")
-      // Split on digit→letter boundary: "2D" → "2 D" (edge case)
-      .replace(/(\d)([a-zA-Z])/g, "$1 $2")
-      .trim();
-  }
-  ```
-  Examples: `"IconMilk"` → `"Milk"`, `"IconIceCream2"` → `"Ice Cream 2"`, `"CakeSlice"` → `"Cake Slice"`, `"ForkKnife"` → `"Fork Knife"`, `"Banana"` → `"Banana"`.
+**Remove `docker-publish` job from `.github/workflows/release-please.yml`**
+- Delete the entire `docker-publish` job block.
+- The `outputs` block on `release-please` job can also be removed (no longer consumed by anything in this file).
 
-#### `frontend/src/components/EntryRow.jsx`
-- Add `FALLBACK_ICON_NAME, resolveIconName` to the `iconRegistry` import; remove `FALLBACK_ICON` import if it becomes unused.
-- Delete the local `normalizeSelectedIconName` function and its `FALLBACK_ICON_NAME` constant.
-- Replace usage:
-  ```js
-  const resolvedIconName = resolveIconName(entry.icon);
-  const EntryIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
-  // data-icon-name={resolvedIconName ?? FALLBACK_ICON_NAME}  ← unchanged
-  ```
+**Create `.github/workflows/docker-publish.yml`**
+- Trigger: `on: release: types: [published]`
+  - Fires reliably whenever a GitHub Release is published, regardless of how or when it was created.
+- Single job `docker-publish`:
+  - `actions/checkout@v6`
+  - `docker/login-action@v4` → GHCR with `${{ secrets.GITHUB_TOKEN }}`
+  - `docker/metadata-action@v6` → image `ghcr.io/derfloDev/endgame-grocery`, tags:
+    - `type=semver,pattern={{version}},value=${{ github.event.release.tag_name }}`
+    - `type=raw,value=latest`
+  - `docker/build-push-action@v7` → `push: true`
+- Permissions: `contents: read`, `packages: write`
 
-#### `frontend/src/components/RecentlyUsedSection.jsx`
-- Add `FALLBACK_ICON_NAME, resolveIconName` to the `iconRegistry` import; remove `FALLBACK_ICON` import.
-- Delete the local `resolveIconName` function and its `FALLBACK_ICON_NAME` constant.
-- Replace usage:
-  ```js
-  const resolvedIconName = resolveIconName(item.icon) ?? FALLBACK_ICON_NAME;
-  const ItemIcon = ICON_REGISTRY[resolvedIconName];
-  ```
+### Files to change
+| File | Action |
+|---|---|
+| `.github/workflows/release-please.yml` | Remove `outputs` block from `release-please` job; remove entire `docker-publish` job |
+| `.github/workflows/docker-publish.yml` | Create |
 
-#### `frontend/src/components/AutocompleteSuggestions.jsx`
-- Add `FALLBACK_ICON_NAME, resolveIconName` to the `iconRegistry` import; remove `FALLBACK_ICON` import.
-- Replace inline resolution:
-  ```js
-  const resolvedIconName = resolveIconName(suggestion.icon) ?? FALLBACK_ICON_NAME;
-  const SuggestionIcon = ICON_REGISTRY[resolvedIconName];
-  ```
+### Acceptance Criteria
+- `.github/workflows/docker-publish.yml` exists with `on: release: types: [published]` trigger.
+- `release-please.yml` no longer contains a `docker-publish` job.
+- The next merged release PR automatically publishes a Docker image to GHCR without manual intervention.
+- `npm run lint` passes (YAML-only change, no JS affected).
 
-#### `frontend/src/components/AddItemSheet.jsx`
-- Import `resolveIconName` and `formatIconName` from `iconRegistry`.
-- In `useState` initialiser: `useState(resolveIconName(initialIconName))` — normalises aliased names from DB on first render.
-- In the `useEffect` for `[initialIconName, initialText, open]`: `setSelectedIconName(resolveIconName(initialIconName))` — same normalisation on re-open.
-- Icon browser labels: replace `{browserIconName}` (the raw key) with `{formatIconName(browserIconName)}` in both the `aria-label` and the visible `<span>`. Example: `aria-label={`Browse ${formatIconName(browserIconName)}`}`.
-- Suggested-icon picker labels: replace `{suggestedIconName}` in `aria-label={`Choose ${suggestedIconName}`}` with `formatIconName(suggestedIconName)`.
-- No other changes; the picker only ever writes valid current registry names as the stored value.
+### Note on v0.4.0
+The v0.4.0 GitHub Release already exists. After this fix is merged, re-publishing the v0.4.0 release via "Edit release → Save" in the GitHub UI will trigger `docker-publish.yml` and backfill the missing image.
 
-#### `frontend/src/data/iconRegistry.test.js` *(new file)*
-- Test `resolveIconName`:
-  - `null` → `null`
-  - `undefined` → `null`
-  - known name (e.g. `"IconMilk"`) → `"IconMilk"`
-  - unknown name with no alias → `null`
-- The alias branch (`ICON_ALIASES` lookup) cannot be tested against the frozen production map. Document in a comment that adding a real alias must be accompanied by a test entry using `vi.mock` or a local alias fixture.
-- Test `formatIconName`:
-  - `"IconMilk"` → `"Milk"`
-  - `"IconIceCream2"` → `"Ice Cream 2"`
-  - `"CakeSlice"` → `"Cake Slice"`
-  - `"ForkKnife"` → `"Fork Knife"`
-  - `"Banana"` → `"Banana"`
-  - `"IconBowlChopsticks"` → `"Bowl Chopsticks"`
+---
 
-#### Existing tests
-- `entry-row.test.jsx`: no changes expected — `data-icon-name` assertions still pass because `resolveIconName("IconMilk")` → `"IconMilk"` and `resolveIconName(null) ?? FALLBACK_ICON_NAME` → `"IconShoppingCart"`.
-- `RecentlyUsedSection.test.jsx`, `AutocompleteSuggestions.test.jsx`: no changes expected — behaviour is identical, only the source of the logic moved.
-- `AddItemSheet.test.jsx`: **aria-label assertions must be updated** — e.g. `"Choose IconLeaf"` → `"Choose Leaf"`, `"Browse IconTrash"` → `"Browse Trash"`, `"Browse Banana"` → `"Browse Banana"` (unchanged), `"Browse IconMilk"` → `"Browse Milk"`. Update all `getByRole("button", { name: "Browse ..." })` and `"Choose ..."` lookups to use the formatted name.
-
-### Phase 6 — T-006: PWA manifest credentials for Cloudflare Access
-
-**Context:**  
-When the app is hosted behind Cloudflare Access, the browser fetches `manifest.webmanifest` in `no-cors` mode without sending the `CF_Authorization` cookie. CF Access redirects the request to its login page; the browser receives HTML instead of JSON and silently fails to register the PWA. Setting `useCredentials: true` in VitePWA causes the injected manifest link to include `crossorigin="use-credentials"`, which makes the browser send credentials with the manifest fetch.
-
-The service worker scripts (`/sw.js`, `/workbox-*.js`) are fetched by `navigator.serviceWorker.register()` without credentials and cannot be fixed from the client side alone — a CF Access bypass policy is required for those paths. This is documented but not automated.
-
-**Files to change:**
-
-#### `frontend/vite.config.js`
-- Add `useCredentials: true` inside the `VitePWA({...})` options object (top-level option, alongside `registerType`).
-- Add an inline comment above it:
-  ```js
-  // Required when the app is served behind Cloudflare Access: sends the CF_Authorization
-  // cookie with the manifest fetch so Access does not redirect it to the login page.
-  // Note: /sw.js and /workbox-*.js must be bypassed in CF Access separately (see README).
-  useCredentials: true,
-  ```
-
-#### `README.md`
-- Under the **Docker Deployment** section, add a new subsection **"Cloudflare Access"** after the Environment variables table:
-
-  ```markdown
-  ### Cloudflare Access
-
-  If you host the app behind Cloudflare Access, two bypass policies are required so the
-  PWA can install correctly:
-
-  | Path pattern | Reason |
-  | --- | --- |
-  | `/sw.js` | Service worker script — fetched without credentials by the browser's SW registration API |
-  | `/workbox-*.js` | Workbox runtime chunks loaded by the service worker |
-
-  The manifest (`/manifest.webmanifest`) does not need a bypass policy: the app already
-  sets `crossorigin="use-credentials"` on the manifest link so the browser sends the
-  `CF_Authorization` cookie with that request.
-  ```
-
-**No tests required** — `vite.config.js` changes are build-time configuration and verified by `npm run build` producing an `index.html` whose injected manifest link contains `crossorigin="use-credentials"`.
-
-## Validation
-
+## Validation (run before each commit)
 ```
 npm run lint
 npm run build

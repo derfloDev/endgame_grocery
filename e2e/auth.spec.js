@@ -18,7 +18,7 @@ async function fillLoginForm(page, { email, password }) {
 }
 
 async function registerByApi(request, { displayName, email, password = TEST_PASSWORD }) {
-  const response = await request.post("/api/auth/register", {
+  const response = await request.post("/api/test/create-verified-user", {
     data: {
       display_name: displayName,
       email,
@@ -30,7 +30,7 @@ async function registerByApi(request, { displayName, email, password = TEST_PASS
 }
 
 test.describe("registration", () => {
-  test("registers a new user and lands on the protected overview", async ({ page }) => {
+  test("registers a new user and redirects to email verification", async ({ page }) => {
     const email = uniqueEmail("register");
 
     await page.goto("/register");
@@ -40,8 +40,8 @@ test.describe("registration", () => {
     });
     await page.getByRole("button", { name: "Create account" }).click();
 
-    await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByText("No lists yet")).toBeVisible();
+    await expect(page).toHaveURL(/\/verify-email$/);
+    await expect(page.getByText(/check your inbox/i)).toBeVisible();
   });
 
   test("shows an error when the email is already registered", async ({ page }) => {
@@ -53,7 +53,7 @@ test.describe("registration", () => {
       email
     });
     await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/verify-email$/);
 
     await page.context().clearCookies();
     await page.evaluate(() => {

@@ -7,6 +7,18 @@ const autocompleteHistoryMigrationPath = path.resolve(
   "src/db/migrations/1713902400000_add_autocomplete_history.cjs"
 );
 const detailsMigrationPath = path.resolve("src/db/migrations/1713906000000_add_details_to_entries.cjs");
+const emailVerificationMigrationPath = path.resolve(
+  "src/db/migrations/1713909600000_add_email_verification.cjs"
+);
+const passwordResetMigrationPath = path.resolve(
+  "src/db/migrations/1713913200000_add_password_reset_tokens.cjs"
+);
+const listInvitesMigrationPath = path.resolve(
+  "src/db/migrations/1713916800000_add_list_invites.cjs"
+);
+const pushTablesMigrationPath = path.resolve(
+  "src/db/migrations/1713920400000_add_push_tables.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -161,6 +173,321 @@ describe("database migrations", () => {
       ],
       ["dropTable", "autocomplete_history", { ifExists: true, cascade: true }],
       ["dropExtension", "pg_trgm", { ifExists: true }]
+    ]);
+  });
+
+  it("adds email verification columns and token tables", async () => {
+    const migration = await import(pathToFileURL(emailVerificationMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "addColumns",
+        "users",
+        {
+          email_verified: {
+            type: "boolean",
+            notNull: true,
+            default: true
+          }
+        }
+      ],
+      [
+        "createTable",
+        "email_verification_tokens",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          user_id: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          token: {
+            type: "uuid",
+            notNull: true,
+            unique: true
+          },
+          expires_at: {
+            type: "timestamptz",
+            notNull: true
+          },
+          created_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [
+      ["dropTable", "email_verification_tokens", { ifExists: true, cascade: true }],
+      ["dropColumns", "users", ["email_verified"]]
+    ]);
+  });
+
+  it("creates and removes password reset token tables", async () => {
+    const migration = await import(pathToFileURL(passwordResetMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "createTable",
+        "password_reset_tokens",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          user_id: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          token: {
+            type: "uuid",
+            notNull: true,
+            unique: true
+          },
+          expires_at: {
+            type: "timestamptz",
+            notNull: true
+          },
+          used: {
+            type: "boolean",
+            notNull: true,
+            default: false
+          },
+          created_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [
+      ["dropTable", "password_reset_tokens", { ifExists: true, cascade: true }]
+    ]);
+  });
+
+  it("creates and removes list invite tables", async () => {
+    const migration = await import(pathToFileURL(listInvitesMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "createTable",
+        "list_invites",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          list_id: {
+            type: "uuid",
+            notNull: true,
+            references: "lists(id)",
+            onDelete: "CASCADE"
+          },
+          invited_email: {
+            type: "text",
+            notNull: true
+          },
+          invited_by: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          token: {
+            type: "uuid",
+            notNull: true,
+            unique: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          status: {
+            type: "text",
+            notNull: true,
+            default: "pending"
+          },
+          expires_at: {
+            type: "timestamptz",
+            notNull: true
+          },
+          created_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ],
+      [
+        "addConstraint",
+        "list_invites",
+        "list_invites_status_check",
+        {
+          check: "status IN ('pending', 'accepted', 'declined')"
+        }
+      ],
+      [
+        "createIndex",
+        "list_invites",
+        ["list_id", "invited_email"],
+        {
+          name: "list_invites_pending_email_idx",
+          unique: true,
+          where: "status = 'pending'"
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [
+      [
+        "dropIndex",
+        "list_invites",
+        ["list_id", "invited_email"],
+        { name: "list_invites_pending_email_idx", ifExists: true }
+      ],
+      ["dropTable", "list_invites", { ifExists: true, cascade: true }]
+    ]);
+  });
+
+  it("creates and removes push notification tables", async () => {
+    const migration = await import(pathToFileURL(pushTablesMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "createTable",
+        "push_subscriptions",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          user_id: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          endpoint: {
+            type: "text",
+            notNull: true
+          },
+          p256dh: {
+            type: "text",
+            notNull: true
+          },
+          auth: {
+            type: "text",
+            notNull: true
+          },
+          created_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ],
+      [
+        "addConstraint",
+        "push_subscriptions",
+        "push_subscriptions_user_endpoint_key",
+        { unique: ["user_id", "endpoint"] }
+      ],
+      [
+        "createTable",
+        "pending_push_jobs",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          list_id: {
+            type: "uuid",
+            notNull: true,
+            references: "lists(id)",
+            onDelete: "CASCADE"
+          },
+          actor_user_id: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          fire_at: {
+            type: "timestamptz",
+            notNull: true
+          },
+          items: {
+            type: "jsonb",
+            notNull: true,
+            default: { value: "'[]'::jsonb" }
+          },
+          created_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ],
+      [
+        "addConstraint",
+        "pending_push_jobs",
+        "pending_push_jobs_list_actor_key",
+        { unique: ["list_id", "actor_user_id"] }
+      ],
+      [
+        "createTable",
+        "push_cooldowns",
+        {
+          list_id: {
+            type: "uuid",
+            primaryKey: true,
+            references: "lists(id)",
+            onDelete: "CASCADE"
+          },
+          last_sent_at: {
+            type: "timestamptz",
+            notNull: true
+          }
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [
+      ["dropTable", "push_cooldowns", { ifExists: true, cascade: true }],
+      ["dropTable", "pending_push_jobs", { ifExists: true, cascade: true }],
+      ["dropTable", "push_subscriptions", { ifExists: true, cascade: true }]
     ]);
   });
 });

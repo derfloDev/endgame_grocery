@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { requireAuth } from "../middleware/auth.js";
+import { enqueuePushJob } from "../workers/pushWorker.js";
 
 async function ensureListAccess(pool, listId, userId) {
   const result = await pool.query(
@@ -113,6 +114,16 @@ export function createEntryRouter({
         `,
         [req.params.id, text.trim(), icon ?? null, normalizeDetails(details)]
       );
+
+      void enqueuePushJob({
+        pool,
+        listId: req.params.id,
+        actorUserId: req.user.sub,
+        entryText: result.rows[0].text,
+        now: new Date()
+      }).catch((pushError) => {
+        console.error("Failed to enqueue push notification job.", pushError);
+      });
 
       res.status(201).json({
         entry: result.rows[0]

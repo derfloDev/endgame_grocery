@@ -35,7 +35,7 @@ Copy the example environment file and adjust values for your machine:
 cp .env.example .env
 ```
 
-The backend requires a valid `DATABASE_URL` before registration, login, or list APIs can work. `JWT_SECRET` is fine for local development, but you must replace it with a strong secret outside local use.
+The backend requires a valid `DATABASE_URL` before registration, login, or list APIs can work. `JWT_SECRET` is fine for local development, but you must replace it with a strong secret outside local use. Mail-based flows also require SMTP credentials plus an `APP_BASE_URL` that points at the public frontend origin used in verification, invite, and password-reset links. Browser push also requires `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_CONTACT` so the backend can authenticate Web Push deliveries.
 
 Backend commands that read configuration, including `npm run dev` and `npm run db:seed`, load this project-root `.env` file automatically even when npm starts them from the `backend/` workspace directory. The frontend Vite app also reads `VITE_*` values from the same repo-root `.env`, including `VITE_ICON_SIMILARITY_THRESHOLD`.
 
@@ -74,9 +74,40 @@ This starts both apps concurrently:
 
 During local development, the frontend Vite server proxies `/api` requests to `http://localhost:4000`, so the backend must be running before the browser can register, log in, or load list data.
 
-### 7. Verify the setup
+### 7. Generate VAPID keys for push notifications (optional)
 
-Open `http://localhost:5173/register` and create an account. If the environment file, database container, and migrations are in place, the registration request should succeed and the app should redirect into the protected grocery list UI.
+Push notifications require a VAPID key pair. The `web-push` package bundled with the backend provides a one-shot generator:
+
+```bash
+node -e "const wp = require('web-push'); const k = wp.generateVAPIDKeys(); console.log(JSON.stringify(k, null, 2));"
+```
+
+The output looks like this:
+
+```json
+{
+  "publicKey": "BNabc...xyz",
+  "privateKey": "Kabc...xyz"
+}
+```
+
+Copy the values into your `.env` file:
+
+```
+VAPID_PUBLIC_KEY=BNabc...xyz
+VAPID_PRIVATE_KEY=Kabc...xyz
+VAPID_CONTACT=mailto:you@example.com
+```
+
+**Key points:**
+- Run the generator **once** and keep both values. Changing either key invalidates all existing browser push subscriptions, requiring users to opt in again.
+- `VAPID_PRIVATE_KEY` is a secret — treat it like a password and never commit it to version control.
+- `VAPID_CONTACT` must be a reachable `mailto:` address (or a URL). Push services use it to contact you if your endpoint misbehaves. Use a real address in production.
+- If `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, or `VAPID_CONTACT` are missing, the backend starts normally but the push worker logs a warning and skips delivery. Users can still use the app; they simply will not receive push notifications.
+
+### 8. Verify the setup
+
+Open `http://localhost:5173/register` and create an account. If the environment file, database container, migrations, and SMTP settings are in place, the backend sends a verification email instead of logging you in immediately. Follow the `/verify-email` link from that message to activate the account and enter the protected grocery list UI. Shared-list invite mails use the same `APP_BASE_URL`: existing users land on `/invite/:token` and join after login, while new users can register through `/register?invite=...` and are added to the list immediately.
 
 ## Docker Deployment
 
@@ -107,6 +138,16 @@ The repository's checked-in `docker-compose.yml` is intentionally kept for local
 | `JWT_SECRET` | Secret used to sign authentication tokens. Replace with a strong random value. | `change-me-strong-random-value` |
 | `PORT` | Internal backend port that nginx proxies to. | `4000` |
 | `JWT_EXPIRES_IN` | JWT lifetime accepted by the backend. | `7d` |
+| `SMTP_HOST` | SMTP server hostname used for transactional mail delivery. | `smtp.change-me.example` |
+| `SMTP_PORT` | SMTP server port. Port `465` enables implicit TLS; other ports use STARTTLS/plain transport as supported by the server. | `587` |
+| `SMTP_USER` | SMTP username for authenticated mail delivery. | `change-me` |
+| `SMTP_PASS` | SMTP password for authenticated mail delivery. | `change-me` |
+| `SMTP_FROM` | Sender email address used for transactional mails. | `noreply@change-me.example` |
+| `SMTP_FROM_NAME` | Sender display name shown in mail clients. | `Endgame Grocery` |
+| `APP_BASE_URL` | Public frontend base URL used to build e-mail verification, invite, and reset links. | `https://grocery.change-me.example` |
+| `VAPID_PUBLIC_KEY` | Public VAPID key sent to the browser so it can create a `PushSubscription`. Generate once with `node -e "const wp=require('web-push');const k=wp.generateVAPIDKeys();console.log(k.publicKey)"` inside the `backend/` directory. Changing this key invalidates all existing subscriptions. | *(generated — see below)* |
+| `VAPID_PRIVATE_KEY` | Private VAPID key used by the backend push worker to sign outbound Web Push requests. **Treat as a secret.** Generated together with `VAPID_PUBLIC_KEY`; the two keys must always be used as a pair. | *(generated — see below)* |
+| `VAPID_CONTACT` | Contact URI included in the VAPID `Authorization` header so push services can reach you if deliveries fail. Must be a `mailto:` address or an HTTPS URL. | `mailto:notifications@change-me.example` |
 | `VITE_ICON_SIMILARITY_THRESHOLD` | Build-time similarity cutoff for local icon assignment in the frontend worker. Use a value from `0` to `1`; higher values require closer semantic matches before an icon is suggested. | `0.5` |
 
 ### Cloudflare Access
@@ -116,7 +157,7 @@ PWA can install correctly:
 
 | Path pattern | Reason |
 | --- | --- |
-| `/sw.js` | Service worker script — fetched without credentials by the browser's SW registration API |
+| `/service-worker.js` | Service worker script — fetched without credentials by the browser's SW registration API |
 | `/workbox-*.js` | Workbox runtime chunks loaded by the service worker |
 
 The manifest (`/manifest.webmanifest`) does not need a bypass policy: the app already
@@ -130,10 +171,11 @@ Run these checks before merging changes:
 - `npm run lint`
 - `npm run build`
 - `npm test`
+- `npm run e2e`
 
 ## E2E Tests
 
-Playwright E2E coverage exercises the registration, login, and core shopping-list CRUD flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first.
+Playwright E2E coverage exercises the registration, login, and core shopping-list CRUD flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first. The non-production backend also exposes `POST /api/test/create-verified-user` specifically for E2E setup, and transactional mail delivery is skipped with a warning when `SMTP_HOST` is not configured.
 
 Install the Chromium browser once:
 
@@ -167,7 +209,7 @@ GitHub Actions runs lint, build, unit tests, and Playwright E2E tests on every p
 
 The workflow files pin current maintained major versions of the GitHub-hosted actions so the pipeline stays compatible with GitHub's Node.js runtime upgrades.
 
-Release Please runs after the `CI` workflow completes successfully on `main` and opens release PRs based on Conventional Commits. That CI gate prevents failed `main` builds from producing a release or publishing Docker images. Merging a release PR creates a GitHub Release and publishes Docker images to `ghcr.io/derfloDev/endgame-grocery` with the release version tag and `latest`.
+Release Please runs after the `CI` workflow completes successfully on `main` and opens release PRs based on Conventional Commits. That CI gate prevents failed `main` builds from producing a release PR. Publishing a GitHub Release triggers the dedicated Docker publish workflow, which pushes images to `ghcr.io/derfloDev/endgame-grocery` with the release version tag and `latest`.
 
 Version bumps follow Conventional Commits: `feat` creates a minor release, `fix` creates a patch release, and breaking changes create a major release.
 
@@ -190,13 +232,14 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 
 - The protected React app uses a dark Endgame-themed shell with bottom navigation for Lists.
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
-- Authentication supports register and login flows backed by JWT access tokens.
+- Authentication supports register, email verification, password reset, and login flows backed by JWT access tokens.
 - Lists support create, rename, delete, ownership, and shared-access visibility.
 - The list detail view uses a sticky top bar, a more-options flyout for rename and sharing, a bottom-sheet add-item flow with an overlaid autocomplete suggestion dropdown that anchors to the input, an inline icon preview to the right of the field, a smoothly sliding icon browser, outside-tap dismissal, swipe-to-delete entry rows with optional detail text, and a recently used panel that updates immediately when items are completed or deleted.
 - Entries support add, edit, toggle, and delete actions with open and done grouping, optional icons, and free-text details for quantities, brands, or similar context.
 - The backend tracks per-list autocomplete history from completed and deleted items, exposes ranked typo-tolerant suggestions, and provides per-list recently used history endpoints.
 - History chips and autocomplete suggestions fall back to the cart icon when no specific saved icon is available, so list rows keep a consistent visual layout.
-- Sharing supports inviting registered users by email and revoking member access.
+- Sharing supports invite emails for existing and new users, direct invite-link acceptance after login, and revoking member access.
+- Shared lists support browser push opt-in, batched activity notifications, actor exclusion, and cooldown-based suppression to avoid notification spam.
 - Offline support caches successful reads and queues failed writes for replay after reconnect.
 
 ### Icon Assignment

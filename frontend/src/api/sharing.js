@@ -33,3 +33,10 @@ export function revokeListMember(listId, memberId, token) {
     method: "DELETE"
   });
 }
+
+export function acceptInvite(token, authToken) {
+  return sendJsonRequest(`/api/invites/${encodeURIComponent(token)}`, {
+    method: "GET",
+    token: authToken
+  });
+}

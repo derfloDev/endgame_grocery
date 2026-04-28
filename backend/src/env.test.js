@@ -12,13 +12,20 @@ const repoRootDir = path.resolve(backendSrcDir, "../..");
 describe("getConfig", () => {
   it("falls back to the default port", () => {
     const previousPort = process.env.PORT;
+    const previousSmtpPort = process.env.SMTP_PORT;
 
     delete process.env.PORT;
+    delete process.env.SMTP_PORT;
 
     assert.equal(getConfig().port, 4000);
+    assert.equal(getConfig().smtpPort, 587);
 
     if (previousPort) {
       process.env.PORT = previousPort;
+    }
+
+    if (previousSmtpPort) {
+      process.env.SMTP_PORT = previousSmtpPort;
     }
   });
 
@@ -32,6 +39,16 @@ describe("getConfig", () => {
     const previousJwtSecret = process.env.JWT_SECRET;
     const previousPort = process.env.PORT;
     const previousJwtExpiresIn = process.env.JWT_EXPIRES_IN;
+    const previousSmtpHost = process.env.SMTP_HOST;
+    const previousSmtpPort = process.env.SMTP_PORT;
+    const previousSmtpUser = process.env.SMTP_USER;
+    const previousSmtpPass = process.env.SMTP_PASS;
+    const previousSmtpFrom = process.env.SMTP_FROM;
+    const previousSmtpFromName = process.env.SMTP_FROM_NAME;
+    const previousAppBaseUrl = process.env.APP_BASE_URL;
+    const previousVapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+    const previousVapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+    const previousVapidContact = process.env.VAPID_CONTACT;
 
     fs.mkdirSync(fixtureBackendSrcDir, { recursive: true });
     fs.copyFileSync(path.join(backendSrcDir, "env.js"), fixtureEnvModulePath);
@@ -41,6 +58,16 @@ describe("getConfig", () => {
         "DATABASE_URL=postgres://fixture-user:fixture-pass@localhost:5432/fixture_db",
         "JWT_SECRET=fixture-secret",
         "PORT=4567",
+        "SMTP_HOST=smtp.fixture.local",
+        "SMTP_PORT=2525",
+        "SMTP_USER=fixture-user",
+        "SMTP_PASS=fixture-pass",
+        "SMTP_FROM=noreply@fixture.local",
+        "SMTP_FROM_NAME=Fixture Mailer",
+        "APP_BASE_URL=https://fixture.local",
+        "VAPID_PUBLIC_KEY=fixture-public-key",
+        "VAPID_PRIVATE_KEY=fixture-private-key",
+        "VAPID_CONTACT=mailto:fixture@example.com",
         ""
       ].join("\n")
     );
@@ -50,6 +77,16 @@ describe("getConfig", () => {
       delete process.env.JWT_SECRET;
       delete process.env.PORT;
       delete process.env.JWT_EXPIRES_IN;
+      delete process.env.SMTP_HOST;
+      delete process.env.SMTP_PORT;
+      delete process.env.SMTP_USER;
+      delete process.env.SMTP_PASS;
+      delete process.env.SMTP_FROM;
+      delete process.env.SMTP_FROM_NAME;
+      delete process.env.APP_BASE_URL;
+      delete process.env.VAPID_PUBLIC_KEY;
+      delete process.env.VAPID_PRIVATE_KEY;
+      delete process.env.VAPID_CONTACT;
       process.chdir(fixtureBackendDir);
 
       const fixtureModuleUrl = new URL(
@@ -65,12 +102,32 @@ describe("getConfig", () => {
       );
       assert.equal(config.jwtSecret, "fixture-secret");
       assert.equal(config.port, 4567);
+      assert.equal(config.smtpHost, "smtp.fixture.local");
+      assert.equal(config.smtpPort, 2525);
+      assert.equal(config.smtpUser, "fixture-user");
+      assert.equal(config.smtpPass, "fixture-pass");
+      assert.equal(config.smtpFrom, "noreply@fixture.local");
+      assert.equal(config.smtpFromName, "Fixture Mailer");
+      assert.equal(config.appBaseUrl, "https://fixture.local");
+      assert.equal(config.vapidPublicKey, "fixture-public-key");
+      assert.equal(config.vapidPrivateKey, "fixture-private-key");
+      assert.equal(config.vapidContact, "mailto:fixture@example.com");
     } finally {
       process.chdir(previousCwd);
       restoreEnvVar("DATABASE_URL", previousDatabaseUrl);
       restoreEnvVar("JWT_SECRET", previousJwtSecret);
       restoreEnvVar("PORT", previousPort);
       restoreEnvVar("JWT_EXPIRES_IN", previousJwtExpiresIn);
+      restoreEnvVar("SMTP_HOST", previousSmtpHost);
+      restoreEnvVar("SMTP_PORT", previousSmtpPort);
+      restoreEnvVar("SMTP_USER", previousSmtpUser);
+      restoreEnvVar("SMTP_PASS", previousSmtpPass);
+      restoreEnvVar("SMTP_FROM", previousSmtpFrom);
+      restoreEnvVar("SMTP_FROM_NAME", previousSmtpFromName);
+      restoreEnvVar("APP_BASE_URL", previousAppBaseUrl);
+      restoreEnvVar("VAPID_PUBLIC_KEY", previousVapidPublicKey);
+      restoreEnvVar("VAPID_PRIVATE_KEY", previousVapidPrivateKey);
+      restoreEnvVar("VAPID_CONTACT", previousVapidContact);
       fs.rmSync(fixtureRootDir, { recursive: true, force: true });
     }
   });
@@ -86,6 +143,16 @@ describe("getConfig", () => {
     const previousJwtSecret = process.env.JWT_SECRET;
     const previousPort = process.env.PORT;
     const previousJwtExpiresIn = process.env.JWT_EXPIRES_IN;
+    const previousSmtpHost = process.env.SMTP_HOST;
+    const previousSmtpPort = process.env.SMTP_PORT;
+    const previousSmtpUser = process.env.SMTP_USER;
+    const previousSmtpPass = process.env.SMTP_PASS;
+    const previousSmtpFrom = process.env.SMTP_FROM;
+    const previousSmtpFromName = process.env.SMTP_FROM_NAME;
+    const previousAppBaseUrl = process.env.APP_BASE_URL;
+    const previousVapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+    const previousVapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+    const previousVapidContact = process.env.VAPID_CONTACT;
 
     fs.mkdirSync(fixtureBackendSrcDir, { recursive: true });
     fs.mkdirSync(fixtureDotenvDir, { recursive: true });
@@ -115,6 +182,16 @@ describe("getConfig", () => {
       delete process.env.JWT_SECRET;
       delete process.env.PORT;
       delete process.env.JWT_EXPIRES_IN;
+      delete process.env.SMTP_HOST;
+      delete process.env.SMTP_PORT;
+      delete process.env.SMTP_USER;
+      delete process.env.SMTP_PASS;
+      delete process.env.SMTP_FROM;
+      delete process.env.SMTP_FROM_NAME;
+      delete process.env.APP_BASE_URL;
+      delete process.env.VAPID_PUBLIC_KEY;
+      delete process.env.VAPID_PRIVATE_KEY;
+      delete process.env.VAPID_CONTACT;
       process.chdir(fixtureBackendDir);
 
       const fixtureModuleUrl = new URL(
@@ -128,12 +205,32 @@ describe("getConfig", () => {
       assert.equal(config.jwtSecret, "");
       assert.equal(config.port, 4000);
       assert.equal(config.jwtExpiresIn, "7d");
+      assert.equal(config.smtpHost, "");
+      assert.equal(config.smtpPort, 587);
+      assert.equal(config.smtpUser, "");
+      assert.equal(config.smtpPass, "");
+      assert.equal(config.smtpFrom, "");
+      assert.equal(config.smtpFromName, "");
+      assert.equal(config.appBaseUrl, "");
+      assert.equal(config.vapidPublicKey, "");
+      assert.equal(config.vapidPrivateKey, "");
+      assert.equal(config.vapidContact, "");
     } finally {
       process.chdir(previousCwd);
       restoreEnvVar("DATABASE_URL", previousDatabaseUrl);
       restoreEnvVar("JWT_SECRET", previousJwtSecret);
       restoreEnvVar("PORT", previousPort);
       restoreEnvVar("JWT_EXPIRES_IN", previousJwtExpiresIn);
+      restoreEnvVar("SMTP_HOST", previousSmtpHost);
+      restoreEnvVar("SMTP_PORT", previousSmtpPort);
+      restoreEnvVar("SMTP_USER", previousSmtpUser);
+      restoreEnvVar("SMTP_PASS", previousSmtpPass);
+      restoreEnvVar("SMTP_FROM", previousSmtpFrom);
+      restoreEnvVar("SMTP_FROM_NAME", previousSmtpFromName);
+      restoreEnvVar("APP_BASE_URL", previousAppBaseUrl);
+      restoreEnvVar("VAPID_PUBLIC_KEY", previousVapidPublicKey);
+      restoreEnvVar("VAPID_PRIVATE_KEY", previousVapidPrivateKey);
+      restoreEnvVar("VAPID_CONTACT", previousVapidContact);
       fs.rmSync(fixtureRootDir, { recursive: true, force: true });
     }
   });
