@@ -287,3 +287,48 @@ No blocking, major, or minor findings.
 #### Verdict
 
 `PASS`
+
+---
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **approved**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+No findings.
+
+#### Verification
+
+##### Steps
+
+1. Read `.ai/PLAN.md` Phase 6 (T-006) acceptance criteria.
+2. Verified `frontend/vite.config.js`:
+   - `useCredentials: true` added inside `VitePWA({...})` options ✓
+   - Inline comment above it explains the Cloudflare Access rationale and references README ✓
+3. Verified `README.md` "Cloudflare Access" subsection under Docker Deployment:
+   - Two-row bypass table: `/sw.js` (SW registration) and `/workbox-*.js` (Workbox chunks) ✓
+   - Explanation that manifest does not need bypass (credentials sent via `crossorigin="use-credentials"`) ✓
+4. Built the project and grepped `frontend/dist/index.html`: confirmed `crossorigin="use-credentials"` present on the manifest link ✓
+5. Verified `vite-config.test.js` has new test "sends credentials with the PWA manifest request" asserting `useCredentials: true` in the config source ✓
+6. Ran `npm run lint` — 0 errors (pre-existing frontend warning only) ✓
+7. Ran `npm run build` — succeeded ✓
+8. Ran `npm test` — 79 frontend + 50 backend tests pass (+1 new vite-config test) ✓
+
+##### Findings
+
+- All acceptance criteria satisfied.
+- `crossorigin="use-credentials"` confirmed in the built `index.html` manifest link (E2E verified).
+- README subsection is accurate: correctly distinguishes manifest (credentials fix applied) from SW scripts (requires CF bypass).
+
+##### Risks
+
+- None — this is a build-time configuration change with no runtime logic.
+
+#### Verdict
+
+`PASS`

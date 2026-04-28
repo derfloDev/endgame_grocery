@@ -109,6 +109,20 @@ The repository's checked-in `docker-compose.yml` is intentionally kept for local
 | `JWT_EXPIRES_IN` | JWT lifetime accepted by the backend. | `7d` |
 | `VITE_ICON_SIMILARITY_THRESHOLD` | Build-time similarity cutoff for local icon assignment in the frontend worker. Use a value from `0` to `1`; higher values require closer semantic matches before an icon is suggested. | `0.5` |
 
+### Cloudflare Access
+
+If you host the app behind Cloudflare Access, two bypass policies are required so the
+PWA can install correctly:
+
+| Path pattern | Reason |
+| --- | --- |
+| `/sw.js` | Service worker script — fetched without credentials by the browser's SW registration API |
+| `/workbox-*.js` | Workbox runtime chunks loaded by the service worker |
+
+The manifest (`/manifest.webmanifest`) does not need a bypass policy: the app already
+sets `crossorigin="use-credentials"` on the manifest link so the browser sends the
+`CF_Authorization` cookie with that request.
+
 ## Validation
 
 Run these checks before merging changes:

@@ -272,3 +272,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-006 — review — 2026-04-28T14:05:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed VitePWA `useCredentials: true` config change and README Cloudflare Access documentation; `crossorigin="use-credentials"` confirmed in built index.html, all tests pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-04-28T13:14:50Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Enabled credentialed manifest fetches in the PWA config for Cloudflare Access deployments and documented the required bypass rules for service-worker assets. |
+| Files Changed | `frontend/vite.config.js`, `frontend/src/vite-config.test.js`, `README.md`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- src/vite-config.test.js` pass (required escalation because sandbox blocked `esbuild` spawn); `npm run lint` pass with existing frontend warning in `frontend/src/context/AuthContext.jsx`; `npm run build` pass; `npm test` pass; verified `frontend/dist/index.html` contains `crossorigin="use-credentials"` on the manifest link |
+| Commit | `pending fix(pwa): send manifest credentials behind Cloudflare Access` |
+| Next Role | review |
+
+---
+
+### T-006 — implement — 2026-04-28T13:22:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-006 done and prepared the reviewed PWA manifest credential fix for commit with the recorded Conventional Commit message. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `frontend/src/vite-config.test.js`, `frontend/vite.config.js` |
+| Validation | Reused prior passing validation from the approved review state: `npm run test --workspace frontend -- src/vite-config.test.js`, `npm run lint` (pass with existing frontend warning), `npm run build`, `npm test`; verified `frontend/dist/index.html` contains `crossorigin="use-credentials"` on the manifest link |
+| Commit | `pending fix(pwa): send manifest credentials behind Cloudflare Access` |
+| Next Role | none |
+
+---

@@ -1,8 +1,16 @@
 // @vitest-environment node
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import viteConfig from "../vite.config";
 
+const viteConfigSource = readFileSync(path.resolve(import.meta.dirname, "../vite.config.js"), "utf8");
+
 describe("vite worker config", () => {
+  it("sends credentials with the PWA manifest request", () => {
+    expect(viteConfigSource).toMatch(/useCredentials:\s*true/);
+  });
+
   it("keeps transformers and onnxruntime out of optimizeDeps", () => {
     expect(viteConfig.optimizeDeps.exclude).toEqual(
       expect.arrayContaining(["@xenova/transformers", "onnxruntime-web"])
