@@ -55,6 +55,7 @@ No blocking or major findings.
 
 ## Task: T-002
 
+
 ### Review Round 1
 
 Status: **approved**
@@ -104,6 +105,62 @@ No blocking or major findings.
 - Optimistic-update normalization (frontend) and server-side normalization (backend) are equivalent — no consistency gap.
 - Details input resets correctly after add-mode submit and after sheet re-open.
 - CSS rule validated via regex in `entry-row.test.jsx`.
+
+##### Risks
+
+- None.
+
+#### Verdict
+
+`PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **approved**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+No blocking, major, or minor findings.
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `RecentlyUsedSection.test.jsx` | `afterEach(cleanup)` added alongside the new test — good hygiene; not a finding, just an observation. | No |
+
+#### Verification
+
+##### Steps
+
+1. Read `.ai/PLAN.md` Phase 3 (T-003) acceptance criteria.
+2. Confirmed `FALLBACK_ICON` is exported from `frontend/src/data/iconRegistry.js` (`export const FALLBACK_ICON = IconShoppingCart;`) ✓
+3. Reviewed `frontend/src/components/RecentlyUsedSection.jsx`:
+   - `resolveIconName`: falsy `iconName` now returns `FALLBACK_ICON_NAME` instead of `null` ✓
+   - `ItemIcon` assignment simplified to `ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON` (always non-null) ✓
+   - Conditional `{ItemIcon ? ... : null}` replaced with unconditional `<ItemIcon ... />` ✓
+4. Reviewed `frontend/src/components/AutocompleteSuggestions.jsx`:
+   - `FALLBACK_ICON` imported alongside `ICON_REGISTRY` ✓
+   - Resolution: `(suggestion.icon ? ICON_REGISTRY[suggestion.icon] : null) ?? FALLBACK_ICON` — matches plan exactly ✓
+   - Conditional `{SuggestionIcon ? ... : null}` replaced with unconditional `<SuggestionIcon ... />` ✓
+5. Reviewed `frontend/src/components/AutocompleteSuggestions.test.jsx`:
+   - Null SVG assertion removed; truthy fallback SVG assertion added ✓
+   - CSS `min-height`/`width` assertions retained ✓
+6. Reviewed `frontend/src/components/RecentlyUsedSection.test.jsx`:
+   - New test verifies `.recently-used-chip-icon` present when `item.icon` is null ✓
+   - Also verifies `data-icon-name === "IconShoppingCart"` — stronger than plan required ✓
+7. Ran `npm run lint` — 0 errors (pre-existing frontend warning only) ✓
+8. Ran `npm run build` — succeeded ✓
+9. Ran `npm test` — 73 frontend + 50 backend tests pass ✓
+
+##### Findings
+
+- All acceptance criteria satisfied.
+- Both fallback paths (`resolveIconName` in RecentlyUsed, inline `??` in AutocompleteSuggestions) guarantee a non-null component — unconditional renders are safe.
+- The `??` correctly handles unknown icon names (`ICON_REGISTRY[name]` returns `undefined`), falling through to `FALLBACK_ICON`.
 
 ##### Risks
 

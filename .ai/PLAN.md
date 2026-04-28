@@ -1,6 +1,6 @@
 # Plan
 
-Status: **ready**
+Status: **ready** (T-001/T-002 done; T-003 newly planned)
 
 Goal: Add a free-text `details` field to grocery entries (ROADMAP.md — Priority 1).
 
@@ -91,6 +91,189 @@ Goal: Add a free-text `details` field to grocery entries (ROADMAP.md — Priorit
   - Add-mode `AddItemSheet`: update `onAdd` callback signature to `(text, icon, details)` and forward to `addEntryByText`.
 - `frontend/src/index.css`
   - Add `.entry-row-details` rule: smaller font size (e.g. `0.8rem`), muted color (`var(--text-secondary)` or similar), `margin: 0`, no extra top margin (tight to the name line).
+
+### Phase 3 — T-003: Fallback icon in chips
+
+**Context:**  
+`RecentlyUsedSection` and `AutocompleteSuggestions` both omit the icon element entirely when `item.icon` / `suggestion.icon` is null or unknown. Both should always render the fallback `IconShoppingCart` instead.
+
+**Files to change:**
+- `frontend/src/components/RecentlyUsedSection.jsx`
+  - Change `resolveIconName`: replace `return null` with `return FALLBACK_ICON_NAME` when `iconName` is falsy.
+  - Result: `ItemIcon` is never null → the conditional `{ItemIcon ? ... : null}` always renders the icon. The conditional can be simplified to an unconditional render.
+- `frontend/src/components/AutocompleteSuggestions.jsx`
+  - Import `FALLBACK_ICON` from `../data/iconRegistry`.
+  - Change icon resolution to: `const SuggestionIcon = (suggestion.icon ? ICON_REGISTRY[suggestion.icon] : null) ?? FALLBACK_ICON;`
+  - Replace `{SuggestionIcon ? <SuggestionIcon ... /> : null}` with an unconditional `<SuggestionIcon ... />`.
+- `frontend/src/components/AutocompleteSuggestions.test.jsx`
+  - Update the existing test **"renders a suggestion without an icon and keeps the dropdown row full-width with a 44px touch target"**:
+    - Remove the assertion `expect(container.querySelector(".autocomplete-chip svg")).toBeNull()`.
+    - Add assertion that the fallback icon SVG **is** rendered, e.g. `expect(container.querySelector(".autocomplete-chip svg")).toBeTruthy()`.
+    - Retain the CSS assertions for `min-height: 44px` and `width: 100%`.
+- `frontend/src/components/RecentlyUsedSection.test.jsx`
+  - Add test: when an item has `icon: null`, the chip still renders an SVG icon (fallback).
+  - Verify via `container.querySelector(".recently-used-chip-icon")` being truthy.
+
+### Phase 4 — T-004: Icon registry expansion
+
+**Context:**  
+`iconRegistry.js` currently holds ~80 icons. 45 new icons are to be added from Tabler (primary) and Lucide (secondary, wrapped via `fromLucide()`). `iconDatabase.js` maps text keywords to icon names for the suggestion engine and must be updated in sync.
+
+**Files to change:**
+
+#### `frontend/src/data/iconRegistry.js`
+
+1. **New Tabler imports** — add to the existing `@tabler/icons-react` import block (alphabetical order):
+   ```
+   IconBlender, IconBone, IconBowl, IconBowlChopsticks, IconBowlSpoon,
+   IconChefHat, IconEggCracked, IconLollipop, IconMelon, IconMicrowave,
+   IconNut, IconPlant, IconPlant2, IconSeeding, IconSunglasses,
+   IconTeapot, IconWheat
+   ```
+
+2. **New Lucide imports** — add to the existing `lucide-react` import block (alphabetical order):
+   ```
+   CakeSlice, CandyCane, Citrus, CookingPot, Croissant, CupSoda,
+   Dessert, Donut, Drumstick, FishSymbol, ForkKnife, GlassWater,
+   Ham, Hamburger, Hop, IceCreamBowl, IceCreamCone, Martini,
+   Popcorn, Refrigerator, Sandwich, Shrimp, UtensilsCrossed,
+   Vegan, Wine, Cigarette, Syringe, PillBottle
+   ```
+
+3. **ICON_REGISTRY** — add all new icons in alphabetical order, Tabler ones as direct references, Lucide ones wrapped with `fromLucide()`:
+   ```js
+   CakeSlice: fromLucide(CakeSlice),
+   CandyCane: fromLucide(CandyCane),
+   Cigarette: fromLucide(Cigarette),
+   Citrus: fromLucide(Citrus),
+   CookingPot: fromLucide(CookingPot),
+   Croissant: fromLucide(Croissant),
+   CupSoda: fromLucide(CupSoda),
+   Dessert: fromLucide(Dessert),
+   Donut: fromLucide(Donut),
+   Drumstick: fromLucide(Drumstick),
+   FishSymbol: fromLucide(FishSymbol),
+   ForkKnife: fromLucide(ForkKnife),
+   GlassWater: fromLucide(GlassWater),
+   Ham: fromLucide(Ham),
+   Hamburger: fromLucide(Hamburger),
+   Hop: fromLucide(Hop),
+   IceCreamBowl: fromLucide(IceCreamBowl),
+   IceCreamCone: fromLucide(IceCreamCone),
+   IconBlender,
+   IconBone,
+   IconBowl,
+   IconBowlChopsticks,
+   IconBowlSpoon,
+   IconChefHat,
+   IconEggCracked,
+   IconLollipop,
+   IconMelon,
+   IconMicrowave,
+   IconNut,
+   IconPlant,
+   IconPlant2,
+   IconSeeding,
+   IconSunglasses,
+   IconTeapot,
+   IconWheat,
+   Martini: fromLucide(Martini),
+   PillBottle: fromLucide(PillBottle),
+   Popcorn: fromLucide(Popcorn),
+   Refrigerator: fromLucide(Refrigerator),
+   Sandwich: fromLucide(Sandwich),
+   Shrimp: fromLucide(Shrimp),
+   Syringe: fromLucide(Syringe),
+   UtensilsCrossed: fromLucide(UtensilsCrossed),
+   Vegan: fromLucide(Vegan),
+   Wine: fromLucide(Wine),
+   ```
+   Insert each entry in its correct alphabetical position within the existing registry object.
+
+#### `frontend/src/data/iconDatabase.js`
+
+**Update existing entries** to use the better, more specific new icons:
+
+| Entry label | Old icon | New icon |
+|---|---|---|
+| croissant | `IconCakeRoll` | `Croissant` |
+| ham | `IconSausage` | `Ham` |
+| shrimp | `IconFishBone` | `Shrimp` |
+| ice cream | `IconIceCream2` | `IceCreamBowl` |
+| ice cream cone | `IconIceCream` | `IceCreamCone` |
+| nuts | `IconLeaf2` | `IconNut` |
+| popcorn | `IconCandy` | `Popcorn` |
+| tea | `IconCup` | `IconTeapot` |
+| wine | `IconGlassChampagne` | `Wine` |
+
+**Add new keyword entries** for icons that have no existing entry (insert under the most appropriate category comment):
+
+```js
+// Produce / new
+{ label: "melon", icon: "IconMelon", tags: ["melone", "cantaloup", "honeydew"] },
+{ label: "wheat", icon: "IconWheat", tags: ["weizen"] },
+{ label: "plant", icon: "IconPlant", tags: ["pflanze", "blume"] },
+
+// Bakery / new
+{ label: "croissant", icon: "Croissant", tags: ["croissants", "gipfel"] },  // replaces existing CakeRoll entry
+{ label: "donut", icon: "Donut", tags: ["doughnut", "berliner"] },
+
+// Meat and fish / new
+{ label: "shrimp", icon: "Shrimp", tags: ["garnele", "garnelen", "prawn", "prawns"] },  // replaces existing FishBone entry
+{ label: "drumstick", icon: "Drumstick", tags: ["hähnchenkeule", "haehnchenkeule", "chicken leg"] },
+{ label: "ham", icon: "Ham", tags: ["schinken"] },  // replaces existing Sausage entry
+
+// Beverages / new
+{ label: "wine", icon: "Wine", tags: ["wein", "rotwein", "weißwein", "weisswein"] },  // replaces existing entry
+{ label: "martini", icon: "Martini", tags: ["cocktail"] },
+{ label: "soda", icon: "CupSoda", tags: ["cola", "softdrink", "limonade", "limo"] },
+{ label: "glass of water", icon: "GlassWater", tags: ["glas wasser"] },
+
+// Snacks / new
+{ label: "sandwich", icon: "Sandwich", tags: ["sandwich", "belegtes brot"] },
+{ label: "hamburger", icon: "Hamburger", tags: ["burger", "cheeseburger"] },
+{ label: "popcorn", icon: "Popcorn", tags: ["popcorn", "kinoschnack"] },  // replaces existing Candy entry
+{ label: "ice cream", icon: "IceCreamBowl", tags: ["eis", "speiseeis"] },  // replaces existing entry
+{ label: "ice cream cone", icon: "IceCreamCone", tags: ["softeis", "soft serve"] },  // replaces existing entry
+
+// Kitchen appliances / new
+{ label: "refrigerator", icon: "Refrigerator", tags: ["kühlschrank", "kuehlschrank", "fridge"] },
+{ label: "microwave", icon: "IconMicrowave", tags: ["mikrowelle"] },
+{ label: "blender", icon: "IconBlender", tags: ["mixer", "standmixer"] },
+{ label: "cooking pot", icon: "CookingPot", tags: ["kochtopf", "pot"] },
+
+// Fruit & veg specialties / new
+{ label: "citrus", icon: "Citrus", tags: ["zitrusfrucht", "orange", "grapefruit"] },
+{ label: "cake slice", icon: "CakeSlice", tags: ["tortenstück", "kuchenstück"] },
+{ label: "candy cane", icon: "CandyCane", tags: ["zuckerstange"] },
+{ label: "lollipop", icon: "IconLollipop", tags: ["lutscher"] },
+{ label: "dessert", icon: "Dessert", tags: ["nachtisch", "nachspeise"] },
+
+// Misc food / new
+{ label: "bowl", icon: "IconBowl", tags: ["schüssel", "schale", "müslischale"] },
+{ label: "fork and knife", icon: "ForkKnife", tags: ["besteck", "cutlery"] },
+{ label: "utensils", icon: "UtensilsCrossed", tags: ["küchenutensilien"] },
+{ label: "vegan", icon: "Vegan", tags: ["vegetarisch", "plant-based"] },
+{ label: "hop", icon: "Hop", tags: ["hopfen", "craft beer"] },
+{ label: "fish symbol", icon: "FishSymbol", tags: ["fisch symbol"] },
+{ label: "chef hat", icon: "IconChefHat", tags: ["kochmütze", "kochmuetze"] },
+{ label: "bone", icon: "IconBone", tags: ["knochen", "dog treat"] },
+
+// Health / new
+{ label: "syringe", icon: "Syringe", tags: ["spritze", "impfung", "injection"] },
+{ label: "pill bottle", icon: "PillBottle", tags: ["pillendose", "medikamentenflasche"] },
+{ label: "cigarette", icon: "Cigarette", tags: ["zigarette", "zigaretten", "tabak"] },
+{ label: "sunglasses", icon: "IconSunglasses", tags: ["sonnenbrille"] },
+
+// Seeds & plants / new  
+{ label: "seed", icon: "IconSeeding", tags: ["samen", "saat"] },
+{ label: "nuts", icon: "IconNut", tags: ["nüsse", "nuesse", "mixed nuts"] },  // replaces existing Leaf2 entry
+{ label: "tea", icon: "IconTeapot", tags: ["tee", "teekanne"] },  // replaces existing Cup entry
+```
+
+Note: Where an entry is "replacing" an existing one, update the `icon` field of the existing row rather than adding a duplicate. The label + tags remain the same.
+
+**No new test files are required** — `iconRegistry.js` and `iconDatabase.js` are static data modules tested implicitly by the icon browser and suggestion hook tests. Verify that all newly imported names resolve without build error (`npm run build`) and that existing tests still pass (`npm test`).
 
 ## Validation
 
