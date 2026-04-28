@@ -8,6 +8,45 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-008 — implement — 2026-04-28T18:15:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Advanced T-008 from approved review to committed state and marked the task done on the board. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md` |
+| Validation | Reused reviewed validation from the approved `next_task` implementation; no additional commands run during `commit_task`. |
+| Commit | `fix(e2e): support verified-user test setup` |
+| Next Role | none |
+
+---
+
+### T-008 — review — 2026-04-28T18:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-008 E2E email-verification fix: mailer SMTP guard, test-only verified-user endpoint, E2E helper updates all correct; all 9 E2E tests pass; one minor pre-existing push jsonb serialization bug noted (outside T-008 scope, fire-and-forget so all tests pass). |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-008 — implement — 2026-04-28T18:10:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Fixed the E2E account-setup flow for email verification by skipping mail delivery when SMTP is unconfigured, adding a non-production verified-user test endpoint, and updating the Playwright auth/list helpers to use the new verification-aware behavior. |
+| Files Changed | `.ai/TASKS.md`, `README.md`, `backend/src/app.js`, `backend/src/mail/mailer.js`, `backend/src/mail/mailer.test.js`, `backend/src/routes/testRouter.js`, `backend/src/testRoutes.test.js`, `e2e/auth.spec.js`, `e2e/lists.spec.js` |
+| Validation | `npm run test --workspace backend -- src/mail/mailer.test.js src/testRoutes.test.js` PASS; `npm run e2e -- e2e/auth.spec.js e2e/lists.spec.js` PASS (backend logged separate existing push enqueue JSON warnings during list-entry scenarios); `npm run lint` PASS (existing frontend warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing Vite warning about `onnxruntime-web` eval usage); `npm test` PASS |
+| Commit | `fix(e2e): support verified-user test setup` |
+| Next Role | review |
+
+---
+
 ### T-007 — implement — 2026-04-28T17:47:23Z
 
 | Field | Value |
@@ -199,6 +238,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
 | Verdict | PASS_WITH_NOTES |
 | Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-008 — plan — 2026-04-28T18:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Diagnosed 7 failing E2E tests caused by T-002 email-verification changes: registration UI now redirects to /verify-email (not /), and API-registered users are unverified so immediate login returns 403; planned T-008 to add a test-only `POST /api/test/create-verified-user` route and update both E2E spec files. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
 | Next Role | implement |
 
 ---

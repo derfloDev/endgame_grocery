@@ -7,6 +7,7 @@ import listRoutes from "./routes/lists.js";
 import pushRoutes from "./routes/push.js";
 import suggestionRoutes from "./routes/suggestions.js";
 import sharingRoutes from "./routes/sharing.js";
+import testRoutes from "./routes/testRouter.js";
 import { startPushWorker } from "./workers/pushWorker.js";
 
 export function createApp(options = {}) {
@@ -22,6 +23,9 @@ export function createApp(options = {}) {
   app.use("/api/auth", authRoutes(options));
   app.use("/api/invites", invitesRoutes(options));
   app.use("/api/push", pushRoutes(options));
+  if (process.env.NODE_ENV !== "production") {
+    app.use("/api/test", testRoutes(options));
+  }
   app.use("/api/lists", listRoutes(options));
   app.use("/api/lists/:id/history", historyRoutes(options));
   app.use("/api/lists/:id/suggestions", suggestionRoutes(options));

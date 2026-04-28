@@ -358,3 +358,53 @@ No findings. Single-line fix is correct and complete.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-008 — Fix E2E Tests for Email-Verification Flow
+
+### Review Round 1
+
+Status: **PASS_WITH_NOTES**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+| # | Severity | File | Description | Required Fix |
+|---|----------|------|-------------|--------------|
+| 1 | minor | `backend/src/routes/entries.js` line 118, `backend/src/workers/pushWorker.js` lines 26–33 | Pre-existing (T-005) bug surfaced by E2E runs: `enqueuePushJob` passes a JavaScript array `[entryText]` as a `jsonb` column parameter. `node-postgres` serializes JS arrays as PostgreSQL array literals (`{"item"}`) rather than JSON arrays (`["item"]`), causing `22P02 invalid input syntax for type json`. The error is fire-and-forget so entry creation succeeds, but push notifications never enqueue in the E2E environment. This was already present before T-008 and is explicitly acknowledged in the implementer's HANDOFF as "existing push enqueue JSON warnings". No fix required for T-008 approval; tracked here for the next cycle. | No |
+
+No blockers. No major findings.
+
+#### Verification
+
+##### Steps
+1. Read all changed files: `backend/src/mail/mailer.js`, `backend/src/mail/mailer.test.js`, `backend/src/routes/testRouter.js`, `backend/src/testRoutes.test.js`, `backend/src/app.js`, `e2e/auth.spec.js`, `e2e/lists.spec.js`.
+2. Cross-checked deliverables against the T-008 plan:
+   - `mailer.js`: transport created only when `config.smtpHost` is truthy; `send()` returns `{ skipped: true }` + `console.warn` when transport is `null` ✅
+   - `testRouter.js`: `createTestRouter` factory; `POST /create-verified-user` inserts `email_verified=true`, returns JWT; 400 on missing fields; 409 on duplicate email ✅
+   - `app.js`: mounts `/api/test` only when `process.env.NODE_ENV !== "production"` ✅
+   - `auth.spec.js`: `registerByApi` calls `/api/test/create-verified-user`; registration UI test asserts `toHaveURL(/\/verify-email$/)` and "check your inbox" text ✅
+   - `lists.spec.js`: `setupLoggedInUser` calls `/api/test/create-verified-user`, reads `token` from response, injects it into `localStorage` ✅
+3. Verified acceptance criteria:
+   - All 9 E2E tests pass without SMTP configured ✅ (confirmed by `npm run e2e -- e2e/auth.spec.js e2e/lists.spec.js`)
+   - `send()` skips transport when `smtpHost` empty — `mailer.test.js` test "skips sending and warns…" passes ✅
+   - Registration UI test expects `/verify-email` redirect ✅
+   - Test route returns 404 in production — `testRoutes.test.js` "returns 404 for test routes in production" passes ✅
+4. Ran `npm run test --workspace backend -- src/mail/mailer.test.js src/testRoutes.test.js` — 4/4 pass ✅
+5. Ran `npm run lint` — 0 errors, 1 pre-existing warning ✅
+6. Ran `npm test` — 81 backend tests pass (+2 new: mailer skip + test-routes), 93 frontend tests pass ✅
+7. Ran `npm run e2e -- e2e/auth.spec.js e2e/lists.spec.js` — 9/9 pass in 15.8s ✅
+
+##### Findings
+- `smtpHost` guard in `mailer.js` is placed at transport-creation time (constructor), not per-call — correct approach; avoids creating a broken transport that would fail on every `send()` invocation.
+- Test router uses the same DI injection pattern (`pool`, `bcryptLib`, `jwtLib`, `config`) as production routers — fully testable without real DB.
+- `app.js` uses `process.env.NODE_ENV !== "production"` (runtime check) rather than a build-time flag — correct for a Node.js service where the same binary runs in all environments.
+- E2E logs show `"Failed to enqueue push notification job"` errors (pre-existing T-005 `jsonb` serialization bug — `[entryText]` passed as JS array, `node-postgres` emits `{item}` PostgreSQL array format instead of `["item"]` JSON). All tests still pass because the enqueue is fire-and-forget.
+
+##### Risks
+- The pre-existing push enqueue `jsonb` serialization bug means no push notifications will fire in any environment where `node-postgres` receives a raw JS array for a `jsonb` column. Needs a follow-up fix (`JSON.stringify([entryText])` at the call site in `entries.js` and similar sites in `pushWorker.js`).
+
+#### Verdict
+`PASS_WITH_NOTES`

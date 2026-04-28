@@ -351,6 +351,67 @@ The existing `frontend/src/sw/register.js` is unchanged.
 
 ---
 
+## Hotfix — T-008: Fix E2E Tests for Email-Verification Flow
+
+### Root Cause
+T-002 changed two behaviours that the existing E2E tests were not updated for:
+
+1. `POST /api/auth/register` no longer returns a JWT — registration redirects to `/verify-email`. Tests asserting `toHaveURL(/\/$/)` after clicking "Create account" now fail.
+2. Users created via the API are `email_verified = false`. Any test that registers via API and immediately logs in gets a 403, because login blocks unverified accounts.
+
+### What to build
+
+**`backend/src/mail/mailer.js`** — guard against unconfigured SMTP
+- In `send()`, check `config.smtpHost` before attempting delivery:
+  ```js
+  if (!config.smtpHost) {
+    console.warn(`[mailer] SMTP not configured — skipping mail to ${to} (${subject})`);
+    return;
+  }
+  ```
+- This prevents Nodemailer from opening a TCP connection to an empty hostname during E2E tests (and any other environment where SMTP vars are absent).
+- Consistent with the push-worker pattern (`setVapidDetails` is skipped when VAPID keys are missing).
+
+**`backend/src/routes/test.js`** — new test-only router
+- Export `createTestRouter({ pool, bcryptLib, jwtLib, config })`.
+- Guard: if `process.env.NODE_ENV === 'production'` the router returns 404 on all routes.
+- `POST /api/test/create-verified-user` — accepts `{ display_name, email, password }`:
+  - Hashes password, inserts user with `email_verified = true`.
+  - Returns `{ token: <JWT> }` immediately (same shape as the login endpoint).
+  - Returns 409 if email already exists.
+- This endpoint exists solely to give E2E tests a way to create a ready-to-use account without going through the email flow.
+
+**`backend/src/app.js`**
+- Import and mount `createTestRouter` at `/api/test` when `process.env.NODE_ENV !== 'production'`.
+
+**`e2e/auth.spec.js`**
+- `registerByApi` helper: change from `POST /api/auth/register` to `POST /api/test/create-verified-user`. This helper is only used by tests that need a pre-existing user for setup (login tests), not for testing the registration UI itself.
+- `"registers a new user and lands on the protected overview"`: update assertion from `toHaveURL(/\/$/)` to `toHaveURL(/\/verify-email$/)` and add `expect(page.getByText(/check your inbox/i)).toBeVisible()`.
+- `"shows an error when the email is already registered"`: change `toHaveURL(/\/$/)` (first registration outcome) to `toHaveURL(/\/verify-email$/)`.
+
+**`e2e/lists.spec.js`**
+- `setupLoggedInUser`: replace the separate `POST /api/auth/register` + `POST /api/auth/login` pair with a single call to `POST /api/test/create-verified-user` which returns the JWT directly.
+
+### Files to change
+| File | Action |
+|---|---|
+| `backend/src/mail/mailer.js` | Add `smtpHost` guard in `send()` |
+| `backend/src/mail/mailer.test.js` | Add test: `send()` resolves without transport call when `smtpHost` is empty |
+| `backend/src/routes/test.js` | Create |
+| `backend/src/app.js` | Mount test router conditionally |
+| `e2e/auth.spec.js` | Update `registerByApi`; fix two URL assertions |
+| `e2e/lists.spec.js` | Update `setupLoggedInUser` |
+
+### Acceptance Criteria
+- All 9 E2E tests pass locally and in CI without requiring SMTP configuration.
+- `send()` returns without calling `transport.sendMail` when `smtpHost` is empty; a warning is logged.
+- Registration UI test asserts redirect to `/verify-email` (correct new behaviour).
+- `POST /api/test/create-verified-user` returns 404 when `NODE_ENV=production`.
+- No changes to production auth routes.
+- `npm run lint` passes.
+
+---
+
 ## Hotfix — T-007: Fix `pending_push_jobs` Migration
 
 ### Root Cause

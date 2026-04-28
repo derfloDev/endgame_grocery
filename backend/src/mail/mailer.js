@@ -14,11 +14,18 @@ export function createMailer({
   handlebarsLib = Handlebars,
   templatesDir = defaultTemplatesDir
 } = {}) {
-  const transport = nodemailerLib.createTransport(createTransportOptions(config));
+  const transport = config.smtpHost
+    ? nodemailerLib.createTransport(createTransportOptions(config))
+    : null;
   const rendererPromise = createRenderer({ handlebarsLib, templatesDir });
 
   return {
     async send({ to, subject, template, context = {} }) {
+      if (!transport) {
+        console.warn("SMTP host is not configured; skipping email delivery.");
+        return { skipped: true };
+      }
+
       const renderer = await rendererPromise;
       const html = await renderer.render(template, {
         appName: config.smtpFromName || "Endgame Grocery",

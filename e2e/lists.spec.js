@@ -12,7 +12,7 @@ test.use({ hasTouch: true });
 async function setupLoggedInUser(page, request) {
   const email = uniqueEmail("lists");
 
-  const registerResponse = await request.post("/api/auth/register", {
+  const registerResponse = await request.post("/api/test/create-verified-user", {
     data: {
       display_name: "List Tester",
       email,
@@ -20,16 +20,7 @@ async function setupLoggedInUser(page, request) {
     }
   });
   expect(registerResponse.ok()).toBeTruthy();
-
-  const loginResponse = await request.post("/api/auth/login", {
-    data: {
-      email,
-      password: TEST_PASSWORD
-    }
-  });
-  expect(loginResponse.ok()).toBeTruthy();
-
-  const { token } = await loginResponse.json();
+  const { token } = await registerResponse.json();
 
   await page.goto("/");
   await page.evaluate(

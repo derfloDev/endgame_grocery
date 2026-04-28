@@ -175,7 +175,7 @@ Run these checks before merging changes:
 
 ## E2E Tests
 
-Playwright E2E coverage exercises the registration, login, and core shopping-list CRUD flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first.
+Playwright E2E coverage exercises the registration, login, and core shopping-list CRUD flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first. The non-production backend also exposes `POST /api/test/create-verified-user` specifically for E2E setup, and transactional mail delivery is skipped with a warning when `SMTP_HOST` is not configured.
 
 Install the Chromium browser once:
 

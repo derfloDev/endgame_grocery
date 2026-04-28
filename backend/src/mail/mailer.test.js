@@ -87,6 +87,54 @@ describe("createMailer", () => {
       /https:\/\/app\.example\.com\/verify-email\?token(?:=|&#x3D;)abc123/
     );
   });
+
+  it("skips sending and warns when smtpHost is not configured", async () => {
+    let createTransportCalls = 0;
+    const warnings = [];
+    const originalWarn = console.warn;
+
+    console.warn = (message) => {
+      warnings.push(message);
+    };
+
+    try {
+      const mailer = createMailer({
+        config: {
+          smtpHost: "",
+          smtpPort: 587,
+          smtpFrom: "noreply@example.com",
+          smtpFromName: "Endgame Grocery"
+        },
+        nodemailerLib: {
+          createTransport() {
+            createTransportCalls += 1;
+            return {
+              async sendMail() {
+                throw new Error("sendMail should not be called without SMTP config");
+              }
+            };
+          }
+        }
+      });
+
+      const result = await mailer.send({
+        to: "demo@example.com",
+        subject: "Welcome",
+        template: "welcome",
+        context: {
+          body: "Skipped delivery."
+        }
+      });
+
+      assert.deepEqual(result, { skipped: true });
+      assert.equal(createTransportCalls, 0);
+      assert.deepEqual(warnings, [
+        "SMTP host is not configured; skipping email delivery."
+      ]);
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
 });
 
 function createTempTemplatesDir(templates) {
