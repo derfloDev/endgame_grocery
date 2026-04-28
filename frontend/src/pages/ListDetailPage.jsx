@@ -133,7 +133,7 @@ export default function ListDetailPage() {
     await writeCachedResource(`members:${id}`, { members: nextMembers });
   }
 
-  async function addEntryByText(text, icon) {
+  async function addEntryByText(text, icon, details = "") {
     const trimmed = text.trim();
 
     if (!trimmed) {
@@ -142,16 +142,23 @@ export default function ListDetailPage() {
 
     try {
       setEntryError("");
+      const nextDetails = normalizeEntryDetails(details);
 
       const temporaryEntry = {
         id: createTemporaryId("entry"),
         text: trimmed,
         icon: icon ?? null,
+        details: nextDetails,
         status: "open",
         created_at: new Date().toISOString(),
         is_pending_sync: true
       };
-      const result = await createEntry(id, token, { text: trimmed, icon: icon ?? null }, { tempId: temporaryEntry.id });
+      const result = await createEntry(
+        id,
+        token,
+        { text: trimmed, icon: icon ?? null, details },
+        { tempId: temporaryEntry.id }
+      );
 
       await updateEntries((currentEntries) =>
         sortEntries([...currentEntries, result?.queued ? temporaryEntry : result.entry])
@@ -192,7 +199,7 @@ export default function ListDetailPage() {
     }
   }
 
-  async function submitEditEntry(entryId, text, iconName) {
+  async function submitEditEntry(entryId, text, iconName, details = "") {
     const trimmed = text.trim();
 
     if (!trimmed) {
@@ -202,7 +209,8 @@ export default function ListDetailPage() {
     try {
       setEntryError("");
       const nextIcon = iconName ?? null;
-      const result = await updateEntry(id, entryId, token, { text: trimmed, icon: nextIcon });
+      const nextDetails = normalizeEntryDetails(details);
+      const result = await updateEntry(id, entryId, token, { text: trimmed, icon: nextIcon, details });
 
       await updateEntries((currentEntries) =>
         sortEntries(
@@ -210,7 +218,9 @@ export default function ListDetailPage() {
             currentEntry.id === entryId
               ? {
                   ...currentEntry,
-                  ...(result?.queued ? { icon: nextIcon, is_pending_sync: true, text: trimmed } : result.entry)
+                  ...(result?.queued
+                    ? { details: nextDetails, icon: nextIcon, is_pending_sync: true, text: trimmed }
+                    : result.entry)
                 }
               : currentEntry
           )
@@ -393,21 +403,22 @@ export default function ListDetailPage() {
       <AddItemSheet
         listId={id}
         open={showAddItem}
-        onAdd={addEntryByText}
+        onAdd={(text, icon, details) => addEntryByText(text, icon, details)}
         onClose={() => setShowAddItem(false)}
       />
       <AddItemSheet
+        initialDetails={editingEntry?.details ?? ""}
         initialIconName={editingEntry?.icon ?? null}
         initialText={editingEntry?.text ?? ""}
         listId={id}
         mode="edit"
         open={Boolean(editingEntry)}
-        onAdd={async (text, icon) => {
+        onAdd={async (text, icon, details) => {
           if (!editingEntry) {
             return false;
           }
 
-          const didSaveEntry = await submitEditEntry(editingEntry.id, text, icon);
+          const didSaveEntry = await submitEditEntry(editingEntry.id, text, icon, details);
 
           if (didSaveEntry) {
             setEditingEntry(null);
@@ -453,4 +464,13 @@ function sortEntries(entries) {
 
     return left.status === "open" ? -1 : 1;
   });
+}
+
+function normalizeEntryDetails(details) {
+  if (typeof details !== "string") {
+    return null;
+  }
+
+  const trimmedDetails = details.trim();
+  return trimmedDetails ? trimmedDetails : null;
 }

@@ -88,6 +88,7 @@ export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
 
         <div className="entry-row-copy">
           <p className={`entry-row-text ${entry.status === "done" ? "entry-row-text-done" : ""}`}>{entry.text}</p>
+          {entry.details ? <p className="entry-row-details">{entry.details}</p> : null}
           {entry.is_pending_sync ? <span className="eg-chip-queued entry-row-chip">Queued</span> : null}
         </div>
 

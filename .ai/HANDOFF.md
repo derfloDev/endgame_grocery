@@ -72,3 +72,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-04-28T13:22:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed frontend `details` field implementation across AddItemSheet, EntryRow, ListDetailPage, and API client; all acceptance criteria met, all tests pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-28T11:18:31Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added optional entry details to the add/edit sheet, entry row rendering, and list detail request wiring across the frontend. |
+| Files Changed | `frontend/src/api/entries.js`, `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/components/EntryRow.jsx`, `frontend/src/components/entry-row.test.jsx`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/index.css`, `frontend/src/app.test.jsx`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- src/components/entry-row.test.jsx` pass; `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx` pass (required escalation because sandbox blocked `esbuild` spawn); `npm run test --workspace frontend -- src/app.test.jsx` pass; `npm run lint` pass with existing frontend warning in `frontend/src/context/AuthContext.jsx`; `npm run build` pass; `npm test` pass |
+| Commit | `pending feat(ui): add optional entry details` |
+| Next Role | review |
+
+---
+
+### T-002 — implement — 2026-04-28T11:23:17Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and prepared the reviewed frontend entry details work for commit with the recorded Conventional Commit message. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `frontend/src/api/entries.js`, `frontend/src/app.test.jsx`, `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/components/EntryRow.jsx`, `frontend/src/components/entry-row.test.jsx`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.jsx` |
+| Validation | Reused prior passing validation from the approved review state: `npm run test --workspace frontend -- src/components/entry-row.test.jsx`, `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx`, `npm run test --workspace frontend -- src/app.test.jsx`, `npm run lint` (pass with existing frontend warning), `npm run build`, `npm test` |
+| Commit | `pending feat(ui): add optional entry details` |
+| Next Role | none |
+
+---

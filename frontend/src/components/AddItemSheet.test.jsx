@@ -64,6 +64,13 @@ describe("AddItemSheet", () => {
     cleanup();
   });
 
+  it("renders the optional details field with the expected placeholder", () => {
+    render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByLabelText("Details (optional)")).toBeTruthy();
+    expect(screen.getByPlaceholderText("Beschreibung, Menge...")).toBeTruthy();
+  });
+
   it("shows the resolved icon preview and submits it with the item text", async () => {
     const onAdd = vi.fn();
     const { container } = render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
@@ -75,7 +82,7 @@ describe("AddItemSheet", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
-    expect(onAdd).toHaveBeenCalledWith("Milch", "IconMilk");
+    expect(onAdd).toHaveBeenCalledWith("Milch", "IconMilk", "");
   });
 
   it("expands the inline icon browser, filters icons, and submits the manually selected icon", async () => {
@@ -126,13 +133,25 @@ describe("AddItemSheet", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
-    expect(onAdd).toHaveBeenCalledWith("Gemüse", "IconTrash");
+    expect(onAdd).toHaveBeenCalledWith("Gemüse", "IconTrash", "");
+  });
+
+  it("submits typed details as the third onAdd argument", async () => {
+    const onAdd = vi.fn();
+    render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText("Add item"), "Reis");
+    await userEvent.type(screen.getByLabelText("Details (optional)"), "500 g");
+    await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
+
+    expect(onAdd).toHaveBeenCalledWith("Reis", null, "500 g");
   });
 
   it("supports edit mode with prefilled text and icon state", async () => {
     const onAdd = vi.fn();
     const { container } = render(
       <AddItemSheet
+        initialDetails="2L"
         initialIconName="IconMilk"
         initialText="Milch"
         listId="list-1"
@@ -145,6 +164,7 @@ describe("AddItemSheet", () => {
 
     expect(screen.getByRole("dialog", { name: "Edit Item" })).toBeTruthy();
     expect(screen.getByLabelText("Edit item").value).toBe("Milch");
+    expect(screen.getByLabelText("Details (optional)").value).toBe("2L");
     expect(container.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save Item" })).toBeTruthy();
 
@@ -167,7 +187,7 @@ describe("AddItemSheet", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Save Item" }));
 
-    expect(onAdd).toHaveBeenCalledWith("Milch", "Banana");
+    expect(onAdd).toHaveBeenCalledWith("Milch", "Banana", "2L");
   });
 
   it("shows a loading indicator while the icon suggestion is resolving", async () => {
@@ -206,9 +226,10 @@ describe("AddItemSheet", () => {
 
     await userEvent.click(within(inputAnchor).getByRole("option", { name: "Tomaten" }));
 
-    expect(onAdd).toHaveBeenCalledWith("Tomaten", "IconSalad");
+    expect(onAdd).toHaveBeenCalledWith("Tomaten", "IconSalad", "");
     expect(screen.getByRole("dialog", { name: "Add Item" })).toBeTruthy();
     expect(screen.getByLabelText("Add item").value).toBe("");
+    expect(screen.getByLabelText("Details (optional)").value).toBe("");
     expect(screen.queryByRole("listbox", { name: "Autocomplete suggestions" })).toBeNull();
     expect(cssSource).toMatch(
       /\.eg-input-wrap\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*row;[^}]*align-items:\s*center;[^}]*gap:\s*10px;/s

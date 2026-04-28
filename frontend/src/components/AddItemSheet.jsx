@@ -11,6 +11,7 @@ function normalizeSearchTerm(value) {
 }
 
 export default function AddItemSheet({
+  initialDetails = "",
   initialIconName = null,
   initialText = "",
   listId = "",
@@ -21,6 +22,7 @@ export default function AddItemSheet({
 }) {
   const { token } = useAuth();
   const [text, setText] = useState(initialText);
+  const [details, setDetails] = useState(initialDetails);
   const [selectedIconName, setSelectedIconName] = useState(initialIconName);
   const [showIconBrowser, setShowIconBrowser] = useState(false);
   const [iconBrowserSearchText, setIconBrowserSearchText] = useState("");
@@ -37,6 +39,7 @@ export default function AddItemSheet({
     candidate.toLowerCase().includes(normalizedIconBrowserSearchText)
   );
   const textInputId = isEditMode ? "edit-item-sheet-text" : "add-item-sheet-text";
+  const detailsInputId = isEditMode ? "edit-item-sheet-details" : "add-item-sheet-details";
   const iconSearchInputId = isEditMode ? "edit-item-icon-browser-search" : "add-item-icon-browser-search";
   const sheetTitle = isEditMode ? "Edit Item" : "Add Item";
   const inputLabel = isEditMode ? "Edit item" : "Add item";
@@ -46,11 +49,12 @@ export default function AddItemSheet({
 
   useEffect(() => {
     setText(initialText);
+    setDetails(initialDetails);
     setSelectedIconName(initialIconName);
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
     setShowSuggestions(false);
-  }, [initialIconName, initialText, open]);
+  }, [initialDetails, initialIconName, initialText, open]);
 
   useEffect(() => {
     setSelectedIconName(iconName);
@@ -111,7 +115,7 @@ export default function AddItemSheet({
     }
 
     // Keep the add sheet open after a successful chip tap so users can continue adding items.
-    const submitResult = await onAdd?.(trimmed, suggestedIconName);
+    const submitResult = await onAdd?.(trimmed, suggestedIconName, "");
 
     if (submitResult === false) {
       return;
@@ -120,6 +124,7 @@ export default function AddItemSheet({
     setShowSuggestions(false);
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
+    setDetails("");
     setText("");
     setSelectedIconName(null);
   }
@@ -133,7 +138,7 @@ export default function AddItemSheet({
       return;
     }
 
-    const submitResult = await onAdd?.(trimmed, selectedIconName);
+    const submitResult = await onAdd?.(trimmed, selectedIconName, details);
 
     if (submitResult === false) {
       return;
@@ -144,6 +149,7 @@ export default function AddItemSheet({
     setIconBrowserSearchText("");
 
     if (!isEditMode) {
+      setDetails("");
       setText("");
       setSelectedIconName(null);
     }
@@ -180,6 +186,17 @@ export default function AddItemSheet({
               </div>
             ) : null}
           </div>
+        </div>
+
+        <div className="eg-field">
+          <label htmlFor={detailsInputId}>Details (optional)</label>
+          <input
+            id={detailsInputId}
+            className="eg-input"
+            placeholder="Beschreibung, Menge..."
+            value={details}
+            onChange={(event) => setDetails(event.target.value)}
+          />
         </div>
 
         {suggestedIconNames.length > 0 ? (

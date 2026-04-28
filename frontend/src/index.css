@@ -1138,6 +1138,13 @@ p {
   text-decoration: line-through;
 }
 
+.entry-row-details {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.35;
+}
+
 .entry-row-chip {
   margin-top: 8px;
 }
