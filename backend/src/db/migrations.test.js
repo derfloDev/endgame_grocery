@@ -16,6 +16,9 @@ const passwordResetMigrationPath = path.resolve(
 const listInvitesMigrationPath = path.resolve(
   "src/db/migrations/1713916800000_add_list_invites.cjs"
 );
+const pushTablesMigrationPath = path.resolve(
+  "src/db/migrations/1713920400000_add_push_tables.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -368,6 +371,123 @@ describe("database migrations", () => {
         { name: "list_invites_pending_email_idx", ifExists: true }
       ],
       ["dropTable", "list_invites", { ifExists: true, cascade: true }]
+    ]);
+  });
+
+  it("creates and removes push notification tables", async () => {
+    const migration = await import(pathToFileURL(pushTablesMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "createTable",
+        "push_subscriptions",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          user_id: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          endpoint: {
+            type: "text",
+            notNull: true
+          },
+          p256dh: {
+            type: "text",
+            notNull: true
+          },
+          auth: {
+            type: "text",
+            notNull: true
+          },
+          created_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ],
+      [
+        "addConstraint",
+        "push_subscriptions",
+        "push_subscriptions_user_endpoint_key",
+        { unique: ["user_id", "endpoint"] }
+      ],
+      [
+        "createTable",
+        "pending_push_jobs",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          list_id: {
+            type: "uuid",
+            notNull: true,
+            references: "lists(id)",
+            onDelete: "CASCADE"
+          },
+          actor_user_id: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          fire_at: {
+            type: "timestamptz",
+            notNull: true
+          },
+          items: {
+            type: "jsonb",
+            notNull: true,
+            default: []
+          },
+          created_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ],
+      [
+        "addConstraint",
+        "pending_push_jobs",
+        "pending_push_jobs_list_actor_key",
+        { unique: ["list_id", "actor_user_id"] }
+      ],
+      [
+        "createTable",
+        "push_cooldowns",
+        {
+          list_id: {
+            type: "uuid",
+            primaryKey: true,
+            references: "lists(id)",
+            onDelete: "CASCADE"
+          },
+          last_sent_at: {
+            type: "timestamptz",
+            notNull: true
+          }
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [
+      ["dropTable", "push_cooldowns", { ifExists: true, cascade: true }],
+      ["dropTable", "pending_push_jobs", { ifExists: true, cascade: true }],
+      ["dropTable", "push_subscriptions", { ifExists: true, cascade: true }]
     ]);
   });
 });

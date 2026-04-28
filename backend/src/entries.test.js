@@ -87,6 +87,19 @@ describe("entry routes", () => {
           };
         }
 
+        if (callCount === 3) {
+          assert.match(sql, /SELECT id, items, fire_at\s+FROM pending_push_jobs/);
+          assert.deepEqual(params, ["list-1", "user-1"]);
+          return { rows: [] };
+        }
+
+        if (callCount === 4) {
+          assert.match(sql, /INSERT INTO pending_push_jobs/);
+          assert.deepEqual(params, ["list-1", "user-1", params[2], ["Milk"]]);
+          assert.equal(params[2] instanceof Date, true);
+          return { rows: [] };
+        }
+
         assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
@@ -99,10 +112,11 @@ describe("entry routes", () => {
     assert.equal(response.status, 201);
     assert.equal(response.body.entry.status, "open");
     assert.equal(response.body.entry.icon, "🥛");
-    assert.equal(callCount, 2);
+    await waitForQueuedPushInsert();
+    assert.equal(callCount, 4);
   });
 
-  it("creates the entry without writing autocomplete history", async () => {
+  it("creates the entry without writing autocomplete history and still queues push delivery", async () => {
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -121,6 +135,18 @@ describe("entry routes", () => {
           };
         }
 
+        if (callCount === 3) {
+          assert.match(sql, /SELECT id, items, fire_at\s+FROM pending_push_jobs/);
+          return { rows: [] };
+        }
+
+        if (callCount === 4) {
+          assert.match(sql, /INSERT INTO pending_push_jobs/);
+          assert.deepEqual(params, ["list-1", "user-1", params[2], ["Milk"]]);
+          assert.equal(params[2] instanceof Date, true);
+          return { rows: [] };
+        }
+
         assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
@@ -131,7 +157,8 @@ describe("entry routes", () => {
 
     assert.equal(response.status, 201);
     assert.equal(response.body.entry.id, "entry-1");
-    assert.equal(callCount, 2);
+    await waitForQueuedPushInsert();
+    assert.equal(callCount, 4);
   });
 
   it("stores and returns entry details on create", async () => {
@@ -162,6 +189,18 @@ describe("entry routes", () => {
           };
         }
 
+        if (callCount === 3) {
+          assert.match(sql, /SELECT id, items, fire_at\s+FROM pending_push_jobs/);
+          return { rows: [] };
+        }
+
+        if (callCount === 4) {
+          assert.match(sql, /INSERT INTO pending_push_jobs/);
+          assert.deepEqual(params, ["list-1", "user-1", params[2], ["Milk"]]);
+          assert.equal(params[2] instanceof Date, true);
+          return { rows: [] };
+        }
+
         assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
@@ -181,7 +220,8 @@ describe("entry routes", () => {
       icon: "🥛",
       details: "2L"
     });
-    assert.equal(callCount, 2);
+    await waitForQueuedPushInsert();
+    assert.equal(callCount, 4);
   });
 
   it("writes autocomplete history when an entry is marked done", async () => {
@@ -437,3 +477,7 @@ describe("entry routes", () => {
     assert.equal(callCount, 4);
   });
 });
+
+async function waitForQueuedPushInsert() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}

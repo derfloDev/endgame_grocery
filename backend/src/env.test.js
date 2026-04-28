@@ -46,6 +46,9 @@ describe("getConfig", () => {
     const previousSmtpFrom = process.env.SMTP_FROM;
     const previousSmtpFromName = process.env.SMTP_FROM_NAME;
     const previousAppBaseUrl = process.env.APP_BASE_URL;
+    const previousVapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+    const previousVapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+    const previousVapidContact = process.env.VAPID_CONTACT;
 
     fs.mkdirSync(fixtureBackendSrcDir, { recursive: true });
     fs.copyFileSync(path.join(backendSrcDir, "env.js"), fixtureEnvModulePath);
@@ -62,6 +65,9 @@ describe("getConfig", () => {
         "SMTP_FROM=noreply@fixture.local",
         "SMTP_FROM_NAME=Fixture Mailer",
         "APP_BASE_URL=https://fixture.local",
+        "VAPID_PUBLIC_KEY=fixture-public-key",
+        "VAPID_PRIVATE_KEY=fixture-private-key",
+        "VAPID_CONTACT=mailto:fixture@example.com",
         ""
       ].join("\n")
     );
@@ -78,6 +84,9 @@ describe("getConfig", () => {
       delete process.env.SMTP_FROM;
       delete process.env.SMTP_FROM_NAME;
       delete process.env.APP_BASE_URL;
+      delete process.env.VAPID_PUBLIC_KEY;
+      delete process.env.VAPID_PRIVATE_KEY;
+      delete process.env.VAPID_CONTACT;
       process.chdir(fixtureBackendDir);
 
       const fixtureModuleUrl = new URL(
@@ -100,6 +109,9 @@ describe("getConfig", () => {
       assert.equal(config.smtpFrom, "noreply@fixture.local");
       assert.equal(config.smtpFromName, "Fixture Mailer");
       assert.equal(config.appBaseUrl, "https://fixture.local");
+      assert.equal(config.vapidPublicKey, "fixture-public-key");
+      assert.equal(config.vapidPrivateKey, "fixture-private-key");
+      assert.equal(config.vapidContact, "mailto:fixture@example.com");
     } finally {
       process.chdir(previousCwd);
       restoreEnvVar("DATABASE_URL", previousDatabaseUrl);
@@ -113,6 +125,9 @@ describe("getConfig", () => {
       restoreEnvVar("SMTP_FROM", previousSmtpFrom);
       restoreEnvVar("SMTP_FROM_NAME", previousSmtpFromName);
       restoreEnvVar("APP_BASE_URL", previousAppBaseUrl);
+      restoreEnvVar("VAPID_PUBLIC_KEY", previousVapidPublicKey);
+      restoreEnvVar("VAPID_PRIVATE_KEY", previousVapidPrivateKey);
+      restoreEnvVar("VAPID_CONTACT", previousVapidContact);
       fs.rmSync(fixtureRootDir, { recursive: true, force: true });
     }
   });
@@ -135,6 +150,9 @@ describe("getConfig", () => {
     const previousSmtpFrom = process.env.SMTP_FROM;
     const previousSmtpFromName = process.env.SMTP_FROM_NAME;
     const previousAppBaseUrl = process.env.APP_BASE_URL;
+    const previousVapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+    const previousVapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+    const previousVapidContact = process.env.VAPID_CONTACT;
 
     fs.mkdirSync(fixtureBackendSrcDir, { recursive: true });
     fs.mkdirSync(fixtureDotenvDir, { recursive: true });
@@ -171,6 +189,9 @@ describe("getConfig", () => {
       delete process.env.SMTP_FROM;
       delete process.env.SMTP_FROM_NAME;
       delete process.env.APP_BASE_URL;
+      delete process.env.VAPID_PUBLIC_KEY;
+      delete process.env.VAPID_PRIVATE_KEY;
+      delete process.env.VAPID_CONTACT;
       process.chdir(fixtureBackendDir);
 
       const fixtureModuleUrl = new URL(
@@ -191,6 +212,9 @@ describe("getConfig", () => {
       assert.equal(config.smtpFrom, "");
       assert.equal(config.smtpFromName, "");
       assert.equal(config.appBaseUrl, "");
+      assert.equal(config.vapidPublicKey, "");
+      assert.equal(config.vapidPrivateKey, "");
+      assert.equal(config.vapidContact, "");
     } finally {
       process.chdir(previousCwd);
       restoreEnvVar("DATABASE_URL", previousDatabaseUrl);
@@ -204,6 +228,9 @@ describe("getConfig", () => {
       restoreEnvVar("SMTP_FROM", previousSmtpFrom);
       restoreEnvVar("SMTP_FROM_NAME", previousSmtpFromName);
       restoreEnvVar("APP_BASE_URL", previousAppBaseUrl);
+      restoreEnvVar("VAPID_PUBLIC_KEY", previousVapidPublicKey);
+      restoreEnvVar("VAPID_PRIVATE_KEY", previousVapidPrivateKey);
+      restoreEnvVar("VAPID_CONTACT", previousVapidContact);
       fs.rmSync(fixtureRootDir, { recursive: true, force: true });
     }
   });

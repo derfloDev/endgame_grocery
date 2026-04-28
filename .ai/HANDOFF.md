@@ -8,6 +8,45 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-005 — implement — 2026-04-28T17:26:31Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Advanced T-005 from approved review to committed state and marked the task done on the board. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md` |
+| Validation | Reused reviewed validation from the approved `next_task` implementation; no additional commands run during `commit_task`. |
+| Commit | `feat(notifications): add shared list push alerts` |
+| Next Role | none |
+
+---
+
+### T-005 — implement — 2026-04-28T17:19:45Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added shared-list push notifications with Web Push subscription endpoints, queued batching and cooldown delivery, a custom injectManifest service worker, list-level opt-in UI, and documentation for the new VAPID configuration. |
+| Files Changed | `.ai/TASKS.md`, `.env.example`, `README.md`, `backend/package.json`, `backend/src/app.js`, `backend/src/db/migrations.test.js`, `backend/src/db/migrations/1713920400000_add_push_tables.cjs`, `backend/src/entries.test.js`, `backend/src/env.js`, `backend/src/env.test.js`, `backend/src/push.test.js`, `backend/src/pushWorker.test.js`, `backend/src/routes/entries.js`, `backend/src/routes/push.js`, `backend/src/workers/pushWorker.js`, `docker-compose.example.yml`, `docker-compose.yml`, `frontend/src/api/push.js`, `frontend/src/app.test.jsx`, `frontend/src/hooks/usePushNotifications.js`, `frontend/src/hooks/usePushNotifications.test.js`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/sw/service-worker.js`, `frontend/src/vite-config.test.js`, `frontend/vite.config.js`, `package-lock.json` |
+| Validation | `npm run test --workspace backend -- src/env.test.js src/db/migrations.test.js src/entries.test.js src/push.test.js src/pushWorker.test.js` PASS; `npm run test --workspace frontend -- src/app.test.jsx src/hooks/usePushNotifications.test.js src/vite-config.test.js` PASS; `npm run lint` PASS (existing frontend warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing Vite warning about `onnxruntime-web` eval usage); `npm test` PASS |
+| Commit | `feat(notifications): add shared list push alerts` |
+| Next Role | review |
+
+---
+
+### T-005 — review — 2026-04-28T18:05:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 push notifications: all plan deliverables present, all 6 acceptance criteria met, 76 backend tests pass (+7 new) and 93 frontend tests pass (+6 new); npm run build succeeds with injectManifest producing dist/service-worker.js; two nits (cleanup function not stored, setVapidDetails called per tick) — no blocking findings. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### <TASK_ID> — <ROLE> — <YYYY-MM-DDTHH:MM:SSZ>
 
 | Field | Value |

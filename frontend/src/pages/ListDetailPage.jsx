@@ -15,6 +15,7 @@ import ShareListSheet from "../components/ShareListSheet";
 import { EmptyState, FAB, Icon, LoadingState, TopBar } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
+import { usePushNotifications } from "../hooks/usePushNotifications";
 import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "./recentlyUsedState";
 
 export default function ListDetailPage() {
@@ -37,6 +38,16 @@ export default function ListDetailPage() {
   const [showOptions, setShowOptions] = useState(false);
   const [showRename, setShowRename] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const shouldShowPushToggle = Boolean(list) && (!list.is_owner || members.length > 1);
+  const {
+    isSubscribed,
+    isSupported: isPushSupported,
+    subscribe,
+    unsubscribe
+  } = usePushNotifications({
+    enabled: shouldShowPushToggle,
+    token
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -328,6 +339,21 @@ export default function ListDetailPage() {
     }
   }
 
+  async function handlePushToggle() {
+    try {
+      setEntryError("");
+
+      if (isSubscribed) {
+        await unsubscribe();
+        return;
+      }
+
+      await subscribe();
+    } catch (pushError) {
+      setEntryError(pushError.message);
+    }
+  }
+
   const openEntries = entries.filter((entry) => entry.status === "open");
   const visibleRecentlyUsed = filterRecentlyUsedItems(recentlyUsed, openEntries);
 
@@ -358,6 +384,11 @@ export default function ListDetailPage() {
               </span>
               {list.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
             </div>
+            {shouldShowPushToggle && isPushSupported ? (
+              <button className="eg-btn-secondary" type="button" onClick={() => void handlePushToggle()}>
+                {isSubscribed ? "Disable notifications" : "Enable notifications"}
+              </button>
+            ) : null}
           </div>
         ) : null}
 

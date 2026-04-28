@@ -23,6 +23,9 @@ export function getConfig() {
     smtpPass: process.env.SMTP_PASS ?? "",
     smtpFrom: process.env.SMTP_FROM ?? "",
     smtpFromName: process.env.SMTP_FROM_NAME ?? "",
-    appBaseUrl: process.env.APP_BASE_URL ?? ""
+    appBaseUrl: process.env.APP_BASE_URL ?? "",
+    vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
+    vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
+    vapidContact: process.env.VAPID_CONTACT ?? ""
   };
 }

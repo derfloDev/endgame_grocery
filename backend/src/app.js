@@ -4,11 +4,14 @@ import entryRoutes from "./routes/entries.js";
 import historyRoutes from "./routes/history.js";
 import invitesRoutes from "./routes/invites.js";
 import listRoutes from "./routes/lists.js";
+import pushRoutes from "./routes/push.js";
 import suggestionRoutes from "./routes/suggestions.js";
 import sharingRoutes from "./routes/sharing.js";
+import { startPushWorker } from "./workers/pushWorker.js";
 
 export function createApp(options = {}) {
   const app = express();
+  const shouldStartWorkers = options.startWorkers ?? !("pool" in options);
 
   app.use(express.json());
 
@@ -18,6 +21,7 @@ export function createApp(options = {}) {
 
   app.use("/api/auth", authRoutes(options));
   app.use("/api/invites", invitesRoutes(options));
+  app.use("/api/push", pushRoutes(options));
   app.use("/api/lists", listRoutes(options));
   app.use("/api/lists/:id/history", historyRoutes(options));
   app.use("/api/lists/:id/suggestions", suggestionRoutes(options));
@@ -29,6 +33,10 @@ export function createApp(options = {}) {
     console.error(error);
     res.status(500).json({ error: "Internal server error." });
   });
+
+  if (shouldStartWorkers) {
+    startPushWorker(options);
+  }
 
   return app;
 }

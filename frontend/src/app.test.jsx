@@ -28,6 +28,40 @@ function renderApp(initialEntries = ["/"]) {
 describe("authentication shell", () => {
   beforeEach(async () => {
     vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("Notification", {
+      permission: "granted",
+      requestPermission: vi.fn(async () => "granted")
+    });
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        ready: Promise.resolve({
+          pushManager: {
+            async getSubscription() {
+              return null;
+            },
+            async subscribe() {
+              return {
+                endpoint: "https://push.example.com/subscriptions/1",
+                keys: {
+                  p256dh: "p256dh-key",
+                  auth: "auth-key"
+                },
+                async unsubscribe() {
+                  return true;
+                },
+                toJSON() {
+                  return {
+                    endpoint: this.endpoint,
+                    keys: this.keys
+                  };
+                }
+              };
+            }
+          }
+        })
+      }
+    });
     window.localStorage.clear();
     await resetOfflineStateForTests();
     setNavigatorOnline(true);
@@ -173,6 +207,10 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ history: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ publicKey: "dGVzdA" })
       });
 
     renderApp(["/register?invite=invite-token-1"]);
@@ -250,6 +288,10 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ history: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ publicKey: "dGVzdA" })
       });
 
     renderApp(["/invite/invite-token-1"]);
@@ -917,6 +959,10 @@ describe("authentication shell", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        json: async () => ({ publicKey: "dGVzdA" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         json: async () => ({
           invite: {
             id: "invite-1",
@@ -953,6 +999,73 @@ describe("authentication shell", () => {
     await waitFor(() => {
       expect(screen.queryByText("Alex")).toBeNull();
     });
+  });
+
+  it("shows the notifications toggle only for shared lists", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Solo groceries", owner_name: "Demo User", is_owner: true }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ entries: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ history: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          members: [
+            {
+              user_id: "user-1",
+              display_name: "Demo User",
+              email: "demo@example.com",
+              joined_at: "2026-04-21T00:00:00Z",
+              is_owner: true
+            }
+          ]
+        })
+      });
+
+    const rendered = renderApp(["/lists/list-1"]);
+
+    expect(await screen.findByText("Solo groceries")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Enable notifications" })).toBeNull();
+
+    rendered.unmount();
+    fetch.mockReset();
+
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-2", name: "BBQ party", owner_name: "Alex", is_owner: false }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ entries: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ history: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ publicKey: "test-public-key" })
+      });
+
+    renderApp(["/lists/list-2"]);
+
+    expect(await screen.findByText("BBQ party")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Enable notifications" })).toBeTruthy();
   });
 
   it("shows the redesigned list detail loading and error states", async () => {

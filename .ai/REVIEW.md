@@ -213,3 +213,67 @@ No findings. Implementation is clean and complete.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-005 — Push Notifications
+
+### Review Round 1
+
+Status: **PASS_WITH_NOTES**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+| # | Severity | File | Description | Required Fix |
+|---|----------|------|-------------|--------------|
+| 1 | nit | `backend/src/app.js` line 38 | `startPushWorker` returns a `clearInterval` cleanup function but `app.js` does not store or call it. There is no graceful shutdown path for the push worker timer. This is mitigated by `timer.unref()` in `startPushWorker` (process can exit without the timer blocking it), so there is no operational risk. | No |
+| 2 | nit | `backend/src/workers/pushWorker.js` lines 86–90 | `webpushLib.setVapidDetails(...)` is called inside `processPendingPushJobs`, which runs on every 5-second tick. The VAPID values are static at startup and could be set once. No functional impact — the `web-push` library stores values in memory. | No |
+
+No blockers. No major findings.
+
+#### Verification
+
+##### Steps
+1. Read all changed files: migration `1713920400000_add_push_tables.cjs`, `env.js`, `app.js`, `routes/push.js`, `workers/pushWorker.js`, `routes/entries.js` (enqueue call), `api/push.js`, `hooks/usePushNotifications.js`, `sw/service-worker.js`, `vite.config.js`, `pages/ListDetailPage.jsx`, `push.test.js`, `pushWorker.test.js`, `env.test.js`, `migrations.test.js`, `.env.example`, `docker-compose.yml`, `docker-compose.example.yml`.
+2. Cross-checked every deliverable against the T-005 plan section:
+   - Migration: `push_subscriptions` (with `(user_id, endpoint)` unique constraint), `pending_push_jobs` (with `(list_id, actor_user_id)` unique constraint), `push_cooldowns` (PK on `list_id`) ✅
+   - `GET /api/push/vapid-public-key` — no auth required, returns `{ publicKey }` ✅
+   - `POST /api/push/subscribe` — upserts subscription row ✅
+   - `DELETE /api/push/subscribe` — removes subscription row ✅
+   - `enqueuePushJob`: creates new job or appends items/resets fire_at on existing within-window job; fire_at = NOW + 5 min ✅
+   - `startPushWorker`: setInterval every 5s, `timer.unref()` for clean process exit ✅
+   - `processPendingPushJobs`: fetches due jobs, checks 15-min cooldown, excludes actor from recipients, sends Web Push, swallows 410 Gone (removes stale sub), deletes job, upserts cooldown ✅
+   - `entries.js` POST: fires `enqueuePushJob` fire-and-forget after successful insert ✅
+   - `app.js`: push router registered, worker started only when `pool` not explicitly passed (DI-based test guard) ✅
+   - `getConfig()`: `vapidPublicKey`, `vapidPrivateKey`, `vapidContact` added ✅
+   - `docker-compose.yml`/`.env.example`/`docker-compose.example.yml`: all 3 VAPID vars documented ✅
+   - `vite.config.js`: switched to `strategies: "injectManifest"`, `srcDir: "src/sw"`, `injectManifest.globPatterns` ✅
+   - `service-worker.js`: `precacheAndRoute`, `push` event handler with `showNotification`, `notificationclick` handler with focus/open ✅
+   - `usePushNotifications`: fetches VAPID key + SW subscription on mount; `subscribe()` requests permission, creates PushSubscription, calls API; `unsubscribe()` calls browser + API ✅
+   - `ListDetailPage`: `shouldShowPushToggle = Boolean(list) && (!list.is_owner || members.length > 1)` — shows for non-owners (always shared) and owners with ≥1 other member; toggle button conditionally renders ✅
+3. Verified all T-005 acceptance criteria:
+   - Subscribe/unsubscribe endpoints persist/remove rows — confirmed by tests ✅
+   - Single entry → push within ≤10 min — `fire_at = NOW + 5min`, worker polls every 5s ✅
+   - 3 entries in 5-min window → one batched notification — `items.length - 1} weitere Artikel` body; test confirms "Milk und 2 weitere Artikel" ✅
+   - Actor excluded — SQL `recipient.user_id <> $2`; test asserts query shape ✅
+   - 15-min cooldown suppresses second notification — `last_sent_at > NOW - 15min` check; test confirms no send ✅
+   - Toggle only on shared lists — condition correctly gates on shared-list context ✅
+   - `npm run build` passes — `injectManifest` builds `service-worker.js`, 12 precache entries ✅
+4. Ran `npm run lint` — 0 errors, 1 pre-existing warning ✅
+5. Ran `npm test` — 76 backend tests pass (+7 new: 3 push route + 3 push worker + 1 migration + updated entries), 93 frontend tests pass (+6 new) ✅
+6. Ran `npm run build` — PWA injectManifest build succeeds, `dist/service-worker.js` generated ✅
+
+##### Findings
+- `timer.unref()` in `startPushWorker` ensures the push worker timer does not prevent Node.js process exit — correct approach for a background interval worker.
+- Worker startup guard `options.startWorkers ?? !("pool" in options)` is an elegant DI-based test isolation pattern that avoids `process.env.NODE_ENV` checks.
+- `enqueuePushJob` correctly resets the 5-min window on each new entry (extends `fire_at`) — enables batching without a separate scheduler.
+- `decodeBase64Url` in `usePushNotifications.js` correctly pads and decodes the VAPID public key for `applicationServerKey`.
+
+##### Risks
+- Push worker runs globally for the process and is not scoped per-list — acceptable for this scale.
+- VAPID keys must be generated and configured before push notifications function; left blank in `.env.example` by design.
+
+#### Verdict
+`PASS_WITH_NOTES`

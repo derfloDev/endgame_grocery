@@ -38,6 +38,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src/sw",
+      filename: "service-worker.js",
       registerType: "autoUpdate",
       // Required when the app is served behind Cloudflare Access: sends the CF_Authorization
       // cookie with the manifest fetch so Access does not redirect it to the login page.
@@ -67,17 +70,8 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png}"],
-        runtimeCaching: [
-          {
-            urlPattern: ({ url, request }) => request.method === "GET" && url.pathname.startsWith("/api/"),
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "api-cache"
-            }
-          }
-        ]
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,svg,png,webmanifest}"]
       }
     })
   ]

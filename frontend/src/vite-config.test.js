@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 import viteConfig from "../vite.config";
 
 const viteConfigSource = readFileSync(path.resolve(import.meta.dirname, "../vite.config.js"), "utf8");
+const serviceWorkerSource = readFileSync(
+  path.resolve(import.meta.dirname, "./sw/service-worker.js"),
+  "utf8"
+);
 
 describe("vite worker config", () => {
   it("sends credentials with the PWA manifest request", () => {
@@ -30,5 +34,18 @@ describe("vite worker config", () => {
 
   it("defines the app version from the root package.json", () => {
     expect(viteConfig.define.__APP_VERSION__).toMatch(/^"\d+\.\d+\.\d+"$/);
+  });
+
+  it("uses injectManifest for the custom push-aware service worker", () => {
+    expect(viteConfigSource).toMatch(/strategies:\s*["']injectManifest["']/);
+    expect(viteConfigSource).toMatch(/srcDir:\s*["']src\/sw["']/);
+    expect(viteConfigSource).toMatch(/filename:\s*["']service-worker\.js["']/);
+  });
+
+  it("registers precaching and push handlers in the custom service worker", () => {
+    expect(serviceWorkerSource).toMatch(/precacheAndRoute/);
+    expect(serviceWorkerSource).toMatch(/addEventListener\(["']push["']/);
+    expect(serviceWorkerSource).toMatch(/showNotification/);
+    expect(serviceWorkerSource).toMatch(/addEventListener\(["']notificationclick["']/);
   });
 });

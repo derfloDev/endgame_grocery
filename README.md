@@ -35,7 +35,7 @@ Copy the example environment file and adjust values for your machine:
 cp .env.example .env
 ```
 
-The backend requires a valid `DATABASE_URL` before registration, login, or list APIs can work. `JWT_SECRET` is fine for local development, but you must replace it with a strong secret outside local use. Mail-based flows also require SMTP credentials plus an `APP_BASE_URL` that points at the public frontend origin used in verification, invite, and password-reset links.
+The backend requires a valid `DATABASE_URL` before registration, login, or list APIs can work. `JWT_SECRET` is fine for local development, but you must replace it with a strong secret outside local use. Mail-based flows also require SMTP credentials plus an `APP_BASE_URL` that points at the public frontend origin used in verification, invite, and password-reset links. Browser push also requires `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_CONTACT` so the backend can authenticate Web Push deliveries.
 
 Backend commands that read configuration, including `npm run dev` and `npm run db:seed`, load this project-root `.env` file automatically even when npm starts them from the `backend/` workspace directory. The frontend Vite app also reads `VITE_*` values from the same repo-root `.env`, including `VITE_ICON_SIMILARITY_THRESHOLD`.
 
@@ -114,6 +114,9 @@ The repository's checked-in `docker-compose.yml` is intentionally kept for local
 | `SMTP_FROM` | Sender email address used for transactional mails. | `noreply@change-me.example` |
 | `SMTP_FROM_NAME` | Sender display name shown in mail clients. | `Endgame Grocery` |
 | `APP_BASE_URL` | Public frontend base URL used to build e-mail verification, invite, and reset links. | `https://grocery.change-me.example` |
+| `VAPID_PUBLIC_KEY` | Public VAPID key exposed to the browser when users opt into push notifications. | `change-me` |
+| `VAPID_PRIVATE_KEY` | Private VAPID key used by the backend push worker to sign outbound push deliveries. | `change-me` |
+| `VAPID_CONTACT` | Contact URI sent with VAPID details, typically a `mailto:` address for operational issues. | `mailto:notifications@change-me.example` |
 | `VITE_ICON_SIMILARITY_THRESHOLD` | Build-time similarity cutoff for local icon assignment in the frontend worker. Use a value from `0` to `1`; higher values require closer semantic matches before an icon is suggested. | `0.5` |
 
 ### Cloudflare Access
@@ -123,7 +126,7 @@ PWA can install correctly:
 
 | Path pattern | Reason |
 | --- | --- |
-| `/sw.js` | Service worker script — fetched without credentials by the browser's SW registration API |
+| `/service-worker.js` | Service worker script — fetched without credentials by the browser's SW registration API |
 | `/workbox-*.js` | Workbox runtime chunks loaded by the service worker |
 
 The manifest (`/manifest.webmanifest`) does not need a bypass policy: the app already
@@ -137,6 +140,7 @@ Run these checks before merging changes:
 - `npm run lint`
 - `npm run build`
 - `npm test`
+- `npm run e2e`
 
 ## E2E Tests
 
@@ -204,6 +208,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - The backend tracks per-list autocomplete history from completed and deleted items, exposes ranked typo-tolerant suggestions, and provides per-list recently used history endpoints.
 - History chips and autocomplete suggestions fall back to the cart icon when no specific saved icon is available, so list rows keep a consistent visual layout.
 - Sharing supports invite emails for existing and new users, direct invite-link acceptance after login, and revoking member access.
+- Shared lists support browser push opt-in, batched activity notifications, actor exclusion, and cooldown-based suppression to avoid notification spam.
 - Offline support caches successful reads and queues failed writes for replay after reconnect.
 
 ### Icon Assignment

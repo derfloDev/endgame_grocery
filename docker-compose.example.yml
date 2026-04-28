@@ -23,6 +23,9 @@ services:
       SMTP_FROM: noreply@change-me.example
       SMTP_FROM_NAME: Endgame Grocery
       APP_BASE_URL: https://grocery.change-me.example
+      VAPID_PUBLIC_KEY: change-me
+      VAPID_PRIVATE_KEY: change-me
+      VAPID_CONTACT: mailto:notifications@change-me.example
     depends_on:
       postgres:
         condition: service_healthy
