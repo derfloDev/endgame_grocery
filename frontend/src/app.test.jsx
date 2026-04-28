@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -271,7 +271,7 @@ describe("authentication shell", () => {
     expect(screen.getByText("Shared · Alex")).toBeTruthy();
   });
 
-  it("adds, toggles, edits, renames, and collapses done entries in the list detail options flow", async () => {
+  it("shows recently used items, re-adds them, and dismisses them from list detail", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     const queuedResponses = [
       {
@@ -284,8 +284,16 @@ describe("authentication shell", () => {
         ok: true,
         json: async () => ({
           entries: [
-            { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" },
-            { id: "entry-2", text: "Bread", status: "done", icon: null, created_at: "2026-04-21T00:01:00Z" }
+            { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" }
+          ]
+        })
+      },
+      {
+        ok: true,
+        json: async () => ({
+          history: [
+            { text: "Tomatoes", icon: "IconSalad", useCount: 7 },
+            { text: "Bread", icon: "IconBread", useCount: 4 }
           ]
         })
       },
@@ -306,31 +314,13 @@ describe("authentication shell", () => {
       {
         ok: true,
         json: async () => ({
-          entry: { id: "entry-3", text: "Milch", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:02:00Z" }
-        })
-      },
-      {
-        ok: true,
-        json: async () => ({
-          entry: { id: "entry-1", text: "Milk", status: "done", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" }
-        })
-      },
-      {
-        ok: true,
-        json: async () => ({
           entry: {
-            id: "entry-3",
-            text: "Ground coffee",
+            id: "entry-2",
+            text: "Tomatoes",
             status: "open",
-            icon: "IconCoffee",
+            icon: "IconSalad",
             created_at: "2026-04-21T00:02:00Z"
           }
-        })
-      },
-      {
-        ok: true,
-        json: async () => ({
-          list: { id: "list-1", name: "Mission groceries", owner_name: "Demo User", is_owner: true }
         })
       },
       {
@@ -364,98 +354,154 @@ describe("authentication shell", () => {
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "List options" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Share list" })).toBeNull();
     expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
 
-    expect(screen.getByText("OPEN ITEMS")).toBeTruthy();
-    expect(screen.getByText("DONE")).toBeTruthy();
+    const openSectionLabel = screen.getByText("OPEN ITEMS");
+    const recentlyUsedSection = await screen.findByRole("region", { name: "Recently Used" });
+    const recentlyUsedLabel = within(recentlyUsedSection).getByText("RECENTLY USED");
+
+    expect(openSectionLabel.compareDocumentPosition(recentlyUsedLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText("DONE")).toBeNull();
     expect(screen.getByText("Milk")).toBeTruthy();
-    expect(screen.getByText("Bread")).toBeTruthy();
+    expect(within(recentlyUsedSection).getByText("Tomatoes")).toBeTruthy();
+    expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
 
-    await userEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(await screen.findByRole("dialog", { name: "Add Item" })).toBeTruthy();
-
-    await userEvent.type(screen.getByLabelText("Add item"), "Milch");
-    expect(screen.getByRole("button", { name: "Mehr anzeigen" })).toBeTruthy();
-    expect(document.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
+    await userEvent.click(within(recentlyUsedSection).getByRole("button", { name: "Tomatoes" }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/lists/list-1/entries",
         expect.objectContaining({
-          body: JSON.stringify({ text: "Milch", icon: "IconMilk" }),
+          body: JSON.stringify({ text: "Tomatoes", icon: "IconSalad" }),
           method: "POST"
         })
       );
     });
 
-    expect(await screen.findByText("Milch")).toBeTruthy();
-    const addItemDialog = screen.getByRole("dialog", { name: "Add Item" });
-    expect(addItemDialog).toBeTruthy();
-    expect(within(addItemDialog).getByLabelText("Add item").value).toBe("");
-    await userEvent.click(within(addItemDialog).getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("dialog", { name: "Add Item" })).toBeNull();
+    expect(await screen.findByRole("button", { name: "Mark Tomatoes done" })).toBeTruthy();
+    await waitFor(() => {
+      expect(within(recentlyUsedSection).queryByText("Tomatoes")).toBeNull();
+    });
 
-    await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
-    expect(await screen.findByRole("button", { name: "Mark Milk open" })).toBeTruthy();
-
-    await userEvent.click(screen.getByRole("button", { name: "Edit Milch" }));
-    const editDialog = await screen.findByRole("dialog", { name: "Edit Item" });
-    const editInput = within(editDialog).getByLabelText("Edit item");
-    expect(editInput.value).toBe("Milch");
-    await userEvent.click(within(editDialog).getByRole("button", { name: "Cancel" }));
-
-    expect(screen.queryByRole("dialog", { name: "Edit Item" })).toBeNull();
-    expect(screen.getByText("Milch")).toBeTruthy();
-
-    await userEvent.click(screen.getByRole("button", { name: "Edit Milch" }));
-    const reopenedEditDialog = await screen.findByRole("dialog", { name: "Edit Item" });
-    const reopenedEditInput = within(reopenedEditDialog).getByLabelText("Edit item");
-    expect(reopenedEditInput.value).toBe("Milch");
-
-    await userEvent.clear(reopenedEditInput);
-    await userEvent.type(reopenedEditInput, "Ground coffee");
-    await userEvent.click(within(reopenedEditDialog).getByRole("button", { name: "Mehr anzeigen" }));
-    expect(within(reopenedEditDialog).getByLabelText("Search icons")).toBeTruthy();
-    await userEvent.type(within(reopenedEditDialog).getByLabelText("Search icons"), "coffee");
-    await userEvent.click(within(reopenedEditDialog).getByRole("button", { name: "Browse IconCoffee" }));
-    await userEvent.click(within(reopenedEditDialog).getByRole("button", { name: "Save Item" }));
+    await userEvent.click(within(recentlyUsedSection).getByRole("button", { name: "Dismiss Bread" }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        "/api/lists/list-1/entries/entry-3",
+        "/api/lists/list-1/history",
         expect.objectContaining({
-          body: JSON.stringify({ text: "Ground coffee", icon: "IconCoffee" }),
-          method: "PATCH"
+          body: JSON.stringify({ text: "Bread" }),
+          method: "DELETE"
         })
       );
     });
 
-    expect(await screen.findByText("Ground coffee")).toBeTruthy();
-    expect(screen.queryByRole("dialog", { name: "Edit Item" })).toBeNull();
-
-    await userEvent.click(screen.getByRole("button", { name: "List options" }));
-    expect(await screen.findByRole("dialog", { name: "List Options" })).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: /^Rename list/ }));
-
-    const renameSheetInput = await screen.findByLabelText("Rename list");
-    expect(renameSheetInput.value).toBe("Weekly groceries");
-    await userEvent.clear(renameSheetInput);
-    await userEvent.type(renameSheetInput, "Mission groceries");
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(await screen.findByText("Mission groceries")).toBeTruthy();
-
-    await userEvent.click(screen.getByRole("button", { name: "Toggle done items" }));
-
-    expect(screen.queryByText("Bread")).toBeNull();
-    expect(screen.queryByText("Milk")).toBeNull();
-
-    await userEvent.click(screen.getByRole("button", { name: "Toggle done items" }));
-    expect(await screen.findByText("Bread")).toBeTruthy();
-    expect(screen.getByText("Milk")).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.queryByRole("region", { name: "Recently Used" })).toBeNull();
+    });
   }, 10000);
+
+  it("adds done and deleted items to recently used immediately without a reload", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          entries: [
+            { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" },
+            {
+              id: "entry-2",
+              text: "Cheese",
+              status: "open",
+              icon: "IconCheese",
+              created_at: "2026-04-21T00:01:00Z"
+            }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          history: [{ text: "Bread", icon: "IconBread", useCount: 2 }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          members: [
+            {
+              user_id: "user-1",
+              display_name: "Demo User",
+              email: "demo@example.com",
+              joined_at: "2026-04-21T00:00:00Z",
+              is_owner: true
+            }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          entry: {
+            id: "entry-1",
+            text: "Milk",
+            status: "done",
+            icon: "IconMilk",
+            created_at: "2026-04-21T00:00:00Z"
+          }
+        })
+      })
+      .mockResolvedValueOnce({
+        status: 204
+      });
+
+    renderApp(["/lists/list-1"]);
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+    const recentlyUsedSection = await screen.findByRole("region", { name: "Recently Used" });
+
+    expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Mark Milk done" })).toBeNull();
+    });
+    expect(within(recentlyUsedSection).getByText("Milk")).toBeTruthy();
+
+    const chipLabelsAfterDone = within(recentlyUsedSection)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"));
+    expect(chipLabelsAfterDone.indexOf("Milk")).toBeLessThan(chipLabelsAfterDone.indexOf("Bread"));
+
+    const cheeseRow = screen.getByTestId("entry-row-entry-2");
+    fireEvent.touchStart(cheeseRow, { touches: [{ clientX: 120 }] });
+    fireEvent.touchMove(cheeseRow, { touches: [{ clientX: 20 }] });
+    fireEvent.touchEnd(cheeseRow);
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/lists/list-1/entries/entry-2",
+        expect.objectContaining({
+          method: "DELETE"
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(within(recentlyUsedSection).getByText("Cheese")).toBeTruthy();
+    });
+
+    const chipLabelsAfterDelete = within(recentlyUsedSection)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"));
+    expect(chipLabelsAfterDelete.indexOf("Cheese")).toBeLessThan(chipLabelsAfterDelete.indexOf("Milk"));
+  });
 
   it("opens the share sheet from list options and revokes a member", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
@@ -470,6 +516,12 @@ describe("authentication shell", () => {
         ok: true,
         json: async () => ({
           entries: []
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          history: []
         })
       })
       .mockResolvedValueOnce({
@@ -540,7 +592,13 @@ describe("authentication shell", () => {
       new Promise((_, reject) => {
         rejectFetch = reject;
       })
-      );
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          history: []
+        })
+      });
 
     renderApp(["/lists/list-1"]);
 

@@ -1,49 +1,36 @@
 # ROADMAP
 
-Goal: deliver smart autocomplete for the Add Item flow so users can build grocery lists faster, even offline.
+Goal: deliver the "Recently Used" feature — a per-list, one-tap quick-add panel on the List Detail Page that replaces the Done-items section.
 
-## Priority 1 — Smart Autocomplete
+## Priority 1
 
-Objective: show ranked product-name suggestions as the user types in the Add Item sheet. Tapping a suggestion immediately adds the item to the list (no extra confirmation). The ranking learns from per-list usage history stored on the backend and survives offline via a local cache.
+Objective: Let users instantly re-add items they have bought before without typing.
+
+### Scope decisions (agreed 2026-04-27)
+
+| Question | Decision |
+|---|---|
+| History scope | Per (user, list) — existing `autocomplete_history` design |
+| History trigger | Written on **Done** or **Delete** only; removed from POST /entries |
+| UI placement | Separate section on ListDetailPage **below Open Items**; Done section removed |
+| One-tap behaviour | Immediately adds item as `open`; no extra form or pre-fill sheet |
+| Deduplicate | Items already `open` on the list are excluded from the panel |
 
 ### Acceptance Criteria
 
-- Suggestions appear after the user types ≥ 2 characters into the Add Item input.
-- Up to 5 suggestions are shown, each displaying the product icon and label.
-- Suggestions are ranked by per-list usage frequency (most-used items first).
-- Fuzzy/typo-tolerant matching: e.g. "Schokollade" surfaces "Schokolade".
-- Tapping a suggestion directly adds the item (text + icon) to the list; the sheet stays open for the next entry.
-- Every successfully created entry (manual or via autocomplete) increments that item's use-count in the backend history for the current list.
-- When offline, the last successfully fetched suggestion set for each list is served from a local cache (localStorage); client-side prefix + edit-distance filtering is applied to the cached set.
-- Autocomplete suggestions load within 300 ms on a fast connection (debounced input).
-- All new UI is thumb-reachable on mobile (suggestion chips ≥ 44 px tap target).
+- When a user marks an entry **done**, the entry is written (upsert) into `autocomplete_history` for that list.
+- When a user **deletes** an entry, the entry is written (upsert) into `autocomplete_history` before the row is removed.
+- Adding a new entry via POST `/entries` does **not** write to `autocomplete_history`.
+- `GET /lists/:id/history` returns up to 20 items, sorted by `use_count DESC, last_used_at DESC`, excluding any item whose `text` matches a currently `open` entry on the list.
+- `DELETE /lists/:id/history` with `{ text }` body permanently removes the item from history for that user+list combination.
+- The ListDetailPage shows a **"Recently Used"** section below Open Items with up to 20 chips/rows.
+- Tapping a Recently Used item calls the existing `addEntryByText` path and the item disappears from the panel immediately (it is now open).
+- Each Recently Used item has a dismiss/delete button that permanently removes it from history.
+- The **Done** section is removed from ListDetailPage.
+- Items with status `open` on the current list never appear in the Recently Used panel.
 
-### Decisions Made
+### Out of scope
 
-| # | Question | Choice |
-|---|----------|--------|
-| 1 | Suggestion source | Backend-driven (DB history) |
-| 2 | Tap-to-add behaviour | Direct add, sheet stays open |
-| 3 | Fuzzy matching | Independent autocomplete mechanism (not reusing icon worker) |
-| 4 | History scope | Per-list (user × list) |
-| 5 | Offline fallback | Last cached suggestions (localStorage), client-side fuzzy filter |
-
-### Scope
-
-**Backend**
-- New DB migration: `autocomplete_history` table (`user_id`, `list_id`, `text`, `icon`, `use_count`, `last_used_at`; unique on `user_id + list_id + text`).
-- `POST /api/lists/:id/entries` upserts into `autocomplete_history` on every successful entry creation (both manual and autocomplete paths).
-- New endpoint `GET /api/lists/:id/suggestions?q=<query>` — returns top 5 suggestions for the list, ranked by `use_count DESC`, fuzzy-matched via `ILIKE` / `pg_trgm` similarity on `text`.
-
-**Frontend**
-- New `useAutocomplete(listId, inputText, token)` hook:
-  - Debounces API call (300 ms).
-  - Caches last API response per `listId` in localStorage.
-  - When offline or API fails, loads from cache and applies client-side prefix + edit-distance filtering.
-- New `AutocompleteSuggestions` component: renders up to 5 suggestion chips (icon + label), ≥ 44 px tap targets.
-- `AddItemSheet` integration: render suggestions below the text input; on chip tap call `onAdd(text, icon)` directly.
-
-**Out of scope for this cycle**
-- Cross-list or global history.
-- Deleting or managing autocomplete history.
-- Surfacing suggestions on the Edit Item sheet.
+- Cross-list history view.
+- Any additional "note" or quantity field on one-tap add.
+- Migration or purge of existing `autocomplete_history` rows (written on add); they evolve naturally.

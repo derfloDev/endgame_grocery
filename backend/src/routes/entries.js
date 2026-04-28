@@ -20,6 +20,21 @@ async function ensureListAccess(pool, listId, userId) {
   return Boolean(result.rows[0]);
 }
 
+function upsertAutocompleteHistory(pool, { userId, listId, text, icon }) {
+  return pool.query(
+    `
+      INSERT INTO autocomplete_history (user_id, list_id, text, icon, use_count, last_used_at)
+      VALUES ($1, $2, $3, $4, 1, NOW())
+      ON CONFLICT (user_id, list_id, text)
+      DO UPDATE SET
+        icon = EXCLUDED.icon,
+        use_count = autocomplete_history.use_count + 1,
+        last_used_at = NOW()
+    `,
+    [userId, listId, text, icon]
+  );
+}
+
 export function createEntryRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth
@@ -90,24 +105,6 @@ export function createEntryRouter({
         [req.params.id, text.trim(), icon ?? null]
       );
 
-      try {
-        // Autocomplete history should not block successful item creation.
-        await pool.query(
-          `
-            INSERT INTO autocomplete_history (user_id, list_id, text, icon, use_count, last_used_at)
-            VALUES ($1, $2, $3, $4, 1, NOW())
-            ON CONFLICT (user_id, list_id, text)
-            DO UPDATE SET
-              icon = EXCLUDED.icon,
-              use_count = autocomplete_history.use_count + 1,
-              last_used_at = NOW()
-          `,
-          [req.user.sub, req.params.id, text.trim(), icon ?? null]
-        );
-      } catch (historyError) {
-        console.error("Failed to upsert autocomplete history.", historyError);
-      }
-
       res.status(201).json({
         entry: result.rows[0]
       });
@@ -161,6 +158,17 @@ export function createEntryRouter({
         return;
       }
 
+      if (result.rows[0].status === "done") {
+        void upsertAutocompleteHistory(pool, {
+          userId: req.user.sub,
+          listId: req.params.id,
+          text: result.rows[0].text,
+          icon: result.rows[0].icon
+        }).catch((historyError) => {
+          console.error("Failed to upsert autocomplete history.", historyError);
+        });
+      }
+
       res.json({
         entry: result.rows[0]
       });
@@ -183,6 +191,21 @@ export function createEntryRouter({
         return;
       }
 
+      const entryResult = await pool.query(
+        `
+          SELECT text, icon
+          FROM entries
+          WHERE id = $1 AND list_id = $2
+          LIMIT 1
+        `,
+        [req.params.entryId, req.params.id]
+      );
+
+      if (!entryResult.rows[0]) {
+        res.status(404).json({ error: "Entry not found." });
+        return;
+      }
+
       const result = await pool.query(
         `
           DELETE FROM entries
@@ -196,6 +219,15 @@ export function createEntryRouter({
         res.status(404).json({ error: "Entry not found." });
         return;
       }
+
+      void upsertAutocompleteHistory(pool, {
+        userId: req.user.sub,
+        listId: req.params.id,
+        text: entryResult.rows[0].text,
+        icon: entryResult.rows[0].icon
+      }).catch((historyError) => {
+        console.error("Failed to upsert autocomplete history.", historyError);
+      });
 
       res.status(204).send();
     } catch (error) {

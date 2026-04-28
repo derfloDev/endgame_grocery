@@ -1,6 +1,7 @@
 import express from "express";
 import authRoutes from "./routes/auth.js";
 import entryRoutes from "./routes/entries.js";
+import historyRoutes from "./routes/history.js";
 import listRoutes from "./routes/lists.js";
 import suggestionRoutes from "./routes/suggestions.js";
 import sharingRoutes from "./routes/sharing.js";
@@ -16,6 +17,7 @@ export function createApp(options = {}) {
 
   app.use("/api/auth", authRoutes(options));
   app.use("/api/lists", listRoutes(options));
+  app.use("/api/lists/:id/history", historyRoutes(options));
   app.use("/api/lists/:id/suggestions", suggestionRoutes(options));
   app.use("/api/lists/:id/entries", entryRoutes(options));
   app.use("/api/lists/:id/members", sharingRoutes(options));

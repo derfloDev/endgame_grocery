@@ -2,777 +2,303 @@
 
 Status: **ready_for_implement**
 
-Goal: deliver smart autocomplete in the Add Item sheet — ranked product suggestions from per-list backend history, with offline cache fallback.
+Goal: deliver the "Recently Used" panel on the List Detail Page (per-list, one-tap re-add, replaces Done section).
 
 ## Scope
 
-See `ROADMAP.md` for full acceptance criteria and design decisions. Summary:
+### What changes
 
-- DB table `autocomplete_history` tracks per-user-per-list item usage frequency.
-- `POST /entries` upserts history on every successful item creation.
-- `GET /api/lists/:id/suggestions?q=<query>` returns ≤ 5 ranked, fuzzy-matched suggestions.
-- Frontend hook `useAutocomplete` debounces the API call, caches results in IndexedDB, and applies client-side fuzzy filtering when offline.
-- New `AutocompleteSuggestions` component renders icon + label chips (≥ 44 px tap target).
-- `AddItemSheet` renders the chip list below the text input; tapping a chip calls `onAdd(text, iconName)` directly — no extra confirmation, sheet stays open.
+| Layer | Change |
+|---|---|
+| Backend – `routes/entries.js` | Remove autocomplete_history write from `POST /entries`; add history upsert to `PATCH /:entryId` (only when `status` changes **to** `done`); add history upsert to `DELETE /:entryId` (read `text`+`icon` before deleting) |
+| Backend – `routes/history.js` | New router: `GET /api/lists/:id/history` + `DELETE /api/lists/:id/history` |
+| Backend – `app.js` | Register `/api/lists/:id/history` |
+| Backend tests | Update `entries.test.js`; new `history.test.js` |
+| Frontend – `api/history.js` | New file: `fetchRecentlyUsed` + `deleteFromHistory` |
+| Frontend – `ListDetailPage.jsx` | Remove Done section; add Recently Used section; load + manage `recentlyUsed` state |
+| Frontend – `RecentlyUsedSection.jsx` | New component: renders ≤20 chips with one-tap add + dismiss button |
+| Frontend – `index.css` | Styles for the Recently Used section |
 
-## Task Dependency Order
+### What does NOT change
 
-```
-T-001  →  T-002  →  T-003  →  T-004
-(migration) (backend)  (hook)   (UI)
-```
-
-T-003 and T-004 may be started in parallel once T-002 is merged, but T-004 depends on the shape exported by T-003.
-
----
-
-## T-001 — DB Migration: `autocomplete_history`
-
-### What
-New node-postgres-migrate migration file that creates the `autocomplete_history` table and enables the `pg_trgm` extension used by T-002 for fuzzy matching.
-
-### Schema
-
-```sql
--- Extension (idempotent)
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
-CREATE TABLE autocomplete_history (
-  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id      UUID        NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
-  list_id      UUID        NOT NULL REFERENCES lists(id)  ON DELETE CASCADE,
-  text         TEXT        NOT NULL,
-  icon         TEXT,
-  use_count    INTEGER     NOT NULL DEFAULT 1,
-  last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Enforce one row per user+list+text combination
-ALTER TABLE autocomplete_history
-  ADD CONSTRAINT autocomplete_history_user_list_text_key
-  UNIQUE (user_id, list_id, text);
-
--- Fast lookup by user + list
-CREATE INDEX autocomplete_history_user_list_idx
-  ON autocomplete_history (user_id, list_id);
-```
-
-### Files to change
-- `backend/src/db/migrations/<timestamp>_add_autocomplete_history.cjs` — **new**
-
-### Acceptance Criteria
-- Migration runs `up` without error against a fresh DB (existing migration tests pass).
-- `down` cleanly drops the table, index, and extension (if no other tables use it).
-- `npm run lint` passes.
-- `npm run build` passes.
+- `autocomplete_history` DB schema (no migration needed).
+- `routes/suggestions.js` and `useAutocomplete` hook (autocomplete while typing is a separate concern and keeps working independently).
+- Offline queue behaviour (recently-used calls are not queued; they are best-effort).
 
 ---
 
-## T-002 — Backend: Suggestions Endpoint + Entry Upsert
+## Acceptance Criteria
 
-### What
-Two backend changes wired together:
-1. **Upsert** into `autocomplete_history` whenever `POST /api/lists/:id/entries` succeeds.
-2. **New route** `GET /api/lists/:id/suggestions?q=<query>` that queries `autocomplete_history` with fuzzy matching and returns ≤ 5 ranked results.
+1. Marking an entry **done** (`PATCH` → `status: done`) writes/upserts the item into `autocomplete_history`.
+2. **Deleting** an entry writes/upserts the item into `autocomplete_history` before the row is removed.
+3. **Adding** an entry (`POST /entries`) does **not** write to `autocomplete_history`.
+4. `GET /api/lists/:id/history` returns `{ history: [{text, icon, useCount}] }`, ≤20 items, `use_count DESC, last_used_at DESC`, excluding items whose `text` matches any `open` entry in that list.
+5. `DELETE /api/lists/:id/history` with `{ text }` body returns 204 and permanently removes the record for `(user_id, list_id, text)`.
+6. The ListDetailPage shows a **"Recently Used"** section below Open Items when `recentlyUsed.length > 0`.
+7. Tapping a Recently Used chip calls the existing add-entry path; the item disappears from the panel immediately (optimistic removal).
+8. Each chip has a dismiss (×) button; tapping it calls `DELETE /history` and removes the chip immediately.
+9. The **Done** section is fully removed from ListDetailPage.
+10. Items already `open` on the current list never appear in the Recently Used panel (server-side filter + client-side guard after add).
 
-### Upsert Logic (entries route)
+---
 
-After a successful `INSERT INTO entries …`, execute:
+## Implementation Phases
+
+### Phase 1 – Backend (T-001)
+
+#### 1.1 `routes/entries.js`
+
+**`POST /entries`** – remove the entire `try { await pool.query(INSERT INTO autocomplete_history …) } catch` block.
+
+**`PATCH /:entryId`** – after the UPDATE query succeeds, if `status === 'done'`, fire an async history upsert (same pattern as the old POST block: fire-and-forget, errors only logged):
 
 ```sql
 INSERT INTO autocomplete_history (user_id, list_id, text, icon, use_count, last_used_at)
 VALUES ($1, $2, $3, $4, 1, NOW())
 ON CONFLICT (user_id, list_id, text)
 DO UPDATE SET
-  icon         = EXCLUDED.icon,
-  use_count    = autocomplete_history.use_count + 1,
-  last_used_at = NOW();
+  icon       = EXCLUDED.icon,
+  use_count  = autocomplete_history.use_count + 1,
+  last_used_at = NOW()
 ```
 
-- `user_id` = `req.user.sub`
-- `list_id` = `req.params.id`
-- `text` = `text.trim()` (same normalisation as the entry)
-- `icon` = `icon ?? null`
+Parameters: `[req.user.sub, req.params.id, updatedEntry.text, updatedEntry.icon]`
 
-### Suggestions Endpoint
+**`DELETE /:entryId`** – before the DELETE query, fetch `text` + `icon` from the entry. After successful delete (204), fire async history upsert with the same query. Errors only logged, never block the 204.
 
-`GET /api/lists/:id/suggestions?q=<query>`
+#### 1.2 `routes/history.js` (new file)
 
-- Requires auth (same `requireAuth` middleware).
-- Validates list access via `ensureListAccess`.
-- Query param `q` must be a non-empty string of ≥ 2 characters; return `400` otherwise.
-- SQL (top 5, ranked by use_count desc, fuzzy match):
+Router mounted at `/api/lists/:id/history` (mergeParams: true).
+
+**`GET /`**
 
 ```sql
-SELECT text, icon, use_count
-FROM autocomplete_history
-WHERE user_id = $1
-  AND list_id = $2
-  AND (
-    text ILIKE $3          -- prefix / substring match
-    OR similarity(text, $4) > 0.25   -- trigram fuzzy match
+SELECT ah.text, ah.icon, ah.use_count
+FROM   autocomplete_history ah
+WHERE  ah.user_id = $1
+  AND  ah.list_id = $2
+  AND  NOT EXISTS (
+    SELECT 1 FROM entries e
+    WHERE  e.list_id = $2
+      AND  e.text    = ah.text
+      AND  e.status  = 'open'
   )
-ORDER BY use_count DESC, last_used_at DESC
-LIMIT 5
+ORDER BY ah.use_count DESC, ah.last_used_at DESC
+LIMIT 20
 ```
 
-- `$3` = `'%' || query || '%'`
-- `$4` = raw `query`
-- Response shape:
+Response: `{ history: [{ text, icon, useCount }] }`
 
-```json
-{
-  "suggestions": [
-    { "text": "Tomaten", "icon": "IconSalad", "useCount": 7 },
-    { "text": "Tomatenmark", "icon": "IconBottle", "useCount": 3 }
-  ]
-}
-```
+**`DELETE /`**
 
-### Files to change
-- `backend/src/routes/suggestions.js` — **new** (suggestions router, exported as `createSuggestionsRouter`)
-- `backend/src/routes/entries.js` — add upsert after successful INSERT
-- `backend/src/app.js` — mount `GET /api/lists/:id/suggestions` (before the entries sub-router to avoid param conflicts — use a separate `app.use` line)
-- `backend/src/suggestions.test.js` — **new** (unit tests for suggestions route: auth check, list access check, min-length validation, happy path, empty result)
-- `backend/src/entries.test.js` — add test: successful `POST /entries` upserts into `autocomplete_history`
+Body: `{ text }`. Validate: if `text` is blank → 400. Delete from `autocomplete_history` where `(user_id, list_id, text)`. Returns 204 (even if no row matched, idempotent).
 
-### Acceptance Criteria
-- `GET /suggestions?q=to` returns ≤ 5 results ordered by `use_count DESC`.
-- `GET /suggestions?q=a` (1 char) returns 400.
-- `GET /suggestions?q=Schokollade` (typo) returns "Schokolade" if it exists in history with similarity > 0.25.
-- `POST /entries` upserts a row; repeated POST increments `use_count`.
-- Upsert failure does not block the entry creation response (best-effort — catch and log, do not re-throw).
-- `npm run lint`, `npm run build`, `npm test` all pass.
+#### 1.3 `app.js`
 
----
-
-## T-003 — Frontend: `useAutocomplete` Hook + API Client
-
-### What
-A new frontend API function and React hook that feed suggestions to the UI. The hook debounces the network call, caches per-list results in IndexedDB (via the existing `sendJsonRequest` caching path), and provides an offline fuzzy-filter fallback.
-
-### API client — `frontend/src/api/suggestions.js`
-
+Add:
 ```js
-export function fetchSuggestions(listId, token, query) {
-  return sendJsonRequest(
-    `/api/lists/${listId}/suggestions?q=${encodeURIComponent(query)}`,
-    {
-      method: "GET",
-      token,
-      cacheKey: createCacheKey("suggestions", listId),   // per-list cache key
-      offlineFallbackMessage: "Offline suggestions unavailable."
-    }
-  );
-}
-```
-
-The existing `sendJsonRequest` already writes GET responses to IndexedDB and reads them back when the network is unavailable — no extra cache logic needed in the API layer.
-
-### Hook — `frontend/src/hooks/useAutocomplete.js`
-
-```
-useAutocomplete(listId, inputText, token)
-  → { suggestions: [{ text, icon, useCount }], loading: boolean }
-```
-
-Behaviour:
-- Returns `[]` immediately if `inputText.trim().length < 2`.
-- Debounces the `fetchSuggestions` call by **300 ms** (cancel on unmount / next keystroke via cleanup `clearTimeout`).
-- When the API call succeeds (online), sets `suggestions` to the returned array.
-- When `sendJsonRequest` returns `{ offline: true, suggestions }` (cache hit), applies **client-side fuzzy filtering** before setting state (see below).
-- When the API errors and there is no cache, sets `suggestions = []` silently (no error surface — autocomplete is enhancement-only).
-
-#### Client-side fuzzy filter (offline path)
-
-Utility `fuzzyMatch(query, text)` — returns `true` if:
-- `text.toLowerCase().includes(query.toLowerCase())` (substring), **or**
-- Normalised edit distance ≤ `Math.floor(query.length / 4) + 1` (allow ~1 error per 4 chars)
-
-Apply to the cached `suggestions` array and return matches sorted by `useCount DESC`.
-
-Edit-distance implementation: iterative two-row Levenshtein (O(m·n) time, O(m) space) — no external library.
-
-### Files to change
-- `frontend/src/api/suggestions.js` — **new**
-- `frontend/src/hooks/useAutocomplete.js` — **new**
-- `frontend/src/hooks/useAutocomplete.test.js` — **new**
-  - Test: returns `[]` for < 2 chars
-  - Test: debounce — only calls API once per burst
-  - Test: applies fuzzy filter on offline cached response
-  - Test: clears suggestions when input is cleared
-  - Mock `fetchSuggestions` via `vi.mock`
-
-### Acceptance Criteria
-- `useAutocomplete` does not call the API for input shorter than 2 characters.
-- API is called at most once per 300 ms burst.
-- Offline cached suggestions are filtered by the fuzzy matcher before being returned.
-- `npm run lint`, `npm run build`, `npm test` all pass.
-
----
-
-## T-004 — Frontend: `AutocompleteSuggestions` Component + `AddItemSheet` Integration
-
-### What
-New presentational component for the suggestion chips, wired into `AddItemSheet`. Tapping a chip immediately triggers `onAdd(text, iconName)` — the sheet stays open (existing `AddItemSheet` behaviour already does this when `onAdd` returns non-`false` in add mode).
-
-### Component — `frontend/src/components/AutocompleteSuggestions.jsx`
-
-Props:
-```js
-{
-  suggestions: [{ text: string, icon: string | null }],
-  onSelect: (text, iconName) => void
-}
-```
-
-Renders: a horizontal scrollable row of chips. Each chip shows:
-- Icon (from `ICON_REGISTRY[icon]` — skip icon element if `icon` is null or not in registry)
-- Text label
-
-Tap target: each chip `<button>` must be at minimum **44 px tall** (CSS `min-height: 44px`).
-
-Renders nothing (`null`) when `suggestions` is empty.
-
-Accessibility: `role="listbox"` on the container, `role="option"` on each chip, `aria-label={suggestion.text}`.
-
-### `AddItemSheet` changes
-
-1. Import `useAutocomplete` and `AutocompleteSuggestions`.
-2. Add prop `listId` (required for the hook; passed from `ListDetailPage`).
-3. Call `const { suggestions, loading: acLoading } = useAutocomplete(listId, text, token)`.  
-   - `token` must be threaded from context (`useAuth()`).
-4. Render `<AutocompleteSuggestions>` between the text input field and the icon suggestion row (existing `add-item-icon-picker`).
-5. `onSelect` handler: call `await onAdd(text, iconName)` — same as clicking the submit button.  
-   - Do **not** clear or close after; `AddItemSheet.handleSubmit` already handles reset in add mode.
-
-### `ListDetailPage` change
-
-Pass `listId={id}` (already available as `useParams().id`) to both `<AddItemSheet>` instances (add and edit mode).
-
-### CSS
-
-Add styles in `frontend/src/index.css` (or a component-scoped file if that pattern is established):
-- `.autocomplete-suggestions` — flex row, gap, overflow-x auto, padding
-- `.autocomplete-chip` — flex row, align-center, gap 6px, min-height 44px, border-radius, bg token, cursor pointer
-- `.autocomplete-chip:hover` / `.autocomplete-chip:focus-visible` — highlight
-
-### Files to change
-- `frontend/src/components/AutocompleteSuggestions.jsx` — **new**
-- `frontend/src/components/AutocompleteSuggestions.test.jsx` — **new**
-  - Test: renders nothing when `suggestions` is empty
-  - Test: renders one chip per suggestion
-  - Test: chip click calls `onSelect` with correct text and icon
-  - Test: chip with null icon renders without crashing
-- `frontend/src/components/AddItemSheet.jsx` — add `listId` prop, `useAutocomplete`, render `<AutocompleteSuggestions>`
-- `frontend/src/components/AddItemSheet.test.jsx` — add test: typing ≥ 2 chars renders suggestion chips; tapping chip calls `onAdd`
-- `frontend/src/pages/ListDetailPage.jsx` — pass `listId={id}` to `<AddItemSheet>`
-- `frontend/src/index.css` (or equivalent) — autocomplete chip styles
-
-### Acceptance Criteria
-- Typing "Tom" in Add Item shows "Tomaten" and "Tomatenmark" chips (given history exists).
-- Tapping a chip calls `onAdd` immediately; the sheet stays open.
-- Chips are ≥ 44 px tall.
-- Zero suggestions → chip row not rendered.
-- `npm run lint`, `npm run build`, `npm test` all pass.
-
----
-
----
-
-## T-005 — Frontend: Autocomplete Dropdown Positioning + Styling
-
-### Problem
-`AutocompleteSuggestions` is rendered as a normal grid child of `.add-item-form` (`display: grid; gap: 16px`). This causes:
-- A full 16 px gap between the input and the suggestion list (should be flush / near-flush).
-- The suggestions push all subsequent form content downward (layout shift) instead of overlaying it.
-- The horizontal chip row doesn't match the input width or look like a dropdown.
-
-### Fix: two coordinated changes
-
-#### 1. `AddItemSheet.jsx` — move suggestions inside the input wrapper
-
-Wrap the `<input>` element and the preview icon in a new `<div className="eg-input-wrap">`. Place `<AutocompleteSuggestions>` **inside** that wrapper, after the input:
-
-```jsx
-<div className="eg-field">
-  <label htmlFor={textInputId}>{inputLabel}</label>
-  <div className="eg-input-wrap">
-    <input
-      id={textInputId}
-      autoComplete="off"
-      autoFocus={!showIconBrowser}
-      className="eg-input"
-      placeholder="Add milk, lemons, bread..."
-      value={text}
-      onChange={(event) => setText(event.target.value)}
-    />
-    {loading ? (
-      <div aria-live="polite" className="add-item-preview add-item-preview-loading">
-        <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
-      </div>
-    ) : PreviewIcon ? (
-      <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
-        <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
-      </div>
-    ) : null}
-    {!isEditMode ? <AutocompleteSuggestions suggestions={suggestions} onSelect={handleQuickAdd} /> : null}
-  </div>
-</div>
-```
-
-Remove the standalone `{!isEditMode ? <AutocompleteSuggestions … /> : null}` line that currently sits between `.eg-field` and the icon picker.
-
-#### 2. `index.css` — dropdown styles
-
-**New rule — `.eg-input-wrap`:**
-```css
-.eg-input-wrap {
-  position: relative;
-}
-```
-
-**Replace `.autocomplete-suggestions`** (currently a horizontal flex row) with an absolute-positioned dropdown panel:
-```css
-.autocomplete-suggestions {
-  position: absolute;
-  top: calc(100% + 2px);   /* flush below input, 2 px breathing room */
-  left: 0;
-  right: 0;
-  z-index: 200;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px;
-  background: var(--bg-raised);
-  border: 1.5px solid rgba(139, 43, 226, 0.45);
-  border-radius: var(--radius-md);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-  max-height: 240px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-```
-
-**Replace `.autocomplete-chip`** — full-width rows instead of pills:
-```css
-.autocomplete-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  width: 100%;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-primary);
-  cursor: pointer;
-  padding: 10px 12px;
-  text-align: left;
-  transition: background var(--duration-micro);
-}
-
-.autocomplete-chip:hover,
-.autocomplete-chip:focus-visible {
-  background: rgba(0, 229, 255, 0.10);
-  outline: none;
-}
-```
-
-Remove the old `transform: translateY(-1px)` hover effect — it looks wrong on a list row.
-
-### Files to change
-- `frontend/src/components/AddItemSheet.jsx` — add `autoComplete="off"` to the text input; wrap input + preview in `.eg-input-wrap`; move `<AutocompleteSuggestions>` inside that wrapper
-- `frontend/src/index.css` — add `.eg-input-wrap`; replace `.autocomplete-suggestions` and `.autocomplete-chip` rules
-- `frontend/src/components/AddItemSheet.test.jsx` — verify suggestions render inside the input wrapper (query within `.eg-input-wrap`)
-- `frontend/src/components/AutocompleteSuggestions.test.jsx` — no structural changes needed; chip click test still valid
-
-### Acceptance Criteria
-- Native browser autocomplete is suppressed (`autoComplete="off"`) — only one suggestion list visible.
-- Suggestion list appears **directly below** the text input with no extra gap (≤ 4 px).
-- Suggestion list has the **same width** as the input field (left-aligned, full width of the wrapper).
-- Suggestion list **overlays** content below it — the icon picker and buttons do not shift when suggestions appear or disappear.
-- Each suggestion row is ≥ 44 px tall and spans the full dropdown width.
-- Empty suggestions → dropdown not rendered, no layout impact.
-- `npm run lint`, `npm run build`, `npm test` all pass.
-
----
-
----
-
-## T-006 — Frontend: Autocomplete Anchor Fix + Click-Outside Close + Icon-Preview Spacing
-
-### Root Causes
-
-| # | Problem | Cause |
-|---|---------|-------|
-| 1 | Dropdown not flush with input when preview icon is visible | `position: relative` lives on `.eg-input-wrap`, which grows taller when the preview icon renders; `top: 100%` is therefore calculated from the bottom of the wrapper (below the icon), not from the bottom of the input. |
-| 2 | Dropdown stays open on outside click/touch | No click-outside handler; suggestions are rendered whenever `suggestions.length > 0` with no visibility gate. |
-| 3 | Wrong spacing between input and preview icon | `.eg-input-wrap` has no explicit layout direction or gap; children stack without controlled spacing. |
-
----
-
-### Fix 1 — Isolate the position anchor to the input only
-
-Introduce an inner `.eg-input-anchor` div that wraps **only** the `<input>` element. Place `<AutocompleteSuggestions>` inside `.eg-input-anchor`. Move the preview icon **outside** `.eg-input-anchor` so it does not affect the `top: 100%` calculation.
-
-New JSX structure inside `.eg-field`:
-
-```jsx
-<div className="eg-field">
-  <label htmlFor={textInputId}>{inputLabel}</label>
-  <div className="eg-input-wrap">
-    <div className="eg-input-anchor" ref={inputAnchorRef}>
-      <input
-        id={textInputId}
-        autoComplete="off"
-        autoFocus={!showIconBrowser}
-        className="eg-input"
-        placeholder="Add milk, lemons, bread..."
-        value={text}
-        onFocus={handleInputFocus}
-        onChange={handleInputChange}
-      />
-      {showSuggestions && !isEditMode
-        ? <AutocompleteSuggestions suggestions={suggestions} onSelect={handleQuickAdd} />
-        : null}
-    </div>
-
-    {/* Preview icon — sibling of anchor, does not affect dropdown position */}
-    {loading ? (
-      <div aria-live="polite" className="add-item-preview add-item-preview-loading">
-        <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
-      </div>
-    ) : PreviewIcon ? (
-      <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
-        <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
-      </div>
-    ) : null}
-  </div>
-</div>
-```
-
-CSS changes:
-
-```css
-/* Outer wrapper: flex column so input and preview stack with controlled gap */
-.eg-input-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* Inner anchor: sole position:relative container for the dropdown */
-.eg-input-anchor {
-  position: relative;
-}
-
-/* Dropdown: unchanged position rules, now correctly relative to .eg-input-anchor */
-.autocomplete-suggestions {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
-  right: 0;
-  z-index: 200;
-  /* ... rest of existing dropdown styles unchanged ... */
-}
-```
-
----
-
-### Fix 2 — Click-outside closes the dropdown
-
-Add `showSuggestions` state + `inputAnchorRef` + document event listeners.
-
-**New state and ref in `AddItemSheet`:**
-
-```js
-import { useEffect, useRef, useState } from "react";
+import historyRoutes from "./routes/history.js";
 // ...
-const [showSuggestions, setShowSuggestions] = useState(false);
-const inputAnchorRef = useRef(null);
+app.use("/api/lists/:id/history", historyRoutes(options));
 ```
 
-**Event handler helpers** (replace direct `setText` call):
+#### 1.4 Tests
+
+**`entries.test.js`** – update existing tests:
+- "creates an entry with an icon" → remove the third `callCount === 3` autocomplete assertion; confirm only 2 DB calls are made.
+- "still creates the entry when autocomplete history upsert fails" → same: only 2 DB calls, no history write expected.
+- Add test: "writes autocomplete history when entry is marked done".
+- Add test: "does not write autocomplete history when entry status stays open".
+- Add test: "writes autocomplete history when entry is deleted".
+
+**`history.test.js`** (new file) – cover:
+- GET 401 without auth.
+- GET 403 on inaccessible list.
+- GET returns ≤20 items excluding open entries, ordered correctly.
+- GET returns empty array when nothing in history.
+- DELETE 400 when text is blank.
+- DELETE 403 on inaccessible list.
+- DELETE 204 removes the record.
+
+---
+
+### Phase 2 – Frontend (T-002)
+
+#### 2.1 `api/history.js` (new file)
 
 ```js
-function handleInputChange(event) {
-  const value = event.target.value;
-  setText(value);
-  setShowSuggestions(value.trim().length >= 2);
-}
-
-function handleInputFocus() {
-  if (text.trim().length >= 2) {
-    setShowSuggestions(true);
-  }
-}
+export function fetchRecentlyUsed(listId, token) { … GET /api/lists/:id/history … }
+export function deleteFromHistory(listId, text, token) { … DELETE /api/lists/:id/history … }
 ```
 
-**Click-outside `useEffect`:**
+Use `sendJsonRequest` from `api/client`. `fetchRecentlyUsed` is GET (not queued). `deleteFromHistory` is DELETE (not queued, best-effort).
+
+#### 2.2 `components/RecentlyUsedSection.jsx` (new file)
+
+Props: `items: [{text, icon, useCount}]`, `onAdd(text, icon)`, `onDismiss(text)`.
+
+Renders a `<section>` with:
+- Section header "RECENTLY USED" + item count chip (matching `entry-section-header` pattern).
+- For each item: a chip/row showing icon (if any) + text + a dismiss `×` button.
+- Tapping the chip body calls `onAdd(text, icon)`.
+- Tapping `×` calls `onDismiss(text)`.
+
+#### 2.3 `ListDetailPage.jsx`
+
+State additions:
+```js
+const [recentlyUsed, setRecentlyUsed] = useState([]);
+```
+
+Remove:
+- `doneOpen` state.
+- `doneEntries` derivation.
+- The entire Done `<section>` JSX block.
+
+Load recently used in `loadListDetail` alongside entries:
+```js
+const [listsResult, entriesResult, historyResult] = await Promise.all([
+  fetchLists(token),
+  fetchEntries(id, token),
+  fetchRecentlyUsed(id, token)   // best-effort; errors caught below
+]);
+setRecentlyUsed(historyResult?.history ?? []);
+```
+
+Handler `handleAddFromHistory(text, icon)`:
+1. Optimistically remove from `recentlyUsed` (filter by `text`).
+2. Call existing `addEntryByText(text, icon)`.
+
+Handler `handleDismissFromHistory(text)`:
+1. Optimistically remove from `recentlyUsed`.
+2. Call `deleteFromHistory(id, text, token)` (fire-and-forget; errors logged).
+
+JSX: after the Open Items section and before the FAB:
+```jsx
+{recentlyUsed.length > 0 ? (
+  <RecentlyUsedSection
+    items={recentlyUsed}
+    onAdd={handleAddFromHistory}
+    onDismiss={handleDismissFromHistory}
+  />
+) : null}
+```
+
+#### 2.4 `index.css`
+
+Add styles for `.recently-used-section`, `.recently-used-chip`, `.recently-used-chip-dismiss`. Reuse design tokens; match the visual weight of the entry-section header.
+
+---
+
+---
+
+## Phase 3 – Frontend bugfix: optimistic Recently Used update (T-003)
+
+### Root cause
+
+`recentlyUsed` is populated only in `loadListDetail` (on mount). `toggleStatus` and `handleDeleteEntry` update `entries` state correctly but never touch `recentlyUsed`, so a newly-done or deleted item does not appear in the panel until the next full page load.
+
+### Fix – `ListDetailPage.jsx` only
+
+#### Helper `upsertRecentlyUsed(entry)`
+
+Add a local helper (or inline) that performs a client-side upsert into `recentlyUsed`:
 
 ```js
-useEffect(() => {
-  if (!showSuggestions) return;
-
-  function handlePointerOutside(event) {
-    if (inputAnchorRef.current && !inputAnchorRef.current.contains(event.target)) {
-      setShowSuggestions(false);
-    }
-  }
-
-  document.addEventListener("mousedown", handlePointerOutside);
-  document.addEventListener("touchstart", handlePointerOutside);
-
-  return () => {
-    document.removeEventListener("mousedown", handlePointerOutside);
-    document.removeEventListener("touchstart", handlePointerOutside);
-  };
-}, [showSuggestions]);
+function upsertRecentlyUsed(entry) {
+  setRecentlyUsed((current) => {
+    const existing = current.find((item) => item.text === entry.text);
+    const updated = {
+      text: entry.text,
+      icon: entry.icon ?? null,
+      useCount: (existing?.useCount ?? 0) + 1
+    };
+    // Remove old position if present, prepend updated entry, cap at 20.
+    return [updated, ...current.filter((item) => item.text !== entry.text)].slice(0, 20);
+  });
+}
 ```
 
-**Close dropdown in existing handlers:**
+#### `toggleStatus`
 
-- `handleQuickAdd`: add `setShowSuggestions(false)` after a successful add (before the state resets).
-- `handleSubmit`: add `setShowSuggestions(false)` alongside the existing `setShowIconBrowser(false)` call.
-- Reset `useEffect` (on `open`/`initialText`/`initialIconName`): add `setShowSuggestions(false)`.
+After the optimistic entries update, when `nextStatus === 'done'`, call:
+```js
+upsertRecentlyUsed(entry);   // entry = the original entry object passed to toggleStatus
+```
 
----
+#### `handleDeleteEntry`
 
-### Fix 3 — Controlled icon-preview spacing
+Before calling `deleteEntry`, capture the entry from state:
+```js
+const entryToArchive = entries.find((e) => e.id === entryId);
+```
+After the optimistic entries filter, call:
+```js
+if (entryToArchive) upsertRecentlyUsed(entryToArchive);
+```
 
-`.eg-input-wrap { display: flex; flex-direction: column; gap: 10px; }` (see Fix 1 CSS above) gives the preview icon a consistent 10 px gap below the input. No additional changes needed.
+#### Test additions – `ListDetailPage` (or its nearest test file)
 
----
-
-### Files to change
-- `frontend/src/components/AddItemSheet.jsx`
-  - Add `useRef` import
-  - Add `showSuggestions` state + `inputAnchorRef`
-  - Replace inline `onChange` arrow with `handleInputChange`; add `onFocus={handleInputFocus}`
-  - Add click-outside `useEffect`
-  - Close dropdown in `handleQuickAdd`, `handleSubmit`, and reset `useEffect`
-  - Wrap `<input>` in `<div className="eg-input-anchor" ref={inputAnchorRef}>`; gate `<AutocompleteSuggestions>` on `showSuggestions`
-  - Move preview icon outside `.eg-input-anchor` (sibling inside `.eg-input-wrap`)
-- `frontend/src/index.css`
-  - Add `.eg-input-wrap { display: flex; flex-direction: column; gap: 10px; }`
-  - Add `.eg-input-anchor { position: relative; }`
-  - Remove `position: relative` from `.eg-input-wrap` (moved to `.eg-input-anchor`)
-- `frontend/src/components/AddItemSheet.test.jsx`
-  - Add test: dropdown closes when clicking outside `.eg-input-anchor`
-  - Add test: preview icon does not shift dropdown position (snapshot or structural assertion)
-
-### Acceptance Criteria
-- Dropdown appears flush below the `<input>` border regardless of whether the loading spinner or preview icon is visible.
-- Dropdown closes when the user clicks or touches anywhere outside the input area.
-- Dropdown closes after a chip tap (quick-add).
-- Preview icon (or loading spinner) is visible with ~10 px gap below the input, not crammed against it.
-- `npm run lint`, `npm run build`, `npm test` all pass.
+- Toggling an entry to done adds it to `recentlyUsed` immediately (text + icon visible in panel without reload).
+- Deleting an entry adds it to `recentlyUsed` immediately.
+- If the item was already in `recentlyUsed`, useCount increments and the item moves to the front.
+- The panel never exceeds 20 items after an upsert.
 
 ---
 
 ---
 
-## T-007 — Frontend: Item-Icon Preview to the Right of the Input
+## Phase 4 – E2E test fixes (T-004)
 
-### What
-Move the item icon preview (and loading spinner) from below the input field to the right side, inline with it.
+### Root cause
 
-### Current layout (after T-006)
-`.eg-input-wrap` is `flex-direction: column` — input stacks above preview icon with 10 px gap.
+`e2e/lists.spec.js` was written against the old Done-section behaviour. Two tests fail after T-002/T-003:
 
-### Target layout
-```
-[ input field ················· ] [ 🥛 ]
-```
-`.eg-input-wrap` becomes a **row**, preview icon sits as a flex sibling to the right of the input anchor.
+| Test | Why it fails |
+|---|---|
+| "marks an item as done" | Asserts `Mark [item] open` button and `.entry-row-text-done` element exist — both removed with Done section. |
+| "deletes an item via swipe" | After delete, the item appears in Recently Used, so `page.getByText(itemText)` still finds it → `not.toBeVisible()` fails. |
 
-### CSS changes — `frontend/src/index.css`
+### Fix – `e2e/lists.spec.js` only
 
-```css
-/* Before (T-006) */
-.eg-input-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+#### "marks an item as done in a shopping list"
 
-.eg-input-anchor {
-  position: relative;
-}
+Replace the two old assertions with assertions that match the new behaviour:
 
-/* After (T-007) */
-.eg-input-wrap {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-}
+```js
+// item leaves Open Items
+await expect(
+  page.locator(".entry-section", { hasText: "OPEN ITEMS" })
+      .getByText(itemText)
+).not.toBeVisible();
 
-.eg-input-anchor {
-  flex: 1;          /* input takes all remaining width */
-  position: relative;
-}
+// item appears in Recently Used panel
+await expect(
+  page.locator("section", { hasText: "RECENTLY USED" })
+      .getByText(itemText)
+).toBeVisible();
 ```
 
-No JSX changes required. The preview icon (`.add-item-preview`) and the anchor (`.eg-input-anchor`) are already flex siblings inside `.eg-input-wrap` — changing the flex direction is sufficient.
+Remove assertions:
+- `page.getByRole("button", { name: "Mark ${itemText} open" })` — no longer exists.
+- `page.locator(".entry-row-text-done", { hasText: itemText })` — class no longer rendered.
 
-The dropdown (`autocomplete-suggestions`) uses `left: 0; right: 0` relative to `.eg-input-anchor`. Because `.eg-input-anchor` is now `flex: 1` (input width only, not including the icon), the dropdown correctly spans the input width and no wider.
+#### "deletes an item from a shopping list via swipe"
 
-### Files to change
-- `frontend/src/index.css` — update `.eg-input-wrap` to `flex-direction: row; align-items: center;`; add `flex: 1` to `.eg-input-anchor`
-- `frontend/src/components/AddItemSheet.test.jsx` — add/update structural test: preview icon renders as sibling of `.eg-input-anchor`, not a descendant
+Scope the `not.toBeVisible()` check to the Open Items section only, because the item now reappears in Recently Used:
 
-### Acceptance Criteria
-- Icon preview and loading spinner appear to the **right** of the input, vertically centred.
-- Input field takes all available width left of the icon (no shrinking).
-- Autocomplete dropdown spans the input width only (not extending under the icon).
-- When no icon is available, the input occupies full row width.
-- `npm run lint`, `npm run build`, `npm test` all pass.
-
----
-
----
-
-## T-008 — Frontend: Smooth Slide Animation for Icon Browser Open/Close
-
-### Root Cause
-
-`{showIconBrowser ? <div className="add-item-icon-browser"> … </div> : null}` mounts and unmounts the element in the same render tick as `sheetClassName` switching between `""` and `"bottom-sheet--browser-open"`. The browser has no painted frame to transition from/to, so both the content appearance and the sheet height growth are instantaneous — a visual jump.
-
-### Approach: CSS grid-row expand/collapse trick
-
-Rather than a fixed `max-height` value (which causes non-linear easing because the transition runs over the max value, not the actual height), use `grid-template-rows: 0fr → 1fr`. This animates the actual rendered height regardless of content size, with accurate easing in both directions.
-
-**Why not `max-height` transition?**  
-`transition: max-height 0.3s` on a value like `38vh` means the animation "burns through" the invisible portion between the actual height and `38vh` before it begins to look right. With `grid-template-rows`, the transition is always proportional to actual content height.
-
-### Changes
-
-#### `AddItemSheet.jsx`
-
-1. **Always render `.add-item-icon-browser`** — remove the `{showIconBrowser ? … : null}` conditional so the element stays in the DOM for the exit animation.
-
-2. **Class-driven open state** — pass `showIconBrowser` as an extra CSS class:
-   ```jsx
-   <div className={`add-item-icon-browser${showIconBrowser ? " add-item-icon-browser--open" : ""}`}>
-     <div className="add-item-icon-browser-inner">
-       {/* all existing children: label, input, grid */}
-     </div>
-   </div>
-   ```
-
-3. **Focus the search input on open** — `autoFocus` only fires on mount, and the element is now always mounted. Replace with a `useRef` + `useEffect`:
-   ```js
-   const iconSearchRef = useRef(null);
-
-   useEffect(() => {
-     if (showIconBrowser) {
-       // Start focus after the animation frame so the element is not clipped
-       const id = window.setTimeout(() => iconSearchRef.current?.focus(), 50);
-       return () => window.clearTimeout(id);
-     }
-   }, [showIconBrowser]);
-   ```
-   Remove `autoFocus` from the icon search `<input>`. Pass `ref={iconSearchRef}` to it.
-
-4. **Prevent keyboard access when collapsed** — add `aria-hidden={!showIconBrowser}` to `.add-item-icon-browser` and `inert={!showIconBrowser ? true : undefined}` (or `tabIndex={-1}` on focusable children). Prefer the `inert` boolean attribute: when truthy it blocks focus, pointer, and AT access in one attribute.
-
-   ```jsx
-   <div
-     aria-hidden={!showIconBrowser}
-     className={`add-item-icon-browser${showIconBrowser ? " add-item-icon-browser--open" : ""}`}
-     inert={!showIconBrowser ? "" : undefined}
-   >
-   ```
-   Note: React passes `inert=""` as the HTML boolean attribute. When `undefined`, the attribute is omitted.
-
-#### `index.css`
-
-Replace the existing `.add-item-icon-browser` rules with the grid-trick pattern:
-
-```css
-/* Collapsed state — outer shell is a single-row grid at 0fr height */
-.add-item-icon-browser {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  transition:
-    grid-template-rows 0.32s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.22s ease;
-}
-
-/* Single mandatory child wrapper — overflow:hidden collapses to 0 when grid-row is 0fr */
-.add-item-icon-browser-inner {
-  overflow: hidden;
-  display: grid;
-  gap: 16px;
-  padding-top: 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-/* Open state */
-.add-item-icon-browser--open {
-  grid-template-rows: 1fr;
-  opacity: 1;
-}
+```js
+await expect(
+  page.locator(".entry-section", { hasText: "OPEN ITEMS" })
+      .getByText(itemText)
+).not.toBeVisible();
 ```
 
-Update the flex-layout override for `.bottom-sheet--browser-open`:
-
-```css
-/* When sheet is expanded, allow the inner wrapper to grow and fill available space */
-.bottom-sheet--browser-open .add-item-icon-browser {
-  flex: 1;
-  min-height: 0;
-}
-
-.bottom-sheet--browser-open .add-item-icon-browser-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  overflow: hidden;
-}
-
-.bottom-sheet--browser-open .add-item-icon-browser-grid {
-  flex: 1;
-  max-height: none;
-}
-```
-
-The `.add-item-icon-browser-grid` rule outside the `--browser-open` context keeps its existing `max-height: min(38vh, 20rem)` on `.add-item-icon-browser-inner` overflow — no change needed there.
-
-### Files to change
-
-- `frontend/src/components/AddItemSheet.jsx`
-  - Add `useRef` import (already imported after T-006; confirm it's there)
-  - Add `iconSearchRef` ref
-  - Add `useEffect` for deferred focus
-  - Remove `autoFocus` from icon search input; add `ref={iconSearchRef}`
-  - Remove `{showIconBrowser ? … : null}` conditional; always render `.add-item-icon-browser` with `--open` class and `inert`/`aria-hidden` attributes
-  - Wrap browser children in `.add-item-icon-browser-inner`
-- `frontend/src/index.css`
-  - Replace `.add-item-icon-browser` base rules with grid-trick pattern
-  - Add `.add-item-icon-browser-inner` rules
-  - Add `.add-item-icon-browser--open` rule
-  - Update `.bottom-sheet--browser-open .add-item-icon-browser` and related rules
-- `frontend/src/components/AddItemSheet.test.jsx`
-  - Existing tests must still pass (icon browser shown/hidden via class, not mount/unmount)
-  - Update any test that asserts the browser div is absent from DOM — it is now always present; assert `--open` class instead
-
-### Acceptance Criteria
-- Clicking "Mehr anzeigen" expands the icon browser with a smooth downward slide (~320 ms).
-- Clicking it again collapses the browser with a smooth upward slide.
-- The BottomSheet itself grows/shrinks in sync with the content — no abrupt jump in either direction.
-- Icon search input receives focus automatically after the animation starts.
-- When collapsed, the icon browser is not keyboard-accessible and not announced by screen readers.
-- `npm run lint`, `npm run build`, `npm test` all pass.
+Replace the broad `page.getByText(itemText)` assertion with the scoped one above.
 
 ---
 
 ## Validation
-
-Run after every task and again before the final commit:
 
 ```
 npm run lint
