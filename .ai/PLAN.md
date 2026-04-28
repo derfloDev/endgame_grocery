@@ -190,6 +190,62 @@ Add styles for `.recently-used-section`, `.recently-used-chip`, `.recently-used-
 
 ---
 
+---
+
+## Phase 3 – Frontend bugfix: optimistic Recently Used update (T-003)
+
+### Root cause
+
+`recentlyUsed` is populated only in `loadListDetail` (on mount). `toggleStatus` and `handleDeleteEntry` update `entries` state correctly but never touch `recentlyUsed`, so a newly-done or deleted item does not appear in the panel until the next full page load.
+
+### Fix – `ListDetailPage.jsx` only
+
+#### Helper `upsertRecentlyUsed(entry)`
+
+Add a local helper (or inline) that performs a client-side upsert into `recentlyUsed`:
+
+```js
+function upsertRecentlyUsed(entry) {
+  setRecentlyUsed((current) => {
+    const existing = current.find((item) => item.text === entry.text);
+    const updated = {
+      text: entry.text,
+      icon: entry.icon ?? null,
+      useCount: (existing?.useCount ?? 0) + 1
+    };
+    // Remove old position if present, prepend updated entry, cap at 20.
+    return [updated, ...current.filter((item) => item.text !== entry.text)].slice(0, 20);
+  });
+}
+```
+
+#### `toggleStatus`
+
+After the optimistic entries update, when `nextStatus === 'done'`, call:
+```js
+upsertRecentlyUsed(entry);   // entry = the original entry object passed to toggleStatus
+```
+
+#### `handleDeleteEntry`
+
+Before calling `deleteEntry`, capture the entry from state:
+```js
+const entryToArchive = entries.find((e) => e.id === entryId);
+```
+After the optimistic entries filter, call:
+```js
+if (entryToArchive) upsertRecentlyUsed(entryToArchive);
+```
+
+#### Test additions – `ListDetailPage` (or its nearest test file)
+
+- Toggling an entry to done adds it to `recentlyUsed` immediately (text + icon visible in panel without reload).
+- Deleting an entry adds it to `recentlyUsed` immediately.
+- If the item was already in `recentlyUsed`, useCount increments and the item moves to the front.
+- The panel never exceeds 20 items after an upsert.
+
+---
+
 ## Validation
 
 ```

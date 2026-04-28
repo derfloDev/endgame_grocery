@@ -99,6 +99,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-003 — implement — 2026-04-28T04:36:51Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Fixed the list-detail recently used panel to update immediately after done and delete actions, with helper coverage for prepend, increment, and cap behavior |
+| Files Changed | `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/recentlyUsedState.js`, `frontend/src/pages/recentlyUsedState.test.js`, `frontend/src/app.test.jsx`, `README.md`, `.ai/TASKS.md` |
+| Validation | `npm run lint` (pass with existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run build` (pass), `npm test` (pass outside sandbox) |
+| Commit | TBD fix(ui): update recently used panel immediately after item changes |
+| Next Role | review |
+
+---
+
 ### T-002 — implement — 2026-04-28T04:29:29Z
 
 | Field | Value |
@@ -108,6 +121,43 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/api/history.js`, `frontend/src/app.test.jsx`, `frontend/src/components/RecentlyUsedSection.jsx`, `frontend/src/components/RecentlyUsedSection.test.jsx`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.jsx` |
 | Validation | reused reviewed validation: `npm run lint`, `npm run build`, `npm test` |
 | Commit | TBD feat(ui): add recently used list detail panel |
+| Next Role | none |
+
+---
+
+### T-003 — review — 2026-04-28T06:40:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the optimistic recently-used panel update bugfix; all four acceptance criteria met, pure helper module extracted and tested, all tests pass, lint and build clean. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — plan — 2026-04-28T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-003 to fix missing optimistic recentlyUsed updates in toggleStatus and handleDeleteEntry so newly done/deleted items appear in the panel immediately |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-28T04:52:10Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed optimistic recently-used update bugfix for T-003 |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/app.test.jsx`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/recentlyUsedState.js`, `frontend/src/pages/recentlyUsedState.test.js` |
+| Validation | reused reviewed validation: `npm run lint`, `npm run build`, `npm test` |
+| Commit | TBD fix(ui): update recently used panel immediately after item changes |
 | Next Role | none |
 
 ---

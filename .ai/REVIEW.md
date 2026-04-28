@@ -108,3 +108,58 @@ None.
 #### Verdict
 
 `PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `frontend/src/pages/ListDetailPage.jsx:248-253` | `handleAddFromHistory` rollback was simplified from `filterRecentlyUsed([historyItem, ...], entries)` to `[historyItem, ...currentItems]` (no open-entry filter). On rollback the add failed, so the item is not open — the filter was a no-op in practice. Technically slightly less defensive, but correct. | No |
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps Performed
+
+1. Re-read `.ai/PLAN.md` Phase 3 scope and T-003 acceptance criteria.
+2. Read new file `frontend/src/pages/recentlyUsedState.js` — pure `upsertRecentlyUsedItems` and `filterRecentlyUsedItems` helpers.
+3. Read new file `frontend/src/pages/recentlyUsedState.test.js` — 3 unit tests covering prepend+cap, increment+move-to-front, and open-entry filter.
+4. Reviewed `git diff HEAD -- frontend/src/pages/ListDetailPage.jsx` — confirmed changes to `toggleStatus` (upsert after entries update, only when `nextStatus === 'done'`) and `handleDeleteEntry` (capture before delete, upsert after optimistic filter).
+5. Verified `entryToArchive` is captured from `entries` state BEFORE `deleteEntry` is called (line 229 before 230) — correct.
+6. Verified `toggleStatus` upsert passes `result?.queued ? entry : result?.entry ?? entry` — correct for both queued and non-queued paths.
+7. Read `git diff HEAD -- frontend/src/app.test.jsx` — confirmed new E2E test covering AC 11 (toggle-to-done → Milk appears in panel), AC 13 (Milk prepended before Bread), AC 12 (swipe-delete Cheese → Cheese appears in panel), and ordering assertion (Cheese before Milk after delete).
+8. Confirmed README updated to describe immediate panel update behavior.
+9. Ran `npm run lint` — 0 errors; 1 pre-existing warning.
+10. Ran `npm run build` — clean.
+11. Ran `npm test` — 66/66 frontend tests (3 new `recentlyUsedState` + 1 new `app.test` E2E scenario); 45/45 backend. All pass.
+
+##### Findings
+
+| AC | Description | Status |
+|----|-------------|--------|
+| 11 | Marking entry done → `upsertRecentlyUsedItems` called immediately in `toggleStatus`. E2E test confirms Milk appears in panel. | ✅ |
+| 12 | Deleting entry → `entryToArchive` captured, `upsertRecentlyUsedItems` called after optimistic filter. E2E test confirms Cheese appears after swipe-delete. | ✅ |
+| 13 | Prepend + useCount increment + cap at 20 — all three covered by unit tests in `recentlyUsedState.test.js`. E2E ordering assertions pass. | ✅ |
+| 14 | All pre-existing tests pass unchanged. | ✅ |
+
+**Bonus improvement**: `filterRecentlyUsed` (previously a local function in `ListDetailPage.jsx`) was extracted to `recentlyUsedState.js` as `filterRecentlyUsedItems` and covered by an additional unit test. This consolidates all recently-used state logic into one tested module.
+
+##### Risks
+
+- Negligible: `handleAddFromHistory` rollback no longer re-filters against open entries. Correct in practice (add failed → item not open), but slightly less defensive than before.
+
+#### Verdict
+
+`PASS`

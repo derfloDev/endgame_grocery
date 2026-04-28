@@ -178,7 +178,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
 - Authentication supports register and login flows backed by JWT access tokens.
 - Lists support create, rename, delete, ownership, and shared-access visibility.
-- The list detail view uses a sticky top bar, a more-options flyout for rename and sharing, a bottom-sheet add-item flow with an overlaid autocomplete suggestion dropdown that anchors to the input, an inline icon preview to the right of the field, a smoothly sliding icon browser, outside-tap dismissal, swipe-to-delete entry rows, and a recently used panel for quick re-adds.
+- The list detail view uses a sticky top bar, a more-options flyout for rename and sharing, a bottom-sheet add-item flow with an overlaid autocomplete suggestion dropdown that anchors to the input, an inline icon preview to the right of the field, a smoothly sliding icon browser, outside-tap dismissal, swipe-to-delete entry rows, and a recently used panel that updates immediately when items are completed or deleted.
 - Entries support add, edit, toggle, and delete actions with open and done grouping.
 - The backend tracks per-list autocomplete history from completed and deleted items, exposes ranked typo-tolerant suggestions, and provides per-list recently used history endpoints.
 - Sharing supports inviting registered users by email and revoking member access.

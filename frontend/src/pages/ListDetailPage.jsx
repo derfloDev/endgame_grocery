@@ -15,6 +15,7 @@ import ShareListSheet from "../components/ShareListSheet";
 import { EmptyState, FAB, Icon, LoadingState, TopBar } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
+import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "./recentlyUsedState";
 
 export default function ListDetailPage() {
   const navigate = useNavigate();
@@ -72,7 +73,7 @@ export default function ListDetailPage() {
         setList(activeList);
         const nextEntries = entriesResult.entries ?? [];
         setEntries(nextEntries);
-        setRecentlyUsed(filterRecentlyUsed(historyResult?.history ?? [], nextEntries));
+        setRecentlyUsed(filterRecentlyUsedItems(historyResult?.history ?? [], nextEntries));
 
         if (activeList.is_owner) {
           setIsSharingLoading(true);
@@ -180,6 +181,12 @@ export default function ListDetailPage() {
           )
         )
       );
+
+      if (nextStatus === "done") {
+        setRecentlyUsed((currentItems) =>
+          upsertRecentlyUsedItems(currentItems, result?.queued ? entry : result?.entry ?? entry)
+        );
+      }
     } catch (submitError) {
       setEntryError(submitError.message);
     }
@@ -219,8 +226,13 @@ export default function ListDetailPage() {
   async function handleDeleteEntry(entryId) {
     try {
       setEntryError("");
+      const entryToArchive = entries.find((entry) => entry.id === entryId);
       await deleteEntry(id, entryId, token);
       await updateEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
+
+      if (entryToArchive) {
+        setRecentlyUsed((currentItems) => upsertRecentlyUsedItems(currentItems, entryToArchive));
+      }
     } catch (submitError) {
       setEntryError(submitError.message);
     }
@@ -238,7 +250,7 @@ export default function ListDetailPage() {
           return currentItems;
         }
 
-        return filterRecentlyUsed([historyItem, ...currentItems], entries);
+        return [historyItem, ...currentItems];
       });
     }
   }
@@ -310,7 +322,7 @@ export default function ListDetailPage() {
   }
 
   const openEntries = entries.filter((entry) => entry.status === "open");
-  const visibleRecentlyUsed = filterRecentlyUsed(recentlyUsed, openEntries);
+  const visibleRecentlyUsed = filterRecentlyUsedItems(recentlyUsed, openEntries);
 
   return (
     <div className="detail-page">
@@ -441,12 +453,4 @@ function sortEntries(entries) {
 
     return left.status === "open" ? -1 : 1;
   });
-}
-
-function filterRecentlyUsed(historyItems, entriesOrOpenEntries) {
-  const openTexts = new Set(
-    entriesOrOpenEntries.filter((entry) => entry.status === "open").map((entry) => entry.text)
-  );
-
-  return historyItems.filter((item) => !openTexts.has(item.text));
 }

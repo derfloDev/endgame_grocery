@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -399,6 +399,109 @@ describe("authentication shell", () => {
       expect(screen.queryByRole("region", { name: "Recently Used" })).toBeNull();
     });
   }, 10000);
+
+  it("adds done and deleted items to recently used immediately without a reload", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          entries: [
+            { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" },
+            {
+              id: "entry-2",
+              text: "Cheese",
+              status: "open",
+              icon: "IconCheese",
+              created_at: "2026-04-21T00:01:00Z"
+            }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          history: [{ text: "Bread", icon: "IconBread", useCount: 2 }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          members: [
+            {
+              user_id: "user-1",
+              display_name: "Demo User",
+              email: "demo@example.com",
+              joined_at: "2026-04-21T00:00:00Z",
+              is_owner: true
+            }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          entry: {
+            id: "entry-1",
+            text: "Milk",
+            status: "done",
+            icon: "IconMilk",
+            created_at: "2026-04-21T00:00:00Z"
+          }
+        })
+      })
+      .mockResolvedValueOnce({
+        status: 204
+      });
+
+    renderApp(["/lists/list-1"]);
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+    const recentlyUsedSection = await screen.findByRole("region", { name: "Recently Used" });
+
+    expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Mark Milk done" })).toBeNull();
+    });
+    expect(within(recentlyUsedSection).getByText("Milk")).toBeTruthy();
+
+    const chipLabelsAfterDone = within(recentlyUsedSection)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"));
+    expect(chipLabelsAfterDone.indexOf("Milk")).toBeLessThan(chipLabelsAfterDone.indexOf("Bread"));
+
+    const cheeseRow = screen.getByTestId("entry-row-entry-2");
+    fireEvent.touchStart(cheeseRow, { touches: [{ clientX: 120 }] });
+    fireEvent.touchMove(cheeseRow, { touches: [{ clientX: 20 }] });
+    fireEvent.touchEnd(cheeseRow);
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/lists/list-1/entries/entry-2",
+        expect.objectContaining({
+          method: "DELETE"
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(within(recentlyUsedSection).getByText("Cheese")).toBeTruthy();
+    });
+
+    const chipLabelsAfterDelete = within(recentlyUsedSection)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"));
+    expect(chipLabelsAfterDelete.indexOf("Cheese")).toBeLessThan(chipLabelsAfterDelete.indexOf("Milk"));
+  });
 
   it("opens the share sheet from list options and revokes a member", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
