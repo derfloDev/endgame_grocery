@@ -122,3 +122,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-04-28T15:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 password reset: all plan deliverables present, all acceptance criteria met, 5 new backend tests + 3 new frontend tests pass; one nit on ForgotPasswordPage showing errors on network faults instead of always-success notice — no blocking findings. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-28T15:24:44Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added password reset end-to-end across auth routes, schema migration, mail templates, public forgot/reset UI, and documentation so verified users can request and apply one-time reset links. |
+| Files Changed | `.ai/TASKS.md`, `README.md`, `backend/src/auth.test.js`, `backend/src/db/migrations.test.js`, `backend/src/db/migrations/1713913200000_add_password_reset_tokens.cjs`, `backend/src/mail/templates/password-reset.hbs`, `backend/src/routes/auth.js`, `frontend/src/App.jsx`, `frontend/src/api/auth.js`, `frontend/src/app.test.jsx`, `frontend/src/pages/ForgotPasswordPage.jsx`, `frontend/src/pages/LoginPage.jsx`, `frontend/src/pages/ResetPasswordPage.jsx` |
+| Validation | `npm run test --workspace backend -- src/auth.test.js src/db/migrations.test.js` PASS; `npm run test --workspace frontend -- src/app.test.jsx` PASS; `npm run lint` PASS (existing frontend warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing Vite warning about `onnxruntime-web` eval usage); `npm test` PASS |
+| Commit | `feat(auth): add password reset flow` |
+| Next Role | review |
+
+---
+
+### T-003 — implement — 2026-04-28T15:35:59Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Advanced T-003 from approved review to committed state and marked the task done on the board. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md` |
+| Validation | Reused reviewed validation from the approved `next_task` implementation; no additional commands run during `commit_task`. |
+| Commit | `feat(auth): add password reset flow` |
+| Next Role | none |
+
+---

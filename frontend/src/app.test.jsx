@@ -216,6 +216,74 @@ describe("authentication shell", () => {
     expect(await screen.findByText("A fresh verification email is on its way if your account is still pending.")).toBeTruthy();
   });
 
+  it("links to forgot password from login and submits the request with a generic success message", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: "If an account exists, you will receive an email." })
+    });
+
+    renderApp(["/login"]);
+
+    expect(await screen.findByRole("link", { name: "Forgot password?" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("link", { name: "Forgot password?" }));
+
+    expect(await screen.findByRole("heading", { name: "Reset your password" })).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Email"), "demo@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Send reset email" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/forgot-password",
+        expect.objectContaining({
+          body: JSON.stringify({ email: "demo@example.com" }),
+          method: "POST"
+        })
+      );
+    });
+
+    expect(await screen.findByText("If the account exists, a reset email is on its way.")).toBeTruthy();
+  });
+
+  it("shows reset-password errors for invalid or expired tokens", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: "Password reset link is invalid or has expired." })
+    });
+
+    renderApp(["/reset-password?token=expired-reset"]);
+
+    await userEvent.type(screen.getByLabelText("New password"), "new-password-123");
+    await userEvent.click(screen.getByRole("button", { name: "Update password" }));
+
+    expect(await screen.findByText("Password reset link is invalid or has expired.")).toBeTruthy();
+  });
+
+  it("submits a new password and returns to login with a success message", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: "Password updated." })
+    });
+
+    renderApp(["/reset-password?token=valid-reset"]);
+
+    expect(await screen.findByRole("heading", { name: "Choose a new password" })).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("New password"), "new-password-123");
+    await userEvent.click(screen.getByRole("button", { name: "Update password" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/reset-password",
+        expect.objectContaining({
+          body: JSON.stringify({ token: "valid-reset", password: "new-password-123" }),
+          method: "POST"
+        })
+      );
+    });
+
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    expect(screen.getByText("Password updated. Please log in with your new password.")).toBeTruthy();
+  });
+
   it("creates, renames, and deletes a list from the overview", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     vi.stubGlobal("confirm", vi.fn(() => true));

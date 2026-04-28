@@ -1,31 +1,33 @@
 import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
-import { useAuth } from "../context/AuthContext";
+import { resetPassword } from "../api/auth";
 
-export default function LoginPage() {
-  const { login, token } = useAuth();
+export default function ResetPasswordPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [email, setEmail] = useState("");
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") ?? "";
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(token ? "" : "Password reset token is required.");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const redirectTo = location.state?.from ?? "/";
-  const successMessage = location.state?.message ?? "";
-
-  if (token) {
-    return <Navigate to={redirectTo} replace />;
-  }
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (!token) {
+      setError("Password reset token is required.");
+      return;
+    }
+
     setError("");
     setIsSubmitting(true);
 
     try {
-      await login({ email, password });
-      navigate(redirectTo, { replace: true });
+      await resetPassword(token, password);
+      navigate("/login", {
+        replace: true,
+        state: { message: "Password updated. Please log in with your new password." }
+      });
     } catch (submitError) {
       setError(submitError.message);
     } finally {
@@ -43,30 +45,17 @@ export default function LoginPage() {
             <div className="auth-brand-sub">GROCERY</div>
           </div>
         </div>
-        <h1>Welcome Back</h1>
-        <p>Sign in to access your mission.</p>
+        <h1>Choose a new password</h1>
+        <p>Create a fresh password for your account.</p>
         <form className="auth-form" onSubmit={handleSubmit}>
-          {successMessage ? <p className="eg-success-banner">{successMessage}</p> : null}
           {error ? <p className="eg-error-banner">{error}</p> : null}
           <div className="eg-field">
-            <label htmlFor="login-email">Email</label>
+            <label htmlFor="reset-password-next">New password</label>
             <input
-              id="login-email"
-              autoComplete="email"
+              id="reset-password-next"
+              autoComplete="new-password"
               className="eg-input"
-              name="email"
-              required
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </div>
-          <div className="eg-field">
-            <label htmlFor="login-password">Password</label>
-            <input
-              id="login-password"
-              autoComplete="current-password"
-              className="eg-input"
+              minLength={8}
               name="password"
               required
               type="password"
@@ -76,13 +65,10 @@ export default function LoginPage() {
           </div>
           <div className="button-row">
             <button className="eg-btn-primary" disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Signing in..." : "Log in"}
+              {isSubmitting ? "Updating..." : "Update password"}
             </button>
-            <Link className="eg-link" to="/forgot-password">
-              Forgot password?
-            </Link>
-            <Link className="eg-link" to="/register">
-              Create an account
+            <Link className="eg-link" to="/login">
+              Back to login
             </Link>
           </div>
         </form>

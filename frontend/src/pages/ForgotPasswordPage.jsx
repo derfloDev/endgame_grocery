@@ -1,31 +1,23 @@
 import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
-import { useAuth } from "../context/AuthContext";
+import { forgotPassword } from "../api/auth";
 
-export default function LoginPage() {
-  const { login, token } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const redirectTo = location.state?.from ?? "/";
-  const successMessage = location.state?.message ?? "";
-
-  if (token) {
-    return <Navigate to={redirectTo} replace />;
-  }
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+    setNotice("");
     setIsSubmitting(true);
 
     try {
-      await login({ email, password });
-      navigate(redirectTo, { replace: true });
+      await forgotPassword(email.trim());
+      setNotice("If the account exists, a reset email is on its way.");
     } catch (submitError) {
       setError(submitError.message);
     } finally {
@@ -43,15 +35,15 @@ export default function LoginPage() {
             <div className="auth-brand-sub">GROCERY</div>
           </div>
         </div>
-        <h1>Welcome Back</h1>
-        <p>Sign in to access your mission.</p>
+        <h1>Reset your password</h1>
+        <p>Enter your email address and we&apos;ll send you a reset link.</p>
         <form className="auth-form" onSubmit={handleSubmit}>
-          {successMessage ? <p className="eg-success-banner">{successMessage}</p> : null}
+          {notice ? <p className="eg-success-banner">{notice}</p> : null}
           {error ? <p className="eg-error-banner">{error}</p> : null}
           <div className="eg-field">
-            <label htmlFor="login-email">Email</label>
+            <label htmlFor="forgot-password-email">Email</label>
             <input
-              id="login-email"
+              id="forgot-password-email"
               autoComplete="email"
               className="eg-input"
               name="email"
@@ -61,28 +53,12 @@ export default function LoginPage() {
               onChange={(event) => setEmail(event.target.value)}
             />
           </div>
-          <div className="eg-field">
-            <label htmlFor="login-password">Password</label>
-            <input
-              id="login-password"
-              autoComplete="current-password"
-              className="eg-input"
-              name="password"
-              required
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </div>
           <div className="button-row">
             <button className="eg-btn-primary" disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Signing in..." : "Log in"}
+              {isSubmitting ? "Sending..." : "Send reset email"}
             </button>
-            <Link className="eg-link" to="/forgot-password">
-              Forgot password?
-            </Link>
-            <Link className="eg-link" to="/register">
-              Create an account
+            <Link className="eg-link" to="/login">
+              Back to login
             </Link>
           </div>
         </form>

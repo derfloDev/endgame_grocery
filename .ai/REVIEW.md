@@ -105,3 +105,56 @@ No blockers.
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-003 — Password Reset
+
+### Review Round 1
+
+Status: **PASS_WITH_NOTES**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+| # | Severity | File | Description | Required Fix |
+|---|----------|------|-------------|--------------|
+| 1 | nit | `frontend/src/pages/ForgotPasswordPage.jsx` lines 21–23 | Plan says "on submit shows static success message regardless of outcome." On a network error or 500, the catch block sets `error` instead of `notice`, so the user sees a technical error message rather than the ambiguous success copy. Backend always returns 200 for this endpoint under normal operation, so the risk only surfaces on network/server faults. Showing the static success notice unconditionally would better match the security intent. | No |
+
+No blockers.
+
+#### Verification
+
+##### Steps
+1. Read all changed files: migration `1713913200000_add_password_reset_tokens.cjs`, `password-reset.hbs`, `auth.js` (routes), `api/auth.js`, `ForgotPasswordPage.jsx`, `ResetPasswordPage.jsx`, `LoginPage.jsx`, `App.jsx`, `auth.test.js` (new tests), `migrations.test.js` (new test), `app.test.jsx` (new tests).
+2. Cross-checked every deliverable against the T-003 plan section:
+   - Migration: `password_reset_tokens` table with all required columns (`id`, `user_id` FK CASCADE, `token UNIQUE`, `expires_at`, `used BOOLEAN DEFAULT false`, `created_at`) ✅
+   - `POST /forgot-password`: only acts for `email_verified = true` users; `expires_at = NOW() + 1h`; always returns `200 { message }` ✅
+   - `POST /reset-password`: validates token (exists, not expired, `used = false`); hashes new password; marks token `used = true`; returns `200 { message }`; invalid/used/expired → `400` ✅
+   - `password-reset.hbs`: delegates to base partial with German subject + 60-min warning body ✅
+   - `forgotPassword(email)` and `resetPassword(token, password)` in `api/auth.js` ✅
+   - `ForgotPasswordPage`: email form, shows success notice on submit ✅
+   - `ResetPasswordPage`: reads `?token`, password form, navigates to `/login` with success message on completion ✅
+   - `LoginPage`: "Forgot password?" link to `/forgot-password` added ✅; now also renders `location.state?.message` as a success banner (T-003 + prep for future flows) ✅
+   - `App.jsx`: `/forgot-password` and `/reset-password` added as public routes ✅
+3. Verified acceptance criteria:
+   - Unknown email → `200`, no mail sent — confirmed by test and `if (user?.email_verified)` guard ✅
+   - Reset link expires after 60 min → `400` — confirmed (`addHours(now(), 1)`, SQL `expires_at > $2`) ✅
+   - Used token rejected with `400` — confirmed (SQL `used = false`, then `SET used = true`) ✅
+   - Successful reset allows login with new password — confirmed (bcrypt hash written to `users.password_hash`) ✅
+4. Ran `npm run lint` — 0 errors, 1 pre-existing warning ✅
+5. Ran `npm test` — 62 backend tests pass (+5 new: 4 auth + 1 migration), 85 frontend tests pass (+3 new) ✅
+
+##### Findings
+- Token expiry is 1 hour (`addHours(now(), 1)`) — matches plan's "60 min".
+- `forgot-password` correctly skips unverified accounts — prevents reset-before-verify bypass.
+- `LoginPage` now handles `location.state?.from` for post-login redirect — bonus prep for T-004 invite flow, no regression risk.
+- `ResetPasswordPage` shows an immediate error when no `?token` in URL — good defensive UX.
+- Used tokens remain in the table (not deleted) — safe and auditable.
+
+##### Risks
+- None for T-003 scope.
+
+#### Verdict
+`PASS_WITH_NOTES`

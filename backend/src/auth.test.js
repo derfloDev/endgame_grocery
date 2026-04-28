@@ -317,6 +317,172 @@ describe("authentication routes", () => {
     assert.deepEqual(response.body, { message: "If your account is pending verification, a new email has been sent." });
     assert.equal(mailSent, false);
   });
+
+  it("creates a password reset token and sends a mail for a verified account", async () => {
+    const sentMessages = [];
+    let insertedValues = null;
+    const pool = {
+      async query(text, params) {
+        if (text.includes("SELECT id, email, display_name, email_verified")) {
+          return {
+            rows: [
+              {
+                id: "user-1",
+                email: "demo@example.com",
+                display_name: "Demo User",
+                email_verified: true
+              }
+            ]
+          };
+        }
+
+        if (text.includes("INSERT INTO password_reset_tokens")) {
+          insertedValues = params;
+          return { rows: [{ token: "reset-token-1" }] };
+        }
+
+        throw new Error(`Unexpected query: ${text}`);
+      }
+    };
+
+    const app = createApp({
+      pool,
+      config: {
+        appBaseUrl: "https://app.example.com"
+      },
+      mailer: {
+        async send(message) {
+          sentMessages.push(message);
+        }
+      },
+      generatePasswordResetToken() {
+        return "reset-token-1";
+      },
+      now() {
+        return new Date("2026-04-21T00:00:00Z");
+      }
+    });
+
+    const response = await request(app).post("/api/auth/forgot-password").send({
+      email: "demo@example.com"
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { message: "If an account exists, you will receive an email." });
+    assert.deepEqual(insertedValues, [
+      "user-1",
+      "reset-token-1",
+      new Date("2026-04-21T01:00:00.000Z")
+    ]);
+    assert.deepEqual(sentMessages, [
+      {
+        to: "demo@example.com",
+        subject: "Passwort zurücksetzen",
+        template: "password-reset",
+        context: {
+          heading: "Passwort zurücksetzen",
+          intro: "Hi Demo User,",
+          body: "Nutze den Link unten, um dein Passwort zurückzusetzen. Der Link läuft in 60 Minuten ab.",
+          ctaLabel: "Passwort zurücksetzen",
+          ctaUrl: "https://app.example.com/reset-password?token=reset-token-1"
+        }
+      }
+    ]);
+  });
+
+  it("returns 200 without sending mail for unknown forgot-password emails", async () => {
+    let mailSent = false;
+    const pool = {
+      async query() {
+        return { rows: [] };
+      }
+    };
+
+    const app = createApp({
+      pool,
+      mailer: {
+        async send() {
+          mailSent = true;
+        }
+      }
+    });
+
+    const response = await request(app).post("/api/auth/forgot-password").send({
+      email: "missing@example.com"
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { message: "If an account exists, you will receive an email." });
+    assert.equal(mailSent, false);
+  });
+
+  it("rejects used or expired password reset tokens", async () => {
+    const pool = {
+      async query() {
+        return { rows: [] };
+      }
+    };
+
+    const app = createApp({ pool });
+
+    const response = await request(app).post("/api/auth/reset-password").send({
+      token: "used-token",
+      password: "new-password-123"
+    });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, {
+      error: "Password reset link is invalid or has expired."
+    });
+  });
+
+  it("updates the password and marks the reset token as used", async () => {
+    let updatedPasswordParams = null;
+    let markedToken = null;
+    const pool = {
+      async query(text, params) {
+        if (text.includes("SELECT prt.user_id")) {
+          return {
+            rows: [
+              {
+                user_id: "user-1"
+              }
+            ]
+          };
+        }
+
+        if (text.includes("UPDATE users")) {
+          updatedPasswordParams = params;
+          return { rows: [] };
+        }
+
+        if (text.includes("UPDATE password_reset_tokens")) {
+          markedToken = params[0];
+          return { rows: [] };
+        }
+
+        throw new Error(`Unexpected query: ${text}`);
+      }
+    };
+
+    const app = createApp({
+      pool,
+      now() {
+        return new Date("2026-04-21T00:00:00Z");
+      }
+    });
+
+    const response = await request(app).post("/api/auth/reset-password").send({
+      token: "valid-reset-token",
+      password: "new-password-123"
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { message: "Password updated." });
+    assert.equal(updatedPasswordParams[1], "user-1");
+    assert.notEqual(updatedPasswordParams[0], "new-password-123");
+    assert.equal(markedToken, "valid-reset-token");
+  });
 });
 
 describe("requireAuth middleware", () => {

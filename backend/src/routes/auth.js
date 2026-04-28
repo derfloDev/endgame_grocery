@@ -19,6 +19,7 @@ export function createAuthRouter({
   config = getConfig(),
   mailer = createMailer({ config }),
   generateVerificationToken = randomUUID,
+  generatePasswordResetToken = randomUUID,
   now = () => new Date()
 } = {}) {
   const router = Router();
@@ -243,6 +244,115 @@ export function createAuthRouter({
     }
   });
 
+  router.post("/forgot-password", async (req, res, next) => {
+    const { email } = req.body ?? {};
+
+    if (!email) {
+      res.status(400).json({ error: "Email is required." });
+      return;
+    }
+
+    if (!pool) {
+      next(new Error("Database connection is not configured."));
+      return;
+    }
+
+    try {
+      const result = await pool.query(
+        `
+          SELECT id, email, display_name, email_verified
+          FROM users
+          WHERE email = $1
+          LIMIT 1
+        `,
+        [email.toLowerCase()]
+      );
+      const user = result.rows[0];
+
+      if (user?.email_verified) {
+        const resetToken = generatePasswordResetToken();
+        const expiresAt = addHours(now(), 1);
+
+        await pool.query(
+          `
+            INSERT INTO password_reset_tokens (user_id, token, expires_at)
+            VALUES ($1, $2, $3)
+            RETURNING token
+          `,
+          [user.id, resetToken, expiresAt]
+        );
+
+        await sendPasswordResetEmail({
+          config,
+          mailer,
+          token: resetToken,
+          user
+        });
+      }
+
+      res.json({ message: "If an account exists, you will receive an email." });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/reset-password", async (req, res, next) => {
+    const { token, password } = req.body ?? {};
+
+    if (!token || !password) {
+      res.status(400).json({ error: "Token and password are required." });
+      return;
+    }
+
+    if (!pool) {
+      next(new Error("Database connection is not configured."));
+      return;
+    }
+
+    try {
+      const result = await pool.query(
+        `
+          SELECT prt.user_id
+          FROM password_reset_tokens prt
+          WHERE prt.token = $1
+            AND prt.expires_at > $2
+            AND prt.used = false
+          LIMIT 1
+        `,
+        [token, now()]
+      );
+      const resetRequest = result.rows[0];
+
+      if (!resetRequest) {
+        res.status(400).json({ error: "Password reset link is invalid or has expired." });
+        return;
+      }
+
+      const passwordHash = await bcryptLib.hash(password, 12);
+
+      await pool.query(
+        `
+          UPDATE users
+          SET password_hash = $1
+          WHERE id = $2
+        `,
+        [passwordHash, resetRequest.user_id]
+      );
+      await pool.query(
+        `
+          UPDATE password_reset_tokens
+          SET used = true
+          WHERE token = $1
+        `,
+        [token]
+      );
+
+      res.json({ message: "Password updated." });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }
 
@@ -269,6 +379,24 @@ async function sendVerificationEmail({ config, mailer, token, user }) {
       ctaUrl: buildAppUrl(
         config.appBaseUrl,
         `/verify-email?token=${encodeURIComponent(token)}`
+      )
+    }
+  });
+}
+
+async function sendPasswordResetEmail({ config, mailer, token, user }) {
+  await mailer.send({
+    to: user.email,
+    subject: "Passwort zurücksetzen",
+    template: "password-reset",
+    context: {
+      heading: "Passwort zurücksetzen",
+      intro: `Hi ${user.display_name},`,
+      body: "Nutze den Link unten, um dein Passwort zurückzusetzen. Der Link läuft in 60 Minuten ab.",
+      ctaLabel: "Passwort zurücksetzen",
+      ctaUrl: buildAppUrl(
+        config.appBaseUrl,
+        `/reset-password?token=${encodeURIComponent(token)}`
       )
     }
   });

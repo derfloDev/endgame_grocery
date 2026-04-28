@@ -10,6 +10,9 @@ const detailsMigrationPath = path.resolve("src/db/migrations/1713906000000_add_d
 const emailVerificationMigrationPath = path.resolve(
   "src/db/migrations/1713909600000_add_email_verification.cjs"
 );
+const passwordResetMigrationPath = path.resolve(
+  "src/db/migrations/1713913200000_add_password_reset_tokens.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -223,6 +226,58 @@ describe("database migrations", () => {
     assert.deepEqual(calls, [
       ["dropTable", "email_verification_tokens", { ifExists: true, cascade: true }],
       ["dropColumns", "users", ["email_verified"]]
+    ]);
+  });
+
+  it("creates and removes password reset token tables", async () => {
+    const migration = await import(pathToFileURL(passwordResetMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "createTable",
+        "password_reset_tokens",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          user_id: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          token: {
+            type: "uuid",
+            notNull: true,
+            unique: true
+          },
+          expires_at: {
+            type: "timestamptz",
+            notNull: true
+          },
+          used: {
+            type: "boolean",
+            notNull: true,
+            default: false
+          },
+          created_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [
+      ["dropTable", "password_reset_tokens", { ifExists: true, cascade: true }]
     ]);
   });
 });
