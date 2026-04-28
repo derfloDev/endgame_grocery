@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/derfloDev/endgame_grocery/compare/v0.3.0...v0.4.0) (2026-04-28)
+
+
+### Features
+
+* **api:** support optional entry details ([a6e46b1](https://github.com/derfloDev/endgame_grocery/commit/a6e46b1eb6c8454ca261e91e5b70f6d2a2b79a9f))
+* **ui:** add optional entry details ([27bd46e](https://github.com/derfloDev/endgame_grocery/commit/27bd46ea491a727c73cc8e554f0341bb1ce17478))
+* **ui:** expand grocery, household, and health icon catalog ([9d73dba](https://github.com/derfloDev/endgame_grocery/commit/9d73dba8e4250a8f87bb5e26bc6cbd2a4acb8d80))
+* **ui:** render fallback icons in history chips ([6d1d761](https://github.com/derfloDev/endgame_grocery/commit/6d1d761e770b77291825b03376e35a55055e04a4))
+* **ui:** share icon resolution and picker labels ([31f2e6a](https://github.com/derfloDev/endgame_grocery/commit/31f2e6a8b5bb7569d3e52cacf048a05128e7716b))
+
+
+### Bug Fixes
+
+* **pwa:** send manifest credentials behind Cloudflare Access ([549ea7e](https://github.com/derfloDev/endgame_grocery/commit/549ea7e5bdd41c96aea50e6614fd4a82f67ee499))
+
 ## [0.3.0](https://github.com/derfloDev/endgame_grocery/compare/v0.2.0...v0.3.0) (2026-04-28)
 
 
