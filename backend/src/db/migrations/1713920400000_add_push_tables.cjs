@@ -61,7 +61,7 @@ function up(pgm) {
     items: {
       type: "jsonb",
       notNull: true,
-      default: []
+      default: pgm.func("'[]'::jsonb")
     },
     created_at: {
       type: "timestamptz",

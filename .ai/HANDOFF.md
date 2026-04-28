@@ -8,6 +8,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-007 — implement — 2026-04-28T17:47:23Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Advanced T-007 from approved review to committed state and marked the task done on the board. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md` |
+| Validation | Reused reviewed validation from the approved `next_task` implementation; no additional commands run during `commit_task`. |
+| Commit | `fix(db): correct push job jsonb default` |
+| Next Role | none |
+
+---
+
+### T-007 — implement — 2026-04-28T17:43:18Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Fixed the push migration hotfix by switching `pending_push_jobs.items` from a serialized array default to a raw `jsonb` SQL expression and updated the migration contract test to assert the corrected default. |
+| Files Changed | `.ai/TASKS.md`, `backend/src/db/migrations.test.js`, `backend/src/db/migrations/1713920400000_add_push_tables.cjs` |
+| Validation | `npm run test --workspace backend -- src/db/migrations.test.js` PASS; `npm run migrate` PASS; `npm run lint` PASS (existing frontend warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing Vite warning about `onnxruntime-web` eval usage); `npm test` PASS |
+| Commit | `fix(db): correct push job jsonb default` |
+| Next Role | review |
+
+---
+
 ### T-006 — implement — 2026-04-28T17:39:39Z
 
 | Field | Value |
@@ -79,6 +105,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 |-------|-------|
 | Agent | claude |
 | Summary | Reviewed T-006 Docker publish pipeline fix: docker-publish.yml created with correct `on: release: types: [published]` trigger and all required action steps; release-please.yml stripped of docker-publish job and outputs block; 2 new release workflow tests pass; lint, build, and full test suite clean. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-007 — review — 2026-04-28T18:25:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-007 migration hotfix: `pending_push_jobs.items` default correctly changed to `pgm.func("'[]'::jsonb")`, migration test updated to assert the new default shape; 8/8 migration tests pass, full suite clean. |
 | Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
 | Verdict | PASS |
 | Blocking Findings | none |

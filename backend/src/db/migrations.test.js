@@ -448,7 +448,7 @@ describe("database migrations", () => {
           items: {
             type: "jsonb",
             notNull: true,
-            default: []
+            default: { value: "'[]'::jsonb" }
           },
           created_at: {
             type: "timestamptz",

@@ -323,3 +323,38 @@ No findings. Implementation matches the plan exactly.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-007 — Hotfix: Fix `pending_push_jobs.items` Default
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+No findings. Single-line fix is correct and complete.
+
+#### Verification
+
+##### Steps
+1. Read `backend/src/db/migrations/1713920400000_add_push_tables.cjs`: `items` column now uses `default: pgm.func("'[]'::jsonb")` — `pgm.func()` emits the argument as a raw SQL expression, so PostgreSQL receives `DEFAULT '[]'::jsonb` which is a valid jsonb literal. ✅
+2. Read `backend/src/db/migrations.test.js` (T-007 section, lines 448–452): test now asserts `default: { value: "'[]'::jsonb" }`, matching the `pgm.func()` spy return value `{ value }`. ✅
+3. Verified no other files were changed beyond the two listed in the HANDOFF entry.
+4. Ran `npm run test --workspace backend -- src/db/migrations.test.js` — 8/8 pass, including "creates and removes push notification tables" which validates the corrected `items` default ✅
+5. Ran `npm run lint` — 0 errors, 1 pre-existing warning ✅
+6. Ran `npm test` — 78 backend tests pass, 93 frontend tests pass ✅
+7. Note: `npm run migrate` requires a live PostgreSQL instance and was not re-run in this review session. The implementer confirmed it passed; the code change (`pgm.func("'[]'::jsonb")`) follows the established pattern used for all other raw-SQL defaults in the codebase (e.g., `pgm.func("gen_random_uuid()")`, `pgm.func("CURRENT_TIMESTAMP")`).
+
+##### Findings
+- `pgm.func("'[]'::jsonb")` is the idiomatic `node-pg-migrate` way to emit a literal SQL expression as a column default; the previous value was likely a JavaScript array `[]` which `node-pg-migrate` serialized as `ARRAY[]` — untyped and rejected by PostgreSQL for `jsonb` columns.
+- Fix is minimal and surgical: only the `items` default line changed. All other column definitions, constraints, and the `down()` function are untouched.
+
+##### Risks
+- None. The `pgm.func()` pattern is used across all migrations in this codebase and is well-tested.
+
+#### Verdict
+`PASS`
