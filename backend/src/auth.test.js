@@ -92,6 +92,166 @@ describe("authentication routes", () => {
     assert.equal(queries[1][1][2].toISOString(), "2026-04-22T00:00:00.000Z");
   });
 
+  it("registers a user from a valid invite, auto-verifies the account, and returns a jwt", async () => {
+    const sentMessages = [];
+    const queries = [];
+    const pool = {
+      async query(text, params) {
+        queries.push([normalizeSql(text), params]);
+
+        if (text.includes("FROM list_invites")) {
+          return {
+            rows: [
+              {
+                id: "invite-1",
+                list_id: "list-1",
+                invited_email: "demo@example.com",
+                status: "pending"
+              }
+            ]
+          };
+        }
+
+        if (text.includes("INSERT INTO users")) {
+          return {
+            rows: [
+              {
+                id: "user-9",
+                email: "demo@example.com",
+                display_name: "Demo User",
+                created_at: "2026-04-21T00:00:00Z"
+              }
+            ]
+          };
+        }
+
+        return { rows: [] };
+      }
+    };
+
+    const app = createApp({
+      pool,
+      config: {
+        jwtSecret: "test-secret",
+        jwtExpiresIn: "7d",
+        appBaseUrl: "https://app.example.com"
+      },
+      mailer: {
+        async send(message) {
+          sentMessages.push(message);
+        }
+      },
+      now() {
+        return new Date("2026-04-21T00:00:00Z");
+      }
+    });
+
+    const response = await request(app).post("/api/auth/register").send({
+      email: "demo@example.com",
+      password: "password123",
+      display_name: "Demo User",
+      invite_token: "invite-token-1"
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(typeof response.body.token, "string");
+    assert.equal(response.body.listId, "list-1");
+    assert.equal(sentMessages.length, 0);
+    assert.match(queries[0][0], /FROM list_invites/);
+    assert.equal(queries[0][1][0], "invite-token-1");
+    assert.equal(queries[0][1][1] instanceof Date, true);
+    assert.match(queries[1][0], /INSERT INTO users/);
+    assert.deepEqual(queries[1][1], [
+      "demo@example.com",
+      queries[1][1][1],
+      "Demo User",
+      true
+    ]);
+    assert.match(queries[2][0], /SELECT user_id FROM list_members/);
+    assert.deepEqual(queries[2][1], ["list-1", "user-9"]);
+    assert.match(queries[3][0], /INSERT INTO list_members/);
+    assert.deepEqual(queries[3][1], ["list-1", "user-9"]);
+    assert.match(queries[4][0], /UPDATE list_invites/);
+    assert.deepEqual(queries[4][1], ["invite-1"]);
+  });
+
+  it("falls back to the standard verification flow when the invite token is invalid", async () => {
+    const sentMessages = [];
+    const queries = [];
+    const pool = {
+      async query(text, params) {
+        queries.push([normalizeSql(text), params]);
+
+        if (text.includes("FROM list_invites")) {
+          return { rows: [] };
+        }
+
+        if (text.includes("INSERT INTO users")) {
+          return {
+            rows: [
+              {
+                id: "user-1",
+                email: "demo@example.com",
+                display_name: "Demo User",
+                created_at: "2026-04-21T00:00:00Z"
+              }
+            ]
+          };
+        }
+
+        if (text.includes("INSERT INTO email_verification_tokens")) {
+          return {
+            rows: [{ token: "verification-token-1" }]
+          };
+        }
+
+        return {
+          rows: []
+        };
+      }
+    };
+
+    const app = createApp({
+      pool,
+      config: {
+        jwtSecret: "test-secret",
+        jwtExpiresIn: "7d",
+        appBaseUrl: "https://app.example.com"
+      },
+      mailer: {
+        async send(message) {
+          sentMessages.push(message);
+        }
+      },
+      generateVerificationToken() {
+        return "verification-token-1";
+      },
+      now() {
+        return new Date("2026-04-21T00:00:00Z");
+      }
+    });
+
+    const response = await request(app).post("/api/auth/register").send({
+      email: "demo@example.com",
+      password: "password123",
+      display_name: "Demo User",
+      invite_token: "expired-invite-token"
+    });
+
+    assert.equal(response.status, 201);
+    assert.deepEqual(response.body, { message: "Verification email sent." });
+    assert.equal(sentMessages.length, 1);
+    assert.match(queries[0][0], /FROM list_invites/);
+    assert.match(queries[1][0], /INSERT INTO users/);
+    assert.deepEqual(queries[1][1], [
+      "demo@example.com",
+      queries[1][1][1],
+      "Demo User",
+      false
+    ]);
+    assert.match(queries[2][0], /INSERT INTO email_verification_tokens/);
+  });
+
   it("logs in an existing user and returns a token", async () => {
     const passwordHash = await bcrypt.hash("password123", 12);
     const pool = {

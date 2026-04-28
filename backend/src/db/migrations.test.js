@@ -13,6 +13,9 @@ const emailVerificationMigrationPath = path.resolve(
 const passwordResetMigrationPath = path.resolve(
   "src/db/migrations/1713913200000_add_password_reset_tokens.cjs"
 );
+const listInvitesMigrationPath = path.resolve(
+  "src/db/migrations/1713916800000_add_list_invites.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -278,6 +281,93 @@ describe("database migrations", () => {
     assert.doesNotThrow(() => migration.down(pgm));
     assert.deepEqual(calls, [
       ["dropTable", "password_reset_tokens", { ifExists: true, cascade: true }]
+    ]);
+  });
+
+  it("creates and removes list invite tables", async () => {
+    const migration = await import(pathToFileURL(listInvitesMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "createTable",
+        "list_invites",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          list_id: {
+            type: "uuid",
+            notNull: true,
+            references: "lists(id)",
+            onDelete: "CASCADE"
+          },
+          invited_email: {
+            type: "text",
+            notNull: true
+          },
+          invited_by: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          token: {
+            type: "uuid",
+            notNull: true,
+            unique: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          status: {
+            type: "text",
+            notNull: true,
+            default: "pending"
+          },
+          expires_at: {
+            type: "timestamptz",
+            notNull: true
+          },
+          created_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ],
+      [
+        "addConstraint",
+        "list_invites",
+        "list_invites_status_check",
+        {
+          check: "status IN ('pending', 'accepted', 'declined')"
+        }
+      ],
+      [
+        "createIndex",
+        "list_invites",
+        ["list_id", "invited_email"],
+        {
+          name: "list_invites_pending_email_idx",
+          unique: true,
+          where: "status = 'pending'"
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [
+      [
+        "dropIndex",
+        "list_invites",
+        ["list_id", "invited_email"],
+        { name: "list_invites_pending_email_idx", ifExists: true }
+      ],
+      ["dropTable", "list_invites", { ifExists: true, cascade: true }]
     ]);
   });
 });

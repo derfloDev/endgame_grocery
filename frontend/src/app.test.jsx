@@ -154,6 +154,53 @@ describe("authentication shell", () => {
     expect(screen.getByRole("button", { name: "Resend verification email" })).toBeTruthy();
   });
 
+  it("registers a user from an invite and redirects directly to the shared list", async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: createFakeJwt("user-5"), listId: "list-1" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ entries: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ history: [] })
+      });
+
+    renderApp(["/register?invite=invite-token-1"]);
+
+    await userEvent.type(screen.getByLabelText("Display name"), "Demo User");
+    await userEvent.type(screen.getByLabelText("Email"), "demo@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/register",
+        expect.objectContaining({
+          body: JSON.stringify({
+            display_name: "Demo User",
+            email: "demo@example.com",
+            password: "password123",
+            invite_token: "invite-token-1"
+          }),
+          method: "POST"
+        })
+      );
+    });
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+    expect(window.localStorage.getItem("endgame_grocery.auth_token")).toBe(createFakeJwt("user-5"));
+  });
+
   it("verifies the email token, stores the jwt, and redirects into the protected app", async () => {
     fetch
       .mockResolvedValueOnce({
@@ -178,6 +225,60 @@ describe("authentication shell", () => {
 
     expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
     expect(window.localStorage.getItem("endgame_grocery.auth_token")).toBe(createFakeJwt("user-1"));
+  });
+
+  it("redirects invite links through login and accepts the invite after authentication", async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: createFakeJwt("user-1") })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ listId: "list-1" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ entries: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ history: [] })
+      });
+
+    renderApp(["/invite/invite-token-1"]);
+
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    await userEvent.type(screen.getByLabelText("Email"), "demo@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/login",
+        expect.objectContaining({
+          body: JSON.stringify({ email: "demo@example.com", password: "password123" }),
+          method: "POST"
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/invites/invite-token-1",
+        expect.objectContaining({
+          method: "GET"
+        })
+      );
+    });
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
   });
 
   it("shows verification errors when the token is invalid or expired", async () => {
@@ -772,7 +873,7 @@ describe("authentication shell", () => {
     });
   });
 
-  it("opens the share sheet from list options and revokes a member", async () => {
+  it("opens the share sheet, sends an invite notice, and revokes an existing member", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch
       .mockResolvedValueOnce({
@@ -803,6 +904,13 @@ describe("authentication shell", () => {
               email: "demo@example.com",
               joined_at: "2026-04-21T00:00:00Z",
               is_owner: true
+            },
+            {
+              user_id: "user-2",
+              display_name: "Alex",
+              email: "alex@example.com",
+              joined_at: "2026-04-21T01:00:00Z",
+              is_owner: false
             }
           ]
         })
@@ -810,12 +918,11 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          member: {
-            user_id: "user-2",
-            display_name: "Alex",
-            email: "alex@example.com",
-            joined_at: "2026-04-21T01:00:00Z",
-            is_owner: false
+          invite: {
+            id: "invite-1",
+            invited_email: "sam@example.com",
+            status: "pending",
+            expires_at: "2026-04-28T00:00:00Z"
           }
         })
       })
@@ -832,12 +939,14 @@ describe("authentication shell", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Share list/ }));
 
     expect(await screen.findByRole("dialog", { name: "Share List" })).toBeTruthy();
-    expect(screen.getByText("SQUAD (1)")).toBeTruthy();
+    expect(screen.getByText("SQUAD (2)")).toBeTruthy();
+    expect(screen.getByText("Alex")).toBeTruthy();
 
-    await userEvent.type(screen.getByLabelText("Add member by email"), "alex@example.com");
-    await userEvent.click(screen.getByRole("button", { name: "Add Member" }));
+    await userEvent.type(screen.getByLabelText("Invite member by email"), "sam@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Send Invite" }));
 
-    expect(await screen.findByText("Alex")).toBeTruthy();
+    expect(await screen.findByText("Invitation sent to sam@example.com.")).toBeTruthy();
+    expect(screen.queryByText("sam@example.com")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Revoke" }));
 

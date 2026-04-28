@@ -76,7 +76,7 @@ During local development, the frontend Vite server proxies `/api` requests to `h
 
 ### 7. Verify the setup
 
-Open `http://localhost:5173/register` and create an account. If the environment file, database container, migrations, and SMTP settings are in place, the backend sends a verification email instead of logging you in immediately. Follow the `/verify-email` link from that message to activate the account and enter the protected grocery list UI.
+Open `http://localhost:5173/register` and create an account. If the environment file, database container, migrations, and SMTP settings are in place, the backend sends a verification email instead of logging you in immediately. Follow the `/verify-email` link from that message to activate the account and enter the protected grocery list UI. Shared-list invite mails use the same `APP_BASE_URL`: existing users land on `/invite/:token` and join after login, while new users can register through `/register?invite=...` and are added to the list immediately.
 
 ## Docker Deployment
 
@@ -203,7 +203,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - Entries support add, edit, toggle, and delete actions with open and done grouping, optional icons, and free-text details for quantities, brands, or similar context.
 - The backend tracks per-list autocomplete history from completed and deleted items, exposes ranked typo-tolerant suggestions, and provides per-list recently used history endpoints.
 - History chips and autocomplete suggestions fall back to the cart icon when no specific saved icon is available, so list rows keep a consistent visual layout.
-- Sharing supports inviting registered users by email and revoking member access.
+- Sharing supports invite emails for existing and new users, direct invite-link acceptance after login, and revoking member access.
 - Offline support caches successful reads and queues failed writes for replay after reconnect.
 
 ### Icon Assignment

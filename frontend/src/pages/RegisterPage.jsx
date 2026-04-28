@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 
 export default function RegisterPage() {
-  const { register, token } = useAuth();
+  const { register, setAuthToken, token } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const inviteToken = searchParams.get("invite") ?? "";
 
   if (token) {
     return <Navigate to="/" replace />;
@@ -22,11 +24,19 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      await register({
+      const result = await register({
         display_name: displayName,
         email,
-        password
+        password,
+        ...(inviteToken ? { invite_token: inviteToken } : {})
       });
+
+      if (result?.token && result?.listId) {
+        setAuthToken(result.token);
+        navigate(`/lists/${result.listId}`, { replace: true });
+        return;
+      }
+
       navigate("/verify-email", { replace: true, state: { email } });
     } catch (submitError) {
       setError(submitError.message);
@@ -46,7 +56,11 @@ export default function RegisterPage() {
           </div>
         </div>
         <h1>Join the Squad</h1>
-        <p>Create your account to get started.</p>
+        <p>
+          {inviteToken
+            ? "Create your account to unlock the shared list right away."
+            : "Create your account to get started."}
+        </p>
         <form className="auth-form" onSubmit={handleSubmit}>
           {error ? <p className="eg-error-banner">{error}</p> : null}
           <div className="eg-field">

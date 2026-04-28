@@ -6,6 +6,7 @@ export default function ShareListSheet({
   members,
   shareEmail,
   shareError,
+  shareNotice,
   isSharingLoading,
   onEmailChange,
   onShareSubmit,
@@ -15,7 +16,7 @@ export default function ShareListSheet({
     <BottomSheet open={open} title="Share List" onClose={onClose}>
       <form className="share-list-form" onSubmit={onShareSubmit}>
         <label className="eg-field" htmlFor="share-list-sheet-email">
-          <span className="share-list-label">Add member by email</span>
+          <span className="share-list-label">Invite member by email</span>
           <input
             id="share-list-sheet-email"
             className="eg-input"
@@ -26,11 +27,12 @@ export default function ShareListSheet({
           />
         </label>
         <button className="eg-btn-secondary" type="submit">
-          Add Member
+          Send Invite
         </button>
       </form>
 
       {shareError ? <div className="detail-banner eg-error-banner">{shareError}</div> : null}
+      {shareNotice ? <div className="detail-banner eg-success-banner">{shareNotice}</div> : null}
 
       <div className="eg-orbitron share-sheet-members-label">SQUAD ({members.length})</div>
       {isSharingLoading ? <LoadingState rows={2} /> : null}

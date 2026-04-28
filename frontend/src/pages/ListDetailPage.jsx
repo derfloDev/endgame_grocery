@@ -29,6 +29,7 @@ export default function ListDetailPage() {
   const [shareEmail, setShareEmail] = useState("");
   const [entryError, setEntryError] = useState("");
   const [shareError, setShareError] = useState("");
+  const [shareNotice, setShareNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSharingLoading, setIsSharingLoading] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
@@ -43,6 +44,7 @@ export default function ListDetailPage() {
     async function loadListDetail() {
       setEntryError("");
       setShareError("");
+      setShareNotice("");
       setIsLoading(true);
       setRecentlyUsed([]);
 
@@ -301,20 +303,15 @@ export default function ListDetailPage() {
 
     try {
       setShareError("");
+      setShareNotice("");
       const result = await shareListWithMember(id, token, { email: shareEmail });
 
-      await updateMembers((currentMembers) => [
-        ...currentMembers,
-        result?.queued
-          ? {
-              user_id: createTemporaryId("member"),
-              display_name: shareEmail.trim(),
-              email: shareEmail.trim(),
-              is_owner: false,
-              is_pending_sync: true
-            }
-          : result.member
-      ]);
+      if (result?.queued) {
+        setShareNotice(`Invitation queued for ${shareEmail.trim()}.`);
+      } else if (result?.invite?.invited_email) {
+        setShareNotice(`Invitation sent to ${result.invite.invited_email}.`);
+      }
+
       setShareEmail("");
     } catch (submitError) {
       setShareError(submitError.message);
@@ -447,6 +444,7 @@ export default function ListDetailPage() {
         open={showShare}
         shareEmail={shareEmail}
         shareError={shareError}
+        shareNotice={shareNotice}
         onClose={() => setShowShare(false)}
         onEmailChange={setShareEmail}
         onRevoke={handleRevokeMember}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 
@@ -7,11 +7,12 @@ export default function LoginPage() {
   const { login, token } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const redirectTo = location.state?.from ?? "/";
+  const redirectTo = searchParams.get("redirect") ?? location.state?.from ?? "/";
   const successMessage = location.state?.message ?? "";
 
   if (token) {

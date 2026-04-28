@@ -1,10 +1,17 @@
+import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { getPool } from "../db/client.js";
+import { getConfig } from "../env.js";
+import createMailer from "../mail/mailer.js";
 import { requireAuth } from "../middleware/auth.js";
 
 export function createSharingRouter({
   pool = getPool(),
-  requireAuthMiddleware = requireAuth
+  requireAuthMiddleware = requireAuth,
+  config = getConfig(),
+  mailer = createMailer({ config }),
+  generateInviteToken = randomUUID,
+  now = () => new Date()
 } = {}) {
   const router = Router({ mergeParams: true });
 
@@ -95,48 +102,56 @@ export function createSharingRouter({
 
       const user = userResult.rows[0];
 
-      if (!user) {
-        res.status(404).json({ error: "No user found for that email address." });
-        return;
-      }
-
-      if (user.id === list.owner_id) {
+      if (user?.id === list.owner_id || email.toLowerCase() === list.owner_email.toLowerCase()) {
         res.status(409).json({ error: "That user already has access to this list." });
         return;
       }
 
-      const existingMemberResult = await pool.query(
-        `
-          SELECT user_id
-          FROM list_members
-          WHERE list_id = $1 AND user_id = $2
-          LIMIT 1
-        `,
-        [req.params.id, user.id]
-      );
+      if (user) {
+        const existingMemberResult = await pool.query(
+          `
+            SELECT user_id
+            FROM list_members
+            WHERE list_id = $1 AND user_id = $2
+            LIMIT 1
+          `,
+          [req.params.id, user.id]
+        );
 
-      if (existingMemberResult.rows[0]) {
-        res.status(409).json({ error: "That user already has access to this list." });
-        return;
+        if (existingMemberResult.rows[0]) {
+          res.status(409).json({ error: "That user already has access to this list." });
+          return;
+        }
       }
 
-      const insertResult = await pool.query(
+      const inviteToken = generateInviteToken();
+      const expiresAt = addDays(now(), 7);
+      const inviteResult = await pool.query(
         `
-          INSERT INTO list_members (list_id, user_id)
-          VALUES ($1, $2)
-          RETURNING joined_at
+          INSERT INTO list_invites (list_id, invited_email, invited_by, token, expires_at)
+          VALUES ($1, LOWER($2), $3, $4, $5)
+          ON CONFLICT (list_id, invited_email) WHERE status = 'pending'
+          DO UPDATE SET
+            invited_by = EXCLUDED.invited_by,
+            token = EXCLUDED.token,
+            expires_at = EXCLUDED.expires_at
+          RETURNING id, invited_email, status, expires_at
         `,
-        [req.params.id, user.id]
+        [req.params.id, email, req.user.sub, inviteToken, expiresAt]
       );
+
+      await sendInviteEmail({
+        config,
+        inviteToken,
+        invitedEmail: email.toLowerCase(),
+        inviterName: list.owner_display_name,
+        listName: list.name,
+        mailer,
+        recipientName: user?.display_name ?? ""
+      });
 
       res.status(201).json({
-        member: {
-          user_id: user.id,
-          display_name: user.display_name,
-          email: user.email,
-          joined_at: insertResult.rows[0].joined_at,
-          is_owner: false
-        }
+        invite: inviteResult.rows[0]
       });
     } catch (error) {
       next(error);
@@ -164,9 +179,12 @@ export function createSharingRouter({
 
       const deleteResult = await pool.query(
         `
-          DELETE FROM list_members
-          WHERE list_id = $1 AND user_id = $2
-          RETURNING user_id
+          DELETE FROM list_members lm
+          USING users u
+          WHERE lm.list_id = $1
+            AND lm.user_id = $2
+            AND u.id = lm.user_id
+          RETURNING lm.user_id, u.email, u.display_name
         `,
         [req.params.id, req.params.uid]
       );
@@ -175,6 +193,12 @@ export function createSharingRouter({
         res.status(404).json({ error: "That member does not have access to this list." });
         return;
       }
+
+      await sendRevocationEmail({
+        listName: list.name,
+        mailer,
+        member: deleteResult.rows[0]
+      });
 
       res.status(204).send();
     } catch (error) {
@@ -190,6 +214,7 @@ async function getOwnedList(pool, listId, ownerId) {
     `
       SELECT
         l.id,
+        l.name,
         l.owner_id,
         l.created_at,
         owner.display_name AS owner_display_name,
@@ -203,6 +228,72 @@ async function getOwnedList(pool, listId, ownerId) {
   );
 
   return result.rows[0] ?? null;
+}
+
+function addDays(date, days) {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function buildAppUrl(baseUrl, path) {
+  const normalizedBaseUrl = baseUrl?.replace(/\/$/, "") ?? "";
+
+  return normalizedBaseUrl ? `${normalizedBaseUrl}${path}` : path;
+}
+
+async function sendInviteEmail({
+  config,
+  inviteToken,
+  invitedEmail,
+  inviterName,
+  listName,
+  mailer,
+  recipientName
+}) {
+  const isExistingUserInvite = Boolean(recipientName);
+
+  await mailer.send({
+    to: invitedEmail,
+    subject: isExistingUserInvite
+      ? `${inviterName} shared ${listName} with you`
+      : `${inviterName} invited you to ${listName}`,
+    template: isExistingUserInvite ? "invite-existing" : "invite-new",
+    context: isExistingUserInvite
+      ? {
+          heading: `${inviterName} shared a list with you`,
+          intro: `Hi ${recipientName},`,
+          body: `Open the invite below to access the shared list "${listName}".`,
+          ctaLabel: "View list",
+          ctaUrl: buildAppUrl(config.appBaseUrl, `/invite/${encodeURIComponent(inviteToken)}`),
+          listName,
+          inviterName
+        }
+      : {
+          heading: "You are invited to Endgame Grocery",
+          intro: "Hi there,",
+          body: `Create your account to join the shared list "${listName}".`,
+          ctaLabel: "Register",
+          ctaUrl: buildAppUrl(
+            config.appBaseUrl,
+            `/register?invite=${encodeURIComponent(inviteToken)}`
+          ),
+          listName,
+          inviterName
+        }
+  });
+}
+
+async function sendRevocationEmail({ listName, mailer, member }) {
+  await mailer.send({
+    to: member.email,
+    subject: `Your access to ${listName} was removed`,
+    template: "revocation",
+    context: {
+      heading: "List access removed",
+      intro: `Hi ${member.display_name},`,
+      body: `Your collaboration on the list "${listName}" has ended.`,
+      listName
+    }
+  });
 }
 
 export default createSharingRouter;

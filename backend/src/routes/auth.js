@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
+import { acceptInviteForUser, getPendingInviteByToken } from "../inviteService.js";
 import createMailer from "../mail/mailer.js";
 
 function createToken({ jwtLib, config, userId }) {
@@ -25,7 +26,7 @@ export function createAuthRouter({
   const router = Router();
 
   router.post("/register", async (req, res, next) => {
-    const { email, password, display_name: displayName } = req.body ?? {};
+    const { email, password, display_name: displayName, invite_token: inviteToken } = req.body ?? {};
 
     if (!email || !password || !displayName) {
       res.status(400).json({ error: "Email, password, and display_name are required." });
@@ -38,7 +39,14 @@ export function createAuthRouter({
     }
 
     try {
+      const normalizedEmail = email.toLowerCase();
       const passwordHash = await bcryptLib.hash(password, 12);
+      const inviteCandidate = inviteToken
+        ? await getPendingInviteByToken(pool, inviteToken, now())
+        : null;
+      const pendingInvite = isInviteEmailMatch(normalizedEmail, inviteCandidate)
+        ? inviteCandidate
+        : null;
 
       const result = await pool.query(
         `
@@ -46,8 +54,23 @@ export function createAuthRouter({
           VALUES ($1, $2, $3, $4)
           RETURNING id, email, display_name, created_at
         `,
-        [email.toLowerCase(), passwordHash, displayName, false]
+        [normalizedEmail, passwordHash, displayName, Boolean(pendingInvite)]
       );
+
+      if (pendingInvite) {
+        const listId = await acceptInviteForUser({
+          pool,
+          invite: pendingInvite,
+          userId: result.rows[0].id
+        });
+
+        res.status(201).json({
+          token: createToken({ jwtLib, config, userId: result.rows[0].id }),
+          listId
+        });
+        return;
+      }
+
       const verificationToken = generateVerificationToken();
       const expiresAt = addHours(now(), 24);
 
@@ -364,6 +387,10 @@ function buildAppUrl(baseUrl, path) {
   const normalizedBaseUrl = baseUrl?.replace(/\/$/, "") ?? "";
 
   return normalizedBaseUrl ? `${normalizedBaseUrl}${path}` : path;
+}
+
+function isInviteEmailMatch(email, invite) {
+  return Boolean(invite) && invite.invited_email?.toLowerCase() === email.toLowerCase();
 }
 
 async function sendVerificationEmail({ config, mailer, token, user }) {

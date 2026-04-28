@@ -158,3 +158,58 @@ No blockers.
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-004 — List Sharing via Invitation
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+No findings. Implementation is clean and complete.
+
+#### Verification
+
+##### Steps
+1. Read all changed files: migration `1713916800000_add_list_invites.cjs`, `inviteService.js`, `routes/invites.js`, `routes/sharing.js`, `routes/auth.js` (register extension), `app.js`, `invite-existing.hbs`, `invite-new.hbs`, `revocation.hbs`, `InviteAcceptPage.jsx`, `RegisterPage.jsx`, `LoginPage.jsx`, `ShareListSheet.jsx`, `ListDetailPage.jsx` (`handleShareSubmit`), `api/sharing.js`, `App.jsx`, all test files.
+2. Cross-checked every deliverable against the T-004 plan section:
+   - Migration: `list_invites` table with all required columns, `status IN (...)` CHECK constraint, unique partial index `(list_id, invited_email) WHERE status='pending'` ✅
+   - `POST /members`: upserts invite row (ON CONFLICT resets token), sends `invite-existing.hbs` or `invite-new.hbs` based on whether user exists, returns `201 { invite }` ✅
+   - `DELETE /:uid`: sends `revocation.hbs` after member removal ✅
+   - `GET /api/invites/:token` (`requireAuth`): looks up pending+unexpired invite, idempotently adds to `list_members` (ON CONFLICT DO NOTHING), marks `accepted`, returns `{ listId }` ✅
+   - `inviteService.js`: shared `getPendingInviteByToken` and `acceptInviteForUser` extracted correctly; used by both `auth.js` and `invites.js` ✅
+   - `POST /register` with `invite_token`: validates token, checks email match via `isInviteEmailMatch`, inserts user with `email_verified=true`, consumes invite, returns JWT+listId ✅; falls back to normal verify flow if invite invalid ✅
+   - `app.js`: invites router registered at `/api/invites` ✅
+   - All three mail templates delegate to base partial ✅
+   - `InviteAcceptPage`: redirects to `/login?redirect=...` when unauthenticated; calls `acceptInvite` on mount when authenticated; unmount cleanup via `cancelled` flag ✅
+   - `LoginPage`: reads `searchParams.get("redirect")` with `location.state?.from` as fallback ✅
+   - `RegisterPage`: reads `?invite=` param, passes `invite_token`, navigates to list on JWT+listId response ✅
+   - `App.jsx`: `/invite/:token` added as public route ✅
+   - `ListDetailPage.handleShareSubmit`: shows "Invitation sent to [email]" notice from `result.invite.invited_email` ✅
+3. Verified all T-004 acceptance criteria:
+   - `POST /members` no longer adds member directly; creates invite + sends mail ✅
+   - Existing user clicks invite link → added to list, redirected ✅
+   - New user registers via `?invite=` → `email_verified=true`, JWT, redirected to list ✅
+   - Invite expires after 7 days (`addDays(now(), 7)`) ✅
+   - Duplicate invite resets token and resends via ON CONFLICT upsert ✅
+   - Revoked member receives revocation mail ✅
+   - ShareListSheet shows "invitation sent" notice ✅
+4. Ran `npm run lint` — 0 errors, 1 pre-existing warning ✅
+5. Ran `npm test` — 69 backend tests pass (+7 new: 2 auth + 3 invites + 1 sharing + 1 migration), 87 frontend tests pass (+2 new) ✅
+
+##### Findings
+- `isInviteEmailMatch` securely validates that the registering email matches `invite.invited_email` — prevents invite token hijacking.
+- `acceptInviteForUser` is idempotent (`ON CONFLICT DO NOTHING` for `list_members` insert), correctly handles already-a-member case.
+- Shared `inviteService.js` cleanly eliminates duplication between `auth.js` and `invites.js`; both use injected `pool`, so tests can mock via the pool stub.
+- `LoginPage` now reads both `?redirect=` query param and `location.state.from` — correct priority order for the invite-accept redirect flow.
+
+##### Risks
+- None for T-004 scope.
+
+#### Verdict
+`PASS`

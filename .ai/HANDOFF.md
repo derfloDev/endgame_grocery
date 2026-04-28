@@ -123,6 +123,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-004 — review — 2026-04-28T15:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 list-sharing invitations: all plan deliverables present, all 7 acceptance criteria met, 7 new backend tests + 2 new frontend tests pass; no findings — clean PASS. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-003 — review — 2026-04-28T15:35:00Z
 
 | Field | Value |
@@ -158,6 +171,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md` |
 | Validation | Reused reviewed validation from the approved `next_task` implementation; no additional commands run during `commit_task`. |
 | Commit | `feat(auth): add password reset flow` |
+| Next Role | none |
+
+---
+
+### T-004 — implement — 2026-04-28T16:57:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Replaced direct list-member adds with invite-based sharing, added invite acceptance and invite-backed signup, wired the new public invite page into the auth flow, and documented the updated sharing behavior. |
+| Files Changed | `.ai/TASKS.md`, `README.md`, `backend/src/app.js`, `backend/src/auth.test.js`, `backend/src/db/migrations.test.js`, `backend/src/db/migrations/1713916800000_add_list_invites.cjs`, `backend/src/inviteService.js`, `backend/src/invites.test.js`, `backend/src/mail/templates/invite-existing.hbs`, `backend/src/mail/templates/invite-new.hbs`, `backend/src/mail/templates/revocation.hbs`, `backend/src/routes/auth.js`, `backend/src/routes/invites.js`, `backend/src/routes/sharing.js`, `backend/src/sharing.test.js`, `frontend/src/App.jsx`, `frontend/src/api/sharing.js`, `frontend/src/app.test.jsx`, `frontend/src/components/ShareListSheet.jsx`, `frontend/src/pages/InviteAcceptPage.jsx`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/LoginPage.jsx`, `frontend/src/pages/RegisterPage.jsx` |
+| Validation | `npm run test --workspace backend -- src/auth.test.js src/sharing.test.js src/invites.test.js src/db/migrations.test.js` PASS; `npm run test --workspace frontend -- src/app.test.jsx` PASS; `npm run lint` PASS (existing frontend warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing Vite warning about `onnxruntime-web` eval usage); `npm test` PASS |
+| Commit | `feat(sharing): add invite-based list sharing flow` |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-04-28T17:02:53Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Advanced T-004 from approved review to committed state and marked the task done on the board. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md` |
+| Validation | Reused reviewed validation from the approved `next_task` implementation; no additional commands run during `commit_task`. |
+| Commit | `feat(sharing): add invite-based list sharing flow` |
 | Next Role | none |
 
 ---
