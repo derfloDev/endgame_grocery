@@ -246,6 +246,58 @@ if (entryToArchive) upsertRecentlyUsed(entryToArchive);
 
 ---
 
+---
+
+## Phase 4 – E2E test fixes (T-004)
+
+### Root cause
+
+`e2e/lists.spec.js` was written against the old Done-section behaviour. Two tests fail after T-002/T-003:
+
+| Test | Why it fails |
+|---|---|
+| "marks an item as done" | Asserts `Mark [item] open` button and `.entry-row-text-done` element exist — both removed with Done section. |
+| "deletes an item via swipe" | After delete, the item appears in Recently Used, so `page.getByText(itemText)` still finds it → `not.toBeVisible()` fails. |
+
+### Fix – `e2e/lists.spec.js` only
+
+#### "marks an item as done in a shopping list"
+
+Replace the two old assertions with assertions that match the new behaviour:
+
+```js
+// item leaves Open Items
+await expect(
+  page.locator(".entry-section", { hasText: "OPEN ITEMS" })
+      .getByText(itemText)
+).not.toBeVisible();
+
+// item appears in Recently Used panel
+await expect(
+  page.locator("section", { hasText: "RECENTLY USED" })
+      .getByText(itemText)
+).toBeVisible();
+```
+
+Remove assertions:
+- `page.getByRole("button", { name: "Mark ${itemText} open" })` — no longer exists.
+- `page.locator(".entry-row-text-done", { hasText: itemText })` — class no longer rendered.
+
+#### "deletes an item from a shopping list via swipe"
+
+Scope the `not.toBeVisible()` check to the Open Items section only, because the item now reappears in Recently Used:
+
+```js
+await expect(
+  page.locator(".entry-section", { hasText: "OPEN ITEMS" })
+      .getByText(itemText)
+).not.toBeVisible();
+```
+
+Replace the broad `page.getByText(itemText)` assertion with the scoped one above.
+
+---
+
 ## Validation
 
 ```

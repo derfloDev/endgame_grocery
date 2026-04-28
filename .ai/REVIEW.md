@@ -163,3 +163,52 @@ None.
 #### Verdict
 
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+No findings. The change is minimal, well-scoped, and matches the plan exactly.
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps Performed
+
+1. Re-read `.ai/PLAN.md` Phase 4 spec and T-004 acceptance criteria.
+2. Read full `e2e/lists.spec.js` — confirmed two changed tests plus two new helper functions.
+3. Reviewed `git diff HEAD -- e2e/lists.spec.js`:
+   - "deletes an item via swipe": `page.getByText(itemText)` → `openItemsSection(page).getByText(itemText)` — correctly scoped.
+   - "marks an item as done": old `page.getByRole("button", { name: "Mark ${itemText} open" })` and `.entry-row-text-done` assertions replaced with scoped open-items `not.toBeVisible()` + `recentlyUsedSection().getByText(itemText).toBeVisible()`.
+   - Two new page-object helpers `openItemsSection` and `recentlyUsedSection` extracted at module scope.
+4. Ran `npm run lint` — 0 errors; 1 pre-existing warning.
+5. Ran `npm run build` — clean.
+6. Ran `npm test` — 67/67 frontend + 45/45 backend. All pass.
+7. Ran `npm run e2e -- e2e/lists.spec.js` — **4/4 tests pass** against live Chromium + running backend.
+
+##### Findings
+
+| AC | Description | Status |
+|----|-------------|--------|
+| 15 | "marks an item as done" asserts item absent from Open Items and present in Recently Used panel. | ✅ |
+| 16 | "deletes an item via swipe" assertion scoped to Open Items section only; item still visible in Recently Used does not cause a false failure. | ✅ |
+| 17 | All 4 e2e tests pass (`npm run e2e -- e2e/lists.spec.js`). | ✅ |
+
+##### Risks
+
+None.
+
+#### Verdict
+
+`PASS`

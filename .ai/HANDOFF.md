@@ -162,6 +162,56 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-004 — implement — 2026-04-28T05:13:58Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Updated the Playwright list tests to assert the new Recently Used behavior after marking items done and deleting via swipe |
+| Files Changed | `e2e/lists.spec.js`, `.ai/TASKS.md` |
+| Validation | `npm run lint` (pass with existing frontend warning in `frontend/src/context/AuthContext.jsx`), `npm run build` (pass), `npm test` (pass outside sandbox), `npm run e2e -- e2e/lists.spec.js` (pass) |
+| Commit | TBD test(e2e): align list flows with recently used panel |
+| Next Role | review |
+
+---
+
+### T-004 — review — 2026-04-28T06:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the E2E test fixes; both updated tests match plan spec exactly, 4/4 Playwright tests pass live against Chromium, lint and unit tests clean. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-28T05:22:04Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed E2E list-flow assertions for the Recently Used panel update |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `e2e/lists.spec.js` |
+| Validation | reused reviewed validation: `npm run lint`, `npm run build`, `npm test`, `npm run e2e -- e2e/lists.spec.js` |
+| Commit | TBD test(e2e): align list flows with recently used panel |
+| Next Role | none |
+
+---
+
+### T-004 — plan — 2026-04-28T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-004 to fix two broken e2e tests in lists.spec.js that still assert Done-section behaviour removed in T-002 |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
 ### Cycle closed — unversioned — 2026-04-28T05:05:29Z
 
 | Field | Value |

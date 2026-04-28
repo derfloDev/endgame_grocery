@@ -160,7 +160,7 @@ test.describe("shopping lists", () => {
 
     await swipeEntryLeft(page, itemText);
 
-    await expect(page.getByText(itemText)).not.toBeVisible();
+    await expect(openItemsSection(page).getByText(itemText)).not.toBeVisible();
   });
 
   test("marks an item as done in a shopping list", async ({ page, request }) => {
@@ -176,7 +176,15 @@ test.describe("shopping lists", () => {
 
     await toggleButton.click();
 
-    await expect(page.getByRole("button", { name: `Mark ${itemText} open` })).toBeVisible();
-    await expect(page.locator(".entry-row-text-done", { hasText: itemText })).toBeVisible();
+    await expect(openItemsSection(page).getByText(itemText)).not.toBeVisible();
+    await expect(recentlyUsedSection(page).getByText(itemText)).toBeVisible();
   });
 });
+
+function openItemsSection(page) {
+  return page.locator(".entry-section").filter({ hasText: "OPEN ITEMS" });
+}
+
+function recentlyUsedSection(page) {
+  return page.locator("section").filter({ hasText: "RECENTLY USED" });
+}
