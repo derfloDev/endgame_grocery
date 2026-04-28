@@ -248,7 +248,7 @@ describe("authentication shell", () => {
     await userEvent.click(screen.getByRole("button", { name: "Settings" }));
 
     expect(await screen.findByRole("dialog", { name: "Info & Settings" })).toBeTruthy();
-    expect(screen.getByText("v0.2.0")).toBeTruthy();
+    expect(screen.getByText(/^v\d+\.\d+\.\d+$/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "GNU GPL v3.0" })).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));

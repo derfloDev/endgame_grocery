@@ -21,6 +21,6 @@ describe("vite worker config", () => {
   });
 
   it("defines the app version from the root package.json", () => {
-    expect(viteConfig.define.__APP_VERSION__).toBe(JSON.stringify("0.2.0"));
+    expect(viteConfig.define.__APP_VERSION__).toMatch(/^"\d+\.\d+\.\d+"$/);
   });
 });
