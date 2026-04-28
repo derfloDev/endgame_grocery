@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/derfloDev/endgame_grocery/compare/v0.2.0...v0.3.0) (2026-04-28)
+
+
+### Features
+
+* **ai:** autocomplete ([df12df2](https://github.com/derfloDev/endgame_grocery/commit/df12df23d172577cafbc01dd738e66aa0d883ea1))
+* **ui:** add overview info and settings sheet ([8a47217](https://github.com/derfloDev/endgame_grocery/commit/8a472171bda6fe82601c31b5e19c8800d46a1a66))
+
+
+### Miscellaneous Chores
+
+* **release:** correct release version to 0.3.0 ([e8c602d](https://github.com/derfloDev/endgame_grocery/commit/e8c602d184a45d4375eecb3a8f54c1e5de91a784))
+
 ## [0.2.0](https://github.com/derfloDev/endgame_grocery/compare/v0.1.0...v0.2.0) (2026-04-27)
 
 
