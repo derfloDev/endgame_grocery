@@ -35,7 +35,7 @@ Copy the example environment file and adjust values for your machine:
 cp .env.example .env
 ```
 
-The backend requires a valid `DATABASE_URL` before registration, login, or list APIs can work. `JWT_SECRET` is fine for local development, but you must replace it with a strong secret outside local use.
+The backend requires a valid `DATABASE_URL` before registration, login, or list APIs can work. `JWT_SECRET` is fine for local development, but you must replace it with a strong secret outside local use. Mail-based flows also require SMTP credentials plus an `APP_BASE_URL` that points at the public frontend origin used in verification, invite, and password-reset links.
 
 Backend commands that read configuration, including `npm run dev` and `npm run db:seed`, load this project-root `.env` file automatically even when npm starts them from the `backend/` workspace directory. The frontend Vite app also reads `VITE_*` values from the same repo-root `.env`, including `VITE_ICON_SIMILARITY_THRESHOLD`.
 
@@ -107,6 +107,13 @@ The repository's checked-in `docker-compose.yml` is intentionally kept for local
 | `JWT_SECRET` | Secret used to sign authentication tokens. Replace with a strong random value. | `change-me-strong-random-value` |
 | `PORT` | Internal backend port that nginx proxies to. | `4000` |
 | `JWT_EXPIRES_IN` | JWT lifetime accepted by the backend. | `7d` |
+| `SMTP_HOST` | SMTP server hostname used for transactional mail delivery. | `smtp.change-me.example` |
+| `SMTP_PORT` | SMTP server port. Port `465` enables implicit TLS; other ports use STARTTLS/plain transport as supported by the server. | `587` |
+| `SMTP_USER` | SMTP username for authenticated mail delivery. | `change-me` |
+| `SMTP_PASS` | SMTP password for authenticated mail delivery. | `change-me` |
+| `SMTP_FROM` | Sender email address used for transactional mails. | `noreply@change-me.example` |
+| `SMTP_FROM_NAME` | Sender display name shown in mail clients. | `Endgame Grocery` |
+| `APP_BASE_URL` | Public frontend base URL used to build e-mail verification, invite, and reset links. | `https://grocery.change-me.example` |
 | `VITE_ICON_SIMILARITY_THRESHOLD` | Build-time similarity cutoff for local icon assignment in the frontend worker. Use a value from `0` to `1`; higher values require closer semantic matches before an icon is suggested. | `0.5` |
 
 ### Cloudflare Access

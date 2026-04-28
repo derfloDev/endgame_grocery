@@ -12,13 +12,20 @@ const repoRootDir = path.resolve(backendSrcDir, "../..");
 describe("getConfig", () => {
   it("falls back to the default port", () => {
     const previousPort = process.env.PORT;
+    const previousSmtpPort = process.env.SMTP_PORT;
 
     delete process.env.PORT;
+    delete process.env.SMTP_PORT;
 
     assert.equal(getConfig().port, 4000);
+    assert.equal(getConfig().smtpPort, 587);
 
     if (previousPort) {
       process.env.PORT = previousPort;
+    }
+
+    if (previousSmtpPort) {
+      process.env.SMTP_PORT = previousSmtpPort;
     }
   });
 
@@ -32,6 +39,13 @@ describe("getConfig", () => {
     const previousJwtSecret = process.env.JWT_SECRET;
     const previousPort = process.env.PORT;
     const previousJwtExpiresIn = process.env.JWT_EXPIRES_IN;
+    const previousSmtpHost = process.env.SMTP_HOST;
+    const previousSmtpPort = process.env.SMTP_PORT;
+    const previousSmtpUser = process.env.SMTP_USER;
+    const previousSmtpPass = process.env.SMTP_PASS;
+    const previousSmtpFrom = process.env.SMTP_FROM;
+    const previousSmtpFromName = process.env.SMTP_FROM_NAME;
+    const previousAppBaseUrl = process.env.APP_BASE_URL;
 
     fs.mkdirSync(fixtureBackendSrcDir, { recursive: true });
     fs.copyFileSync(path.join(backendSrcDir, "env.js"), fixtureEnvModulePath);
@@ -41,6 +55,13 @@ describe("getConfig", () => {
         "DATABASE_URL=postgres://fixture-user:fixture-pass@localhost:5432/fixture_db",
         "JWT_SECRET=fixture-secret",
         "PORT=4567",
+        "SMTP_HOST=smtp.fixture.local",
+        "SMTP_PORT=2525",
+        "SMTP_USER=fixture-user",
+        "SMTP_PASS=fixture-pass",
+        "SMTP_FROM=noreply@fixture.local",
+        "SMTP_FROM_NAME=Fixture Mailer",
+        "APP_BASE_URL=https://fixture.local",
         ""
       ].join("\n")
     );
@@ -50,6 +71,13 @@ describe("getConfig", () => {
       delete process.env.JWT_SECRET;
       delete process.env.PORT;
       delete process.env.JWT_EXPIRES_IN;
+      delete process.env.SMTP_HOST;
+      delete process.env.SMTP_PORT;
+      delete process.env.SMTP_USER;
+      delete process.env.SMTP_PASS;
+      delete process.env.SMTP_FROM;
+      delete process.env.SMTP_FROM_NAME;
+      delete process.env.APP_BASE_URL;
       process.chdir(fixtureBackendDir);
 
       const fixtureModuleUrl = new URL(
@@ -65,12 +93,26 @@ describe("getConfig", () => {
       );
       assert.equal(config.jwtSecret, "fixture-secret");
       assert.equal(config.port, 4567);
+      assert.equal(config.smtpHost, "smtp.fixture.local");
+      assert.equal(config.smtpPort, 2525);
+      assert.equal(config.smtpUser, "fixture-user");
+      assert.equal(config.smtpPass, "fixture-pass");
+      assert.equal(config.smtpFrom, "noreply@fixture.local");
+      assert.equal(config.smtpFromName, "Fixture Mailer");
+      assert.equal(config.appBaseUrl, "https://fixture.local");
     } finally {
       process.chdir(previousCwd);
       restoreEnvVar("DATABASE_URL", previousDatabaseUrl);
       restoreEnvVar("JWT_SECRET", previousJwtSecret);
       restoreEnvVar("PORT", previousPort);
       restoreEnvVar("JWT_EXPIRES_IN", previousJwtExpiresIn);
+      restoreEnvVar("SMTP_HOST", previousSmtpHost);
+      restoreEnvVar("SMTP_PORT", previousSmtpPort);
+      restoreEnvVar("SMTP_USER", previousSmtpUser);
+      restoreEnvVar("SMTP_PASS", previousSmtpPass);
+      restoreEnvVar("SMTP_FROM", previousSmtpFrom);
+      restoreEnvVar("SMTP_FROM_NAME", previousSmtpFromName);
+      restoreEnvVar("APP_BASE_URL", previousAppBaseUrl);
       fs.rmSync(fixtureRootDir, { recursive: true, force: true });
     }
   });
@@ -86,6 +128,13 @@ describe("getConfig", () => {
     const previousJwtSecret = process.env.JWT_SECRET;
     const previousPort = process.env.PORT;
     const previousJwtExpiresIn = process.env.JWT_EXPIRES_IN;
+    const previousSmtpHost = process.env.SMTP_HOST;
+    const previousSmtpPort = process.env.SMTP_PORT;
+    const previousSmtpUser = process.env.SMTP_USER;
+    const previousSmtpPass = process.env.SMTP_PASS;
+    const previousSmtpFrom = process.env.SMTP_FROM;
+    const previousSmtpFromName = process.env.SMTP_FROM_NAME;
+    const previousAppBaseUrl = process.env.APP_BASE_URL;
 
     fs.mkdirSync(fixtureBackendSrcDir, { recursive: true });
     fs.mkdirSync(fixtureDotenvDir, { recursive: true });
@@ -115,6 +164,13 @@ describe("getConfig", () => {
       delete process.env.JWT_SECRET;
       delete process.env.PORT;
       delete process.env.JWT_EXPIRES_IN;
+      delete process.env.SMTP_HOST;
+      delete process.env.SMTP_PORT;
+      delete process.env.SMTP_USER;
+      delete process.env.SMTP_PASS;
+      delete process.env.SMTP_FROM;
+      delete process.env.SMTP_FROM_NAME;
+      delete process.env.APP_BASE_URL;
       process.chdir(fixtureBackendDir);
 
       const fixtureModuleUrl = new URL(
@@ -128,12 +184,26 @@ describe("getConfig", () => {
       assert.equal(config.jwtSecret, "");
       assert.equal(config.port, 4000);
       assert.equal(config.jwtExpiresIn, "7d");
+      assert.equal(config.smtpHost, "");
+      assert.equal(config.smtpPort, 587);
+      assert.equal(config.smtpUser, "");
+      assert.equal(config.smtpPass, "");
+      assert.equal(config.smtpFrom, "");
+      assert.equal(config.smtpFromName, "");
+      assert.equal(config.appBaseUrl, "");
     } finally {
       process.chdir(previousCwd);
       restoreEnvVar("DATABASE_URL", previousDatabaseUrl);
       restoreEnvVar("JWT_SECRET", previousJwtSecret);
       restoreEnvVar("PORT", previousPort);
       restoreEnvVar("JWT_EXPIRES_IN", previousJwtExpiresIn);
+      restoreEnvVar("SMTP_HOST", previousSmtpHost);
+      restoreEnvVar("SMTP_PORT", previousSmtpPort);
+      restoreEnvVar("SMTP_USER", previousSmtpUser);
+      restoreEnvVar("SMTP_PASS", previousSmtpPass);
+      restoreEnvVar("SMTP_FROM", previousSmtpFrom);
+      restoreEnvVar("SMTP_FROM_NAME", previousSmtpFromName);
+      restoreEnvVar("APP_BASE_URL", previousAppBaseUrl);
       fs.rmSync(fixtureRootDir, { recursive: true, force: true });
     }
   });
