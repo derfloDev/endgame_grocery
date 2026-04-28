@@ -7,6 +7,9 @@ const autocompleteHistoryMigrationPath = path.resolve(
   "src/db/migrations/1713902400000_add_autocomplete_history.cjs"
 );
 const detailsMigrationPath = path.resolve("src/db/migrations/1713906000000_add_details_to_entries.cjs");
+const emailVerificationMigrationPath = path.resolve(
+  "src/db/migrations/1713909600000_add_email_verification.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -161,6 +164,65 @@ describe("database migrations", () => {
       ],
       ["dropTable", "autocomplete_history", { ifExists: true, cascade: true }],
       ["dropExtension", "pg_trgm", { ifExists: true }]
+    ]);
+  });
+
+  it("adds email verification columns and token tables", async () => {
+    const migration = await import(pathToFileURL(emailVerificationMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "addColumns",
+        "users",
+        {
+          email_verified: {
+            type: "boolean",
+            notNull: true,
+            default: true
+          }
+        }
+      ],
+      [
+        "createTable",
+        "email_verification_tokens",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          user_id: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          token: {
+            type: "uuid",
+            notNull: true,
+            unique: true
+          },
+          expires_at: {
+            type: "timestamptz",
+            notNull: true
+          },
+          created_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [
+      ["dropTable", "email_verification_tokens", { ifExists: true, cascade: true }],
+      ["dropColumns", "users", ["email_verified"]]
     ]);
   });
 });

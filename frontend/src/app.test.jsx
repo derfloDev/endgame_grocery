@@ -127,20 +127,11 @@ describe("authentication shell", () => {
     expect(screen.getByRole("button", { name: "Lists" }).getAttribute("aria-current")).toBe("page");
   });
 
-  it("submits the register form", async () => {
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ user: { id: "user-1" } })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ token: createFakeJwt("user-1") })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ lists: [] })
-      });
+  it("submits the register form and redirects to email verification", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: "Verification email sent." })
+    });
 
     renderApp(["/register"]);
 
@@ -150,8 +141,7 @@ describe("authentication shell", () => {
     await userEvent.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenNthCalledWith(
-        1,
+      expect(fetch).toHaveBeenCalledWith(
         "/api/auth/register",
         expect.objectContaining({
           method: "POST"
@@ -159,7 +149,71 @@ describe("authentication shell", () => {
       );
     });
 
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("heading", { name: "Check your inbox" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Resend verification email" })).toBeTruthy();
+  });
+
+  it("verifies the email token, stores the jwt, and redirects into the protected app", async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: createFakeJwt("user-1") })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ lists: [] })
+      });
+
+    renderApp(["/verify-email?token=valid-token"]);
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/verify-email?token=valid-token",
+        expect.objectContaining({
+          method: "GET"
+        })
+      );
+    });
+
     expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    expect(window.localStorage.getItem("endgame_grocery.auth_token")).toBe(createFakeJwt("user-1"));
+  });
+
+  it("shows verification errors when the token is invalid or expired", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: "Verification link is invalid or has expired." })
+    });
+
+    renderApp(["/verify-email?token=expired-token"]);
+
+    expect(await screen.findByText("Verification link is invalid or has expired.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Resend verification email" })).toBeTruthy();
+  });
+
+  it("resends the verification email from the public verify page", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: "If your account is pending verification, a new email has been sent." })
+    });
+
+    renderApp([{ pathname: "/verify-email", state: { email: "demo@example.com" } }]);
+
+    expect(await screen.findByRole("heading", { name: "Check your inbox" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Resend verification email" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/resend-verification",
+        expect.objectContaining({
+          body: JSON.stringify({ email: "demo@example.com" }),
+          method: "POST"
+        })
+      );
+    });
+
+    expect(await screen.findByText("A fresh verification email is on its way if your account is still pending.")).toBeTruthy();
   });
 
   it("creates, renames, and deletes a list from the overview", async () => {

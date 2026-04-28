@@ -8,7 +8,7 @@ Goal: implement the five modules defined in `ROADMAP.md` — e-mail verification
 
 ## Scope
 
-Five deliverables in dependency order:
+Six deliverables in dependency order:
 
 | Task | Module | Depends on |
 |---|---|---|
@@ -17,6 +17,7 @@ Five deliverables in dependency order:
 | T-003 | Password reset (M2) | T-001 |
 | T-004 | List sharing via invitation (M3) | T-001 |
 | T-005 | Push notifications (M5) | — |
+| T-006 | Fix Docker publish pipeline (CI/CD) | — |
 
 ---
 
@@ -345,6 +346,48 @@ The existing `frontend/src/sw/register.js` is unchanged.
 - Second push within 15-minute cooldown window for same list is suppressed.
 - Push opt-in toggle only visible on shared lists.
 - `npm run build` succeeds with injectManifest mode.
+
+---
+
+---
+
+## Phase 6 — T-006: Fix Docker Publish Pipeline
+
+### Root Cause
+`release-please-action@v5` (v17.6.0) creates the GitHub Release and git tag **when the release PR is opened**, not when it is merged. By the time the user merges the release PR and CI triggers the release-please workflow, the release already exists → `release_created` output is never `'true'` → `docker-publish` job is permanently skipped.
+
+### What to build
+
+**Remove `docker-publish` job from `.github/workflows/release-please.yml`**
+- Delete the entire `docker-publish` job block.
+- The `outputs` block on `release-please` job can also be removed (no longer consumed by anything in this file).
+
+**Create `.github/workflows/docker-publish.yml`**
+- Trigger: `on: release: types: [published]`
+  - Fires reliably whenever a GitHub Release is published, regardless of how or when it was created.
+- Single job `docker-publish`:
+  - `actions/checkout@v6`
+  - `docker/login-action@v4` → GHCR with `${{ secrets.GITHUB_TOKEN }}`
+  - `docker/metadata-action@v6` → image `ghcr.io/derfloDev/endgame-grocery`, tags:
+    - `type=semver,pattern={{version}},value=${{ github.event.release.tag_name }}`
+    - `type=raw,value=latest`
+  - `docker/build-push-action@v7` → `push: true`
+- Permissions: `contents: read`, `packages: write`
+
+### Files to change
+| File | Action |
+|---|---|
+| `.github/workflows/release-please.yml` | Remove `outputs` block from `release-please` job; remove entire `docker-publish` job |
+| `.github/workflows/docker-publish.yml` | Create |
+
+### Acceptance Criteria
+- `.github/workflows/docker-publish.yml` exists with `on: release: types: [published]` trigger.
+- `release-please.yml` no longer contains a `docker-publish` job.
+- The next merged release PR automatically publishes a Docker image to GHCR without manual intervention.
+- `npm run lint` passes (YAML-only change, no JS affected).
+
+### Note on v0.4.0
+The v0.4.0 GitHub Release already exists. After this fix is merged, re-publishing the v0.4.0 release via "Edit release → Save" in the GitHub UI will trigger `docker-publish.yml` and backfill the missing image.
 
 ---
 

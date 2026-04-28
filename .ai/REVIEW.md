@@ -48,3 +48,60 @@ No blockers. No major findings.
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-002 — E-Mail Verification
+
+### Review Round 1
+
+Status: **PASS_WITH_NOTES**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+| # | Severity | File | Description | Required Fix |
+|---|----------|------|-------------|--------------|
+| 1 | minor | `backend/src/routes/auth.js` lines 39–68 | Register handler executes three separate DB operations (INSERT users, INSERT email_verification_tokens, send mail) outside a transaction. If the token INSERT fails after user creation, the account exists but has no verification token — the user is effectively stuck until they use resend-verification. Recovery is possible but not transparent to the user. The plan does not mandate transaction semantics here, and the pragmatic recovery path (resend-verification deletes+recreates tokens) mitigates the risk. Not blocking, but worth wrapping in a DB transaction in a follow-up. | No |
+
+No blockers.
+
+#### Verification
+
+##### Steps
+1. Read all changed files: `auth.js` (routes), `1713909600000_add_email_verification.cjs`, `verification.hbs`, `api/auth.js`, `AuthContext.jsx`, `RegisterPage.jsx`, `VerifyEmailPage.jsx`, `App.jsx`, `auth.test.js`, `migrations.test.js`, `app.test.jsx`.
+2. Cross-checked every deliverable against the T-002 plan section:
+   - Migration: `email_verified BOOLEAN NOT NULL DEFAULT true` added to `users` ✅; `email_verification_tokens` table created with all required columns and FK ✅
+   - `POST /register`: inserts with `email_verified = false`, no JWT in response, sends verification mail, returns `201 { message }` ✅
+   - `POST /login`: rejects `email_verified = false` with `403` ✅
+   - `GET /verify-email?token=`: looks up token + expiry, sets `email_verified = true`, deletes token, returns `200 { token: JWT }`, invalid/expired → `400` ✅
+   - `POST /resend-verification`: deletes old tokens, inserts new one, sends mail, always returns `200` (even for unknown email) ✅
+   - `verification.hbs`: delegates to base partial with appropriate subject/context ✅
+   - `api/auth.js`: `verifyEmail(token)` (GET) and `resendVerification(email)` (POST) added ✅
+   - `AuthContext.jsx`: `register()` returns raw API response, no `setToken` call ✅
+   - `RegisterPage.jsx`: navigates to `/verify-email` with `state: { email }` after successful register ✅
+   - `VerifyEmailPage.jsx`: auto-verifies on mount when `?token=` present; shows resend form otherwise; handles cancellation on unmount ✅
+   - `App.jsx`: `/verify-email` added as public route outside `ProtectedLayout` ✅
+3. Verified acceptance criteria:
+   - New registration sends exactly one verification e-mail and returns no JWT — confirmed by test and code ✅
+   - Login with unverified account → 403 — confirmed ✅
+   - Valid token → JWT issued, `email_verified = true` in DB — confirmed ✅
+   - Expired/invalid token → 400 — confirmed ✅
+   - Resend creates new token, deletes old ones — confirmed by test (DELETE before INSERT) ✅
+   - Existing DB users remain `email_verified = true` after migration — `DEFAULT true` on column ✅
+4. Ran `npm run lint` — 0 errors, 1 pre-existing warning ✅
+5. Ran `npm test` — 57 backend tests pass (+6 new), 82 frontend tests pass (+3 new) ✅
+
+##### Findings
+- All acceptance criteria met.
+- `addHours(now(), 24)` gives a 24-hour token expiry — reasonable default; plan doesn't specify duration.
+- `buildAppUrl` gracefully handles missing `appBaseUrl` by returning just the path — useful in dev without `.env`.
+- Email addresses consistently lowercased in all DB queries (`email.toLowerCase()`).
+- `VerifyEmailPage` correctly guards against stale async calls via `cancelled` flag — clean React pattern.
+
+##### Risks
+- Minor strandable-user risk from non-transactional register (see finding #1). Mitigated by resend-verification recovery path.
+
+#### Verdict
+`PASS_WITH_NOTES`

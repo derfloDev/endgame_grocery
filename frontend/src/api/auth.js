@@ -14,3 +14,13 @@ export function registerUser(payload) {
 export function loginUser(payload) {
   return sendAuthRequest("login", payload);
 }
+
+export function verifyEmail(token) {
+  return sendJsonRequest(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, {
+    method: "GET"
+  });
+}
+
+export function resendVerification(email) {
+  return sendAuthRequest("resend-verification", { email });
+}

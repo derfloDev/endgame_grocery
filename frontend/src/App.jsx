@@ -6,6 +6,7 @@ import ListDetailPage from "./pages/ListDetailPage";
 import LoginPage from "./pages/LoginPage";
 import OverviewPage from "./pages/OverviewPage";
 import RegisterPage from "./pages/RegisterPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
 import "./index.css";
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/lists/:id" element={<ListDetailPage />} />

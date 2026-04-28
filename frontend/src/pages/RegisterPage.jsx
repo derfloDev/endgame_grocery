@@ -27,7 +27,7 @@ export default function RegisterPage() {
         email,
         password
       });
-      navigate("/", { replace: true });
+      navigate("/verify-email", { replace: true, state: { email } });
     } catch (submitError) {
       setError(submitError.message);
     } finally {

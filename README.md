@@ -76,7 +76,7 @@ During local development, the frontend Vite server proxies `/api` requests to `h
 
 ### 7. Verify the setup
 
-Open `http://localhost:5173/register` and create an account. If the environment file, database container, and migrations are in place, the registration request should succeed and the app should redirect into the protected grocery list UI.
+Open `http://localhost:5173/register` and create an account. If the environment file, database container, migrations, and SMTP settings are in place, the backend sends a verification email instead of logging you in immediately. Follow the `/verify-email` link from that message to activate the account and enter the protected grocery list UI.
 
 ## Docker Deployment
 
@@ -197,7 +197,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 
 - The protected React app uses a dark Endgame-themed shell with bottom navigation for Lists.
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
-- Authentication supports register and login flows backed by JWT access tokens.
+- Authentication supports register, email verification, and login flows backed by JWT access tokens.
 - Lists support create, rename, delete, ownership, and shared-access visibility.
 - The list detail view uses a sticky top bar, a more-options flyout for rename and sharing, a bottom-sheet add-item flow with an overlaid autocomplete suggestion dropdown that anchors to the input, an inline icon preview to the right of the field, a smoothly sliding icon browser, outside-tap dismissal, swipe-to-delete entry rows with optional detail text, and a recently used panel that updates immediately when items are completed or deleted.
 - Entries support add, edit, toggle, and delete actions with open and done grouping, optional icons, and free-text details for quantities, brands, or similar context.
