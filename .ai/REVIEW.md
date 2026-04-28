@@ -277,3 +277,49 @@ No blockers. No major findings.
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-006 — Fix Docker Publish Pipeline
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+No findings. Implementation matches the plan exactly.
+
+#### Verification
+
+##### Steps
+1. Confirmed `.github/workflows/docker-publish.yml` exists with `on: release: types: [published]` trigger.
+2. Confirmed `.github/workflows/release-please.yml` no longer contains a `docker-publish` job or `outputs` block — the file now contains only the `release-please` job with a single `release-please-action@v5` step.
+3. Cross-checked every deliverable against the T-006 plan:
+   - `docker-publish.yml` trigger: `on: release: types: [published]` ✅
+   - Job named `docker-publish` ✅
+   - `actions/checkout@v6` (consistent with project-wide standard in `ci.yml`) ✅
+   - `docker/login-action@v4` → GHCR with `${{ secrets.GITHUB_TOKEN }}` ✅
+   - `docker/metadata-action@v6` → `images: ghcr.io/derfloDev/endgame-grocery` ✅
+   - `type=semver,pattern={{version}},value=${{ github.event.release.tag_name }}` ✅
+   - `type=raw,value=latest` ✅
+   - `docker/build-push-action@v7` with `push: true` ✅
+   - Permissions: `contents: read`, `packages: write` ✅
+   - `release-please.yml` `outputs` block removed ✅
+   - `release-please.yml` `docker-publish` job removed ✅
+4. Ran `npm run test --workspace backend -- src/releaseWorkflow.test.js` — 2/2 pass ✅
+5. Ran `npm run lint` — 0 errors, 1 pre-existing warning ✅
+6. Ran `npm run build` — passes (pre-existing `onnxruntime-web` eval warning only) ✅
+7. Ran `npm test` — 78 backend tests pass (+2 new release workflow tests), 93 frontend tests pass ✅
+
+##### Findings
+- `releaseWorkflow.test.js` correctly validates both the absence of `docker-publish` in `release-please.yml` and the full shape of `docker-publish.yml` via file-system assertions — no mocking required for YAML contract tests.
+- Action version pinning (`actions/checkout@v6`, `docker/*@v4/v6/v7`) matches the project standard established in `ci.yml` — no deviation.
+
+##### Risks
+- None. YAML-only change; no runtime code affected.
+
+#### Verdict
+`PASS`

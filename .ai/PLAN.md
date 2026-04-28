@@ -351,6 +351,43 @@ The existing `frontend/src/sw/register.js` is unchanged.
 
 ---
 
+## Hotfix — T-007: Fix `pending_push_jobs` Migration
+
+### Root Cause
+`node-pg-migrate` rendered `items jsonb DEFAULT '[]'` as `DEFAULT ARRAY[]` in the generated SQL. PostgreSQL rejects `ARRAY[]` without a type annotation (`42P18: cannot determine type of empty array`).
+
+### What to change
+**`backend/src/db/migrations/1713920400000_add_push_tables.cjs`**
+
+In the `pgm.createTable("pending_push_jobs", ...)` call, change the `items` column default from:
+```js
+default: pgm.func("ARRAY[]")   // or however it is currently expressed
+```
+to:
+```js
+default: "'[]'::jsonb"
+```
+
+The column definition should read:
+```js
+items: {
+  type: "jsonb",
+  notNull: true,
+  default: "'[]'::jsonb"
+}
+```
+
+### Files to change
+| File | Action |
+|---|---|
+| `backend/src/db/migrations/1713920400000_add_push_tables.cjs` | Fix `items` column default to `'[]'::jsonb` |
+
+### Acceptance Criteria
+- `npm run migrate` runs to completion without error on a clean DB.
+- Migration test suite (`npm run test --workspace backend -- src/db/migrations.test.js`) passes.
+
+---
+
 ## Phase 6 — T-006: Fix Docker Publish Pipeline
 
 ### Root Cause

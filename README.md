@@ -74,7 +74,38 @@ This starts both apps concurrently:
 
 During local development, the frontend Vite server proxies `/api` requests to `http://localhost:4000`, so the backend must be running before the browser can register, log in, or load list data.
 
-### 7. Verify the setup
+### 7. Generate VAPID keys for push notifications (optional)
+
+Push notifications require a VAPID key pair. The `web-push` package bundled with the backend provides a one-shot generator:
+
+```bash
+node -e "const wp = require('web-push'); const k = wp.generateVAPIDKeys(); console.log(JSON.stringify(k, null, 2));"
+```
+
+The output looks like this:
+
+```json
+{
+  "publicKey": "BNabc...xyz",
+  "privateKey": "Kabc...xyz"
+}
+```
+
+Copy the values into your `.env` file:
+
+```
+VAPID_PUBLIC_KEY=BNabc...xyz
+VAPID_PRIVATE_KEY=Kabc...xyz
+VAPID_CONTACT=mailto:you@example.com
+```
+
+**Key points:**
+- Run the generator **once** and keep both values. Changing either key invalidates all existing browser push subscriptions, requiring users to opt in again.
+- `VAPID_PRIVATE_KEY` is a secret — treat it like a password and never commit it to version control.
+- `VAPID_CONTACT` must be a reachable `mailto:` address (or a URL). Push services use it to contact you if your endpoint misbehaves. Use a real address in production.
+- If `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, or `VAPID_CONTACT` are missing, the backend starts normally but the push worker logs a warning and skips delivery. Users can still use the app; they simply will not receive push notifications.
+
+### 8. Verify the setup
 
 Open `http://localhost:5173/register` and create an account. If the environment file, database container, migrations, and SMTP settings are in place, the backend sends a verification email instead of logging you in immediately. Follow the `/verify-email` link from that message to activate the account and enter the protected grocery list UI. Shared-list invite mails use the same `APP_BASE_URL`: existing users land on `/invite/:token` and join after login, while new users can register through `/register?invite=...` and are added to the list immediately.
 
@@ -114,9 +145,9 @@ The repository's checked-in `docker-compose.yml` is intentionally kept for local
 | `SMTP_FROM` | Sender email address used for transactional mails. | `noreply@change-me.example` |
 | `SMTP_FROM_NAME` | Sender display name shown in mail clients. | `Endgame Grocery` |
 | `APP_BASE_URL` | Public frontend base URL used to build e-mail verification, invite, and reset links. | `https://grocery.change-me.example` |
-| `VAPID_PUBLIC_KEY` | Public VAPID key exposed to the browser when users opt into push notifications. | `change-me` |
-| `VAPID_PRIVATE_KEY` | Private VAPID key used by the backend push worker to sign outbound push deliveries. | `change-me` |
-| `VAPID_CONTACT` | Contact URI sent with VAPID details, typically a `mailto:` address for operational issues. | `mailto:notifications@change-me.example` |
+| `VAPID_PUBLIC_KEY` | Public VAPID key sent to the browser so it can create a `PushSubscription`. Generate once with `node -e "const wp=require('web-push');const k=wp.generateVAPIDKeys();console.log(k.publicKey)"` inside the `backend/` directory. Changing this key invalidates all existing subscriptions. | *(generated — see below)* |
+| `VAPID_PRIVATE_KEY` | Private VAPID key used by the backend push worker to sign outbound Web Push requests. **Treat as a secret.** Generated together with `VAPID_PUBLIC_KEY`; the two keys must always be used as a pair. | *(generated — see below)* |
+| `VAPID_CONTACT` | Contact URI included in the VAPID `Authorization` header so push services can reach you if deliveries fail. Must be a `mailto:` address or an HTTPS URL. | `mailto:notifications@change-me.example` |
 | `VITE_ICON_SIMILARITY_THRESHOLD` | Build-time similarity cutoff for local icon assignment in the frontend worker. Use a value from `0` to `1`; higher values require closer semantic matches before an icon is suggested. | `0.5` |
 
 ### Cloudflare Access
@@ -178,7 +209,7 @@ GitHub Actions runs lint, build, unit tests, and Playwright E2E tests on every p
 
 The workflow files pin current maintained major versions of the GitHub-hosted actions so the pipeline stays compatible with GitHub's Node.js runtime upgrades.
 
-Release Please runs after the `CI` workflow completes successfully on `main` and opens release PRs based on Conventional Commits. That CI gate prevents failed `main` builds from producing a release or publishing Docker images. Merging a release PR creates a GitHub Release and publishes Docker images to `ghcr.io/derfloDev/endgame-grocery` with the release version tag and `latest`.
+Release Please runs after the `CI` workflow completes successfully on `main` and opens release PRs based on Conventional Commits. That CI gate prevents failed `main` builds from producing a release PR. Publishing a GitHub Release triggers the dedicated Docker publish workflow, which pushes images to `ghcr.io/derfloDev/endgame-grocery` with the release version tag and `latest`.
 
 Version bumps follow Conventional Commits: `feat` creates a minor release, `fix` creates a patch release, and breaking changes create a major release.
 

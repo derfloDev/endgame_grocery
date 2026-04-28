@@ -8,6 +8,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-006 — implement — 2026-04-28T17:39:39Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Advanced T-006 from approved review to committed state and marked the task done on the board. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md` |
+| Validation | Reused reviewed validation from the approved `next_task` implementation; no additional commands run during `commit_task`. |
+| Commit | `fix(ci): trigger Docker publish from GitHub releases` |
+| Next Role | none |
+
+---
+
+### T-006 — implement — 2026-04-28T17:34:36Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Split Docker publishing out of the Release Please workflow into a dedicated release-triggered workflow, added an automated regression test for the workflow contract, and updated the CI/CD documentation to match the new publish path. |
+| Files Changed | `.ai/TASKS.md`, `.github/workflows/docker-publish.yml`, `.github/workflows/release-please.yml`, `README.md`, `backend/src/releaseWorkflow.test.js` |
+| Validation | `npm run test --workspace backend -- src/releaseWorkflow.test.js` PASS; `npm run lint` PASS (existing frontend warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing Vite warning about `onnxruntime-web` eval usage); `npm test` PASS |
+| Commit | `fix(ci): trigger Docker publish from GitHub releases` |
+| Next Role | review |
+
+---
+
 ### T-005 — implement — 2026-04-28T17:26:31Z
 
 | Field | Value |
@@ -42,6 +68,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Summary | Reviewed T-005 push notifications: all plan deliverables present, all 6 acceptance criteria met, 76 backend tests pass (+7 new) and 93 frontend tests pass (+6 new); npm run build succeeds with injectManifest producing dist/service-worker.js; two nits (cleanup function not stored, setVapidDetails called per tick) — no blocking findings. |
 | Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
 | Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — review — 2026-04-28T18:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-006 Docker publish pipeline fix: docker-publish.yml created with correct `on: release: types: [published]` trigger and all required action steps; release-please.yml stripped of docker-publish job and outputs block; 2 new release workflow tests pass; lint, build, and full test suite clean. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
@@ -121,6 +160,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
 | Verdict | PASS_WITH_NOTES |
 | Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-007 — plan — 2026-04-28T18:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Diagnosed `npm run migrate` failure: `pending_push_jobs.items` column uses `DEFAULT ARRAY[]` which PostgreSQL rejects without a type annotation; fix is to change the default to `'[]'::jsonb` in the migration file. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
 | Next Role | implement |
 
 ---
