@@ -172,3 +172,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — review — 2026-04-28T13:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed icon registry expansion (45 new icons, 9 DB updates, new DB entries); all 134 registry entries resolve, no broken DB references, build and tests pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-28T12:10:41Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Expanded the frontend icon catalog and exact-match database with new grocery, household, and health icons across Tabler and Lucide. The planned `IconSeeding` name is not exported by the installed Tabler package, so the seed entry uses the real `IconSeedling` export instead. |
+| Files Changed | `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconDatabase.js`, `frontend/src/utils/cosineSimilarity.test.js`, `README.md`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js` pass; `npm run lint` pass with existing frontend warning in `frontend/src/context/AuthContext.jsx`; `npm run build` pass; `npm test` pass |
+| Commit | `pending feat(ui): expand grocery, household, and health icon catalog` |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-04-28T12:23:47Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-004 done and prepared the reviewed icon-catalog expansion for commit with the recorded Conventional Commit message. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `frontend/src/data/iconDatabase.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/utils/cosineSimilarity.test.js` |
+| Validation | Reused prior passing validation from the approved review state: `npm run test --workspace frontend -- src/utils/cosineSimilarity.test.js`, `npm run lint` (pass with existing frontend warning), `npm run build`, `npm test` |
+| Commit | `pending feat(ui): expand grocery, household, and health icon catalog` |
+| Next Role | none |
+
+---

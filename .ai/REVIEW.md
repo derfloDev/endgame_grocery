@@ -169,3 +169,55 @@ No blocking, major, or minor findings.
 #### Verdict
 
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **approved**
+
+Reviewed: 2026-04-28
+
+#### Findings
+
+No blocking or major findings.
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `iconRegistry.js` / `iconDatabase.js` | Plan specifies `IconSeeding`; implementation uses `IconSeedling`. `IconSeeding` does not exist in `@tabler/icons-react`; `IconSeedling` is the correct Tabler name. Build passes — substitution is accurate, plan had a typo. | No |
+| 2 | nit | `iconRegistry.js` | `IconBowlChopsticks` and `IconBowlSpoon` are imported and registered but have no `iconDatabase.js` keyword entries. Plan lists them for the registry only — no DB entries required. Consistent with plan. | No |
+
+#### Verification
+
+##### Steps
+
+1. Read `.ai/PLAN.md` Phase 4 (T-004) acceptance criteria and icon lists.
+2. Verified all 17 new Tabler icons imported and registered:
+   `IconBlender`, `IconBone`, `IconBowl`, `IconBowlChopsticks`, `IconBowlSpoon`, `IconChefHat`, `IconEggCracked`, `IconLollipop`, `IconMelon`, `IconMicrowave`, `IconNut`, `IconPlant`, `IconPlant2`, `IconSeedling` (plan: `IconSeeding` — valid Tabler substitution), `IconSunglasses`, `IconTeapot`, `IconWheat` ✓
+3. Verified all 28 new Lucide icons imported and registered:
+   `CakeSlice`, `CandyCane`, `Cigarette`, `Citrus`, `CookingPot`, `Croissant`, `CupSoda`, `Dessert`, `Donut`, `Drumstick`, `FishSymbol`, `ForkKnife`, `GlassWater`, `Ham`, `Hamburger`, `Hop`, `IceCreamBowl`, `IceCreamCone`, `Martini`, `PillBottle`, `Popcorn`, `Refrigerator`, `Sandwich`, `Shrimp`, `Syringe`, `UtensilsCrossed`, `Vegan`, `Wine` ✓
+4. Runtime check: `ICON_REGISTRY_KEYS.length === 134` (45 new entries); all 45 new keys present; 0 missing ✓
+5. Runtime check: all `iconDatabase.js` entries reference icons that resolve in the registry — 0 broken references ✓
+6. Verified all 9 existing `iconDatabase.js` icon substitutions:
+   croissant → `Croissant`, ham → `Ham`, shrimp → `Shrimp`, ice cream → `IceCreamBowl`, ice cream cone → `IceCreamCone`, nuts → `IconNut`, popcorn → `Popcorn`, tea → `IconTeapot`, wine → `Wine` ✓
+7. Verified new `iconDatabase.js` keyword entries present for all plan-specified labels ✓
+8. Ran `npm run lint` — 0 errors (pre-existing frontend warning only) ✓
+9. Ran `npm run build` — succeeded, bundle grew proportionally (1885 KiB precache vs 1858 KiB prior) ✓
+10. Ran `npm test` — 73 frontend + 50 backend tests pass ✓
+
+##### Findings
+
+- All acceptance criteria satisfied.
+- `IconSeedling` is the correct Tabler icon name; `IconSeeding` in the plan was a typo — implementer made the right call.
+- All Lucide icons correctly wrapped with `fromLucide()` to normalize the `stroke`/`strokeWidth` prop difference.
+- No orphaned iconDatabase references (runtime verified).
+
+##### Risks
+
+- None.
+
+#### Verdict
+
+`PASS`
