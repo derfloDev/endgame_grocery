@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0](https://github.com/derfloDev/endgame_grocery/compare/v0.4.0...v0.5.0) (2026-04-28)
+
+
+### Features
+
+* **auth:** add password reset flow ([16262ca](https://github.com/derfloDev/endgame_grocery/commit/16262ca0f9fc0ee55e3e30ecf8aed19bd3c95662))
+* **auth:** require email verification before login ([f304ca5](https://github.com/derfloDev/endgame_grocery/commit/f304ca5e0ce01e118db2a3719afad52b81a8fd53))
+* **mail:** add SMTP mailer infrastructure ([7349308](https://github.com/derfloDev/endgame_grocery/commit/73493087e48e0c5dff8faff870679ec727021c1e))
+* **notifications:** add shared list push alerts ([4dce143](https://github.com/derfloDev/endgame_grocery/commit/4dce143b92d29fd2a4b34c767ab0f5723fd80e2c))
+* **sharing:** add invite-based list sharing flow ([1438164](https://github.com/derfloDev/endgame_grocery/commit/1438164a3fccaca25a4d40c5b1a71fe68f254bac))
+
+
+### Bug Fixes
+
+* **ci:** trigger Docker publish from GitHub releases ([5d51696](https://github.com/derfloDev/endgame_grocery/commit/5d51696b8fa9e7d63efc901ac23d1ac5d23560f3))
+* **db:** correct push job jsonb default ([c60bfee](https://github.com/derfloDev/endgame_grocery/commit/c60bfee750f581fa6fa94c7f894b07dcc3c8251a))
+* **e2e:** support verified-user test setup ([766bab6](https://github.com/derfloDev/endgame_grocery/commit/766bab61d87b154cfa7561fc246652335ee03358))
+
 ## [0.4.0](https://github.com/derfloDev/endgame_grocery/compare/v0.3.0...v0.4.0) (2026-04-28)
 
 
