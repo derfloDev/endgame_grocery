@@ -31,8 +31,12 @@ export default function ShareListSheet({
         </button>
       </form>
 
-      {shareError ? <div className="detail-banner eg-error-banner">{shareError}</div> : null}
-      {shareNotice ? <div className="detail-banner eg-success-banner">{shareNotice}</div> : null}
+      {shareError || shareNotice ? (
+        <div className="share-list-sheet-feedback">
+          {shareError ? <div className="detail-banner eg-error-banner">{shareError}</div> : null}
+          {shareNotice ? <div className="detail-banner eg-success-banner">{shareNotice}</div> : null}
+        </div>
+      ) : null}
 
       <div className="eg-orbitron share-sheet-members-label">SQUAD ({members.length})</div>
       {isSharingLoading ? <LoadingState rows={2} /> : null}

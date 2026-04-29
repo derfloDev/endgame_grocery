@@ -71,3 +71,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-04-29T15:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 spacing and scroll fixes; all four acceptance criteria met, all validations pass |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-29T15:36:05Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Tightened list-detail and sheet spacing, added mobile input scroll-into-view behavior, and covered the new layout hooks with tests |
+| Files Changed | `.ai/TASKS.md`, `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/components/ShareListSheet.jsx`, `frontend/src/components/ShareListSheet.test.jsx`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.test.jsx` |
+| Validation | `npm run lint` (pass; existing warning in `frontend/src/context/AuthContext.jsx`), `npm run build` (pass), `npm test` (pass) |
+| Commit | `pending feat(ui): tighten list and sheet spacing` |
+| Next Role | review |
+
+---
+
+### T-002 — implement — 2026-04-29T15:41:10Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-002 spacing and focus-scroll changes using the approved Conventional Commit message |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/components/ShareListSheet.jsx`, `frontend/src/components/ShareListSheet.test.jsx`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.test.jsx` |
+| Validation | `not rerun (commit-only step after review approval)` |
+| Commit | `pending feat(ui): tighten list and sheet spacing` |
+| Next Role | none |
+
+---

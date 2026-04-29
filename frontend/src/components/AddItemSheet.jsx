@@ -101,7 +101,12 @@ export default function AddItemSheet({
     setShowSuggestions(value.trim().length >= 2);
   }
 
-  function handleInputFocus() {
+  function handleInputFocus(event) {
+    event.target.scrollIntoView?.({
+      behavior: "smooth",
+      block: "nearest"
+    });
+
     if (!isEditMode && text.trim().length >= 2) {
       setShowSuggestions(true);
     }
@@ -221,60 +226,62 @@ export default function AddItemSheet({
           </div>
         ) : null}
 
-        <button
-          className="eg-btn-ghost add-item-more-btn"
-          type="button"
-          onClick={() => setShowIconBrowser((currentValue) => !currentValue)}
-        >
-          {iconBrowserToggleLabel}
-        </button>
+        <div className={`add-item-disclosure${showIconBrowser ? " add-item-disclosure--open" : ""}`}>
+          <button
+            className="eg-btn-ghost add-item-more-btn"
+            type="button"
+            onClick={() => setShowIconBrowser((currentValue) => !currentValue)}
+          >
+            {iconBrowserToggleLabel}
+          </button>
 
-        <div
-          aria-hidden={!showIconBrowser}
-          className={`add-item-icon-browser${showIconBrowser ? " add-item-icon-browser--open" : ""}`}
-          inert={!showIconBrowser || undefined}
-        >
-          <div className="add-item-icon-browser-inner">
-            <label className="visually-hidden" htmlFor={iconSearchInputId}>
-              Search icons
-            </label>
-            <input
-              ref={iconSearchRef}
-              id={iconSearchInputId}
-              className="eg-input"
-              placeholder="Search icons"
-              value={iconBrowserSearchText}
-              onChange={(event) => setIconBrowserSearchText(event.target.value)}
-            />
+          <div
+            aria-hidden={!showIconBrowser}
+            className={`add-item-icon-browser${showIconBrowser ? " add-item-icon-browser--open" : ""}`}
+            inert={!showIconBrowser || undefined}
+          >
+            <div className="add-item-icon-browser-inner">
+              <label className="visually-hidden" htmlFor={iconSearchInputId}>
+                Search icons
+              </label>
+              <input
+                ref={iconSearchRef}
+                id={iconSearchInputId}
+                className="eg-input"
+                placeholder="Search icons"
+                value={iconBrowserSearchText}
+                onChange={(event) => setIconBrowserSearchText(event.target.value)}
+              />
 
-            <div className="add-item-icon-browser-grid">
-              {visibleIconNames.map((browserIconName) => {
-                const BrowserIcon = ICON_REGISTRY[browserIconName];
+              <div className="add-item-icon-browser-grid">
+                {visibleIconNames.map((browserIconName) => {
+                  const BrowserIcon = ICON_REGISTRY[browserIconName];
 
-                return (
-                  <button
-                    key={browserIconName}
-                    aria-label={`Browse ${formatIconName(browserIconName)}`}
-                    className={`add-item-icon-browser-btn ${
-                      selectedIconName === browserIconName ? "add-item-icon-browser-btn--selected" : ""
-                    }`}
-                    type="button"
-                    onClick={() => {
-                      setSelectedIconName(browserIconName);
-                      setShowIconBrowser(false);
-                      setIconBrowserSearchText("");
-                    }}
-                  >
-                    <BrowserIcon aria-hidden="true" size={22} stroke={1.6} />
-                    <span className="icon-picker-btn-label">{formatIconName(browserIconName)}</span>
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={browserIconName}
+                      aria-label={`Browse ${formatIconName(browserIconName)}`}
+                      className={`add-item-icon-browser-btn ${
+                        selectedIconName === browserIconName ? "add-item-icon-browser-btn--selected" : ""
+                      }`}
+                      type="button"
+                      onClick={() => {
+                        setSelectedIconName(browserIconName);
+                        setShowIconBrowser(false);
+                        setIconBrowserSearchText("");
+                      }}
+                    >
+                      <BrowserIcon aria-hidden="true" size={22} stroke={1.6} />
+                      <span className="icon-picker-btn-label">{formatIconName(browserIconName)}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="button-row">
+        <div className="button-row add-item-actions">
           <button className="eg-btn-ghost" type="button" onClick={onClose}>
             Cancel
           </button>

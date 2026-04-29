@@ -69,6 +69,15 @@ describe("AddItemSheet", () => {
 
     expect(screen.getByLabelText("Details (optional)")).toBeTruthy();
     expect(screen.getByPlaceholderText("Beschreibung, Menge...")).toBeTruthy();
+    expect(cssSource).toMatch(
+      /\.add-item-disclosure\s*\{[^}]*display:\s*grid;[^}]*gap:\s*0;[^}]*\}/s
+    );
+    expect(cssSource).toMatch(
+      /\.add-item-disclosure--open\s*\{[^}]*gap:\s*var\(--space-2\);[^}]*\}/s
+    );
+    expect(cssSource).toMatch(
+      /\.add-item-actions\s*\{[^}]*margin-top:\s*-8px;[^}]*\}/s
+    );
   });
 
   it("shows the resolved icon preview and submits it with the item text", async () => {
@@ -288,5 +297,31 @@ describe("AddItemSheet", () => {
     );
     expect(cssSource).toMatch(/\.add-item-icon-browser-inner\s*\{[^}]*overflow:\s*hidden;[^}]*display:\s*grid;[^}]*gap:\s*16px;/s);
     expect(cssSource).toMatch(/\.add-item-icon-browser--open\s*\{[^}]*grid-template-rows:\s*1fr;[^}]*opacity:\s*1;/s);
+  });
+
+  it("scrolls the add-item input into view when it receives focus", async () => {
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
+
+    Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView
+    });
+
+    try {
+      render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
+
+      await userEvent.click(screen.getByLabelText("Add item"));
+
+      expect(scrollIntoView).toHaveBeenCalledWith({
+        behavior: "smooth",
+        block: "nearest"
+      });
+    } finally {
+      Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+        configurable: true,
+        value: originalScrollIntoView
+      });
+    }
   });
 });

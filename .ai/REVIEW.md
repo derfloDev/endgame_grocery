@@ -64,3 +64,57 @@ Both `scheduleEntryExit` and `handleDeletedEntry` check `exitingIdsRef.current.h
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-29
+
+#### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `ShareListSheet.jsx` line 37, `index.css` | `eg-success-banner` class is used on the share-notice banner but has no CSS definition (only `.eg-error-banner` and `.eg-chip-success` exist). The notice text renders unstyled (just `.detail-banner` margin). **Pre-existing issue, not introduced by T-002** — the class was already present before this task's changes. | No (pre-existing) |
+| 2 | nit | `index.css` `.add-item-actions` | `margin-top: -8px` is a negative-margin trick to reduce the form-grid gap from 16 px to ≈ 8 px between the disclosure wrapper and the button row. Correct and tested, but slightly fragile if the parent `gap` ever changes. | No |
+
+#### Verification
+
+##### Steps
+1. Read all changed files: `AddItemSheet.jsx`, `AddItemSheet.test.jsx`, `ShareListSheet.jsx`, `ShareListSheet.test.jsx`, `index.css` (diff), `ListDetailPage.test.jsx`.
+2. Cross-referenced each acceptance criterion against the implementation.
+3. Ran `git diff HEAD` to confirm exact CSS and JSX changes.
+4. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx`.
+5. Ran `npm run build` — clean.
+6. Ran `npm test` — 50 frontend tests (AddItemSheet +1 new, ShareListSheet new, ListDetailPage.test.jsx new) + 98 backend; 0 failures.
+
+##### Findings
+
+**AC: Owner→Enable-notifications gap ≈ 12 px**
+`.detail-meta` now has `display: flex; flex-direction: column; gap: var(--space-3)`. `--space-3` is 12 px per the design tokens. `ListDetailPage.test.jsx` asserts the CSS rule. ✅
+
+**AC: Mehr-anzeigen→Cancel gap ≈ 8 px**
+The toggle button and icon-browser are now wrapped in `.add-item-disclosure`. Closed state: `gap: 0` (disclosure collapses its own internal gap); the 16 px form-grid gap between the disclosure and the button-row is offset by `.add-item-actions { margin-top: -8px }`, giving a net ≈ 8 px. Open state: `gap: var(--space-2)` (8 px between toggle and browser). CSS assertions in `AddItemSheet.test.jsx` cover all three rules. ✅
+
+**AC: Send-Invite→notice gap consistent**
+Banners are now wrapped in `.share-list-sheet-feedback { display: grid; gap: var(--space-3); margin-top: var(--space-3); }` giving 12 px between the form and the feedback area. `ShareListSheet.test.jsx` asserts the wrapper and CSS rule. ✅
+
+**AC: Add-item input scrolls into view when keyboard opens on mobile**
+`handleInputFocus` calls `event.target.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })`. Optional-chaining guards against environments without the method. `AddItemSheet.test.jsx` mocks `scrollIntoView` and asserts it is called with the correct options. ✅
+
+**Behaviour preservation**
+The `handleInputFocus` change is additive: `scrollIntoView` is prepended, the existing `setShowSuggestions` branch is unchanged. All 11 prior `AddItemSheet` tests continue to pass. ✅
+
+##### Risks
+- Low: The `scrollIntoView` call fires on every focus event (including programmatic focus and desktop focus). On desktop, `scrollIntoView({ block: 'nearest' })` is a no-op if the element is already visible, so there is no visible side-effect.
+- Low: Negative `margin-top: -8px` on `.add-item-actions` is tied to the parent grid gap being exactly 16 px. If `add-item-form` gap changes, this offset will need adjustment.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
