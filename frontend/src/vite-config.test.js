@@ -50,6 +50,8 @@ describe("vite worker config", () => {
 
   it("registers precaching and push handlers in the custom service worker", () => {
     expect(serviceWorkerSource).toMatch(/precacheAndRoute/);
+    expect(serviceWorkerSource).toMatch(/const precacheManifest = self\.__WB_MANIFEST/);
+    expect(serviceWorkerSource).toMatch(/precacheAndRoute\(precacheManifest \|\| \[\]\)/);
     expect(serviceWorkerSource).toMatch(/addEventListener\(["']push["']/);
     expect(serviceWorkerSource).toMatch(/showNotification/);
     expect(serviceWorkerSource).toMatch(/addEventListener\(["']notificationclick["']/);

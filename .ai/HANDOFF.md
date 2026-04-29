@@ -138,3 +138,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-04-29T14:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed SW activation guard and `registrationRef` cache fix; all plan phases implemented correctly; lint/build/tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-29T13:49:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Fixed dev-mode service-worker activation and removed the redundant ready wait in `subscribe()` by caching the registration and adding an 8-second fallback error. |
+| Files Changed | .ai/TASKS.md, frontend/src/hooks/usePushNotifications.js, frontend/src/hooks/usePushNotifications.test.js, frontend/src/sw/service-worker.js, frontend/src/vite-config.test.js |
+| Validation | `npm run lint` (pass with existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/hooks/usePushNotifications.test.js src/vite-config.test.js` (pass), `npm run build` (pass), `npm test` (pass) |
+| Commit | `<pending> fix(push): complete localhost push subscription flow` |
+| Next Role | review |
+
+---
+
+### T-003 — implement — 2026-04-29T13:55:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed localhost push-flow fix done and created the single task commit using the approved Conventional Commit subject. |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, frontend/src/hooks/usePushNotifications.js, frontend/src/hooks/usePushNotifications.test.js, frontend/src/sw/service-worker.js, frontend/src/vite-config.test.js |
+| Validation | not rerun during `commit_task`; using the reviewer-approved `npm run lint`, `npm run build`, and `npm test` results recorded above |
+| Commit | `<pending> fix(push): complete localhost push subscription flow` |
+| Next Role | none |
+
+---

@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import { createElement } from "react";
+import { createElement, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchVapidPublicKey,
@@ -19,14 +19,34 @@ function HookHarness({ enabled = true, token = "token-1" }) {
     enabled,
     token
   });
+  const [subscribeError, setSubscribeError] = useState("");
+  const [subscribeResult, setSubscribeResult] = useState("");
 
   return [
     createElement("span", { "data-testid": "supported", key: "supported" }, String(isSupported)),
     createElement("span", { "data-testid": "ready", key: "ready" }, String(isReady)),
     createElement("span", { "data-testid": "subscribed", key: "subscribed" }, String(isSubscribed)),
+    createElement("span", { "data-testid": "subscribe-error", key: "subscribe-error" }, subscribeError),
+    createElement(
+      "span",
+      { "data-testid": "subscribe-result", key: "subscribe-result" },
+      subscribeResult
+    ),
     createElement(
       "button",
-      { key: "subscribe", onClick: () => void subscribe(), type: "button" },
+      {
+        key: "subscribe",
+        onClick: async () => {
+          try {
+            setSubscribeError("");
+            setSubscribeResult(String(await subscribe()));
+          } catch (error) {
+            setSubscribeResult("");
+            setSubscribeError(error.message);
+          }
+        },
+        type: "button"
+      },
       "subscribe"
     ),
     createElement(
@@ -94,6 +114,7 @@ describe("usePushNotifications", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     cleanup();
   });
@@ -177,6 +198,79 @@ describe("usePushNotifications", () => {
       expect(screen.getByTestId("ready").textContent).toBe("true");
     });
 
+    expect(subscribePush).not.toHaveBeenCalled();
+  });
+
+  it("subscribes without re-reading serviceWorker.ready once the registration is cached", async () => {
+    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    let readyAccessCount = 0;
+    const registration = {
+      pushManager: {
+        async getSubscription() {
+          return null;
+        },
+        async subscribe() {
+          return subscribeResult;
+        }
+      }
+    };
+
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      configurable: true,
+      value: {}
+    });
+    Object.defineProperty(window.navigator.serviceWorker, "ready", {
+      configurable: true,
+      get() {
+        readyAccessCount += 1;
+        return Promise.resolve(registration);
+      }
+    });
+
+    render(createElement(HookHarness, { enabled: true }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
+    expect(readyAccessCount).toBe(1);
+
+    await act(async () => {
+      screen.getByText("subscribe").click();
+    });
+
+    expect(screen.getByTestId("subscribe-result").textContent).toBe("true");
+    expect(screen.getByTestId("subscribed").textContent).toBe("true");
+    expect(readyAccessCount).toBe(1);
+  });
+
+  it("rejects subscribe with a timeout error when no service worker registration becomes available", async () => {
+    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        ready: new Promise(() => {})
+      }
+    });
+
+    render(createElement(HookHarness, { enabled: true }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
+
+    vi.useFakeTimers();
+
+    await act(async () => {
+      screen.getByText("subscribe").click();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8000);
+    });
+
+    expect(screen.getByTestId("subscribe-error").textContent).toBe(
+      "Service worker is not available. Try refreshing the page."
+    );
     expect(subscribePush).not.toHaveBeenCalled();
   });
 
