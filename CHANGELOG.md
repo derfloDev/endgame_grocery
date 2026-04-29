@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/derfloDev/endgame_grocery/compare/v0.5.0...v0.5.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **ci:** trigger Docker publish from Release Please releases ([ce0bbec](https://github.com/derfloDev/endgame_grocery/commit/ce0bbec1c97c816505eb7aa4858d05333a6d9364))
+
 ## [0.5.0](https://github.com/derfloDev/endgame_grocery/compare/v0.4.0...v0.5.0) (2026-04-28)
 
 
