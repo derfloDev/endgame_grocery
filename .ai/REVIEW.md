@@ -67,6 +67,64 @@ Both `scheduleEntryExit` and `handleDeletedEntry` check `exitingIdsRef.current.h
 
 ---
 
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-29
+
+#### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `index.css` `.add-item-icon-browser-inner` | `overflow-clip-margin: 12px` is used; the plan specified 4px. 12px gives more room for the cyan glow and degrades gracefully (clip without margin) on older Safari < 17. | No |
+| 2 | nit | `index.css` `.bottom-sheet` | Adds `overflow-x: hidden` — not in the plan but a sensible belt-and-suspenders addition alongside `html { overflow-x: hidden }`. | No |
+
+#### Verification
+
+##### Steps
+1. Reviewed `git diff HEAD` for `frontend/src/index.css` and `frontend/src/components/AddItemSheet.test.jsx`.
+2. Cross-referenced all four acceptance criteria against the diff.
+3. Verified `overflow: clip` + `overflow-clip-margin` browser support (Chrome 90 / Firefox 102 / Safari 17; degrades to clipped shadow on older).
+4. Ran `npm run lint` — 0 errors, 1 pre-existing warning.
+5. Ran `npm run build` — clean.
+6. Ran `npm test` — 51 frontend tests (AddItemSheet +1 new test + 1 updated assertion); 98 backend; 0 failures.
+
+##### Findings
+
+**AC: FAB fully visible with ≥ 16 px right margin on ≤ 375 px screens**
+`right: max(calc(50% - 195px), 16px)`. At 375 px: `50% - 195px = −7.5px`; `max(−7.5px, 16px) = 16px`. New test asserts the CSS rule by regex. ✅
+
+**AC: Icon-search glow not clipped**
+`.add-item-icon-browser-inner` changed from `overflow: hidden` (creates scroll container, clips shadows) to `overflow: clip` (layout-only clip) with `overflow-clip-margin: 12px` (allows shadow bleed). Also adds `padding: 4px 4px 0` (replaces previous `padding-top: 4px`, adds 4px side clearance). Test asserts `overflow: clip`, `overflow-clip-margin: 12px`. ✅
+
+**AC: No border-top divider above icon-browser search field**
+`border-top: 1px solid rgba(255, 255, 255, 0.05)` removed from `.add-item-icon-browser-inner`. Test asserts `iconBrowserInnerRule` does not match `border-top:`. ✅
+
+**AC: No scrollbar flash on icon-browser collapse**
+Three-layer defence:
+- `html { overflow-x: hidden }` — prevents viewport-level transient overflow;
+- `.bottom-sheet { overflow-x: hidden }` — containment at sheet level;
+- `.add-item-icon-browser { overflow: clip; contain: layout }` — prevents content escaping the grid-row animation boundary.
+Test asserts `html { overflow-x: hidden }` and `contain: layout` on the browser element. ✅
+
+**`overflow: clip` on `.bottom-sheet--browser-open .add-item-icon-browser-inner`**
+Also changes `overflow: hidden` → `overflow: clip` in the browser-open variant, consistent with the base rule. ✅
+
+##### Risks
+- Low: `overflow-clip-margin` requires Safari 17+ (2023). On Safari 16 the glow reverts to clipped — previous behaviour, not a regression.
+- Low: `contain: layout` is well-supported but creates a new containing block; this is intentional and already scoped to the icon browser element.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-002
 
 ### Review Round 1

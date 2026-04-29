@@ -286,6 +286,10 @@ describe("AddItemSheet", () => {
 
     const iconBrowser = container.querySelector(".add-item-icon-browser");
     const iconBrowserInner = container.querySelector(".add-item-icon-browser-inner");
+    const iconBrowserRule =
+      cssSource.match(/\.add-item-icon-browser\s*\{[^}]*\}/s)?.[0] ?? "";
+    const iconBrowserInnerRule =
+      cssSource.match(/\.add-item-icon-browser-inner\s*\{[^}]*\}/s)?.[0] ?? "";
 
     expect(iconBrowser).toBeTruthy();
     expect(iconBrowserInner).toBeTruthy();
@@ -295,8 +299,20 @@ describe("AddItemSheet", () => {
     expect(cssSource).toMatch(
       /\.add-item-icon-browser\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*0fr;[^}]*opacity:\s*0;[^}]*transition:\s*[^;]*grid-template-rows/s
     );
-    expect(cssSource).toMatch(/\.add-item-icon-browser-inner\s*\{[^}]*overflow:\s*hidden;[^}]*display:\s*grid;[^}]*gap:\s*16px;/s);
+    expect(iconBrowserRule).toMatch(/overflow:\s*clip;/);
+    expect(iconBrowserRule).toMatch(/contain:\s*layout;/);
+    expect(iconBrowserInnerRule).toMatch(/overflow:\s*clip;/);
+    expect(iconBrowserInnerRule).toMatch(/overflow-clip-margin:\s*12px;/);
+    expect(iconBrowserInnerRule).toMatch(/display:\s*grid;/);
+    expect(iconBrowserInnerRule).toMatch(/gap:\s*16px;/);
+    expect(iconBrowserInnerRule).toMatch(/padding:\s*4px 4px 0;/);
+    expect(iconBrowserInnerRule).not.toMatch(/border-top:/);
     expect(cssSource).toMatch(/\.add-item-icon-browser--open\s*\{[^}]*grid-template-rows:\s*1fr;[^}]*opacity:\s*1;/s);
+  });
+
+  it("keeps the FAB inset on narrow screens and prevents icon-browser collapse overflow from reaching the viewport", () => {
+    expect(cssSource).toMatch(/html\s*\{[^}]*overflow-x:\s*hidden;/s);
+    expect(cssSource).toMatch(/\.fab\s*\{[^}]*right:\s*max\(calc\(50%\s*-\s*195px\),\s*16px\);/s);
   });
 
   it("scrolls the add-item input into view when it receives focus", async () => {

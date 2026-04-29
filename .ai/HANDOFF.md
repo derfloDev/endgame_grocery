@@ -109,3 +109,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-04-29T16:05:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 mobile/visual fixes; all four acceptance criteria met, all validations pass |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-29T15:55:51Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Fixed the narrow-screen FAB inset and cleaned up the add-item icon browser clipping, divider, and collapse overflow behavior |
+| Files Changed | `.ai/TASKS.md`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/index.css` |
+| Validation | `npm run lint` (pass; existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx` (pass), `npm run build` (pass; existing `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | `pending fix(ui): polish mobile FAB and icon browser layout` |
+| Next Role | review |
+
+---
+
+### T-003 — implement — 2026-04-29T16:18:43Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-003 mobile and icon-browser layout fixes using the approved Conventional Commit message |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/index.css` |
+| Validation | `not rerun (commit-only step after review approval)` |
+| Commit | `pending fix(ui): polish mobile FAB and icon browser layout` |
+| Next Role | none |
+
+---
