@@ -70,3 +70,15 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-001 — implement — 2026-04-29T08:08:13Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Repaired the `T-001` handoff metadata by recording the actual commit hash and documenting the timestamp mismatch between the git commit and prior handoff entries. |
+| Files Changed | `.ai/HANDOFF.md` |
+| Commit | `5807cd1 feat(api): add structured backend logging` |
+| Next Role | none |
+
+---
