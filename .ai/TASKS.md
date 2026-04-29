@@ -20,4 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | Add `RELEASE_PLEASE_TOKEN` PAT to release-please workflow so Docker Publish is triggered on release | done | `release-please.yml` passes the PAT via `token:`; after the next release the Docker Publish workflow starts automatically | `npm run test --workspace backend -- src/releaseWorkflow.test.js`; `npx prettier --check .github/workflows/release-please.yml`; `npm run lint`; `npm run build`; `npm test` | none |
+| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
