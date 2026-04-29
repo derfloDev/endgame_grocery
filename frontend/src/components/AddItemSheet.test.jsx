@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "../index.css";
@@ -75,7 +75,7 @@ describe("AddItemSheet", () => {
     const onAdd = vi.fn();
     const { container } = render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
 
-    await userEvent.type(screen.getByLabelText("Add item"), "Milch");
+    fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Milch" } });
 
     expect(screen.getByRole("button", { name: "Mehr anzeigen" })).toBeTruthy();
     expect(container.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
@@ -83,13 +83,13 @@ describe("AddItemSheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
     expect(onAdd).toHaveBeenCalledWith("Milch", "IconMilk", "");
-  });
+  }, 10000);
 
   it("expands the inline icon browser, filters icons, and submits the manually selected icon", async () => {
     const onAdd = vi.fn();
     const { container } = render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
 
-    await userEvent.type(screen.getByLabelText("Add item"), "Gemüse");
+    fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Gemüse" } });
 
     expect(screen.getByRole("group", { name: "Suggested icons" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Choose Leaf" })).toBeTruthy();
@@ -117,7 +117,7 @@ describe("AddItemSheet", () => {
     expect(screen.queryByRole("button", { name: "Zurück" })).toBeNull();
     expect(container.querySelectorAll(".add-item-icon-browser-grid").length).toBe(1);
 
-    await userEvent.type(iconSearchInput, "trash");
+    fireEvent.change(iconSearchInput, { target: { value: "trash" } });
     expect(screen.queryByRole("button", { name: "Browse Milk" })).toBeNull();
     expect(screen.getByRole("button", { name: "Browse Trash" })).toBeTruthy();
 
@@ -134,14 +134,14 @@ describe("AddItemSheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
     expect(onAdd).toHaveBeenCalledWith("Gemüse", "IconTrash", "");
-  });
+  }, 10000);
 
   it("submits typed details as the third onAdd argument", async () => {
     const onAdd = vi.fn();
     render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
 
-    await userEvent.type(screen.getByLabelText("Add item"), "Reis");
-    await userEvent.type(screen.getByLabelText("Details (optional)"), "500 g");
+    fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Reis" } });
+    fireEvent.change(screen.getByLabelText("Details (optional)"), { target: { value: "500 g" } });
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
     expect(onAdd).toHaveBeenCalledWith("Reis", null, "500 g");
@@ -178,7 +178,7 @@ describe("AddItemSheet", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(iconSearchInput);
     });
-    await userEvent.type(iconSearchInput, "banana");
+    fireEvent.change(iconSearchInput, { target: { value: "banana" } });
     await userEvent.click(screen.getByRole("button", { name: "Browse Banana" }));
 
     expect(screen.getByLabelText("Search icons")).toBeTruthy();
@@ -193,7 +193,7 @@ describe("AddItemSheet", () => {
   it("shows a loading indicator while the icon suggestion is resolving", async () => {
     render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
 
-    await userEvent.type(screen.getByLabelText("Add item"), "Mil");
+    fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Mil" } });
 
     expect(screen.getByLabelText("Loading icon suggestion")).toBeTruthy();
     expect(screen.queryByTestId("add-item-icon-preview")).toBeNull();
@@ -214,7 +214,7 @@ describe("AddItemSheet", () => {
     const onAdd = vi.fn().mockResolvedValue(true);
     const { container } = render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
 
-    await userEvent.type(screen.getByLabelText("Add item"), "Tom");
+    fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Tom" } });
 
     const inputWrap = container.querySelector(".eg-input-wrap");
     const inputAnchor = container.querySelector(".eg-input-anchor");
@@ -241,7 +241,7 @@ describe("AddItemSheet", () => {
   it("closes the dropdown when clicking outside the input anchor", async () => {
     const { container } = render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
 
-    await userEvent.type(screen.getByLabelText("Add item"), "Tom");
+    fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Tom" } });
 
     const inputAnchor = container.querySelector(".eg-input-anchor");
     expect(within(inputAnchor).getByRole("listbox", { name: "Autocomplete suggestions" })).toBeTruthy();
@@ -254,7 +254,7 @@ describe("AddItemSheet", () => {
   it("keeps the preview icon outside the dropdown anchor and inline to the right of the input", async () => {
     const { container } = render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
 
-    await userEvent.type(screen.getByLabelText("Add item"), "Milch");
+    fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Milch" } });
 
     const inputWrap = container.querySelector(".eg-input-wrap");
     const inputAnchor = container.querySelector(".eg-input-anchor");

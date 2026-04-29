@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
+import { sseManager as defaultSseManager } from "../sseManager.js";
 import { enqueuePushJob } from "../workers/pushWorker.js";
 
 async function ensureListAccess(pool, listId, userId) {
@@ -49,7 +50,8 @@ function normalizeDetails(details) {
 export function createEntryRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth,
-  logger = defaultLogger
+  logger = defaultLogger,
+  sseManager = defaultSseManager
 } = {}) {
   const router = Router({ mergeParams: true });
 
@@ -116,6 +118,15 @@ export function createEntryRouter({
         `,
         [req.params.id, text.trim(), icon ?? null, normalizeDetails(details)]
       );
+
+      void sseManager
+        .broadcastToList(pool, req.params.id, "entry:created", {
+          listId: req.params.id,
+          entryId: result.rows[0].id
+        })
+        .catch((broadcastError) => {
+          logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+        });
 
       void enqueuePushJob({
         pool,
@@ -190,6 +201,15 @@ export function createEntryRouter({
         return;
       }
 
+      void sseManager
+        .broadcastToList(pool, req.params.id, "entry:updated", {
+          listId: req.params.id,
+          entryId: req.params.entryId
+        })
+        .catch((broadcastError) => {
+          logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+        });
+
       if (result.rows[0].status === "done") {
         void upsertAutocompleteHistory(pool, {
           userId: req.user.sub,
@@ -251,6 +271,15 @@ export function createEntryRouter({
         res.status(404).json({ error: "Entry not found." });
         return;
       }
+
+      void sseManager
+        .broadcastToList(pool, req.params.id, "entry:deleted", {
+          listId: req.params.id,
+          entryId: req.params.entryId
+        })
+        .catch((broadcastError) => {
+          logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+        });
 
       void upsertAutocompleteHistory(pool, {
         userId: req.user.sub,

@@ -2,6 +2,8 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
+---
+
 ## Task: T-001
 
 ### Review Round 1
@@ -12,49 +14,193 @@ Reviewed: 2026-04-29
 
 #### Findings
 
-- **nit** — `backend/src/logger.js` line 7: `export default logger` is redundant alongside the named export. The plan only required the named export. No callers import the default. Harmless; no fix required.
-- **nit** — `backend/src/mail/mailer.js` line 27: `logger.warn({}, "SMTP host is not configured; skipping email delivery")` passes an explicit empty-object merging argument. Pino accepts `logger.warn(message)` directly; the `{}` is a no-op but slightly noisy. The test asserts `fields: {}` and passes, so no regression. No fix required.
+No blocking or major findings.
+
+- severity: `nit` | `backend/src/sseManager.js` line 31 & 71 | `sendToUsers` deduplicates `userIds` internally with `new Set(userIds)`, and `broadcastToList` already deduplicates before calling `sendToUsers`. Double deduplication is harmless but redundant. Not a required fix.
 
 #### Verification
 
 ##### Steps
-1. Read `.ai/PLAN.md` and `.ai/TASKS.md` — confirmed T-001 acceptance criteria.
-2. Read every changed file listed in the implement HANDOFF entry:
-   - `backend/src/logger.js` — singleton pino instance, reads `LOG_LEVEL` from env.
-   - `backend/src/app.js` — pino-http middleware registered first; health endpoint excluded; global error handler uses `req.log ?? logger`.
-   - `backend/src/index.js` — `startServer()` injectable; structured startup log with all required fields.
-   - `backend/src/env.js` — `logLevel` field added.
-   - `backend/src/routes/auth.js` — all seven auth events from the plan table logged at correct levels; no passwords or tokens logged.
-   - `backend/src/workers/pushWorker.js` — all push-worker events logged; injectable logger; `intervalMs` in startup log.
-   - `backend/src/mail/mailer.js` — skip/success/error paths all logged; injectable logger.
-   - `backend/src/routes/entries.js` — two `console.error` sites replaced with `logger.error`; injectable logger.
-   - `backend/src/db/seed.js` — seed script uses pino logger (CLI-only path, no production risk).
-   - `backend/src/app.test.js` — new; covers HTTP request logging and unhandled-error path.
-   - `backend/src/index.test.js` — new; covers startup structured log.
-   - `backend/src/pushWorker.test.js` — updated; four tests with logger-spy assertions.
-   - `backend/src/mail/mailer.test.js` — updated; three tests with logger-spy assertions.
-   - `backend/src/env.test.js` — updated; asserts `logLevel` default and fixture loading.
-   - `docker-compose.example.yml` — `LOG_LEVEL: info` added with explanatory comment.
-3. Searched `backend/src/**/*.js` for `console.` — **no matches**.
-4. Ran `npm run lint` — PASS (one pre-existing frontend warning, zero errors).
-5. Ran `npm run build` — PASS.
-6. Ran `npm test` — PASS: 87 backend tests, 0 failures; all frontend tests pass.
+1. Read all changed/new files: `backend/src/sseManager.js`, `backend/src/routes/events.js`, `backend/src/app.js`, `backend/src/middleware/auth.js`, `backend/src/sseManager.test.js`, `backend/src/routes/events.test.js`, `README.md`.
+2. Compared implementation against T-001 plan section in `.ai/PLAN.md`.
+3. Ran `npm run lint` — passed (one pre-existing frontend warning, no errors).
+4. Ran `npm run test --workspace backend -- --test-name-pattern "SseManager|events route"` — 7 tests pass: 3 SseManager unit tests + 4 events route integration tests.
+5. Verified plan coverage:
+   - `SseManager`: `add`, `remove`, `sendToUsers`, `broadcastToList` all implemented ✅
+   - Singleton + class export ✅
+   - `createEventsRouter` factory with injected deps ✅
+   - Token from `req.query.token` (primary) or `Authorization` header (fallback) ✅
+   - 401 without/invalid token ✅
+   - All 4 SSE headers + `flushHeaders` ✅
+   - Heartbeat interval (30 s default, injectable for tests) ✅
+   - `req.on("close")` cleanup with idempotent guard ✅
+   - `app.js`: route registered, `sseManager` forwarded in `routerOptions` ✅
+   - `createRequireAuthFn` added to `middleware/auth.js` ✅
+   - README documentation updated ✅
 
 ##### Findings
-- All nine acceptance criteria are satisfied.
-- No `console.*` calls remain in any production source file.
-- pino-http correctly emits `req.method`, `req.url`, `res.statusCode`, `responseTime` for every non-health request (verified by `app.test.js`).
-- Health endpoint is correctly excluded from HTTP logs.
-- Startup log emits `port`, `dbConfigured`, `smtpConfigured`, `vapidConfigured`, `logLevel` (verified by `index.test.js`).
-- Auth events, push-worker events, and mailer events all match the plan tables (verified by unit tests with logger spies).
-- Injectable logger pattern is consistent across `createMailer`, `startPushWorker`, `processPendingPushJobs`, `createAuthRouter`, `createEntryRouter`, and `createApp`/`startServer`.
-- `LOG_LEVEL` documented in `docker-compose.example.yml` with trace/debug/info/warn/error/fatal comment.
+- All acceptance criteria for T-001 met.
+- All targeted tests pass; no pre-existing tests broken.
+- Idempotent cleanup guard (`createCleanup`) prevents double-remove on concurrent close events — well-designed defensive pattern.
 
 ##### Risks
-- Test stdout is noisy with pino JSON lines from route-level tests that do not inject a silent logger. This is cosmetic; it does not affect correctness or CI signal.
+- Token exposed in URL query string (plan-acknowledged trade-off; server logs may capture it). Acceptable per design decision in PLAN.md.
 
-#### Open Questions
-- None.
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-04-29
+
+#### Findings
+
+No blocking or major findings.
+
+- severity: `nit` | `backend/src/routes/lists.js` line 171 | `list:deleted` broadcast is `await`ed rather than fire-and-forget. This is intentional and safe (ensures member IDs are still resolvable and keeps broadcast-before-delete ordering deterministic); however it means a `broadcastToList` failure will surface a 500 and prevent the delete. Acceptable trade-off — not a required fix.
+- severity: `nit` | plan deviation | The plan attributed `member:added` to `sharing.js POST /`, but the implementer correctly deduced that the invite-POST only creates an invite, not a membership. The broadcast fires from `invites.js GET /:token` and `auth.js POST /register` (the actual member-insertion points). This is semantically correct and better than the plan's description. Not a required fix.
+
+#### Verification
+
+##### Steps
+1. Read all changed/new files: `backend/src/routes/entries.js`, `backend/src/routes/lists.js`, `backend/src/routes/sharing.js`, `backend/src/routes/invites.js`, `backend/src/routes/auth.js`, `backend/src/inviteService.js`, and all corresponding test files.
+2. Compared implementation against T-002 plan section in `.ai/PLAN.md`.
+3. Ran `npm run lint` — passed (one pre-existing frontend warning, no errors).
+4. Ran `npm run test --workspace backend -- --test-name-pattern "entry routes|list routes|sharing routes|invite routes|authentication routes"` — 44 tests pass, 0 fail.
+5. Verified plan coverage:
+   - `entry:created` after POST to entries ✅ — fire-and-forget with `.catch` logger ✅
+   - `entry:updated` after PATCH to entries ✅ — placed after 404 guard ✅
+   - `entry:deleted` after DELETE from entries ✅
+   - No broadcast on 400 (missing text), 403 (no access), 404 (entry not found) ✅
+   - `list:updated` after PATCH to lists ✅ — fire-and-forget ✅
+   - `list:deleted` before DELETE from lists ✅ — await (see nit above) ✅
+   - No broadcast on 403 for lists ✅
+   - `member:removed` after DELETE from members ✅ — fire-and-forget ✅
+   - No broadcast on 400 (owner removal) ✅
+   - `member:added` after invite acceptance (`invites.js`) ✅
+   - `member:added` after register-with-invite (`auth.js`) ✅
+   - `member:added` NOT fired when user already a member ✅ (`memberAdded` flag from `inviteService.js`)
+   - `sseManager` injected in all routers and forwarded via `routerOptions` ✅
+   - `inviteService.js` returns `memberAdded` boolean for conditional broadcast ✅
+
+##### Findings
+- All T-002 acceptance criteria met.
+- All 44 targeted tests pass; 0 failures across the full suite.
+- `member:added` suppression when user is already a member is correctly tested in `invites.test.js` (second test case asserts empty `sseManager.calls`).
+- Broadcast error logging via `logger.error` is consistent across all fire-and-forget sites.
+
+##### Risks
+- `list:deleted` await: if the DB goes down between broadcast and delete, the delete is skipped but the SSE event was still sent. This is a benign edge case (clients will re-fetch on reconnect and see the list still exists) — no action required.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-04-29
+
+#### Findings
+
+No blocking or major findings.
+
+- severity: `nit` | `frontend/src/context/EventSourceContext.jsx` line 1 | `eslint-disable react-refresh/only-export-components` suppresses the fast-refresh warning for the whole file. Acceptable — the file intentionally exports both a provider component and a hook, a common React pattern. Not a required fix.
+- severity: `nit` | `frontend/src/hooks/useListEvents.js` | The inner filter function is recreated each render, so if the consumer does not wrap `handler` in `useCallback`, the hook will re-subscribe on every render. This is documented as a caller responsibility (JSDoc says "stabile Referenz empfohlen") and is enforced in T-004. Not a required fix.
+
+#### Verification
+
+##### Steps
+1. Read all new/changed files: `frontend/src/context/EventSourceContext.jsx`, `frontend/src/hooks/useListEvents.js`, `frontend/src/main.jsx`, `frontend/src/context/EventSourceContext.test.jsx`, `frontend/src/hooks/useListEvents.test.js`, diffs for `frontend/src/app.test.jsx` and `frontend/src/components/AddItemSheet.test.jsx`.
+2. Compared implementation against T-003 plan section in `.ai/PLAN.md`.
+3. Ran `npm run lint` — passed (one pre-existing `AuthContext.jsx` fast-refresh warning, no errors; new `EventSourceContext.jsx` warning suppressed by file-level eslint-disable).
+4. Ran `npm run test --workspace frontend` — **101/101 tests pass**, 0 failures, 17 test files.
+5. Verified plan coverage:
+   - `EventSourceProvider` opens `EventSource` when `token` is present ✅
+   - Closes on logout / token cleared (effect cleanup) ✅
+   - Internal `Map<eventType, Set<handler>>` via `useRef` ✅
+   - `addEventListener(type, handler) → () => void` cleanup function ✅
+   - `onerror` closes connection when `readyState === CLOSED` (401 guard) ✅
+   - All 7 event types registered ✅
+   - `contextValueRef` pattern ensures stable context value across re-renders ✅
+   - `typeof window.EventSource !== "function"` guard for non-browser environments ✅
+   - `useListEvents`: listId filter `!listId || data.listId === listId` ✅
+   - Cleanup on unmount and dependency change ✅
+   - `EventSourceProvider` nesting: inside `AuthProvider`, outside `OfflineQueueProvider` ✅
+   - Exports: `EventSourceProvider`, `useEventSource` ✅
+6. Test changes in `app.test.jsx` and `AddItemSheet.test.jsx`:
+   - `userEvent.type` → `fireEvent.change` for input fields to avoid debounced icon-worker timing issues introduced by the SSE context ✅
+   - Added 10 s test timeout on affected tests ✅
+   - All 26 `app.test.jsx` + 11 `AddItemSheet.test.jsx` tests pass ✅
+
+##### Findings
+- All T-003 acceptance criteria met.
+- 101 frontend tests pass, 0 failures.
+- The `window.EventSource` availability guard is an elegant solution that lets all existing `app.test.jsx` tests run without mocking EventSource (the effect simply skips when EventSource is not a function in the test environment).
+
+##### Risks
+- `useListEvents` re-subscribe on unstable handler reference is a known footgun, mitigated by JSDoc note and enforced in T-004 with `useCallback`.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-04-29
+
+#### Findings
+
+No blocking or major findings.
+
+- severity: `nit` | `frontend/src/pages/ListDetailPage.jsx` | `handleMemberChange` depends on `list?.is_owner` in its `useCallback` dep array. When `list` transitions from `null` → loaded, `handleMemberChange` recreates and `useListEvents` re-subscribes. This is correct behavior — an SSE event arriving before the list is loaded will no-op (skip member fetch). Not a required fix.
+
+#### Verification
+
+##### Steps
+1. Read full diffs for `frontend/src/pages/OverviewPage.jsx`, `frontend/src/pages/ListDetailPage.jsx`, and `frontend/src/app.test.jsx`.
+2. Compared implementation against T-004 plan section in `.ai/PLAN.md`.
+3. Ran `npm run lint` — passed (one pre-existing `AuthContext.jsx` fast-refresh warning, no errors).
+4. Ran `npm run test --workspace frontend` — **103/103 tests pass**, 0 failures, 17 test files (2 new tests added for T-004).
+5. Verified plan coverage:
+   - `OverviewPage`: `handleListChange` wrapped in `useCallback([loadLists])` ✅
+   - `useListEvents("list:updated", null, handleListChange)` ✅
+   - `useListEvents("list:deleted", null, handleListChange)` ✅
+   - `ListDetailPage`: `loadEntries` extracted as `useCallback([id, token])` ✅
+   - `ListDetailPage`: `loadMembers` extracted as `useCallback([id, token])` ✅
+   - `handleEntryChange = useCallback(() => void loadEntries(), [loadEntries])` ✅
+   - `handleMemberChange = useCallback(() => void loadMembers({isOwner: list?.is_owner ?? false}), [list?.is_owner, loadMembers])` ✅
+   - `useListEvents` for all 3 entry events, filtered on `id` ✅
+   - `useListEvents` for both member events, filtered on `id` ✅
+   - All handler references are stable `useCallback` — no re-subscribe thrash per render ✅
+6. Bonus improvement verified: `OverviewPage.loadLists` now guards all state mutations with `isMountedRef.current` — eliminates a prior setState-after-unmount risk.
+7. Test coverage verified:
+   - OverviewPage SSE test: `list:updated` → refetches and shows "Renamed groceries"; `list:deleted` → empty state; asserts exactly 3 `/api/lists` calls ✅
+   - ListDetailPage SSE test: all 5 event types exercised end-to-end with sequential entry/member response sequences; entry counts and member names verified after each event ✅
+   - `MockEventSource` class defined and registered via `vi.stubGlobal` in `beforeEach` ✅
+
+##### Findings
+- All T-004 acceptance criteria met.
+- 103 frontend tests pass, 0 failures.
+- The `isMountedRef` pattern in both pages is correctly shared across the initial `loadListDetail` effect and the `loadEntries`/`loadMembers` callbacks, preventing stale state updates after navigation.
+
+##### Risks
+- None identified.
 
 #### Verdict
 `PASS`

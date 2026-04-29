@@ -11,6 +11,7 @@ function createAuthedApp(pool, options = {}) {
       ...options.config
     },
     mailer: options.mailer,
+    sseManager: options.sseManager ?? createSseManagerSpy(),
     generateInviteToken: options.generateInviteToken,
     now: options.now,
     requireAuthMiddleware(req, _res, next) {
@@ -371,6 +372,7 @@ describe("sharing routes", () => {
   });
 
   it("revokes a shared member and sends a revocation mail", async () => {
+    const sseManager = createSseManagerSpy();
     const sentMessages = [];
     let callCount = 0;
     const pool = {
@@ -410,7 +412,8 @@ describe("sharing routes", () => {
           async send(message) {
             sentMessages.push(message);
           }
-        }
+        },
+        sseManager
       })
     ).delete("/api/lists/list-1/members/user-2");
 
@@ -428,9 +431,13 @@ describe("sharing routes", () => {
         }
       }
     ]);
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "member:removed", { listId: "list-1", userId: "user-2" }]
+    ]);
   });
 
   it("rejects removing the owner from their own list", async () => {
+    const sseManager = createSseManagerSpy();
     const pool = {
       async query() {
         return {
@@ -448,8 +455,22 @@ describe("sharing routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).delete("/api/lists/list-1/members/user-1");
+    const response = await request(createAuthedApp(pool, { sseManager })).delete(
+      "/api/lists/list-1/members/user-1"
+    );
 
     assert.equal(response.status, 400);
+    assert.deepEqual(sseManager.calls, []);
   });
 });
+
+function createSseManagerSpy() {
+  return {
+    calls: [],
+    broadcastToList(pool, listId, eventType, data) {
+      void pool;
+      this.calls.push([listId, eventType, data]);
+      return Promise.resolve();
+    }
+  };
+}

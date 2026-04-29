@@ -106,6 +106,7 @@ describe("authentication routes", () => {
   it("registers a user from a valid invite, auto-verifies the account, and returns a jwt", async () => {
     const sentMessages = [];
     const queries = [];
+    const sseManager = createSseManagerSpy();
     const { logger, getEntries } = createLogCapture();
     const pool = {
       async query(text, params) {
@@ -144,6 +145,7 @@ describe("authentication routes", () => {
     const app = createApp({
       logger,
       pool,
+      sseManager,
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d",
@@ -186,6 +188,9 @@ describe("authentication routes", () => {
     assert.deepEqual(queries[3][1], ["list-1", "user-9"]);
     assert.match(queries[4][0], /UPDATE list_invites/);
     assert.deepEqual(queries[4][1], ["invite-1"]);
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "member:added", { listId: "list-1", userId: "user-9" }]
+    ]);
     assert.deepEqual(findLogEntry(getEntries(), "User registered"), {
       email: "demo@example.com",
       inviteUsed: true,
@@ -832,4 +837,15 @@ function findLogEntry(entries, message) {
 
   assert.ok(entry, `Expected log entry for "${message}"`);
   return entry;
+}
+
+function createSseManagerSpy() {
+  return {
+    calls: [],
+    broadcastToList(pool, listId, eventType, data) {
+      void pool;
+      this.calls.push([listId, eventType, data]);
+      return Promise.resolve();
+    }
+  };
 }

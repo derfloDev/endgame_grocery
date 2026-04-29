@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
+import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 import { registerServiceWorker } from "./sw/register";
 import { primeIconWorker } from "./workers/iconWorkerClient";
@@ -19,9 +20,11 @@ createRoot(document.getElementById("root")).render(
       }}
     >
       <AuthProvider>
-        <OfflineQueueProvider>
-          <App />
-        </OfflineQueueProvider>
+        <EventSourceProvider>
+          <OfflineQueueProvider>
+            <App />
+          </OfflineQueueProvider>
+        </EventSourceProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>

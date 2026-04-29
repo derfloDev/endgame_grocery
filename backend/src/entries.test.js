@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import request from "supertest";
 import { createApp } from "./app.js";
 
-function createAuthedApp(pool) {
+function createAuthedApp(pool, options = {}) {
   return createApp({
     pool,
+    sseManager: options.sseManager ?? createSseManagerSpy(),
     requireAuthMiddleware(req, _res, next) {
       req.user = { sub: "user-1" };
       next();
@@ -60,6 +61,7 @@ describe("entry routes", () => {
   });
 
   it("creates an entry with an icon for an accessible list", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -104,7 +106,9 @@ describe("entry routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).post("/api/lists/list-1/entries").send({
+    const response = await request(createAuthedApp(pool, { sseManager }))
+      .post("/api/lists/list-1/entries")
+      .send({
       text: "Milk",
       icon: "🥛"
     });
@@ -114,6 +118,9 @@ describe("entry routes", () => {
     assert.equal(response.body.entry.icon, "🥛");
     await waitForQueuedPushInsert();
     assert.equal(callCount, 4);
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "entry:created", { listId: "list-1", entryId: "entry-1" }]
+    ]);
   });
 
   it("creates the entry without writing autocomplete history and still queues push delivery", async () => {
@@ -225,6 +232,7 @@ describe("entry routes", () => {
   });
 
   it("writes autocomplete history when an entry is marked done", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -261,7 +269,7 @@ describe("entry routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool))
+    const response = await request(createAuthedApp(pool, { sseManager }))
       .patch("/api/lists/list-1/entries/entry-1")
       .send({
         text: "Oat milk",
@@ -273,6 +281,9 @@ describe("entry routes", () => {
     assert.equal(response.body.entry.status, "done");
     assert.equal(response.body.entry.details, "Barista");
     assert.equal(callCount, 3);
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "entry:updated", { listId: "list-1", entryId: "entry-1" }]
+    ]);
   });
 
   it("does not write autocomplete history when the entry stays open", async () => {
@@ -441,6 +452,7 @@ describe("entry routes", () => {
   });
 
   it("writes autocomplete history when an entry is deleted", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -471,13 +483,86 @@ describe("entry routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).delete("/api/lists/list-1/entries/entry-1");
+    const response = await request(createAuthedApp(pool, { sseManager })).delete(
+      "/api/lists/list-1/entries/entry-1"
+    );
 
     assert.equal(response.status, 204);
     assert.equal(callCount, 4);
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "entry:deleted", { listId: "list-1", entryId: "entry-1" }]
+    ]);
+  });
+
+  it("does not broadcast create events for invalid entry requests", async () => {
+    const sseManager = createSseManagerSpy();
+
+    const response = await request(createAuthedApp(null, { sseManager }))
+      .post("/api/lists/list-1/entries")
+      .send({});
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(sseManager.calls, []);
+  });
+
+  it("does not broadcast update events when the entry is missing", async () => {
+    const sseManager = createSseManagerSpy();
+    let callCount = 0;
+    const pool = {
+      async query() {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        return { rows: [] };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool, { sseManager }))
+      .patch("/api/lists/list-1/entries/entry-404")
+      .send({ text: "Milk" });
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(sseManager.calls, []);
+  });
+
+  it("does not broadcast delete events when the entry is missing", async () => {
+    const sseManager = createSseManagerSpy();
+    let callCount = 0;
+    const pool = {
+      async query() {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        return { rows: [] };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool, { sseManager })).delete(
+      "/api/lists/list-1/entries/entry-404"
+    );
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(sseManager.calls, []);
   });
 });
 
 async function waitForQueuedPushInsert() {
   await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function createSseManagerSpy() {
+  return {
+    calls: [],
+    broadcastToList(pool, listId, eventType, data) {
+      void pool;
+      this.calls.push([listId, eventType, data]);
+      return Promise.resolve();
+    }
+  };
 }

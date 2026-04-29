@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
 import { createEntry, deleteEntry, fetchEntries, updateEntry } from "../api/entries";
@@ -14,6 +14,7 @@ import RenameListSheet from "../components/RenameListSheet";
 import ShareListSheet from "../components/ShareListSheet";
 import { EmptyState, FAB, Icon, LoadingState, TopBar } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { useListEvents } from "../hooks/useListEvents";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 import { usePushNotifications } from "../hooks/usePushNotifications";
 import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "./recentlyUsedState";
@@ -38,6 +39,7 @@ export default function ListDetailPage() {
   const [showOptions, setShowOptions] = useState(false);
   const [showRename, setShowRename] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const isMountedRef = useRef(false);
   const shouldShowPushToggle = Boolean(list) && (!list.is_owner || members.length > 1);
   const {
     isSubscribed,
@@ -50,8 +52,84 @@ export default function ListDetailPage() {
   });
 
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
 
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const loadEntries = useCallback(
+    async ({ historyItems = null, throwOnError = false } = {}) => {
+      try {
+        const entriesResult = await fetchEntries(id, token);
+        const nextEntries = entriesResult.entries ?? [];
+
+        if (isMountedRef.current) {
+          setEntries(nextEntries);
+          setRecentlyUsed((currentItems) => filterRecentlyUsedItems(historyItems ?? currentItems, nextEntries));
+        }
+
+        return nextEntries;
+      } catch (loadError) {
+        if (isMountedRef.current) {
+          setEntryError(loadError.message);
+        }
+
+        if (throwOnError) {
+          throw loadError;
+        }
+
+        return [];
+      }
+    },
+    [id, token]
+  );
+
+  const loadMembers = useCallback(
+    async ({ isOwner = false, throwOnError = false } = {}) => {
+      if (!isOwner) {
+        if (isMountedRef.current) {
+          setMembers([]);
+          setIsSharingLoading(false);
+        }
+
+        return [];
+      }
+
+      if (isMountedRef.current) {
+        setIsSharingLoading(true);
+      }
+
+      try {
+        const membersResult = await fetchListMembers(id, token);
+        const nextMembers = membersResult.members ?? [];
+
+        if (isMountedRef.current) {
+          setMembers(nextMembers);
+        }
+
+        return nextMembers;
+      } catch (loadError) {
+        if (isMountedRef.current) {
+          setEntryError(loadError.message);
+        }
+
+        if (throwOnError) {
+          throw loadError;
+        }
+
+        return [];
+      } finally {
+        if (isMountedRef.current) {
+          setIsSharingLoading(false);
+        }
+      }
+    },
+    [id, token]
+  );
+
+  useEffect(() => {
     async function loadListDetail() {
       setEntryError("");
       setShareError("");
@@ -70,7 +148,7 @@ export default function ListDetailPage() {
         ]);
         const activeList = (listsResult.lists ?? []).find((candidate) => candidate.id === id);
 
-        if (!isMounted) {
+        if (!isMountedRef.current) {
           return;
         }
 
@@ -89,12 +167,10 @@ export default function ListDetailPage() {
         setRecentlyUsed(filterRecentlyUsedItems(historyResult?.history ?? [], nextEntries));
 
         if (activeList.is_owner) {
-          setIsSharingLoading(true);
-          const membersResult = await fetchListMembers(id, token);
-
-          if (isMounted) {
-            setMembers(membersResult.members ?? []);
-          }
+          await loadMembers({
+            isOwner: true,
+            throwOnError: true
+          });
         } else {
           setMembers([]);
           setShowOptions(false);
@@ -102,7 +178,7 @@ export default function ListDetailPage() {
           setShowShare(false);
         }
       } catch (loadError) {
-        if (isMounted) {
+        if (isMountedRef.current) {
           setEntryError(loadError.message);
           setList(null);
           setEntries([]);
@@ -110,7 +186,7 @@ export default function ListDetailPage() {
           setRecentlyUsed([]);
         }
       } finally {
-        if (isMounted) {
+        if (isMountedRef.current) {
           setIsLoading(false);
           setIsSharingLoading(false);
         }
@@ -118,11 +194,21 @@ export default function ListDetailPage() {
     }
 
     void loadListDetail();
+  }, [id, loadEntries, loadMembers, syncVersion, token]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [id, syncVersion, token]);
+  const handleEntryChange = useCallback(() => {
+    void loadEntries();
+  }, [loadEntries]);
+
+  const handleMemberChange = useCallback(() => {
+    void loadMembers({ isOwner: list?.is_owner ?? false });
+  }, [list?.is_owner, loadMembers]);
+
+  useListEvents("entry:created", id, handleEntryChange);
+  useListEvents("entry:updated", id, handleEntryChange);
+  useListEvents("entry:deleted", id, handleEntryChange);
+  useListEvents("member:added", id, handleMemberChange);
+  useListEvents("member:removed", id, handleMemberChange);
 
   async function updateEntries(updater) {
     let nextEntries = [];

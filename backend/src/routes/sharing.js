@@ -2,13 +2,17 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
+import { logger as defaultLogger } from "../logger.js";
 import createMailer from "../mail/mailer.js";
 import { requireAuth } from "../middleware/auth.js";
+import { sseManager as defaultSseManager } from "../sseManager.js";
 
 export function createSharingRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth,
   config = getConfig(),
+  logger = defaultLogger,
+  sseManager = defaultSseManager,
   mailer = createMailer({ config }),
   generateInviteToken = randomUUID,
   now = () => new Date()
@@ -193,6 +197,15 @@ export function createSharingRouter({
         res.status(404).json({ error: "That member does not have access to this list." });
         return;
       }
+
+      void sseManager
+        .broadcastToList(pool, req.params.id, "member:removed", {
+          listId: req.params.id,
+          userId: req.params.uid
+        })
+        .catch((broadcastError) => {
+          logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+        });
 
       await sendRevocationEmail({
         listName: list.name,

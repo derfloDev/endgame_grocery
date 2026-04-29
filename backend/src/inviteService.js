@@ -24,6 +24,8 @@ export async function acceptInviteForUser({ pool, invite, userId }) {
     [invite.list_id, userId]
   );
 
+  let memberAdded = false;
+
   if (!existingMemberResult.rows[0]) {
     await pool.query(
       `
@@ -33,6 +35,7 @@ export async function acceptInviteForUser({ pool, invite, userId }) {
       `,
       [invite.list_id, userId]
     );
+    memberAdded = true;
   }
 
   await pool.query(
@@ -44,5 +47,8 @@ export async function acceptInviteForUser({ pool, invite, userId }) {
     [invite.id]
   );
 
-  return invite.list_id;
+  return {
+    listId: invite.list_id,
+    memberAdded
+  };
 }
