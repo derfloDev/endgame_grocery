@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.0](https://github.com/derfloDev/endgame_grocery/compare/v0.6.0...v0.7.0) (2026-04-29)
+
+
+### Features
+
+* **api:** add authenticated SSE event stream ([07e69d4](https://github.com/derfloDev/endgame_grocery/commit/07e69d4d6c4c39cc5fd5e66761eb71c7fc1e434b))
+* **api:** broadcast SSE events for list changes ([f6dca6b](https://github.com/derfloDev/endgame_grocery/commit/f6dca6b4f76d10e9de9b99d5ac0468914e4aa559))
+* **ui:** add shared frontend SSE event context ([792ad57](https://github.com/derfloDev/endgame_grocery/commit/792ad57b03737df3d1d026b84a500a708130f38e))
+* **ui:** refresh list pages from SSE updates ([b9f5d97](https://github.com/derfloDev/endgame_grocery/commit/b9f5d9727e4ff4d18be5f87cb56bf0c5c94dd4ad))
+
 ## [0.6.0](https://github.com/derfloDev/endgame_grocery/compare/v0.5.1...v0.6.0) (2026-04-29)
 
 
