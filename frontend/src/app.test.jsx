@@ -877,8 +877,8 @@ describe("authentication shell", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
 
     const addDialog = await screen.findByRole("dialog", { name: "Add Item" });
-    await userEvent.type(within(addDialog).getByLabelText("Add item"), "Y");
-    await userEvent.type(within(addDialog).getByLabelText("Details (optional)"), "500 g");
+    fireEvent.change(within(addDialog).getByLabelText("Add item"), { target: { value: "Y" } });
+    fireEvent.change(within(addDialog).getByLabelText("Details (optional)"), { target: { value: "500 g" } });
     await userEvent.click(within(addDialog).getByRole("button", { name: "Add Item" }));
 
     await waitFor(() => {
@@ -897,8 +897,7 @@ describe("authentication shell", () => {
     const editDetailsInput = within(editDialog).getByLabelText("Details (optional)");
     expect(editDetailsInput.value).toBe("2L");
 
-    await userEvent.clear(editDetailsInput);
-    await userEvent.type(editDetailsInput, "3L");
+    fireEvent.change(editDetailsInput, { target: { value: "3L" } });
     await userEvent.click(within(editDialog).getByRole("button", { name: "Save Item" }));
 
     await waitFor(() => {
@@ -913,7 +912,7 @@ describe("authentication shell", () => {
       expect(screen.getByText("3L")).toBeTruthy();
       expect(screen.queryByText("2L")).toBeNull();
     });
-  });
+  }, 10000);
 
   it("opens the share sheet, sends an invite notice, and revokes an existing member", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));

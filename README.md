@@ -235,6 +235,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - Authentication supports register, email verification, password reset, and login flows backed by JWT access tokens.
 - Lists support create, rename, delete, ownership, and shared-access visibility.
 - List overview and detail pages receive real-time cross-device refresh triggers over `GET /api/events?token=<jwt>` using Server-Sent Events when entries change, lists are renamed or deleted, members are removed, or shared-list invites are accepted.
+- The authenticated frontend keeps one shared SSE connection open while a JWT is present, then closes it again on logout so pages can subscribe to list-scoped events without creating their own connections.
 - The list detail view uses a sticky top bar, a more-options flyout for rename and sharing, a bottom-sheet add-item flow with an overlaid autocomplete suggestion dropdown that anchors to the input, an inline icon preview to the right of the field, a smoothly sliding icon browser, outside-tap dismissal, swipe-to-delete entry rows with optional detail text, and a recently used panel that updates immediately when items are completed or deleted.
 - Entries support add, edit, toggle, and delete actions with open and done grouping, optional icons, and free-text details for quantities, brands, or similar context.
 - The backend tracks per-list autocomplete history from completed and deleted items, exposes ranked typo-tolerant suggestions, and provides per-list recently used history endpoints.

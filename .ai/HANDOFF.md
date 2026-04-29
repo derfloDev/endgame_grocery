@@ -109,3 +109,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-04-29T12:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 frontend SSE context and hook; all plan requirements met, 101/101 tests pass, lint clean — no blocking findings |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-29T11:41:24Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the shared frontend SSE connection context, the list-scoped event subscription hook, provider wiring in the app root, and frontend/docs coverage for the new real-time client behavior |
+| Files Changed | .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/components/AddItemSheet.test.jsx, frontend/src/context/EventSourceContext.jsx, frontend/src/context/EventSourceContext.test.jsx, frontend/src/hooks/useListEvents.js, frontend/src/hooks/useListEvents.test.js, frontend/src/main.jsx |
+| Validation | `npm run lint` (pass, existing `frontend/src/context/AuthContext.jsx` fast-refresh warning only); `npm run build` (pass); `npm test` (pass, required escalation because sandbox blocked the full workspace test run); `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx src/context/EventSourceContext.test.jsx src/hooks/useListEvents.test.js` (pass, required escalation) |
+| Commit | pending feat(ui): add shared frontend SSE event context |
+| Next Role | review |
+
+---
+
+### T-003 — implement — 2026-04-29T12:01:23Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the review-approved frontend SSE context and hook changes and closed T-003 |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/components/AddItemSheet.test.jsx, frontend/src/context/EventSourceContext.jsx, frontend/src/context/EventSourceContext.test.jsx, frontend/src/hooks/useListEvents.js, frontend/src/hooks/useListEvents.test.js, frontend/src/main.jsx |
+| Validation | Reused review-approved validation evidence from the `next_task` handoff entry |
+| Commit | pending feat(ui): add shared frontend SSE event context |
+| Next Role | none |
+
+---

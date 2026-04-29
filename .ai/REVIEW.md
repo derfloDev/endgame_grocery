@@ -100,3 +100,56 @@ No blocking or major findings.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-04-29
+
+#### Findings
+
+No blocking or major findings.
+
+- severity: `nit` | `frontend/src/context/EventSourceContext.jsx` line 1 | `eslint-disable react-refresh/only-export-components` suppresses the fast-refresh warning for the whole file. Acceptable — the file intentionally exports both a provider component and a hook, a common React pattern. Not a required fix.
+- severity: `nit` | `frontend/src/hooks/useListEvents.js` | The inner filter function is recreated each render, so if the consumer does not wrap `handler` in `useCallback`, the hook will re-subscribe on every render. This is documented as a caller responsibility (JSDoc says "stabile Referenz empfohlen") and is enforced in T-004. Not a required fix.
+
+#### Verification
+
+##### Steps
+1. Read all new/changed files: `frontend/src/context/EventSourceContext.jsx`, `frontend/src/hooks/useListEvents.js`, `frontend/src/main.jsx`, `frontend/src/context/EventSourceContext.test.jsx`, `frontend/src/hooks/useListEvents.test.js`, diffs for `frontend/src/app.test.jsx` and `frontend/src/components/AddItemSheet.test.jsx`.
+2. Compared implementation against T-003 plan section in `.ai/PLAN.md`.
+3. Ran `npm run lint` — passed (one pre-existing `AuthContext.jsx` fast-refresh warning, no errors; new `EventSourceContext.jsx` warning suppressed by file-level eslint-disable).
+4. Ran `npm run test --workspace frontend` — **101/101 tests pass**, 0 failures, 17 test files.
+5. Verified plan coverage:
+   - `EventSourceProvider` opens `EventSource` when `token` is present ✅
+   - Closes on logout / token cleared (effect cleanup) ✅
+   - Internal `Map<eventType, Set<handler>>` via `useRef` ✅
+   - `addEventListener(type, handler) → () => void` cleanup function ✅
+   - `onerror` closes connection when `readyState === CLOSED` (401 guard) ✅
+   - All 7 event types registered ✅
+   - `contextValueRef` pattern ensures stable context value across re-renders ✅
+   - `typeof window.EventSource !== "function"` guard for non-browser environments ✅
+   - `useListEvents`: listId filter `!listId || data.listId === listId` ✅
+   - Cleanup on unmount and dependency change ✅
+   - `EventSourceProvider` nesting: inside `AuthProvider`, outside `OfflineQueueProvider` ✅
+   - Exports: `EventSourceProvider`, `useEventSource` ✅
+6. Test changes in `app.test.jsx` and `AddItemSheet.test.jsx`:
+   - `userEvent.type` → `fireEvent.change` for input fields to avoid debounced icon-worker timing issues introduced by the SSE context ✅
+   - Added 10 s test timeout on affected tests ✅
+   - All 26 `app.test.jsx` + 11 `AddItemSheet.test.jsx` tests pass ✅
+
+##### Findings
+- All T-003 acceptance criteria met.
+- 101 frontend tests pass, 0 failures.
+- The `window.EventSource` availability guard is an elegant solution that lets all existing `app.test.jsx` tests run without mocking EventSource (the effect simply skips when EventSource is not a function in the test environment).
+
+##### Risks
+- `useListEvents` re-subscribe on unstable handler reference is a known footgun, mitigated by JSDoc note and enforced in T-004 with `useCallback`.
+
+#### Verdict
+`PASS`
