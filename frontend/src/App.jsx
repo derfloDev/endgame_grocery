@@ -1,7 +1,6 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import OfflineBanner from "./components/OfflineBanner";
 import ProtectedRoute from "./components/ProtectedRoute";
-import BottomNav from "./components/ui/BottomNav";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import InviteAcceptPage from "./pages/InviteAcceptPage";
 import ListDetailPage from "./pages/ListDetailPage";
@@ -36,7 +35,6 @@ function ProtectedLayout() {
       <div className="app-shell">
         <OfflineBanner />
         <Outlet />
-        <BottomNav />
       </div>
     </ProtectedRoute>
   );

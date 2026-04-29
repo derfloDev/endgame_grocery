@@ -23,6 +23,18 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-005 — review — 2026-04-29T17:05:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 feature removals; all acceptance criteria met, zero dead references remain, all validations pass |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-001..T-005 — plan — 2026-04-29T00:00:00Z
 
 | Field | Value |
@@ -182,6 +194,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `backend/src/auth.test.js`, `backend/src/routes/auth.js`, `frontend/src/app.test.jsx`, `frontend/src/components/InfoSheet.jsx`, `frontend/src/components/InfoSheet.test.jsx`, `frontend/src/components/ShareListSheet.jsx`, `frontend/src/components/ShareListSheet.test.jsx`, `frontend/src/context/AuthContext.jsx`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.test.jsx`, `frontend/src/pages/RegisterPage.jsx`, `frontend/src/pages/VerifyEmailPage.jsx` |
 | Validation | `not rerun (commit-only step after review approval)` |
 | Commit | `pending feat(ui): improve account and list sharing details` |
+| Next Role | none |
+
+---
+
+### T-005 — implement — 2026-04-29T17:28:38Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed the overview page toggle and stat chips, dropped the bottom navigation from the protected shell, and cleaned up the related CSS and UI exports |
+| Files Changed | `.ai/TASKS.md`, `frontend/src/App.jsx`, `frontend/src/app.test.jsx`, `frontend/src/components/ui/BottomNav.jsx`, `frontend/src/components/ui/index.js`, `frontend/src/components/ui/ui.test.jsx`, `frontend/src/index.css`, `frontend/src/pages/OverviewPage.jsx` |
+| Validation | `npm run lint` (pass; existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/ui/ui.test.jsx src/app.test.jsx` (pass), `npm run build` (pass; existing `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | `pending fix(ui): simplify overview navigation` |
+| Next Role | review |
+
+---
+
+### T-005 — implement — 2026-04-29T17:33:40Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-005 overview and navigation removals using the approved Conventional Commit message |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `frontend/src/App.jsx`, `frontend/src/app.test.jsx`, `frontend/src/components/ui/BottomNav.jsx`, `frontend/src/components/ui/index.js`, `frontend/src/components/ui/ui.test.jsx`, `frontend/src/index.css`, `frontend/src/pages/OverviewPage.jsx` |
+| Validation | `not rerun (commit-only step after review approval)` |
+| Commit | `pending fix(ui): simplify overview navigation` |
 | Next Role | none |
 
 ---

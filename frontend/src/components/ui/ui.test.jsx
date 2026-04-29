@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  BottomNav,
   BottomSheet,
   EmptyState,
   ErrorState,
@@ -30,7 +29,6 @@ describe("shared Endgame UI components", () => {
         <Icon name="sparkles" />
         <TopBar title="Weekly groceries" subtitle="4 open" onBack={() => {}} actions={[{ icon: "share", onClick: () => {} }]} />
         <FAB onClick={() => {}} />
-        <BottomNav />
         <EmptyState title="No lists yet" body="Create your first mission." action="Create" onAction={() => {}} />
         <LoadingState rows={3} />
         <ErrorState onRetry={() => {}} />
@@ -46,23 +44,6 @@ describe("shared Endgame UI components", () => {
     expect(screen.getByText("New List")).toBeTruthy();
     expect(screen.getByText("Sheet content")).toBeTruthy();
     expect(screen.getByLabelText("Loading")).toBeTruthy();
-  });
-
-  it("renders a single Lists bottom navigation tab and marks it active on list routes", () => {
-    render(
-      <MemoryRouter
-        future={{
-          v7_relativeSplatPath: true,
-          v7_startTransition: true
-        }}
-        initialEntries={["/lists/list-1"]}
-      >
-        <BottomNav />
-      </MemoryRouter>
-    );
-
-    expect(screen.getByRole("button", { name: "Lists" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
   });
 
   it("closes the bottom sheet from the backdrop and does not render when closed", async () => {

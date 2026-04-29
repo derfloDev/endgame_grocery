@@ -21,7 +21,6 @@ export default function OverviewPage() {
   const [lists, setLists] = useState([]);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [view, setView] = useState("active");
   const [showInfo, setShowInfo] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const isMountedRef = useRef(false);
@@ -141,9 +140,6 @@ export default function OverviewPage() {
     }
   }
 
-  const sharedCount = lists.filter((list) => !list.is_owner).length;
-  const displayLists = lists;
-
   return (
     <div className="overview-page">
       <div className="overview-topbar">
@@ -159,32 +155,12 @@ export default function OverviewPage() {
             </button>
           </div>
         </div>
-        <div className="overview-chips">
-          <span className="eg-chip-purple">
-            <Icon color="var(--neon-violet)" name="list" size={12} />
-            <span>{lists.length} {lists.length === 1 ? "list" : "lists"}</span>
-          </span>
-          {sharedCount > 0 ? <span className="eg-chip-cyan">{sharedCount} shared</span> : null}
-        </div>
-      </div>
-
-      <div className="overview-toggle">
-        {["active", "all"].map((toggle) => (
-          <button
-            key={toggle}
-            className={view === toggle ? "eg-toggle eg-toggle-active" : "eg-toggle"}
-            type="button"
-            onClick={() => setView(toggle)}
-          >
-            {toggle === "active" ? "Active" : "All Lists"}
-          </button>
-        ))}
       </div>
 
       <div className="overview-content">
         {error ? <ErrorState onRetry={() => void loadLists()} /> : null}
         {isLoading ? <LoadingState rows={3} /> : null}
-        {!isLoading && !error && displayLists.length === 0 ? (
+        {!isLoading && !error && lists.length === 0 ? (
           <EmptyState
             action="New List"
             body="Create your first mission to get started."
@@ -193,7 +169,7 @@ export default function OverviewPage() {
           />
         ) : null}
         {!isLoading && !error
-          ? displayLists.map((list) => (
+          ? lists.map((list) => (
               <ListCardHome
                 key={list.id}
                 list={list}

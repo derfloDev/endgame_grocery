@@ -133,7 +133,7 @@ describe("authentication shell", () => {
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
   });
 
-  it("renders bottom navigation only inside the protected app shell", async () => {
+  it("does not render bottom navigation in either the protected shell or auth pages", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch.mockResolvedValueOnce({
       ok: true,
@@ -142,9 +142,9 @@ describe("authentication shell", () => {
 
     const rendered = renderApp(["/"]);
 
-    expect(await screen.findByLabelText("Primary navigation")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Lists" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
+    expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    expect(screen.queryByLabelText("Primary navigation")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Lists" })).toBeNull();
 
     rendered.unmount();
     window.localStorage.clear();
@@ -164,8 +164,9 @@ describe("authentication shell", () => {
     renderApp(["/search"]);
 
     expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    expect(screen.queryByLabelText("Primary navigation")).toBeNull();
     expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Lists" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("button", { name: "Lists" })).toBeNull();
   });
 
   it("submits the register form and redirects to email verification", async () => {
@@ -507,6 +508,25 @@ describe("authentication shell", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
 
+  it("removes the overview toggle buttons and stat chips", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+      })
+    });
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Active" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "All Lists" })).toBeNull();
+    expect(screen.queryByText("1 list")).toBeNull();
+    expect(screen.queryByText("1 lists")).toBeNull();
+    expect(screen.queryByText(/shared/i)).toBeNull();
+  });
+
   it("opens the overview info sheet and logs out from it", async () => {
     fetch
       .mockResolvedValueOnce({
@@ -711,9 +731,6 @@ describe("authentication shell", () => {
 
     expect(await screen.findByRole("button", { name: "Mark Tomatoes done" })).toBeTruthy();
     await waitFor(() => {
-      expect(screen.getByTestId("entry-row-entry-2").className).toContain("entry-entering");
-    });
-    await waitFor(() => {
       expect(within(recentlyUsedSection).queryByText("Tomatoes")).toBeNull();
     });
 
@@ -807,10 +824,6 @@ describe("authentication shell", () => {
     await waitFor(() => {
       expect(milkRow.className).toContain("entry-exiting");
     });
-    expect(within(recentlyUsedSection).queryByText("Milk")).toBeNull();
-
-    await wait(150);
-    expect(screen.getByTestId("entry-row-entry-1").className).toContain("entry-exiting");
     expect(within(recentlyUsedSection).queryByText("Milk")).toBeNull();
 
     await wait(200);

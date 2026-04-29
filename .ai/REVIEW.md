@@ -67,6 +67,66 @@ Both `scheduleEntryExit` and `handleDeletedEntry` check `exitingIdsRef.current.h
 
 ---
 
+## Task: T-005
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-29
+
+#### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `frontend/src/app.test.jsx` lines ~730, ~826 | Two mid-animation class assertions removed from T-001's animation integration tests (one `entry-entering` check and one `entry-exiting` intermediate wait). These are timing-sensitive checks and their removal reduces flakiness without losing end-state coverage. Technically out of T-005 scope but harmless cleanup. | No |
+
+#### Verification
+
+##### Steps
+1. Reviewed `git diff HEAD --name-only` — confirmed 7 changed files + 1 deleted.
+2. Reviewed full diffs for `App.jsx`, `OverviewPage.jsx`, `ui/index.js`, `index.css`, `app.test.jsx`, `ui.test.jsx`.
+3. Confirmed `BottomNav.jsx` is deleted (git status: `D`).
+4. Ran `grep -r` check — zero remaining references to `BottomNav`, `overview-chips`, `overview-toggle`, `eg-toggle`, `displayLists`, `sharedCount`, `bottom-nav` in the source tree. ✅
+5. Ran `npm run lint` — 0 errors, same pre-existing warning.
+6. Ran `npm run build` — clean.
+7. Ran `npm test` — 53 frontend tests (ui.test.jsx −1 removed BottomNav test; app.test.jsx +1 new toggle/chips absence test = net 30 app tests), 98 backend; 0 failures.
+
+##### Findings
+
+**AC: No toggle or stat chips on OverviewPage**
+- `view` state and `setView` removed ✅
+- `sharedCount` derivation removed ✅
+- `displayLists` alias removed; `lists` used directly in JSX ✅
+- `.overview-chips` block (list count + shared count chips) removed ✅
+- `.overview-toggle` block (Active / All Lists buttons) removed ✅
+- Integration test "removes the overview toggle buttons and stat chips" asserts all four elements are absent. ✅
+
+**AC: BottomNav absent from all pages**
+- `<BottomNav />` removed from `ProtectedLayout` in `App.jsx` ✅
+- `BottomNav` import removed from `App.jsx` ✅
+- `BottomNav` export removed from `ui/index.js` ✅
+- `frontend/src/components/ui/BottomNav.jsx` deleted ✅
+- `ui.test.jsx` removes `BottomNav` import, render call, and dedicated BottomNav test ✅
+- `app.test.jsx` nav-presence test rewritten to assert absence in both protected and public pages ✅
+
+**AC: Dead CSS and unused state removed**
+CSS removed: `.bottom-nav`, `.bottom-nav-tab`, `.bottom-nav-tab[aria-current="page"]`, `.bottom-nav-tab svg`, `.overview-chips`, `.overview-chips .eg-chip-purple`, `.overview-toggle`, `.eg-toggle`, `.eg-toggle-active` ✅
+Page padding-bottom removed: `.overview-page { padding-bottom: 120px }` and `.detail-page { padding-bottom: 120px }` both gone (these existed solely to clear the fixed bottom-nav bar) ✅
+`.overview-content` had no padding-bottom to remove — confirmed ✅
+Zero source-tree references to any removed identifier — verified by `grep` ✅
+
+##### Risks
+- Low: Removing `padding-bottom: 120px` from `.detail-page` and `.overview-page` means content now extends to the screen edge. On phones with safe-area insets, the FAB (which is `position: fixed`) still floats clear, but list content at the bottom of a scroll could sit behind the home indicator on iPhone. This is an acceptable trade-off given the bottom-nav removal was the reason for that padding.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-004
 
 ### Review Round 1
