@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetOfflineStateForTests } from "./api/offlineStore";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
+import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 
 function renderApp(initialEntries = ["/"]) {
@@ -17,9 +18,11 @@ function renderApp(initialEntries = ["/"]) {
       initialEntries={initialEntries}
     >
       <AuthProvider>
-        <OfflineQueueProvider>
-          <App />
-        </OfflineQueueProvider>
+        <EventSourceProvider>
+          <OfflineQueueProvider>
+            <App />
+          </OfflineQueueProvider>
+        </EventSourceProvider>
       </AuthProvider>
     </MemoryRouter>
   );
@@ -28,6 +31,8 @@ function renderApp(initialEntries = ["/"]) {
 describe("authentication shell", () => {
   beforeEach(async () => {
     vi.stubGlobal("fetch", vi.fn());
+    MockEventSource.instances = [];
+    vi.stubGlobal("EventSource", MockEventSource);
     vi.stubGlobal("Notification", {
       permission: "granted",
       requestPermission: vi.fn(async () => "granted")
@@ -536,6 +541,48 @@ describe("authentication shell", () => {
     expect(screen.getByText("Shared · Alex")).toBeTruthy();
   });
 
+  it("refreshes the overview when list SSE events arrive", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    const listResponses = [
+      [{ id: "list-1", name: "Weekend groceries", owner_name: "Demo User", is_owner: true }],
+      [{ id: "list-1", name: "Renamed groceries", owner_name: "Demo User", is_owner: true }],
+      []
+    ];
+    let listRequestCount = 0;
+
+    fetch.mockImplementation(async (input) => {
+      const url = String(input);
+
+      if (url === "/api/lists") {
+        const lists = listResponses[Math.min(listRequestCount, listResponses.length - 1)];
+        listRequestCount += 1;
+
+        return {
+          ok: true,
+          json: async () => ({ lists })
+        };
+      }
+
+      throw new Error(`Unexpected fetch in test: ${url}`);
+    });
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("Weekend groceries")).toBeTruthy();
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    MockEventSource.instances[0].emit("list:updated", { listId: "list-99" });
+
+    expect(await screen.findByText("Renamed groceries")).toBeTruthy();
+
+    MockEventSource.instances[0].emit("list:deleted", { listId: "list-99" });
+
+    expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    expect(fetch.mock.calls.filter(([url]) => url === "/api/lists")).toHaveLength(3);
+  });
+
   it("shows recently used items, re-adds them, and dismisses them from list detail", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     const queuedResponses = [
@@ -767,6 +814,160 @@ describe("authentication shell", () => {
       .map((button) => button.getAttribute("aria-label"));
     expect(chipLabelsAfterDelete.indexOf("Cheese")).toBeLessThan(chipLabelsAfterDelete.indexOf("Milk"));
   });
+
+  it("refetches entries and members for the active list when SSE events arrive", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    const entryResponses = [
+      [{ id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" }],
+      [
+        { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" },
+        { id: "entry-2", text: "Bread", status: "open", icon: "IconBread", created_at: "2026-04-21T00:01:00Z" }
+      ],
+      [
+        {
+          id: "entry-1",
+          text: "Milk updated",
+          status: "open",
+          icon: "IconMilk",
+          created_at: "2026-04-21T00:00:00Z"
+        },
+        { id: "entry-2", text: "Bread", status: "open", icon: "IconBread", created_at: "2026-04-21T00:01:00Z" }
+      ],
+      [
+        {
+          id: "entry-1",
+          text: "Milk updated",
+          status: "open",
+          icon: "IconMilk",
+          created_at: "2026-04-21T00:00:00Z"
+        }
+      ]
+    ];
+    const memberResponses = [
+      [
+        {
+          user_id: "user-1",
+          display_name: "Demo User",
+          email: "demo@example.com",
+          joined_at: "2026-04-21T00:00:00Z",
+          is_owner: true
+        }
+      ],
+      [
+        {
+          user_id: "user-1",
+          display_name: "Demo User",
+          email: "demo@example.com",
+          joined_at: "2026-04-21T00:00:00Z",
+          is_owner: true
+        },
+        {
+          user_id: "user-2",
+          display_name: "Alex",
+          email: "alex@example.com",
+          joined_at: "2026-04-21T01:00:00Z",
+          is_owner: false
+        }
+      ],
+      [
+        {
+          user_id: "user-1",
+          display_name: "Demo User",
+          email: "demo@example.com",
+          joined_at: "2026-04-21T00:00:00Z",
+          is_owner: true
+        }
+      ]
+    ];
+    let entryRequestCount = 0;
+    let memberRequestCount = 0;
+
+    fetch.mockImplementation(async (input) => {
+      const url = String(input);
+
+      if (url === "/api/lists") {
+        return {
+          ok: true,
+          json: async () => ({
+            lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+          })
+        };
+      }
+
+      if (url === "/api/lists/list-1/entries") {
+        const entries = entryResponses[Math.min(entryRequestCount, entryResponses.length - 1)];
+        entryRequestCount += 1;
+
+        return {
+          ok: true,
+          json: async () => ({ entries })
+        };
+      }
+
+      if (url === "/api/lists/list-1/history") {
+        return {
+          ok: true,
+          json: async () => ({ history: [] })
+        };
+      }
+
+      if (url === "/api/lists/list-1/members") {
+        const members = memberResponses[Math.min(memberRequestCount, memberResponses.length - 1)];
+        memberRequestCount += 1;
+
+        return {
+          ok: true,
+          json: async () => ({ members })
+        };
+      }
+
+      if (url === "/api/push/vapid-public-key") {
+        return {
+          ok: true,
+          json: async () => ({ publicKey: "dGVzdA" })
+        };
+      }
+
+      throw new Error(`Unexpected fetch in test: ${url}`);
+    });
+
+    renderApp(["/lists/list-1"]);
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+    expect(await screen.findByText("Milk")).toBeTruthy();
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "List options" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Share list/ }));
+    expect(await screen.findByText(/SQUAD \(1\)/)).toBeTruthy();
+
+    MockEventSource.instances[0].emit("entry:created", { listId: "list-1", entryId: "entry-2" });
+    expect(await screen.findByText("Bread")).toBeTruthy();
+
+    MockEventSource.instances[0].emit("entry:updated", { listId: "list-1", entryId: "entry-1" });
+    expect(await screen.findByText("Milk updated")).toBeTruthy();
+
+    MockEventSource.instances[0].emit("entry:deleted", { listId: "list-1", entryId: "entry-2" });
+    await waitFor(() => {
+      expect(screen.queryByText("Bread")).toBeNull();
+    });
+
+    MockEventSource.instances[0].emit("member:added", { listId: "list-1", userId: "user-2" });
+    expect(await screen.findByText("Alex")).toBeTruthy();
+    expect(screen.getByText(/SQUAD \(2\)/)).toBeTruthy();
+
+    MockEventSource.instances[0].emit("member:removed", { listId: "list-1", userId: "user-2" });
+    await waitFor(() => {
+      expect(screen.queryByText("Alex")).toBeNull();
+    });
+    expect(screen.getByText(/SQUAD \(1\)/)).toBeTruthy();
+
+    expect(fetch.mock.calls.filter(([url]) => url === "/api/lists")).toHaveLength(1);
+    expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1/entries")).toHaveLength(4);
+    expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1/members")).toHaveLength(3);
+  }, 10000);
 
   it("adds and edits entry details from the list detail sheet", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
@@ -1186,4 +1387,42 @@ function setNavigatorOnline(value) {
     configurable: true,
     value
   });
+}
+
+class MockEventSource {
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSED = 2;
+  static instances = [];
+
+  constructor(url) {
+    this.url = url;
+    this.readyState = MockEventSource.OPEN;
+    this.listeners = new Map();
+    this.close = vi.fn(() => {
+      this.readyState = MockEventSource.CLOSED;
+    });
+    this.onerror = null;
+    MockEventSource.instances.push(this);
+  }
+
+  addEventListener(type, handler) {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, new Set());
+    }
+
+    this.listeners.get(type).add(handler);
+  }
+
+  removeEventListener(type, handler) {
+    this.listeners.get(type)?.delete(handler);
+  }
+
+  emit(type, data) {
+    for (const handler of this.listeners.get(type) ?? []) {
+      handler({
+        data: JSON.stringify(data)
+      });
+    }
+  }
 }

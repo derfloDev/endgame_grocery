@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
 import { writeCachedResource } from "../api/offlineStore";
@@ -9,6 +9,7 @@ import NewListSheet from "../components/NewListSheet";
 import { EmptyState, ErrorState, FAB, Icon, LoadingState } from "../components/ui";
 import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
+import { useListEvents } from "../hooks/useListEvents";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 
 const LISTS_CACHE_KEY = "lists";
@@ -23,6 +24,15 @@ export default function OverviewPage() {
   const [view, setView] = useState("active");
   const [showInfo, setShowInfo] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const isMountedRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const loadLists = useCallback(async () => {
     setError("");
@@ -30,44 +40,31 @@ export default function OverviewPage() {
 
     try {
       const result = await fetchLists(token);
-      setLists(result.lists ?? []);
+
+      if (isMountedRef.current) {
+        setLists(result.lists ?? []);
+      }
     } catch (loadError) {
-      setError(loadError.message);
+      if (isMountedRef.current) {
+        setError(loadError.message);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [token]);
 
   useEffect(() => {
-    let isMounted = true;
+    void loadLists();
+  }, [loadLists, syncVersion]);
 
-    async function loadListsForEffect() {
-      setError("");
-      setIsLoading(true);
+  const handleListChange = useCallback(() => {
+    void loadLists();
+  }, [loadLists]);
 
-      try {
-        const result = await fetchLists(token);
-
-        if (isMounted) {
-          setLists(result.lists ?? []);
-        }
-      } catch (loadError) {
-        if (isMounted) {
-          setError(loadError.message);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void loadListsForEffect();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [syncVersion, token]);
+  useListEvents("list:updated", null, handleListChange);
+  useListEvents("list:deleted", null, handleListChange);
 
   async function updateLists(updater) {
     let nextLists = [];

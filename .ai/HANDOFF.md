@@ -147,3 +147,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — review — 2026-04-29T12:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 SSE page wiring; all plan requirements met with stable useCallback handlers, 103/103 tests pass, lint clean — no blocking findings |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-29T12:15:16Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Wired the overview and list-detail pages to shared SSE events so list renames/deletes refetch the overview and matching entry/member changes refetch only the active list detail data |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/pages/ListDetailPage.jsx, frontend/src/pages/OverviewPage.jsx |
+| Validation | `npm run lint` (pass, existing `frontend/src/context/AuthContext.jsx` fast-refresh warning only); `npm run build` (pass, existing Vite warning about `onnxruntime-web` using `eval`); `npm test` (pass, required escalation because sandbox blocked the full workspace test run); `npm run test --workspace frontend -- src/app.test.jsx` (pass, required escalation) |
+| Commit | pending feat(ui): refresh list pages from SSE updates |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-04-29T12:32:51Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the review-approved SSE page refresh wiring and closed T-004 |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/pages/ListDetailPage.jsx, frontend/src/pages/OverviewPage.jsx |
+| Validation | Reused review-approved validation evidence from the `next_task` handoff entry |
+| Commit | pending feat(ui): refresh list pages from SSE updates |
+| Next Role | none |
+
+---

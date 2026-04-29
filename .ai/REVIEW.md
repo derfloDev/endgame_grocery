@@ -153,3 +153,54 @@ No blocking or major findings.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-04-29
+
+#### Findings
+
+No blocking or major findings.
+
+- severity: `nit` | `frontend/src/pages/ListDetailPage.jsx` | `handleMemberChange` depends on `list?.is_owner` in its `useCallback` dep array. When `list` transitions from `null` → loaded, `handleMemberChange` recreates and `useListEvents` re-subscribes. This is correct behavior — an SSE event arriving before the list is loaded will no-op (skip member fetch). Not a required fix.
+
+#### Verification
+
+##### Steps
+1. Read full diffs for `frontend/src/pages/OverviewPage.jsx`, `frontend/src/pages/ListDetailPage.jsx`, and `frontend/src/app.test.jsx`.
+2. Compared implementation against T-004 plan section in `.ai/PLAN.md`.
+3. Ran `npm run lint` — passed (one pre-existing `AuthContext.jsx` fast-refresh warning, no errors).
+4. Ran `npm run test --workspace frontend` — **103/103 tests pass**, 0 failures, 17 test files (2 new tests added for T-004).
+5. Verified plan coverage:
+   - `OverviewPage`: `handleListChange` wrapped in `useCallback([loadLists])` ✅
+   - `useListEvents("list:updated", null, handleListChange)` ✅
+   - `useListEvents("list:deleted", null, handleListChange)` ✅
+   - `ListDetailPage`: `loadEntries` extracted as `useCallback([id, token])` ✅
+   - `ListDetailPage`: `loadMembers` extracted as `useCallback([id, token])` ✅
+   - `handleEntryChange = useCallback(() => void loadEntries(), [loadEntries])` ✅
+   - `handleMemberChange = useCallback(() => void loadMembers({isOwner: list?.is_owner ?? false}), [list?.is_owner, loadMembers])` ✅
+   - `useListEvents` for all 3 entry events, filtered on `id` ✅
+   - `useListEvents` for both member events, filtered on `id` ✅
+   - All handler references are stable `useCallback` — no re-subscribe thrash per render ✅
+6. Bonus improvement verified: `OverviewPage.loadLists` now guards all state mutations with `isMountedRef.current` — eliminates a prior setState-after-unmount risk.
+7. Test coverage verified:
+   - OverviewPage SSE test: `list:updated` → refetches and shows "Renamed groceries"; `list:deleted` → empty state; asserts exactly 3 `/api/lists` calls ✅
+   - ListDetailPage SSE test: all 5 event types exercised end-to-end with sequential entry/member response sequences; entry counts and member names verified after each event ✅
+   - `MockEventSource` class defined and registered via `vi.stubGlobal` in `beforeEach` ✅
+
+##### Findings
+- All T-004 acceptance criteria met.
+- 103 frontend tests pass, 0 failures.
+- The `isMountedRef` pattern in both pages is correctly shared across the initial `loadListDetail` effect and the `loadEntries`/`loadMembers` callbacks, preventing stale state updates after navigation.
+
+##### Risks
+- None identified.
+
+#### Verdict
+`PASS`
