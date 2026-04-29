@@ -21,4 +21,10 @@ export function createRequireAuth({ jwtLib = jwt, config = getConfig() } = {}) {
   };
 }
 
+export function createRequireAuthFn({ jwtLib = jwt, config = getConfig() } = {}) {
+  return function requireAuthFn(token) {
+    return jwtLib.verify(token, config.jwtSecret);
+  };
+}
+
 export const requireAuth = createRequireAuth();

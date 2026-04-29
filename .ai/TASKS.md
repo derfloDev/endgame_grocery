@@ -20,4 +20,7 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
+| T-001 | Backend: SseManager + /api/events-Route | done | 401 ohne/ungültigen Token; korrekte SSE-Headers + Heartbeat bei gültigem Token; Verbindung wird beim Close bereinigt; Unit-Tests für SseManager.add/remove/sendToUsers/broadcastToList | `npm run lint`; `npm run build`; `npm test`; `npm run test --workspace backend -- src/sseManager.test.js src/routes/events.test.js` | none |
+| T-002 | Backend: SSE-Events nach Mutations (entries, lists, sharing) | ready_for_implement | broadcastToList wird nach jedem erfolgreichen POST/PATCH/DELETE aufgerufen; nicht bei 4xx-Antworten; list:deleted broadcast vor DB-DELETE | n/a | implement |
+| T-003 | Frontend: EventSourceContext + useListEvents-Hook | ready_for_implement | EventSource wird bei Token geöffnet und bei Logout geschlossen; Handler werden für eingehende Events aufgerufen; listId-Filter in useListEvents funktioniert; EventSourceProvider in main.jsx eingebunden | n/a | implement |
+| T-004 | Frontend: OverviewPage + ListDetailPage reagieren auf SSE-Events | ready_for_implement | list:updated/list:deleted → loadLists() in OverviewPage; entry:*/member:* → gezielter Refetch in ListDetailPage; Handler-Referenzen sind stabil (useCallback) | n/a | implement |
