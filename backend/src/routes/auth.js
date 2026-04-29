@@ -5,6 +5,7 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { acceptInviteForUser, getPendingInviteByToken } from "../inviteService.js";
+import { logger as defaultLogger } from "../logger.js";
 import createMailer from "../mail/mailer.js";
 
 function createToken({ jwtLib, config, userId }) {
@@ -18,7 +19,8 @@ export function createAuthRouter({
   bcryptLib = bcrypt,
   jwtLib = jwt,
   config = getConfig(),
-  mailer = createMailer({ config }),
+  logger = defaultLogger,
+  mailer = createMailer({ config, logger }),
   generateVerificationToken = randomUUID,
   generatePasswordResetToken = randomUUID,
   now = () => new Date()
@@ -64,6 +66,14 @@ export function createAuthRouter({
           userId: result.rows[0].id
         });
 
+        logger.info(
+          {
+            userId: result.rows[0].id,
+            email: normalizedEmail,
+            inviteUsed: true
+          },
+          "User registered"
+        );
         res.status(201).json({
           token: createToken({ jwtLib, config, userId: result.rows[0].id }),
           listId
@@ -90,9 +100,21 @@ export function createAuthRouter({
         user: result.rows[0]
       });
 
+      logger.info(
+        {
+          userId: result.rows[0].id,
+          email: normalizedEmail,
+          inviteUsed: false
+        },
+        "User registered"
+      );
       res.status(201).json({ message: "Verification email sent." });
     } catch (error) {
       if (error.code === "23505") {
+        logger.warn(
+          { email: email.toLowerCase() },
+          "Registration rejected: email already exists"
+        );
         res.status(409).json({ error: "An account with that email already exists." });
         return;
       }
@@ -115,6 +137,7 @@ export function createAuthRouter({
     }
 
     try {
+      const normalizedEmail = email.toLowerCase();
       const result = await pool.query(
         `
           SELECT id, email, display_name, password_hash, email_verified
@@ -122,12 +145,13 @@ export function createAuthRouter({
           WHERE email = $1
           LIMIT 1
         `,
-        [email.toLowerCase()]
+        [normalizedEmail]
       );
 
       const user = result.rows[0];
 
       if (!user) {
+        logger.warn({ email: normalizedEmail, reason: "invalid_credentials" }, "Login failed");
         res.status(401).json({ error: "Invalid email or password." });
         return;
       }
@@ -135,15 +159,18 @@ export function createAuthRouter({
       const isValid = await bcryptLib.compare(password, user.password_hash);
 
       if (!isValid) {
+        logger.warn({ email: normalizedEmail, reason: "invalid_credentials" }, "Login failed");
         res.status(401).json({ error: "Invalid email or password." });
         return;
       }
 
       if (!user.email_verified) {
+        logger.warn({ email: normalizedEmail, reason: "email_not_verified" }, "Login blocked");
         res.status(403).json({ error: "Please verify your email before logging in." });
         return;
       }
 
+      logger.info({ userId: user.id }, "User logged in");
       res.json({
         token: createToken({ jwtLib, config, userId: user.id })
       });
@@ -200,6 +227,7 @@ export function createAuthRouter({
         [verificationToken]
       );
 
+      logger.info({ userId: verification.user_id }, "Email verified");
       res.json({
         token: createToken({ jwtLib, config, userId: verification.user_id })
       });
@@ -370,6 +398,7 @@ export function createAuthRouter({
         [token]
       );
 
+      logger.info({ userId: resetRequest.user_id }, "Password reset completed");
       res.json({ message: "Password updated." });
     } catch (error) {
       next(error);

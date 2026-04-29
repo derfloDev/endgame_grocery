@@ -26,6 +26,7 @@ export function getConfig() {
     appBaseUrl: process.env.APP_BASE_URL ?? "",
     vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
     vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
-    vapidContact: process.env.VAPID_CONTACT ?? ""
+    vapidContact: process.env.VAPID_CONTACT ?? "",
+    logLevel: process.env.LOG_LEVEL ?? "info"
   };
 }

@@ -13,12 +13,15 @@ describe("getConfig", () => {
   it("falls back to the default port", () => {
     const previousPort = process.env.PORT;
     const previousSmtpPort = process.env.SMTP_PORT;
+    const previousLogLevel = process.env.LOG_LEVEL;
 
     delete process.env.PORT;
     delete process.env.SMTP_PORT;
+    delete process.env.LOG_LEVEL;
 
     assert.equal(getConfig().port, 4000);
     assert.equal(getConfig().smtpPort, 587);
+    assert.equal(getConfig().logLevel, "info");
 
     if (previousPort) {
       process.env.PORT = previousPort;
@@ -27,6 +30,8 @@ describe("getConfig", () => {
     if (previousSmtpPort) {
       process.env.SMTP_PORT = previousSmtpPort;
     }
+
+    restoreEnvVar("LOG_LEVEL", previousLogLevel);
   });
 
   it("loads DATABASE_URL from the project root .env regardless of cwd", async () => {
@@ -49,6 +54,7 @@ describe("getConfig", () => {
     const previousVapidPublicKey = process.env.VAPID_PUBLIC_KEY;
     const previousVapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
     const previousVapidContact = process.env.VAPID_CONTACT;
+    const previousLogLevel = process.env.LOG_LEVEL;
 
     fs.mkdirSync(fixtureBackendSrcDir, { recursive: true });
     fs.copyFileSync(path.join(backendSrcDir, "env.js"), fixtureEnvModulePath);
@@ -68,6 +74,7 @@ describe("getConfig", () => {
         "VAPID_PUBLIC_KEY=fixture-public-key",
         "VAPID_PRIVATE_KEY=fixture-private-key",
         "VAPID_CONTACT=mailto:fixture@example.com",
+        "LOG_LEVEL=debug",
         ""
       ].join("\n")
     );
@@ -87,6 +94,7 @@ describe("getConfig", () => {
       delete process.env.VAPID_PUBLIC_KEY;
       delete process.env.VAPID_PRIVATE_KEY;
       delete process.env.VAPID_CONTACT;
+      delete process.env.LOG_LEVEL;
       process.chdir(fixtureBackendDir);
 
       const fixtureModuleUrl = new URL(
@@ -112,6 +120,7 @@ describe("getConfig", () => {
       assert.equal(config.vapidPublicKey, "fixture-public-key");
       assert.equal(config.vapidPrivateKey, "fixture-private-key");
       assert.equal(config.vapidContact, "mailto:fixture@example.com");
+      assert.equal(config.logLevel, "debug");
     } finally {
       process.chdir(previousCwd);
       restoreEnvVar("DATABASE_URL", previousDatabaseUrl);
@@ -128,6 +137,7 @@ describe("getConfig", () => {
       restoreEnvVar("VAPID_PUBLIC_KEY", previousVapidPublicKey);
       restoreEnvVar("VAPID_PRIVATE_KEY", previousVapidPrivateKey);
       restoreEnvVar("VAPID_CONTACT", previousVapidContact);
+      restoreEnvVar("LOG_LEVEL", previousLogLevel);
       fs.rmSync(fixtureRootDir, { recursive: true, force: true });
     }
   });
@@ -153,6 +163,7 @@ describe("getConfig", () => {
     const previousVapidPublicKey = process.env.VAPID_PUBLIC_KEY;
     const previousVapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
     const previousVapidContact = process.env.VAPID_CONTACT;
+    const previousLogLevel = process.env.LOG_LEVEL;
 
     fs.mkdirSync(fixtureBackendSrcDir, { recursive: true });
     fs.mkdirSync(fixtureDotenvDir, { recursive: true });
@@ -192,6 +203,7 @@ describe("getConfig", () => {
       delete process.env.VAPID_PUBLIC_KEY;
       delete process.env.VAPID_PRIVATE_KEY;
       delete process.env.VAPID_CONTACT;
+      delete process.env.LOG_LEVEL;
       process.chdir(fixtureBackendDir);
 
       const fixtureModuleUrl = new URL(
@@ -215,6 +227,7 @@ describe("getConfig", () => {
       assert.equal(config.vapidPublicKey, "");
       assert.equal(config.vapidPrivateKey, "");
       assert.equal(config.vapidContact, "");
+      assert.equal(config.logLevel, "info");
     } finally {
       process.chdir(previousCwd);
       restoreEnvVar("DATABASE_URL", previousDatabaseUrl);
@@ -231,6 +244,7 @@ describe("getConfig", () => {
       restoreEnvVar("VAPID_PUBLIC_KEY", previousVapidPublicKey);
       restoreEnvVar("VAPID_PRIVATE_KEY", previousVapidPrivateKey);
       restoreEnvVar("VAPID_CONTACT", previousVapidContact);
+      restoreEnvVar("LOG_LEVEL", previousLogLevel);
       fs.rmSync(fixtureRootDir, { recursive: true, force: true });
     }
   });

@@ -29,6 +29,7 @@ describe("createMailer", () => {
       "welcome.hbs": "{{> base heading=heading body=body ctaUrl=ctaUrl ctaLabel=ctaLabel}}\n"
     });
     const sentMessages = [];
+    const loggerEntries = [];
     let transportOptions;
 
     const mailer = createMailer({
@@ -51,6 +52,7 @@ describe("createMailer", () => {
           };
         }
       },
+      logger: createLoggerSpy(loggerEntries),
       templatesDir
     });
 
@@ -86,54 +88,112 @@ describe("createMailer", () => {
       sentMessages[0].html,
       /https:\/\/app\.example\.com\/verify-email\?token(?:=|&#x3D;)abc123/
     );
+    assert.deepEqual(loggerEntries, [
+      {
+        level: "info",
+        message: "Email sent",
+        fields: {
+          to: "demo@example.com",
+          subject: "Welcome"
+        }
+      }
+    ]);
   });
 
   it("skips sending and warns when smtpHost is not configured", async () => {
     let createTransportCalls = 0;
-    const warnings = [];
-    const originalWarn = console.warn;
+    const loggerEntries = [];
+    const mailer = createMailer({
+      config: {
+        smtpHost: "",
+        smtpPort: 587,
+        smtpFrom: "noreply@example.com",
+        smtpFromName: "Endgame Grocery"
+      },
+      nodemailerLib: {
+        createTransport() {
+          createTransportCalls += 1;
+          return {
+            async sendMail() {
+              throw new Error("sendMail should not be called without SMTP config");
+            }
+          };
+        }
+      },
+      logger: createLoggerSpy(loggerEntries)
+    });
 
-    console.warn = (message) => {
-      warnings.push(message);
-    };
+    const result = await mailer.send({
+      to: "demo@example.com",
+      subject: "Welcome",
+      template: "welcome",
+      context: {
+        body: "Skipped delivery."
+      }
+    });
 
-    try {
-      const mailer = createMailer({
-        config: {
-          smtpHost: "",
-          smtpPort: 587,
-          smtpFrom: "noreply@example.com",
-          smtpFromName: "Endgame Grocery"
-        },
-        nodemailerLib: {
-          createTransport() {
-            createTransportCalls += 1;
-            return {
-              async sendMail() {
-                throw new Error("sendMail should not be called without SMTP config");
-              }
-            };
+    assert.deepEqual(result, { skipped: true });
+    assert.equal(createTransportCalls, 0);
+    assert.deepEqual(loggerEntries, [
+      {
+        level: "warn",
+        message: "SMTP host is not configured; skipping email delivery",
+        fields: {}
+      }
+    ]);
+  });
+
+  it("logs and rethrows send errors", async () => {
+    const loggerEntries = [];
+    const templatesDir = createTempTemplatesDir({
+      "base.hbs": "<body>{{body}}</body>\n",
+      "welcome.hbs": "{{> base body=body}}\n"
+    });
+    const sendError = new Error("SMTP refused message");
+    const mailer = createMailer({
+      config: {
+        smtpHost: "smtp.example.com",
+        smtpPort: 587,
+        smtpFrom: "noreply@example.com",
+        smtpFromName: "Endgame Grocery"
+      },
+      nodemailerLib: {
+        createTransport() {
+          return {
+            async sendMail() {
+              throw sendError;
+            }
+          };
+        }
+      },
+      logger: createLoggerSpy(loggerEntries),
+      templatesDir
+    });
+
+    await assert.rejects(
+      () =>
+        mailer.send({
+          to: "demo@example.com",
+          subject: "Welcome",
+          template: "welcome",
+          context: {
+            body: "This one fails."
           }
-        }
-      });
+        }),
+      sendError
+    );
 
-      const result = await mailer.send({
-        to: "demo@example.com",
-        subject: "Welcome",
-        template: "welcome",
-        context: {
-          body: "Skipped delivery."
+    assert.deepEqual(loggerEntries, [
+      {
+        level: "error",
+        message: "Email send failed",
+        fields: {
+          err: sendError,
+          to: "demo@example.com",
+          subject: "Welcome"
         }
-      });
-
-      assert.deepEqual(result, { skipped: true });
-      assert.equal(createTransportCalls, 0);
-      assert.deepEqual(warnings, [
-        "SMTP host is not configured; skipping email delivery."
-      ]);
-    } finally {
-      console.warn = originalWarn;
-    }
+      }
+    ]);
   });
 });
 
@@ -147,4 +207,18 @@ function createTempTemplatesDir(templates) {
   }
 
   return templatesDir;
+}
+
+function createLoggerSpy(entries) {
+  return {
+    info(fields, message) {
+      entries.push({ level: "info", message, fields: fields ?? {} });
+    },
+    warn(fields, message) {
+      entries.push({ level: "warn", message, fields: fields ?? {} });
+    },
+    error(fields, message) {
+      entries.push({ level: "error", message, fields: fields ?? {} });
+    }
+  };
 }
