@@ -19,6 +19,7 @@ describe("release workflows", () => {
     assert.doesNotMatch(workflow, /^\s{2}docker-publish:\s*$/m);
     assert.doesNotMatch(workflow, /^\s{4}release_created:\s+/m);
     assert.doesNotMatch(workflow, /^\s{4}tag_name:\s+/m);
+    assert.match(workflow, /token: \$\{\{ secrets\.RELEASE_PLEASE_TOKEN \}\}/);
   });
 
   it("publishes Docker images from the release published event", () => {
