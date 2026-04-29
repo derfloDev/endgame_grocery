@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/derfloDev/endgame_grocery/compare/v0.5.1...v0.6.0) (2026-04-29)
+
+
+### Features
+
+* **api:** add structured backend logging ([5807cd1](https://github.com/derfloDev/endgame_grocery/commit/5807cd18196b8c4a2c7424694f55c917d589f7c6))
+
 ## [0.5.1](https://github.com/derfloDev/endgame_grocery/compare/v0.5.0...v0.5.1) (2026-04-29)
 
 
