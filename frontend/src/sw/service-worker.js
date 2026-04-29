@@ -3,7 +3,9 @@ import { precacheAndRoute } from "workbox-precaching";
 
 self.skipWaiting();
 clientsClaim();
-precacheAndRoute(self.__WB_MANIFEST);
+const precacheManifest = self.__WB_MANIFEST;
+
+precacheAndRoute(precacheManifest || []);
 
 self.addEventListener("push", (event) => {
   const payload = event.data?.json?.() ?? {

@@ -42,6 +42,10 @@ export default defineConfig({
       srcDir: "src/sw",
       filename: "service-worker.js",
       registerType: "autoUpdate",
+      devOptions: {
+        enabled: true,
+        type: "module"
+      },
       // Required when the app is served behind Cloudflare Access: sends the CF_Authorization
       // cookie with the manifest fetch so Access does not redirect it to the login page.
       // Note: /sw.js and /workbox-*.js must be bypassed in CF Access separately (see README).

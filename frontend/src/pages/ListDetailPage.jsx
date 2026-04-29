@@ -42,6 +42,7 @@ export default function ListDetailPage() {
   const isMountedRef = useRef(false);
   const shouldShowPushToggle = Boolean(list) && (!list.is_owner || members.length > 1);
   const {
+    isReady: isPushReady,
     isSubscribed,
     isSupported: isPushSupported,
     subscribe,
@@ -471,7 +472,12 @@ export default function ListDetailPage() {
               {list.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
             </div>
             {shouldShowPushToggle && isPushSupported ? (
-              <button className="eg-btn-secondary" type="button" onClick={() => void handlePushToggle()}>
+              <button
+                className="eg-btn-secondary"
+                disabled={!isPushReady}
+                type="button"
+                onClick={() => void handlePushToggle()}
+              >
                 {isSubscribed ? "Disable notifications" : "Enable notifications"}
               </button>
             ) : null}

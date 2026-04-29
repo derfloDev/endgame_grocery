@@ -6,8 +6,6 @@ Append-only role handoff log. Each role adds one entry when its step is complete
 
 Each entry uses this exact structure. Omit fields marked as role-specific when they do not apply.
 
----
-
 ### <TASK_ID> — <ROLE> — <YYYY-MM-DDTHH:MM:SSZ>
 
 | Field | Value |
@@ -23,170 +21,163 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
-### T-001..T-004 — plan — 2026-04-29T10:00:00Z
+### T-001 — plan — 2026-04-29T00:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Planned instant updates via SSE: 4 tasks covering backend SseManager + /api/events route, broadcast on mutations, frontend EventSourceContext + useListEvents hook, and page subscriptions |
-| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md |
+| Summary | Diagnosed three root-cause bugs in `usePushNotifications` (stale closure, missing guard, wrong initial state) and planned a three-phase fix covering the hook, its consumer, and test coverage. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
 | Next Role | implement |
 
 ---
 
-### T-001 — review — 2026-04-29T11:00:00Z
+### T-001 — implement — 2026-04-29T12:58:34Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Fixed the push-notification readiness race so the toggle stays disabled until the VAPID key finishes loading and subscription state updates reliably. |
+| Files Changed | .ai/TASKS.md, frontend/src/app.test.jsx, frontend/src/hooks/usePushNotifications.js, frontend/src/hooks/usePushNotifications.test.js, frontend/src/pages/ListDetailPage.jsx |
+| Validation | `npm run lint` (pass with existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/hooks/usePushNotifications.test.js src/app.test.jsx` (pass), `npm run build` (pass), `npm test` (pass) |
+| Commit | `<pending> fix(push): wait for VAPID readiness before enabling notifications` |
+| Next Role | review |
+
+---
+
+### T-001 — review — 2026-04-29T13:30:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed T-001 backend SSE infrastructure; all plan requirements met, all tests pass, lint clean — no blocking findings |
+| Summary | Reviewed push-notification race-condition fix; all plan steps implemented correctly, lint/build/tests pass (98/98). |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-04-29T09:53:54Z
+### T-001 — implement — 2026-04-29T13:03:44Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Added backend SSE infrastructure with authenticated `/api/events`, per-user connection management, heartbeat handling, cleanup on close, and backend/docs coverage |
-| Files Changed | .ai/TASKS.md, README.md, backend/src/app.js, backend/src/middleware/auth.js, backend/src/routes/events.js, backend/src/routes/events.test.js, backend/src/sseManager.js, backend/src/sseManager.test.js |
-| Validation | `npm run lint` (pass, existing frontend warning only); `npm run build` (pass); `npm test` (pass); `npm run test --workspace backend -- src/sseManager.test.js src/routes/events.test.js` (pass, required escalation because sandbox blocked `node --test` with EPERM) |
-| Commit | pending feat(api): add authenticated SSE event stream |
-| Next Role | review |
-
----
-
-### T-001 — implement — 2026-04-29T10:17:24Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Committed the review-approved backend SSE event stream changes and closed T-001 |
-| Files Changed | .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, ROADMAP.md, backend/src/app.js, backend/src/middleware/auth.js, backend/src/routes/events.js, backend/src/routes/events.test.js, backend/src/sseManager.js, backend/src/sseManager.test.js |
-| Validation | Reused review-approved validation evidence from the `next_task` handoff entry |
-| Commit | pending feat(api): add authenticated SSE event stream |
+| Summary | Marked the reviewed push-notification fix done and created the task commit using the approved Conventional Commit subject. |
+| Files Changed | .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, .ai/TASKS.md, ROADMAP.md, frontend/src/app.test.jsx, frontend/src/hooks/usePushNotifications.js, frontend/src/hooks/usePushNotifications.test.js, frontend/src/pages/ListDetailPage.jsx |
+| Validation | not rerun during `commit_task`; using the reviewer-approved `npm run lint`, `npm run build`, and `npm test` results recorded above |
+| Commit | `<pending> fix(push): wait for VAPID readiness before enabling notifications` |
 | Next Role | none |
 
 ---
 
-### T-002 — review — 2026-04-29T11:30:00Z
+### T-002 — implement — 2026-04-29T13:24:01Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Decoupled VAPID-key readiness from service-worker readiness, enabled the module service worker in Vite dev mode, and documented localhost push testing. |
+| Files Changed | .ai/TASKS.md, README.md, frontend/src/hooks/usePushNotifications.js, frontend/src/hooks/usePushNotifications.test.js, frontend/src/vite-config.test.js, frontend/vite.config.js |
+| Validation | `npm run lint` (pass with existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/hooks/usePushNotifications.test.js src/vite-config.test.js` (pass), `npm run build` (pass), `npm test` (pass) |
+| Commit | `<pending> fix(push): enable localhost push testing in Vite dev mode` |
+| Next Role | review |
+
+---
+
+### Cycle closed — unversioned — 2026-04-29T13:10:30Z
+
+| Field | Value |
+|-------|-------|
+| Summary | All tasks done; cycle closed |
+| Version | unversioned |
+
+---
+
+### T-002 — review — 2026-04-29T13:45:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed T-002 SSE mutation broadcasts; all plan requirements met at correct trigger points, all 44 tests pass — no blocking findings |
+| Summary | Reviewed dev-mode SW decoupling fix; all plan phases implemented correctly, lint/build/tests pass (98/98). |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-002 — implement — 2026-04-29T10:42:33Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Added SSE broadcasts for entry and list mutations, member removal, and real member-addition points on invite acceptance and invite-backed registration |
-| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, backend/src/auth.test.js, backend/src/entries.test.js, backend/src/inviteService.js, backend/src/invites.test.js, backend/src/lists.test.js, backend/src/routes/auth.js, backend/src/routes/entries.js, backend/src/routes/invites.js, backend/src/routes/lists.js, backend/src/routes/sharing.js, backend/src/sharing.test.js |
-| Validation | `npm run lint` (pass, existing frontend warning only); `npm run build` (pass); `npm test` (pass, required escalation because sandbox blocked `node --test` with EPERM); `npm run test --workspace backend -- src/entries.test.js src/lists.test.js src/sharing.test.js src/invites.test.js src/auth.test.js` (pass, required escalation) |
-| Commit | pending feat(api): broadcast SSE events for list changes |
-| Next Role | review |
-
----
-
-### T-002 — implement — 2026-04-29T10:54:35Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Committed the review-approved SSE mutation broadcast changes and closed T-002 |
-| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, backend/src/auth.test.js, backend/src/entries.test.js, backend/src/inviteService.js, backend/src/invites.test.js, backend/src/lists.test.js, backend/src/routes/auth.js, backend/src/routes/entries.js, backend/src/routes/invites.js, backend/src/routes/lists.js, backend/src/routes/sharing.js, backend/src/sharing.test.js |
-| Validation | Reused review-approved validation evidence from the `next_task` handoff entry |
-| Commit | pending feat(api): broadcast SSE events for list changes |
-| Next Role | none |
-
----
-
-### T-003 — review — 2026-04-29T12:00:00Z
+### T-002 — plan — 2026-04-29T00:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed T-003 frontend SSE context and hook; all plan requirements met, 101/101 tests pass, lint clean — no blocking findings |
+| Summary | Diagnosed dev-mode root cause (Promise.all coupling blocks publicKey until serviceWorker.ready resolves, which never happens without a registered SW); planned sequential fetch decoupling in the hook and devOptions in vite.config.js. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-003 — plan — 2026-04-29T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Diagnosed two remaining dev-mode causes after T-002: SW activation crash due to unguarded `self.__WB_MANIFEST`, and redundant `serviceWorker.ready` await in `subscribe()` with no timeout. Planned guard in SW file, `registrationRef` cache in hook, and 8-second timeout fallback. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-29T13:40:07Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Repaired the missed T-002 task commit by creating the isolated product-change commit and preserving the follow-up planning artifacts separately. |
+| Files Changed | .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, .ai/TASKS.md, ROADMAP.md |
+| Validation | not rerun during repaired `commit_task`; using the reviewer-approved `npm run lint`, `npm run build`, and `npm test` results recorded above |
+| Commit | `51ec772 fix(push): enable localhost push testing in Vite dev mode` |
+| Next Role | none |
+
+---
+
+### T-003 — review — 2026-04-29T14:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed SW activation guard and `registrationRef` cache fix; all plan phases implemented correctly; lint/build/tests pass. |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-003 — implement — 2026-04-29T11:41:24Z
+### T-003 — implement — 2026-04-29T13:49:29Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Added the shared frontend SSE connection context, the list-scoped event subscription hook, provider wiring in the app root, and frontend/docs coverage for the new real-time client behavior |
-| Files Changed | .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/components/AddItemSheet.test.jsx, frontend/src/context/EventSourceContext.jsx, frontend/src/context/EventSourceContext.test.jsx, frontend/src/hooks/useListEvents.js, frontend/src/hooks/useListEvents.test.js, frontend/src/main.jsx |
-| Validation | `npm run lint` (pass, existing `frontend/src/context/AuthContext.jsx` fast-refresh warning only); `npm run build` (pass); `npm test` (pass, required escalation because sandbox blocked the full workspace test run); `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/app.test.jsx src/context/EventSourceContext.test.jsx src/hooks/useListEvents.test.js` (pass, required escalation) |
-| Commit | pending feat(ui): add shared frontend SSE event context |
+| Summary | Fixed dev-mode service-worker activation and removed the redundant ready wait in `subscribe()` by caching the registration and adding an 8-second fallback error. |
+| Files Changed | .ai/TASKS.md, frontend/src/hooks/usePushNotifications.js, frontend/src/hooks/usePushNotifications.test.js, frontend/src/sw/service-worker.js, frontend/src/vite-config.test.js |
+| Validation | `npm run lint` (pass with existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/hooks/usePushNotifications.test.js src/vite-config.test.js` (pass), `npm run build` (pass), `npm test` (pass) |
+| Commit | `<pending> fix(push): complete localhost push subscription flow` |
 | Next Role | review |
 
 ---
 
-### T-003 — implement — 2026-04-29T12:01:23Z
+### T-003 — implement — 2026-04-29T13:55:55Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Committed the review-approved frontend SSE context and hook changes and closed T-003 |
-| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/components/AddItemSheet.test.jsx, frontend/src/context/EventSourceContext.jsx, frontend/src/context/EventSourceContext.test.jsx, frontend/src/hooks/useListEvents.js, frontend/src/hooks/useListEvents.test.js, frontend/src/main.jsx |
-| Validation | Reused review-approved validation evidence from the `next_task` handoff entry |
-| Commit | pending feat(ui): add shared frontend SSE event context |
+| Summary | Marked the reviewed localhost push-flow fix done and created the single task commit using the approved Conventional Commit subject. |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, frontend/src/hooks/usePushNotifications.js, frontend/src/hooks/usePushNotifications.test.js, frontend/src/sw/service-worker.js, frontend/src/vite-config.test.js |
+| Validation | not rerun during `commit_task`; using the reviewer-approved `npm run lint`, `npm run build`, and `npm test` results recorded above |
+| Commit | `<pending> fix(push): complete localhost push subscription flow` |
 | Next Role | none |
 
 ---
 
-### T-004 — review — 2026-04-29T12:30:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Reviewed T-004 SSE page wiring; all plan requirements met with stable useCallback handlers, 103/103 tests pass, lint clean — no blocking findings |
-| Verdict | PASS |
-| Blocking Findings | none |
-| Next Role | implement |
-
----
-
-### T-004 — implement — 2026-04-29T12:15:16Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Wired the overview and list-detail pages to shared SSE events so list renames/deletes refetch the overview and matching entry/member changes refetch only the active list detail data |
-| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/pages/ListDetailPage.jsx, frontend/src/pages/OverviewPage.jsx |
-| Validation | `npm run lint` (pass, existing `frontend/src/context/AuthContext.jsx` fast-refresh warning only); `npm run build` (pass, existing Vite warning about `onnxruntime-web` using `eval`); `npm test` (pass, required escalation because sandbox blocked the full workspace test run); `npm run test --workspace frontend -- src/app.test.jsx` (pass, required escalation) |
-| Commit | pending feat(ui): refresh list pages from SSE updates |
-| Next Role | review |
-
----
-
-### T-004 — implement — 2026-04-29T12:32:51Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Committed the review-approved SSE page refresh wiring and closed T-004 |
-| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, frontend/src/app.test.jsx, frontend/src/pages/ListDetailPage.jsx, frontend/src/pages/OverviewPage.jsx |
-| Validation | Reused review-approved validation evidence from the `next_task` handoff entry |
-| Commit | pending feat(ui): refresh list pages from SSE updates |
-| Next Role | none |
-
----
-
-### Cycle closed — unversioned — 2026-04-29T12:37:39Z
+### Cycle closed — unversioned — 2026-04-29T13:58:17Z
 
 | Field | Value |
 |-------|-------|

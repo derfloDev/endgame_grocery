@@ -42,8 +42,16 @@ describe("vite worker config", () => {
     expect(viteConfigSource).toMatch(/filename:\s*["']service-worker\.js["']/);
   });
 
+  it("enables the module service worker in Vite dev mode", () => {
+    expect(viteConfigSource).toMatch(/devOptions:\s*\{/);
+    expect(viteConfigSource).toMatch(/enabled:\s*true/);
+    expect(viteConfigSource).toMatch(/type:\s*["']module["']/);
+  });
+
   it("registers precaching and push handlers in the custom service worker", () => {
     expect(serviceWorkerSource).toMatch(/precacheAndRoute/);
+    expect(serviceWorkerSource).toMatch(/const precacheManifest = self\.__WB_MANIFEST/);
+    expect(serviceWorkerSource).toMatch(/precacheAndRoute\(precacheManifest \|\| \[\]\)/);
     expect(serviceWorkerSource).toMatch(/addEventListener\(["']push["']/);
     expect(serviceWorkerSource).toMatch(/showNotification/);
     expect(serviceWorkerSource).toMatch(/addEventListener\(["']notificationclick["']/);

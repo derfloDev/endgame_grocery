@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchVapidPublicKey, subscribePush, unsubscribePush } from "../api/push";
 
 export function usePushNotifications({ enabled = false, token = "" }) {
-  const [publicKey, setPublicKey] = useState("");
+  // `null` means the initial VAPID-key fetch has not completed yet.
+  const [publicKey, setPublicKey] = useState(null);
   const [currentSubscription, setCurrentSubscription] = useState(null);
+  const registrationRef = useRef(null);
 
   const isSupported = Boolean(
     enabled &&
@@ -14,23 +16,27 @@ export function usePushNotifications({ enabled = false, token = "" }) {
   const isSubscribed = Boolean(currentSubscription);
 
   useEffect(() => {
-    if (!isSupported || publicKey) {
+    if (!isSupported || publicKey !== null) {
       return;
     }
 
     let cancelled = false;
 
     async function loadPushState() {
-      const [keyResult, registration] = await Promise.all([
-        fetchVapidPublicKey(),
-        navigator.serviceWorker.ready
-      ]);
+      const keyResult = await fetchVapidPublicKey();
 
       if (cancelled) {
         return;
       }
 
       setPublicKey(keyResult.publicKey ?? "");
+      const registration = await navigator.serviceWorker.ready;
+
+      if (cancelled) {
+        return;
+      }
+
+      registrationRef.current = registration;
       setCurrentSubscription(await registration.pushManager.getSubscription());
     }
 
@@ -48,13 +54,28 @@ export function usePushNotifications({ enabled = false, token = "" }) {
       return false;
     }
 
+    if (!publicKey) {
+      return false;
+    }
+
     const permission = await window.Notification.requestPermission();
 
     if (permission !== "granted") {
       return false;
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration =
+      registrationRef.current ??
+      (await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, reject) => {
+          setTimeout(
+            () => reject(new Error("Service worker is not available. Try refreshing the page.")),
+            8000
+          );
+        })
+      ]));
+    registrationRef.current = registration;
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: decodeBase64Url(publicKey)
@@ -80,6 +101,7 @@ export function usePushNotifications({ enabled = false, token = "" }) {
   }
 
   return {
+    isReady: Boolean(publicKey),
     isSubscribed,
     isSupported,
     subscribe,

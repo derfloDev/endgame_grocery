@@ -1,44 +1,40 @@
 # ROADMAP
 
-Goal: Einkaufslisten und deren Einträge aktualisieren sich automatisch auf allen verbundenen Geräten in Echtzeit, ohne manuelle Seitenaktualisierung.
+Goal: Fix push notification subscription so "Enable notifications" reliably registers the browser
+and toggles the button state — both in production (mobile/desktop) and in the local dev environment.
 
-## Priority 1 — Instant Updates via Server-Sent Events
+## Priority 1 — Production race condition (DONE — T-001)
 
-Objective: Alle Geräte, auf denen ein Nutzer eingeloggt ist, erhalten sofortige Updates wenn sich eine geteilte oder eigene Liste ändert.
+Objective: Eliminate the stale-closure bug in `usePushNotifications` that caused
+"Registration failed – push service error" on desktop and a silent no-op on mobile.
 
-### Technologie-Entscheidung
-- **Server-Sent Events (SSE)** über einen neuen Endpunkt `GET /api/events`
-- Mutations laufen weiterhin über REST; SSE ist nur der Benachrichtigungskanal
-- Kein WebSocket-Umbau nötig
+- Fixed: `publicKey` initial state changed from `""` to `null`.
+- Fixed: `subscribe()` guards against empty/null `publicKey` before calling `requestPermission()`.
+- Fixed: `isReady` flag exposed so the button is disabled until the VAPID key is loaded.
+- Fixed: VAPID-key fetch decoupled from `serviceWorker.ready` so `isReady` becomes true
+  as soon as the HTTP response returns.
+- Fixed: `devOptions: { enabled: true, type: "module" }` added to VitePWA.
 
-### Scope der Echtzeit-Updates
-- **Eintrags-Events**: Eintrag hinzugefügt / geändert / gelöscht → alle Geräte, die die betroffene Liste geöffnet haben, refetchen die Einträge sofort
-- **Listen-Events**: Liste umbenannt / gelöscht / archiviert → Übersichtsseite auf allen Geräten aktualisiert sich sofort
-- **Mitglieder-Events**: Mitglied hinzugefügt / entfernt → Listendetailseite (Members-Bereich) aktualisiert sich sofort
+## Priority 2 — Dev-mode push testing (T-003)
 
-### Architektur
-**Backend:**
-- Neuer SSE-Endpunkt `GET /api/events` (authentifiziert via Bearer-Token)
-- `SseManager`-Singleton: verwaltet offene Verbindungen pro User
-- Nach jeder Mutation in Entry-, List- und Sharing-Routes: `sseManager.broadcast(listId, event)`
-- Server filtert Events pro User: nur Verbindungen die Zugriff auf die betroffene Liste haben erhalten das Event
+Objective: Allow the full subscribe/unsubscribe cycle to complete on `localhost` with the
+Vite dev server.
 
-**Frontend:**
-- `useEventSource`-Hook: baut SSE-Verbindung auf, handled Auto-Reconnect, parst Events
-- Verbindung wird beim Login geöffnet und beim Logout geschlossen (globaler Context)
-- `OverviewPage`: lauscht auf `list:*`-Events → `loadLists()` neu aufrufen
-- `ListDetailPage`: lauscht auf `entry:*`- und `member:*`-Events für die aktuelle Liste → zugehörige Daten refetchen
+Two remaining root causes (confirmed after T-002 landed):
 
-### Acceptance Criteria
-- AC1: Fügt Gerät A einen Eintrag zu einer geteilten Liste hinzu, sieht Gerät B (gleiche Liste geöffnet) ihn innerhalb von 2 Sekunden ohne manuelle Aktualisierung
-- AC2: Benennt Gerät A eine Liste um, zeigt die Übersichtsseite auf Gerät B den neuen Namen innerhalb von 2 Sekunden
-- AC3: Schließt ein Nutzer den Browser oder verliert die Verbindung, verbindet sich der Client automatisch wieder (Exponential Backoff, max. 30 s)
-- AC4: Offline-Geräte (kein SSE) erhalten beim nächsten Seitenaufruf wie bisher die aktuellen Daten (kein Rückschritt)
-- AC5: Der SSE-Endpunkt erfordert Authentifizierung; unauthentifizierte Anfragen erhalten HTTP 401
-- AC6: Bestehende Push-Notifications (verzögert, für nicht aktive Geräte) bleiben unberührt
+1. **`service-worker.js` crashes on activation in dev mode.**
+   `precacheAndRoute(self.__WB_MANIFEST)` throws a `ReferenceError` when
+   `vite-plugin-pwa` does not inject `__WB_MANIFEST` for the `injectManifest` strategy
+   in dev mode. The SW fails to activate → `navigator.serviceWorker.ready` never resolves.
 
-### Out of Scope
-- Optimistisches Merge von SSE-Events in den lokalen State (stattdessen: Refetch)
-- Offline-Queue über SSE statt REST
-- Presence-Anzeige ("User X bearbeitet gerade")
-- Rate-Limiting für SSE-Verbindungen (kann später ergänzt werden)
+2. **`subscribe()` makes its own redundant `await navigator.serviceWorker.ready`.**
+   Even when the registration was already obtained in `loadPushState()`, `subscribe()`
+   re-awaits `serviceWorker.ready` independently, causing a hang if the cached result
+   is not reused.
+
+Planned outcomes:
+- SW activates in dev mode; `navigator.serviceWorker.ready` resolves.
+- `subscribe()` reuses the already-resolved registration from `loadPushState()`.
+- If SW is somehow unavailable, `subscribe()` fails with a clear error after a timeout
+  instead of hanging forever.
+- `npm run lint`, `npm run build`, and `npm test` pass.

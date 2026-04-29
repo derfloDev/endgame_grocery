@@ -1,5 +1,5 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
-import { createElement } from "react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { createElement, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchVapidPublicKey,
@@ -15,14 +15,38 @@ vi.mock("../api/push", () => ({
 }));
 
 function HookHarness({ enabled = true, token = "token-1" }) {
-  const { isSubscribed, isSupported, subscribe, unsubscribe } = usePushNotifications({ enabled, token });
+  const { isReady, isSubscribed, isSupported, subscribe, unsubscribe } = usePushNotifications({
+    enabled,
+    token
+  });
+  const [subscribeError, setSubscribeError] = useState("");
+  const [subscribeResult, setSubscribeResult] = useState("");
 
   return [
     createElement("span", { "data-testid": "supported", key: "supported" }, String(isSupported)),
+    createElement("span", { "data-testid": "ready", key: "ready" }, String(isReady)),
     createElement("span", { "data-testid": "subscribed", key: "subscribed" }, String(isSubscribed)),
+    createElement("span", { "data-testid": "subscribe-error", key: "subscribe-error" }, subscribeError),
+    createElement(
+      "span",
+      { "data-testid": "subscribe-result", key: "subscribe-result" },
+      subscribeResult
+    ),
     createElement(
       "button",
-      { key: "subscribe", onClick: () => void subscribe(), type: "button" },
+      {
+        key: "subscribe",
+        onClick: async () => {
+          try {
+            setSubscribeError("");
+            setSubscribeResult(String(await subscribe()));
+          } catch (error) {
+            setSubscribeResult("");
+            setSubscribeError(error.message);
+          }
+        },
+        type: "button"
+      },
       "subscribe"
     ),
     createElement(
@@ -31,6 +55,17 @@ function HookHarness({ enabled = true, token = "token-1" }) {
       "unsubscribe"
     )
   ];
+}
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+
+  return { promise, resolve, reject };
 }
 
 describe("usePushNotifications", () => {
@@ -79,6 +114,7 @@ describe("usePushNotifications", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     cleanup();
   });
@@ -89,6 +125,9 @@ describe("usePushNotifications", () => {
     render(createElement(HookHarness, { enabled: true }));
 
     expect((await screen.findByTestId("supported")).textContent).toBe("true");
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
 
     await act(async () => {
       screen.getByText("subscribe").click();
@@ -103,6 +142,136 @@ describe("usePushNotifications", () => {
       }
     });
     expect(screen.getByTestId("subscribed").textContent).toBe("true");
+  });
+
+  it("returns false without requesting permission when the VAPID key is still loading", async () => {
+    const deferredKey = createDeferred();
+    fetchVapidPublicKey.mockReturnValue(deferredKey.promise);
+
+    render(createElement(HookHarness, { enabled: true }));
+
+    expect(screen.getByTestId("ready").textContent).toBe("false");
+
+    await act(async () => {
+      screen.getByText("subscribe").click();
+    });
+
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+    expect(subscribePush).not.toHaveBeenCalled();
+
+    deferredKey.resolve({ publicKey: "dGVzdA" });
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
+  });
+
+  it("reports readiness only after the VAPID key finishes loading", async () => {
+    const deferredKey = createDeferred();
+    fetchVapidPublicKey.mockReturnValue(deferredKey.promise);
+
+    render(createElement(HookHarness, { enabled: true }));
+
+    expect(screen.getByTestId("supported").textContent).toBe("true");
+    expect(screen.getByTestId("ready").textContent).toBe("false");
+
+    deferredKey.resolve({ publicKey: "dGVzdA" });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
+  });
+
+  it("becomes ready when the VAPID key loads even while serviceWorker.ready is pending", async () => {
+    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        ready: new Promise(() => {})
+      }
+    });
+
+    render(createElement(HookHarness, { enabled: true }));
+
+    expect(screen.getByTestId("ready").textContent).toBe("false");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
+
+    expect(subscribePush).not.toHaveBeenCalled();
+  });
+
+  it("subscribes without re-reading serviceWorker.ready once the registration is cached", async () => {
+    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    let readyAccessCount = 0;
+    const registration = {
+      pushManager: {
+        async getSubscription() {
+          return null;
+        },
+        async subscribe() {
+          return subscribeResult;
+        }
+      }
+    };
+
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      configurable: true,
+      value: {}
+    });
+    Object.defineProperty(window.navigator.serviceWorker, "ready", {
+      configurable: true,
+      get() {
+        readyAccessCount += 1;
+        return Promise.resolve(registration);
+      }
+    });
+
+    render(createElement(HookHarness, { enabled: true }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
+    expect(readyAccessCount).toBe(1);
+
+    await act(async () => {
+      screen.getByText("subscribe").click();
+    });
+
+    expect(screen.getByTestId("subscribe-result").textContent).toBe("true");
+    expect(screen.getByTestId("subscribed").textContent).toBe("true");
+    expect(readyAccessCount).toBe(1);
+  });
+
+  it("rejects subscribe with a timeout error when no service worker registration becomes available", async () => {
+    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        ready: new Promise(() => {})
+      }
+    });
+
+    render(createElement(HookHarness, { enabled: true }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
+
+    vi.useFakeTimers();
+
+    await act(async () => {
+      screen.getByText("subscribe").click();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8000);
+    });
+
+    expect(screen.getByTestId("subscribe-error").textContent).toBe(
+      "Service worker is not available. Try refreshing the page."
+    );
+    expect(subscribePush).not.toHaveBeenCalled();
   });
 
   it("does not fetch the VAPID key when the toggle is disabled", () => {
@@ -133,6 +302,10 @@ describe("usePushNotifications", () => {
     };
 
     render(createElement(HookHarness, { enabled: true }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
 
     await act(async () => {
       screen.getByText("subscribe").click();
