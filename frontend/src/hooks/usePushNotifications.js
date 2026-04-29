@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { fetchVapidPublicKey, subscribePush, unsubscribePush } from "../api/push";
 
 export function usePushNotifications({ enabled = false, token = "" }) {
-  const [publicKey, setPublicKey] = useState("");
+  // `null` means the initial VAPID-key fetch has not completed yet.
+  const [publicKey, setPublicKey] = useState(null);
   const [currentSubscription, setCurrentSubscription] = useState(null);
 
   const isSupported = Boolean(
@@ -14,7 +15,7 @@ export function usePushNotifications({ enabled = false, token = "" }) {
   const isSubscribed = Boolean(currentSubscription);
 
   useEffect(() => {
-    if (!isSupported || publicKey) {
+    if (!isSupported || publicKey !== null) {
       return;
     }
 
@@ -45,6 +46,10 @@ export function usePushNotifications({ enabled = false, token = "" }) {
 
   async function subscribe() {
     if (!isSupported) {
+      return false;
+    }
+
+    if (!publicKey) {
       return false;
     }
 
@@ -80,6 +85,7 @@ export function usePushNotifications({ enabled = false, token = "" }) {
   }
 
   return {
+    isReady: Boolean(publicKey),
     isSubscribed,
     isSupported,
     subscribe,

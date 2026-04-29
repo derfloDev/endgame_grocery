@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -15,10 +15,14 @@ vi.mock("../api/push", () => ({
 }));
 
 function HookHarness({ enabled = true, token = "token-1" }) {
-  const { isSubscribed, isSupported, subscribe, unsubscribe } = usePushNotifications({ enabled, token });
+  const { isReady, isSubscribed, isSupported, subscribe, unsubscribe } = usePushNotifications({
+    enabled,
+    token
+  });
 
   return [
     createElement("span", { "data-testid": "supported", key: "supported" }, String(isSupported)),
+    createElement("span", { "data-testid": "ready", key: "ready" }, String(isReady)),
     createElement("span", { "data-testid": "subscribed", key: "subscribed" }, String(isSubscribed)),
     createElement(
       "button",
@@ -31,6 +35,17 @@ function HookHarness({ enabled = true, token = "token-1" }) {
       "unsubscribe"
     )
   ];
+}
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+
+  return { promise, resolve, reject };
 }
 
 describe("usePushNotifications", () => {
@@ -89,6 +104,9 @@ describe("usePushNotifications", () => {
     render(createElement(HookHarness, { enabled: true }));
 
     expect((await screen.findByTestId("supported")).textContent).toBe("true");
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
 
     await act(async () => {
       screen.getByText("subscribe").click();
@@ -103,6 +121,43 @@ describe("usePushNotifications", () => {
       }
     });
     expect(screen.getByTestId("subscribed").textContent).toBe("true");
+  });
+
+  it("returns false without requesting permission when the VAPID key is still loading", async () => {
+    const deferredKey = createDeferred();
+    fetchVapidPublicKey.mockReturnValue(deferredKey.promise);
+
+    render(createElement(HookHarness, { enabled: true }));
+
+    expect(screen.getByTestId("ready").textContent).toBe("false");
+
+    await act(async () => {
+      screen.getByText("subscribe").click();
+    });
+
+    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+    expect(subscribePush).not.toHaveBeenCalled();
+
+    deferredKey.resolve({ publicKey: "dGVzdA" });
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
+  });
+
+  it("reports readiness only after the VAPID key finishes loading", async () => {
+    const deferredKey = createDeferred();
+    fetchVapidPublicKey.mockReturnValue(deferredKey.promise);
+
+    render(createElement(HookHarness, { enabled: true }));
+
+    expect(screen.getByTestId("supported").textContent).toBe("true");
+    expect(screen.getByTestId("ready").textContent).toBe("false");
+
+    deferredKey.resolve({ publicKey: "dGVzdA" });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
   });
 
   it("does not fetch the VAPID key when the toggle is disabled", () => {
@@ -133,6 +188,10 @@ describe("usePushNotifications", () => {
     };
 
     render(createElement(HookHarness, { enabled: true }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
 
     await act(async () => {
       screen.getByText("subscribe").click();

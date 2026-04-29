@@ -1241,6 +1241,7 @@ describe("authentication shell", () => {
 
     rendered.unmount();
     fetch.mockReset();
+    const deferredVapidResponse = createDeferred();
 
     fetch
       .mockResolvedValueOnce({
@@ -1257,15 +1258,24 @@ describe("authentication shell", () => {
         ok: true,
         json: async () => ({ history: [] })
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ publicKey: "test-public-key" })
-      });
+      .mockReturnValueOnce(deferredVapidResponse.promise);
 
     renderApp(["/lists/list-2"]);
 
     expect(await screen.findByText("BBQ party")).toBeTruthy();
     expect(await screen.findByRole("button", { name: "Enable notifications" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Enable notifications" }).hasAttribute("disabled")).toBe(true);
+
+    deferredVapidResponse.resolve({
+      ok: true,
+      json: async () => ({ publicKey: "test-public-key" })
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Enable notifications" }).hasAttribute("disabled")).toBe(
+        false
+      );
+    });
   });
 
   it("shows the redesigned list detail loading and error states", async () => {
@@ -1380,6 +1390,17 @@ function createFakeJwt(sub) {
   const payload = btoa(JSON.stringify({ sub }));
 
   return `${header}.${payload}.signature`;
+}
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+
+  return { promise, resolve, reject };
 }
 
 function setNavigatorOnline(value) {

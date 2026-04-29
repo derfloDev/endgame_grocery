@@ -20,4 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
+| T-001 | Fix push-notification subscription race condition in `usePushNotifications` | done | Button disabled until VAPID key loaded; subscribe/unsubscribe cycle completes; button label updates; lint + build + tests pass | `npm run lint`; `npm run build`; `npm test` | none |
