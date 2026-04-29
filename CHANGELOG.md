@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.1](https://github.com/derfloDev/endgame_grocery/compare/v0.7.0...v0.7.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **push:** complete localhost push subscription flow ([f9e1bcc](https://github.com/derfloDev/endgame_grocery/commit/f9e1bcc65f668cb87888bc0965f2da8510bbd156))
+* **push:** enable localhost push testing in Vite dev mode ([51ec772](https://github.com/derfloDev/endgame_grocery/commit/51ec7721436b5cea77b08f290dd6dc4304f9e7cd))
+* **push:** wait for VAPID readiness before enabling notifications ([f282d66](https://github.com/derfloDev/endgame_grocery/commit/f282d66fef12bb1d8b51f5df685e07f48d21fde3))
+
 ## [0.7.0](https://github.com/derfloDev/endgame_grocery/compare/v0.6.0...v0.7.0) (2026-04-29)
 
 
