@@ -1,8 +1,10 @@
 import express from "express";
+import pinoHttp from "pino-http";
 import authRoutes from "./routes/auth.js";
 import entryRoutes from "./routes/entries.js";
 import historyRoutes from "./routes/history.js";
 import invitesRoutes from "./routes/invites.js";
+import { logger as defaultLogger } from "./logger.js";
 import listRoutes from "./routes/lists.js";
 import pushRoutes from "./routes/push.js";
 import suggestionRoutes from "./routes/suggestions.js";
@@ -12,8 +14,19 @@ import { startPushWorker } from "./workers/pushWorker.js";
 
 export function createApp(options = {}) {
   const app = express();
+  const logger = options.logger ?? defaultLogger;
   const shouldStartWorkers = options.startWorkers ?? !("pool" in options);
 
+  app.use(
+    pinoHttp({
+      logger,
+      autoLogging: {
+        ignore(req) {
+          return req.url === "/api/health";
+        }
+      }
+    })
+  );
   app.use(express.json());
 
   app.get("/api/health", (_req, res) => {
@@ -32,9 +45,9 @@ export function createApp(options = {}) {
   app.use("/api/lists/:id/entries", entryRoutes(options));
   app.use("/api/lists/:id/members", sharingRoutes(options));
 
-  app.use((error, _req, res, _next) => {
+  app.use((error, req, res, _next) => {
     void _next;
-    console.error(error);
+    (req.log ?? logger).error({ err: error }, "Unhandled error");
     res.status(500).json({ error: "Internal server error." });
   });
 

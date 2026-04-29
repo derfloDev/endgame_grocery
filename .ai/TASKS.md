@@ -20,4 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | Add `RELEASE_PLEASE_TOKEN` PAT to release-please workflow so Docker Publish is triggered on release | done | `release-please.yml` passes the PAT via `token:`; after the next release the Docker Publish workflow starts automatically | `npm run test --workspace backend -- src/releaseWorkflow.test.js`; `npx prettier --check .github/workflows/release-please.yml`; `npm run lint`; `npm run build`; `npm test` | none |
+| T-001 | Structured backend logging via pino + pino-http | done | (1) Every HTTP request/response logged with method, URL, status, duration. (2) Startup log shows port, DB/SMTP/VAPID configured flags, log level. (3) Auth events (register, login, verify, reset) logged at info/warn. (4) Push worker lifecycle and per-job events logged. (5) Mailer send success/skip/error logged. (6) No console.* calls remain in production code. (7) LOG_LEVEL env var documented in docker-compose.example.yml. (8) npm run lint + npm run build + npm test all pass. | `npm run lint`, `npm run build`, `npm test` | none |

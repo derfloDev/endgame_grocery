@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import Handlebars from "handlebars";
 import nodemailer from "nodemailer";
 import { getConfig } from "../env.js";
+import { logger as defaultLogger } from "../logger.js";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultTemplatesDir = path.join(moduleDir, "templates");
@@ -12,7 +13,8 @@ export function createMailer({
   config = getConfig(),
   nodemailerLib = nodemailer,
   handlebarsLib = Handlebars,
-  templatesDir = defaultTemplatesDir
+  templatesDir = defaultTemplatesDir,
+  logger = defaultLogger
 } = {}) {
   const transport = config.smtpHost
     ? nodemailerLib.createTransport(createTransportOptions(config))
@@ -22,7 +24,7 @@ export function createMailer({
   return {
     async send({ to, subject, template, context = {} }) {
       if (!transport) {
-        console.warn("SMTP host is not configured; skipping email delivery.");
+        logger.warn({}, "SMTP host is not configured; skipping email delivery");
         return { skipped: true };
       }
 
@@ -32,12 +34,19 @@ export function createMailer({
         ...context
       });
 
-      return transport.sendMail({
-        from: formatFromAddress(config),
-        to,
-        subject,
-        html
-      });
+      try {
+        const result = await transport.sendMail({
+          from: formatFromAddress(config),
+          to,
+          subject,
+          html
+        });
+        logger.info({ to, subject }, "Email sent");
+        return result;
+      } catch (error) {
+        logger.error({ err: error, to, subject }, "Email send failed");
+        throw error;
+      }
     }
   };
 }

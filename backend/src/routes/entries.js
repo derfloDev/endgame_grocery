@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
+import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
 import { enqueuePushJob } from "../workers/pushWorker.js";
 
@@ -47,7 +48,8 @@ function normalizeDetails(details) {
 
 export function createEntryRouter({
   pool = getPool(),
-  requireAuthMiddleware = requireAuth
+  requireAuthMiddleware = requireAuth,
+  logger = defaultLogger
 } = {}) {
   const router = Router({ mergeParams: true });
 
@@ -122,7 +124,7 @@ export function createEntryRouter({
         entryText: result.rows[0].text,
         now: new Date()
       }).catch((pushError) => {
-        console.error("Failed to enqueue push notification job.", pushError);
+        logger.error({ err: pushError }, "Failed to enqueue push notification job");
       });
 
       res.status(201).json({
@@ -195,7 +197,7 @@ export function createEntryRouter({
           text: result.rows[0].text,
           icon: result.rows[0].icon
         }).catch((historyError) => {
-          console.error("Failed to upsert autocomplete history.", historyError);
+          logger.error({ err: historyError }, "Failed to upsert autocomplete history");
         });
       }
 
@@ -256,7 +258,7 @@ export function createEntryRouter({
         text: entryResult.rows[0].text,
         icon: entryResult.rows[0].icon
       }).catch((historyError) => {
-        console.error("Failed to upsert autocomplete history.", historyError);
+        logger.error({ err: historyError }, "Failed to upsert autocomplete history");
       });
 
       res.status(204).send();

@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import { pathToFileURL } from "node:url";
 import { createPool } from "./client.js";
+import { logger } from "../logger.js";
 import { DEMO_ENTRIES, DEMO_LIST, DEMO_USER } from "./seed-data.js";
 
 export async function seedDatabase() {
@@ -82,13 +83,18 @@ export async function seedDatabase() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   seedDatabase()
     .then((result) => {
-      console.log(
-        `Seeded ${result.listName} for ${result.email} with ${result.entryCount} starter entries.`
+      logger.info(
+        {
+          email: result.email,
+          listName: result.listName,
+          entryCount: result.entryCount
+        },
+        "Seeded demo data"
       );
-      console.log(`Demo password: ${result.password}`);
+      logger.info({ password: result.password }, "Demo password");
     })
     .catch((error) => {
-      console.error(error.message);
+      logger.error({ err: error }, "Seed script failed");
       process.exitCode = 1;
     });
 }

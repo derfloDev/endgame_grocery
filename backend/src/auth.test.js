@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import bcrypt from "bcrypt";
+import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { createRequireAuth } from "./middleware/auth.js";
@@ -9,6 +10,7 @@ describe("authentication routes", () => {
   it("registers a user, creates a verification token, and sends the verification mail", async () => {
     const sentMessages = [];
     const queries = [];
+    const { logger, getEntries } = createLogCapture();
     const pool = {
       async query(text, params) {
         queries.push([normalizeSql(text), params]);
@@ -39,6 +41,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
+      logger,
       pool,
       config: {
         jwtSecret: "test-secret",
@@ -90,11 +93,20 @@ describe("authentication routes", () => {
     assert.equal(queries[1][1][0], "user-1");
     assert.equal(queries[1][1][1], "verification-token-1");
     assert.equal(queries[1][1][2].toISOString(), "2026-04-22T00:00:00.000Z");
+    assert.deepEqual(findLogEntry(getEntries(), "User registered"), {
+      email: "demo@example.com",
+      inviteUsed: false,
+      level: 30,
+      msg: "User registered",
+      time: findLogEntry(getEntries(), "User registered").time,
+      userId: "user-1"
+    });
   });
 
   it("registers a user from a valid invite, auto-verifies the account, and returns a jwt", async () => {
     const sentMessages = [];
     const queries = [];
+    const { logger, getEntries } = createLogCapture();
     const pool = {
       async query(text, params) {
         queries.push([normalizeSql(text), params]);
@@ -130,6 +142,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
+      logger,
       pool,
       config: {
         jwtSecret: "test-secret",
@@ -173,6 +186,14 @@ describe("authentication routes", () => {
     assert.deepEqual(queries[3][1], ["list-1", "user-9"]);
     assert.match(queries[4][0], /UPDATE list_invites/);
     assert.deepEqual(queries[4][1], ["invite-1"]);
+    assert.deepEqual(findLogEntry(getEntries(), "User registered"), {
+      email: "demo@example.com",
+      inviteUsed: true,
+      level: 30,
+      msg: "User registered",
+      time: findLogEntry(getEntries(), "User registered").time,
+      userId: "user-9"
+    });
   });
 
   it("falls back to the standard verification flow when the invite token is invalid", async () => {
@@ -254,6 +275,7 @@ describe("authentication routes", () => {
 
   it("logs in an existing user and returns a token", async () => {
     const passwordHash = await bcrypt.hash("password123", 12);
+    const { logger, getEntries } = createLogCapture();
     const pool = {
       async query() {
         return {
@@ -271,6 +293,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
+      logger,
       pool,
       config: {
         jwtSecret: "test-secret",
@@ -285,10 +308,54 @@ describe("authentication routes", () => {
 
     assert.equal(response.status, 200);
     assert.equal(typeof response.body.token, "string");
+    assert.deepEqual(findLogEntry(getEntries(), "User logged in"), {
+      level: 30,
+      msg: "User logged in",
+      time: findLogEntry(getEntries(), "User logged in").time,
+      userId: "user-1"
+    });
+  });
+
+  it("logs invalid login attempts at warn", async () => {
+    const passwordHash = await bcrypt.hash("password123", 12);
+    const { logger, getEntries } = createLogCapture();
+    const pool = {
+      async query() {
+        return {
+          rows: [
+            {
+              id: "user-1",
+              email: "demo@example.com",
+              display_name: "Demo User",
+              password_hash: passwordHash,
+              email_verified: true
+            }
+          ]
+        };
+      }
+    };
+
+    const app = createApp({ logger, pool });
+
+    const response = await request(app).post("/api/auth/login").send({
+      email: "demo@example.com",
+      password: "wrong-password"
+    });
+
+    assert.equal(response.status, 401);
+    assert.deepEqual(response.body, { error: "Invalid email or password." });
+    assert.deepEqual(findLogEntry(getEntries(), "Login failed"), {
+      email: "demo@example.com",
+      level: 40,
+      msg: "Login failed",
+      reason: "invalid_credentials",
+      time: findLogEntry(getEntries(), "Login failed").time
+    });
   });
 
   it("rejects login for an unverified account", async () => {
     const passwordHash = await bcrypt.hash("password123", 12);
+    const { logger, getEntries } = createLogCapture();
     const pool = {
       async query() {
         return {
@@ -305,7 +372,7 @@ describe("authentication routes", () => {
       }
     };
 
-    const app = createApp({ pool });
+    const app = createApp({ logger, pool });
 
     const response = await request(app).post("/api/auth/login").send({
       email: "demo@example.com",
@@ -316,11 +383,19 @@ describe("authentication routes", () => {
     assert.deepEqual(response.body, {
       error: "Please verify your email before logging in."
     });
+    assert.deepEqual(findLogEntry(getEntries(), "Login blocked"), {
+      email: "demo@example.com",
+      level: 40,
+      msg: "Login blocked",
+      reason: "email_not_verified",
+      time: findLogEntry(getEntries(), "Login blocked").time
+    });
   });
 
   it("verifies a valid token and returns a jwt", async () => {
     let updatedUserId = null;
     let deletedToken = null;
+    const { logger, getEntries } = createLogCapture();
     const pool = {
       async query(text, params) {
         if (text.includes("SELECT evt.user_id")) {
@@ -352,6 +427,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
+      logger,
       pool,
       config: {
         jwtSecret: "test-secret",
@@ -365,6 +441,12 @@ describe("authentication routes", () => {
     assert.equal(typeof response.body.token, "string");
     assert.equal(updatedUserId, "user-1");
     assert.equal(deletedToken, "valid-token");
+    assert.deepEqual(findLogEntry(getEntries(), "Email verified"), {
+      level: 30,
+      msg: "Email verified",
+      time: findLogEntry(getEntries(), "Email verified").time,
+      userId: "user-1"
+    });
   });
 
   it("rejects invalid or expired verification tokens", async () => {
@@ -599,6 +681,7 @@ describe("authentication routes", () => {
   it("updates the password and marks the reset token as used", async () => {
     let updatedPasswordParams = null;
     let markedToken = null;
+    const { logger, getEntries } = createLogCapture();
     const pool = {
       async query(text, params) {
         if (text.includes("SELECT prt.user_id")) {
@@ -626,6 +709,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
+      logger,
       pool,
       now() {
         return new Date("2026-04-21T00:00:00Z");
@@ -642,6 +726,12 @@ describe("authentication routes", () => {
     assert.equal(updatedPasswordParams[1], "user-1");
     assert.notEqual(updatedPasswordParams[0], "new-password-123");
     assert.equal(markedToken, "valid-reset-token");
+    assert.deepEqual(findLogEntry(getEntries(), "Password reset completed"), {
+      level: 30,
+      msg: "Password reset completed",
+      time: findLogEntry(getEntries(), "Password reset completed").time,
+      userId: "user-1"
+    });
   });
 });
 
@@ -719,4 +809,27 @@ function createResponse() {
 
 function normalizeSql(sql) {
   return sql.replace(/\s+/g, " ").trim();
+}
+
+function createLogCapture() {
+  const lines = [];
+  const logger = pino({ level: "trace", base: null }, {
+    write(chunk) {
+      lines.push(chunk.trim());
+    }
+  });
+
+  return {
+    logger,
+    getEntries() {
+      return lines.filter(Boolean).map((line) => JSON.parse(line));
+    }
+  };
+}
+
+function findLogEntry(entries, message) {
+  const entry = entries.find((candidate) => candidate.msg === message);
+
+  assert.ok(entry, `Expected log entry for "${message}"`);
+  return entry;
 }

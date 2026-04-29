@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
+import { logger as defaultLogger } from "../logger.js";
 
 export async function enqueuePushJob({
   pool,
@@ -53,11 +54,13 @@ export function startPushWorker({
   config = getConfig(),
   webpushLib = webpush,
   now = () => new Date(),
-  intervalMs = 5000
+  intervalMs = 5000,
+  logger = defaultLogger
 } = {}) {
+  logger.info({ intervalMs }, "Push worker started");
   const timer = setInterval(() => {
-    void processPendingPushJobs({ pool, config, webpushLib, now }).catch((error) => {
-      console.error("Push worker failed.", error);
+    void processPendingPushJobs({ pool, config, webpushLib, now, logger }).catch((error) => {
+      logger.error({ err: error }, "Push worker tick failed");
     });
   }, intervalMs);
 
@@ -72,7 +75,8 @@ export async function processPendingPushJobs({
   pool = getPool(),
   config = getConfig(),
   webpushLib = webpush,
-  now = () => new Date()
+  now = () => new Date(),
+  logger = defaultLogger
 } = {}) {
   if (
     !pool ||
@@ -118,6 +122,10 @@ export async function processPendingPushJobs({
       new Date(cooldown.last_sent_at).getTime() > addMinutes(currentTime, -15).getTime()
     ) {
       await deletePushJob(pool, job.id);
+      logger.debug(
+        { jobId: job.id, listId: job.list_id },
+        "Push job skipped because cooldown is active"
+      );
       continue;
     }
 
@@ -146,6 +154,10 @@ export async function processPendingPushJobs({
 
     if (!recipientsResult.rows.length) {
       await deletePushJob(pool, job.id);
+      logger.debug(
+        { jobId: job.id, listId: job.list_id },
+        "Push job skipped because no recipients are available"
+      );
       continue;
     }
 
@@ -160,6 +172,8 @@ export async function processPendingPushJobs({
 
     const { list_name: listName, actor_name: actorName } = recipientsResult.rows[0];
     const items = normalizeJobItems(job.items);
+    let notificationsSent = 0;
+    let subscriptionsExpired = 0;
     const payload = {
       title: listName,
       body: buildNotificationBody({ actorName, items }),
@@ -178,6 +192,7 @@ export async function processPendingPushJobs({
           },
           JSON.stringify(payload)
         );
+        notificationsSent += 1;
       } catch (error) {
         if (error?.statusCode === 410) {
           await pool.query(
@@ -186,6 +201,11 @@ export async function processPendingPushJobs({
               WHERE endpoint = $1
             `,
             [subscription.endpoint]
+          );
+          subscriptionsExpired += 1;
+          logger.info(
+            { endpoint: truncateEndpoint(subscription.endpoint) },
+            "Push subscription expired"
           );
           continue;
         }
@@ -203,6 +223,15 @@ export async function processPendingPushJobs({
         DO UPDATE SET last_sent_at = EXCLUDED.last_sent_at
       `,
       [job.list_id, currentTime]
+    );
+    logger.info(
+      {
+        jobId: job.id,
+        listId: job.list_id,
+        notificationsSent,
+        subscriptionsExpired
+      },
+      "Push job processed"
     );
   }
 }
@@ -235,4 +264,12 @@ async function deletePushJob(pool, jobId) {
 
 function addMinutes(date, minutes) {
   return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
+function truncateEndpoint(endpoint) {
+  if (typeof endpoint !== "string") {
+    return "";
+  }
+
+  return endpoint.slice(0, 60);
 }
