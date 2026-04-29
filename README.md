@@ -209,7 +209,7 @@ GitHub Actions runs lint, build, unit tests, and Playwright E2E tests on every p
 
 The workflow files pin current maintained major versions of the GitHub-hosted actions so the pipeline stays compatible with GitHub's Node.js runtime upgrades.
 
-Release Please runs after the `CI` workflow completes successfully on `main` and opens release PRs based on Conventional Commits. That CI gate prevents failed `main` builds from producing a release PR. Publishing a GitHub Release triggers the dedicated Docker publish workflow, which pushes images to `ghcr.io/derfloDev/endgame-grocery` with the release version tag and `latest`.
+Release Please runs after the `CI` workflow completes successfully on `main` and opens release PRs based on Conventional Commits. That CI gate prevents failed `main` builds from producing a release PR. The workflow uses the `RELEASE_PLEASE_TOKEN` repository secret so the published GitHub Release is emitted as a normal user action and can trigger downstream workflows. Publishing that GitHub Release triggers the dedicated Docker publish workflow, which pushes images to `ghcr.io/derfloDev/endgame-grocery` with the release version tag and `latest`.
 
 Version bumps follow Conventional Commits: `feat` creates a minor release, `fix` creates a patch release, and breaking changes create a major release.
 
