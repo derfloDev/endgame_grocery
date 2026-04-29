@@ -7,6 +7,7 @@ import { getConfig } from "../env.js";
 import { acceptInviteForUser, getPendingInviteByToken } from "../inviteService.js";
 import { logger as defaultLogger } from "../logger.js";
 import createMailer from "../mail/mailer.js";
+import { sseManager as defaultSseManager } from "../sseManager.js";
 
 function createToken({ jwtLib, config, userId }) {
   return jwtLib.sign({ sub: userId }, config.jwtSecret, {
@@ -20,6 +21,7 @@ export function createAuthRouter({
   jwtLib = jwt,
   config = getConfig(),
   logger = defaultLogger,
+  sseManager = defaultSseManager,
   mailer = createMailer({ config, logger }),
   generateVerificationToken = randomUUID,
   generatePasswordResetToken = randomUUID,
@@ -60,11 +62,22 @@ export function createAuthRouter({
       );
 
       if (pendingInvite) {
-        const listId = await acceptInviteForUser({
+        const { listId, memberAdded } = await acceptInviteForUser({
           pool,
           invite: pendingInvite,
           userId: result.rows[0].id
         });
+
+        if (memberAdded) {
+          void sseManager
+            .broadcastToList(pool, listId, "member:added", {
+              listId,
+              userId: result.rows[0].id
+            })
+            .catch((broadcastError) => {
+              logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+            });
+        }
 
         logger.info(
           {

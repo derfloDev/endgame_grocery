@@ -71,3 +71,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-04-29T11:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 SSE mutation broadcasts; all plan requirements met at correct trigger points, all 44 tests pass — no blocking findings |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-29T10:42:33Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added SSE broadcasts for entry and list mutations, member removal, and real member-addition points on invite acceptance and invite-backed registration |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, README.md, backend/src/auth.test.js, backend/src/entries.test.js, backend/src/inviteService.js, backend/src/invites.test.js, backend/src/lists.test.js, backend/src/routes/auth.js, backend/src/routes/entries.js, backend/src/routes/invites.js, backend/src/routes/lists.js, backend/src/routes/sharing.js, backend/src/sharing.test.js |
+| Validation | `npm run lint` (pass, existing frontend warning only); `npm run build` (pass); `npm test` (pass, required escalation because sandbox blocked `node --test` with EPERM); `npm run test --workspace backend -- src/entries.test.js src/lists.test.js src/sharing.test.js src/invites.test.js src/auth.test.js` (pass, required escalation) |
+| Commit | pending feat(api): broadcast SSE events for list changes |
+| Next Role | review |
+
+---
+
+### T-002 — implement — 2026-04-29T10:54:35Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the review-approved SSE mutation broadcast changes and closed T-002 |
+| Files Changed | .ai/HANDOFF.md, .ai/REVIEW.md, .ai/TASKS.md, README.md, backend/src/auth.test.js, backend/src/entries.test.js, backend/src/inviteService.js, backend/src/invites.test.js, backend/src/lists.test.js, backend/src/routes/auth.js, backend/src/routes/entries.js, backend/src/routes/invites.js, backend/src/routes/lists.js, backend/src/routes/sharing.js, backend/src/sharing.test.js |
+| Validation | Reused review-approved validation evidence from the `next_task` handoff entry |
+| Commit | pending feat(api): broadcast SSE events for list changes |
+| Next Role | none |
+
+---

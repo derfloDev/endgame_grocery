@@ -29,7 +29,9 @@
       "Bash(sed -n '197,215p' /c/develop/endgame_grocery/frontend/src/index.css)",
       "Bash(sed -n '551,575p' /c/develop/endgame_grocery/frontend/src/index.css)",
       "Bash(sed -n '760,920p' /c/develop/endgame_grocery/frontend/src/index.css)",
-      "Bash(grep -v 'Icon$')"
+      "Bash(grep -v 'Icon$')",
+      "Read(//mnt/c/develop/**)",
+      "Read(//c/Users/flori/**)"
     ]
   }
 }

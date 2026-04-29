@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import request from "supertest";
 import { createApp } from "./app.js";
 
-function createAuthedApp(pool) {
+function createAuthedApp(pool, options = {}) {
   return createApp({
     pool,
+    sseManager: options.sseManager ?? createSseManagerSpy(),
     requireAuthMiddleware(req, _res, next) {
       req.user = { sub: "user-1" };
       next();
@@ -63,6 +64,7 @@ describe("list routes", () => {
   });
 
   it("renames a list only when the caller is the owner", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query() {
@@ -78,29 +80,39 @@ describe("list routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).patch("/api/lists/list-1").send({
+    const response = await request(createAuthedApp(pool, { sseManager }))
+      .patch("/api/lists/list-1")
+      .send({
       name: "Renamed"
     });
 
     assert.equal(response.status, 200);
     assert.equal(response.body.list.name, "Renamed");
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "list:updated", { listId: "list-1" }]
+    ]);
   });
 
   it("rejects renaming when the caller is not the owner", async () => {
+    const sseManager = createSseManagerSpy();
     const pool = {
       async query() {
         return { rows: [] };
       }
     };
 
-    const response = await request(createAuthedApp(pool)).patch("/api/lists/list-1").send({
+    const response = await request(createAuthedApp(pool, { sseManager }))
+      .patch("/api/lists/list-1")
+      .send({
       name: "Renamed"
     });
 
     assert.equal(response.status, 403);
+    assert.deepEqual(sseManager.calls, []);
   });
 
   it("deletes a list only when the caller is the owner", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query() {
@@ -110,12 +122,41 @@ describe("list routes", () => {
           return { rows: [{ id: "list-1" }] };
         }
 
+        assert.deepEqual(sseManager.calls, [
+          ["list-1", "list:deleted", { listId: "list-1" }]
+        ]);
         return { rows: [] };
       }
     };
 
-    const response = await request(createAuthedApp(pool)).delete("/api/lists/list-1");
+    const response = await request(createAuthedApp(pool, { sseManager })).delete("/api/lists/list-1");
 
     assert.equal(response.status, 204);
+    assert.equal(callCount, 2);
+  });
+
+  it("does not broadcast delete events when the caller is not the owner", async () => {
+    const sseManager = createSseManagerSpy();
+    const pool = {
+      async query() {
+        return { rows: [] };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool, { sseManager })).delete("/api/lists/list-1");
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(sseManager.calls, []);
   });
 });
+
+function createSseManagerSpy() {
+  return {
+    calls: [],
+    broadcastToList(pool, listId, eventType, data) {
+      void pool;
+      this.calls.push([listId, eventType, data]);
+      return Promise.resolve();
+    }
+  };
+}

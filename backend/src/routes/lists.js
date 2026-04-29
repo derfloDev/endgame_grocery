@@ -1,10 +1,14 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
+import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
+import { sseManager as defaultSseManager } from "../sseManager.js";
 
 export function createListRouter({
   pool = getPool(),
-  requireAuthMiddleware = requireAuth
+  requireAuthMiddleware = requireAuth,
+  logger = defaultLogger,
+  sseManager = defaultSseManager
 } = {}) {
   const router = Router();
 
@@ -123,6 +127,14 @@ export function createListRouter({
         [name.trim(), req.params.id]
       );
 
+      void sseManager
+        .broadcastToList(pool, req.params.id, "list:updated", {
+          listId: req.params.id
+        })
+        .catch((broadcastError) => {
+          logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+        });
+
       res.json({
         list: {
           ...result.rows[0],
@@ -156,6 +168,9 @@ export function createListRouter({
         return;
       }
 
+      await sseManager.broadcastToList(pool, req.params.id, "list:deleted", {
+        listId: req.params.id
+      });
       await pool.query("DELETE FROM lists WHERE id = $1", [req.params.id]);
       res.status(204).send();
     } catch (error) {

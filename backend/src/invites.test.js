@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import request from "supertest";
 import { createApp } from "./app.js";
 
-function createAuthedApp(pool) {
+function createAuthedApp(pool, options = {}) {
   return createApp({
     pool,
+    sseManager: options.sseManager ?? createSseManagerSpy(),
     requireAuthMiddleware(req, _res, next) {
       req.user = { sub: "user-1" };
       next();
@@ -15,6 +16,7 @@ function createAuthedApp(pool) {
 
 describe("invite routes", () => {
   it("accepts a pending invite and grants access to the list", async () => {
+    const sseManager = createSseManagerSpy();
     const queries = [];
     const pool = {
       async query(text, params) {
@@ -40,7 +42,9 @@ describe("invite routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/invites/invite-token-1");
+    const response = await request(createAuthedApp(pool, { sseManager })).get(
+      "/api/invites/invite-token-1"
+    );
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { listId: "list-1" });
@@ -53,9 +57,13 @@ describe("invite routes", () => {
     assert.deepEqual(queries[2][1], ["list-1", "user-1"]);
     assert.match(queries[3][0], /UPDATE list_invites/);
     assert.deepEqual(queries[3][1], ["invite-1"]);
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "member:added", { listId: "list-1", userId: "user-1" }]
+    ]);
   });
 
   it("returns the list id when the invited user is already a member", async () => {
+    const sseManager = createSseManagerSpy();
     let updateParams = null;
     const pool = {
       async query(text, params) {
@@ -83,11 +91,14 @@ describe("invite routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/invites/already-member-token");
+    const response = await request(createAuthedApp(pool, { sseManager })).get(
+      "/api/invites/already-member-token"
+    );
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { listId: "list-9" });
     assert.deepEqual(updateParams, ["invite-2"]);
+    assert.deepEqual(sseManager.calls, []);
   });
 
   it("rejects invalid or expired invites", async () => {
@@ -108,4 +119,15 @@ describe("invite routes", () => {
 
 function normalizeSql(sql) {
   return sql.replace(/\s+/g, " ").trim();
+}
+
+function createSseManagerSpy() {
+  return {
+    calls: [],
+    broadcastToList(pool, listId, eventType, data) {
+      void pool;
+      this.calls.push([listId, eventType, data]);
+      return Promise.resolve();
+    }
+  };
 }
