@@ -160,6 +160,26 @@ describe("usePushNotifications", () => {
     });
   });
 
+  it("becomes ready when the VAPID key loads even while serviceWorker.ready is pending", async () => {
+    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        ready: new Promise(() => {})
+      }
+    });
+
+    render(createElement(HookHarness, { enabled: true }));
+
+    expect(screen.getByTestId("ready").textContent).toBe("false");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
+
+    expect(subscribePush).not.toHaveBeenCalled();
+  });
+
   it("does not fetch the VAPID key when the toggle is disabled", () => {
     render(createElement(HookHarness, { enabled: false }));
 

@@ -22,16 +22,19 @@ export function usePushNotifications({ enabled = false, token = "" }) {
     let cancelled = false;
 
     async function loadPushState() {
-      const [keyResult, registration] = await Promise.all([
-        fetchVapidPublicKey(),
-        navigator.serviceWorker.ready
-      ]);
+      const keyResult = await fetchVapidPublicKey();
 
       if (cancelled) {
         return;
       }
 
       setPublicKey(keyResult.publicKey ?? "");
+      const registration = await navigator.serviceWorker.ready;
+
+      if (cancelled) {
+        return;
+      }
+
       setCurrentSubscription(await registration.pushManager.getSubscription());
     }
 

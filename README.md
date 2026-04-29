@@ -74,6 +74,8 @@ This starts both apps concurrently:
 
 During local development, the frontend Vite server proxies `/api` requests to `http://localhost:4000`, so the backend must be running before the browser can register, log in, or load list data.
 
+The Vite PWA plugin also enables the module service worker in dev mode, so localhost can exercise the same push-subscription flow as production. After updating the service worker code or switching branches, reload the page once before retesting push notifications so the browser picks up the latest dev worker.
+
 ### 7. Generate VAPID keys for push notifications (optional)
 
 Push notifications require a VAPID key pair. The `web-push` package bundled with the backend provides a one-shot generator:
