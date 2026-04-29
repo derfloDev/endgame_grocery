@@ -7,6 +7,7 @@ export default function ShareListSheet({
   shareEmail,
   shareError,
   shareNotice,
+  isSubmitting,
   isSharingLoading,
   onEmailChange,
   onShareSubmit,
@@ -26,7 +27,8 @@ export default function ShareListSheet({
             onChange={(event) => onEmailChange(event.target.value)}
           />
         </label>
-        <button className="eg-btn-secondary" type="submit">
+        <button className="eg-btn-secondary" disabled={isSubmitting} type="submit">
+          {isSubmitting ? <span aria-hidden="true" className="share-invite-spinner" /> : null}
           Send Invite
         </button>
       </form>

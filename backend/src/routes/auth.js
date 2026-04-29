@@ -89,7 +89,8 @@ export function createAuthRouter({
         );
         res.status(201).json({
           token: createToken({ jwtLib, config, userId: result.rows[0].id }),
-          listId
+          listId,
+          user: serializeAuthUser(result.rows[0])
         });
         return;
       }
@@ -185,7 +186,8 @@ export function createAuthRouter({
 
       logger.info({ userId: user.id }, "User logged in");
       res.json({
-        token: createToken({ jwtLib, config, userId: user.id })
+        token: createToken({ jwtLib, config, userId: user.id }),
+        user: serializeAuthUser(user)
       });
     } catch (error) {
       next(error);
@@ -242,7 +244,12 @@ export function createAuthRouter({
 
       logger.info({ userId: verification.user_id }, "Email verified");
       res.json({
-        token: createToken({ jwtLib, config, userId: verification.user_id })
+        token: createToken({ jwtLib, config, userId: verification.user_id }),
+        user: serializeAuthUser({
+          id: verification.user_id,
+          email: verification.email,
+          display_name: verification.display_name
+        })
       });
     } catch (error) {
       next(error);
@@ -433,6 +440,14 @@ function buildAppUrl(baseUrl, path) {
 
 function isInviteEmailMatch(email, invite) {
   return Boolean(invite) && invite.invited_email?.toLowerCase() === email.toLowerCase();
+}
+
+function serializeAuthUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    display_name: user.display_name
+  };
 }
 
 async function sendVerificationEmail({ config, mailer, token, user }) {

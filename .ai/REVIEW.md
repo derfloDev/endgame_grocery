@@ -67,6 +67,72 @@ Both `scheduleEntryExit` and `handleDeletedEntry` check `exitingIdsRef.current.h
 
 ---
 
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-29
+
+#### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | nit | `ListDetailPage.jsx` line ~717 | Member-badge row renders inside `.detail-meta` (which is `flex column`), so the badges appear below the chips row rather than literally inline with the "Owner" chip. The AC says "next to Owner chip" but the plan's Implementation section says "after the existing `list-card-chips` div" — the implementation follows the plan spec. | No |
+
+#### Verification
+
+##### Steps
+1. Read git diffs for all 14 changed files.
+2. Cross-referenced all three acceptance criteria against implementation.
+3. Verified `AuthContext` security check (`normalizeAuthUser` guards against stale/mismatched user IDs).
+4. Verified `getInitials` edge-case handling (null, empty, single-word, multi-word).
+5. Verified `handleShareSubmit` uses `try/finally` so `isShareSubmitting` always resets.
+6. Verified `serializeAuthUser` added to login, verify-email, and invite-register endpoints on the backend.
+7. Ran `npm run lint` — 0 errors, 1 pre-existing warning (line number shifted to 80, same `AuthContext` export warning).
+8. Ran `npm run build` — clean.
+9. Ran `npm test` — 53 frontend tests (+2 new), 98 backend tests; 0 failures.
+
+##### Findings
+
+**AC: InfoSheet shows current user name + email**
+Full stack:
+- Backend `serializeAuthUser({ id, email, display_name })` added; returned in `login`, `verify-email`, and invite-register responses; 3 backend test assertions added. ✅
+- `AuthContext` refactored: `setAuthToken(token, user?)` callback replaces the old `useEffect`; persists normalized user to `USER_STORAGE_KEY` in localStorage; `normalizeAuthUser()` validates the user's `id` matches the JWT subject (prevents stale/tampered data). ✅
+- `RegisterPage` and `VerifyEmailPage` pass `result.user ?? null` to the new `setAuthToken`. ✅
+- `InfoSheet` renders `user.display_name` and `user.email` inside a new `info-sheet-section` (conditional on field presence). ✅
+- `InfoSheet.test.jsx` sets `mockUser` and asserts both fields render; `app.test.jsx` info-sheet test now logs in and verifies user profile appears in the dialog. ✅
+
+**AC: Send Invite button disabled + spinner during API call**
+- `isShareSubmitting` state added to `ListDetailPage`; set to `true` before `shareListWithMember` call, reset in `finally` block. ✅
+- `ShareListSheet` accepts `isSubmitting` prop; button gets `disabled={isSubmitting}`; spinner `<span>` (aria-hidden) conditionally rendered inside button. ✅
+- `.share-invite-spinner` CSS: 1 rem, cyan border-spinner, reuses existing `@keyframes spin`. ✅
+- Integration test uses `createDeferred()` for the invite request, verifies button is disabled + spinner visible during inflight, then resolves and asserts re-enabled state. ✅
+
+**AC: Owner view shows per-member initials badge next to Owner chip**
+- `visibleMemberBadges = list?.is_owner ? members.filter(m => !m.is_owner) : []` — correct derivation. ✅
+- Renders `.detail-member-badges` with `.eg-chip-member-initial` spans only when at least one non-owner member exists. ✅
+- `getInitials(name)`: splits on `\s+`, takes first char (uppercased) of first two parts; returns "?" for null/empty input. ✅
+- `title={member.display_name}` on each badge — accessible tooltip. ✅
+- Integration test asserts initials "AB" appear and `title="Alex Brown"` exists. ✅
+- CSS `.detail-member-badges` and `.eg-chip-member-initial` (32px cyan circle) defined; `ListDetailPage.test.jsx` asserts both rules. ✅
+
+**AuthContext refactoring safety**
+The switch from `useEffect`-based persistence to a `useCallback`-based `setAuthToken` eliminates a subtle race where the effect could run with a stale token. All callers (`login`, `logout`, `RegisterPage`, `VerifyEmailPage`) updated. The `setAuthToken` identifier in the context value retains the same name, so downstream callers are unaffected. ✅
+
+##### Risks
+- Low: User profile (display_name, email) is persisted in `localStorage` alongside the JWT. If a user clears only `auth_token` manually, `auth_user` persists but is unreachable (no token = `getStoredUser` returns `null`). This is harmless — `logout()` correctly removes both keys.
+- Low: `register` flow (non-invite path) does not receive a `user` object back from the API (the server returns only a `message`); user data will be `null` until next login/verify. This matches the existing behavior and is correct because registration without invite redirects to email verification before login.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-003
 
 ### Review Round 1

@@ -508,18 +508,35 @@ describe("authentication shell", () => {
   });
 
   it("opens the overview info sheet and logs out from it", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ lists: [] })
-    });
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          token: createFakeJwt("user-1"),
+          user: {
+            id: "user-1",
+            display_name: "Demo User",
+            email: "demo@example.com"
+          }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ lists: [] })
+      });
 
-    renderApp(["/"]);
+    renderApp(["/login"]);
+
+    await userEvent.type(screen.getByLabelText("Email"), "demo@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
 
     expect(await screen.findByText("ENDGAME")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Settings" }));
 
     expect(await screen.findByRole("dialog", { name: "Info & Settings" })).toBeTruthy();
+    expect(screen.getByText("Demo User")).toBeTruthy();
+    expect(screen.getByText("demo@example.com")).toBeTruthy();
     expect(screen.getByText(/^v\d+\.\d+\.\d+$/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "GNU GPL v3.0" })).toBeTruthy();
 
@@ -1219,6 +1236,7 @@ describe("authentication shell", () => {
 
   it("opens the share sheet, sends an invite notice, and revokes an existing member", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    const inviteRequest = createDeferred();
     fetch
       .mockResolvedValueOnce({
         ok: true,
@@ -1251,7 +1269,7 @@ describe("authentication shell", () => {
             },
             {
               user_id: "user-2",
-              display_name: "Alex",
+              display_name: "Alex Brown",
               email: "alex@example.com",
               joined_at: "2026-04-21T01:00:00Z",
               is_owner: false
@@ -1263,17 +1281,7 @@ describe("authentication shell", () => {
         ok: true,
         json: async () => ({ publicKey: "dGVzdA" })
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          invite: {
-            id: "invite-1",
-            invited_email: "sam@example.com",
-            status: "pending",
-            expires_at: "2026-04-28T00:00:00Z"
-          }
-        })
-      })
+      .mockReturnValueOnce(inviteRequest.promise)
       .mockResolvedValueOnce({
         status: 204
       });
@@ -1288,12 +1296,29 @@ describe("authentication shell", () => {
 
     expect(await screen.findByRole("dialog", { name: "Share List" })).toBeTruthy();
     expect(screen.getByText("SQUAD (2)")).toBeTruthy();
-    expect(screen.getByText("Alex")).toBeTruthy();
+    expect(screen.getByText("Alex Brown")).toBeTruthy();
+    expect(screen.getByTitle("Alex Brown")).toBeTruthy();
+    expect(screen.getByText("AB")).toBeTruthy();
 
     await userEvent.type(screen.getByLabelText("Invite member by email"), "sam@example.com");
     await userEvent.click(screen.getByRole("button", { name: "Send Invite" }));
+    expect(screen.getByRole("button", { name: "Send Invite" }).hasAttribute("disabled")).toBe(true);
+    expect(document.querySelector(".share-invite-spinner")).toBeTruthy();
+
+    inviteRequest.resolve({
+      ok: true,
+      json: async () => ({
+        invite: {
+          id: "invite-1",
+          invited_email: "sam@example.com",
+          status: "pending",
+          expires_at: "2026-04-28T00:00:00Z"
+        }
+      })
+    });
 
     expect(await screen.findByText("Invitation sent to sam@example.com.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send Invite" }).hasAttribute("disabled")).toBe(false);
     expect(screen.queryByText("sam@example.com")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Revoke" }));

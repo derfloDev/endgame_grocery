@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 import { loginUser, registerUser } from "../api/auth";
 
 const STORAGE_KEY = "endgame_grocery.auth_token";
+const USER_STORAGE_KEY = "endgame_grocery.auth_user";
 const AuthContext = createContext(null);
 
 function parseJwtSubject(token) {
@@ -26,29 +27,33 @@ function parseJwtSubject(token) {
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => window.localStorage.getItem(STORAGE_KEY) ?? "");
-  const [user, setUser] = useState(() => {
-    const storedToken = window.localStorage.getItem(STORAGE_KEY) ?? "";
-    const sub = parseJwtSubject(storedToken);
+  const [user, setUser] = useState(() => getStoredUser(window.localStorage.getItem(STORAGE_KEY) ?? ""));
 
-    return sub ? { id: sub } : null;
-  });
+  const setAuthToken = useCallback((nextToken, nextUser = null) => {
+    setToken(nextToken);
 
-  useEffect(() => {
-    if (!token) {
+    if (!nextToken) {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(USER_STORAGE_KEY);
       setUser(null);
       return;
     }
 
-    const sub = parseJwtSubject(token);
+    const normalizedUser = normalizeAuthUser(nextToken, nextUser) ?? getStoredUser(nextToken);
 
-    window.localStorage.setItem(STORAGE_KEY, token);
-    setUser(sub ? { id: sub } : null);
-  }, [token]);
+    window.localStorage.setItem(STORAGE_KEY, nextToken);
+    if (normalizedUser?.display_name || normalizedUser?.email) {
+      window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(normalizedUser));
+    } else {
+      window.localStorage.removeItem(USER_STORAGE_KEY);
+    }
+
+    setUser(normalizedUser);
+  }, []);
 
   async function login(credentials) {
     const result = await loginUser(credentials);
-    setToken(result.token);
+    setAuthToken(result.token, result.user ?? null);
     return result;
   }
 
@@ -57,7 +62,7 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
-    setToken("");
+    setAuthToken("");
   }
 
   const value = {
@@ -65,7 +70,7 @@ export function AuthProvider({ children }) {
     user,
     login,
     register,
-    setAuthToken: setToken,
+    setAuthToken,
     logout
   };
 
@@ -80,4 +85,41 @@ export function useAuth() {
   }
 
   return context;
+}
+
+function getStoredUser(token) {
+  const sub = parseJwtSubject(token);
+
+  if (!sub) {
+    return null;
+  }
+
+  try {
+    const storedUser = JSON.parse(window.localStorage.getItem(USER_STORAGE_KEY) ?? "null");
+    return normalizeAuthUser(token, storedUser);
+  } catch {
+    return { id: sub };
+  }
+}
+
+function normalizeAuthUser(token, user) {
+  const sub = parseJwtSubject(token);
+
+  if (!sub) {
+    return null;
+  }
+
+  if (!user || typeof user !== "object") {
+    return { id: sub };
+  }
+
+  if (user.id && user.id !== sub) {
+    return { id: sub };
+  }
+
+  return {
+    id: sub,
+    ...(typeof user.display_name === "string" && user.display_name ? { display_name: user.display_name } : {}),
+    ...(typeof user.email === "string" && user.email ? { email: user.email } : {})
+  };
 }

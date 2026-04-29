@@ -147,3 +147,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — review — 2026-04-29T16:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 feature additions; all three acceptance criteria met across full stack, all validations pass |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-29T16:27:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added persisted account details for the info sheet, invite-button loading feedback, owner member-initial badges, and auth response coverage for the new profile payload |
+| Files Changed | `.ai/TASKS.md`, `backend/src/auth.test.js`, `backend/src/routes/auth.js`, `frontend/src/app.test.jsx`, `frontend/src/components/InfoSheet.jsx`, `frontend/src/components/InfoSheet.test.jsx`, `frontend/src/components/ShareListSheet.jsx`, `frontend/src/components/ShareListSheet.test.jsx`, `frontend/src/context/AuthContext.jsx`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.test.jsx`, `frontend/src/pages/RegisterPage.jsx`, `frontend/src/pages/VerifyEmailPage.jsx` |
+| Validation | `npm run lint` (pass; existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/InfoSheet.test.jsx src/components/ShareListSheet.test.jsx src/pages/ListDetailPage.test.jsx src/app.test.jsx` (pass), `npm run test --workspace backend -- src/auth.test.js` (pass), `npm run build` (pass; existing `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | `pending feat(ui): improve account and list sharing details` |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-04-29T17:09:09Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-004 account and sharing detail changes using the approved Conventional Commit message |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `backend/src/auth.test.js`, `backend/src/routes/auth.js`, `frontend/src/app.test.jsx`, `frontend/src/components/InfoSheet.jsx`, `frontend/src/components/InfoSheet.test.jsx`, `frontend/src/components/ShareListSheet.jsx`, `frontend/src/components/ShareListSheet.test.jsx`, `frontend/src/context/AuthContext.jsx`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.test.jsx`, `frontend/src/pages/RegisterPage.jsx`, `frontend/src/pages/VerifyEmailPage.jsx` |
+| Validation | `not rerun (commit-only step after review approval)` |
+| Commit | `pending feat(ui): improve account and list sharing details` |
+| Next Role | none |
+
+---

@@ -171,6 +171,11 @@ describe("authentication routes", () => {
     assert.equal(response.status, 201);
     assert.equal(typeof response.body.token, "string");
     assert.equal(response.body.listId, "list-1");
+    assert.deepEqual(response.body.user, {
+      id: "user-9",
+      email: "demo@example.com",
+      display_name: "Demo User"
+    });
     assert.equal(sentMessages.length, 0);
     assert.match(queries[0][0], /FROM list_invites/);
     assert.equal(queries[0][1][0], "invite-token-1");
@@ -313,6 +318,11 @@ describe("authentication routes", () => {
 
     assert.equal(response.status, 200);
     assert.equal(typeof response.body.token, "string");
+    assert.deepEqual(response.body.user, {
+      id: "user-1",
+      email: "demo@example.com",
+      display_name: "Demo User"
+    });
     assert.deepEqual(findLogEntry(getEntries(), "User logged in"), {
       level: 30,
       msg: "User logged in",
@@ -444,6 +454,11 @@ describe("authentication routes", () => {
 
     assert.equal(response.status, 200);
     assert.equal(typeof response.body.token, "string");
+    assert.deepEqual(response.body.user, {
+      id: "user-1",
+      email: "demo@example.com",
+      display_name: "Demo User"
+    });
     assert.equal(updatedUserId, "user-1");
     assert.equal(deletedToken, "valid-token");
     assert.deepEqual(findLogEntry(getEntries(), "Email verified"), {

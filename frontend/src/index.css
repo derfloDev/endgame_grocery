@@ -622,6 +622,18 @@ p {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.info-sheet-user-name {
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.info-sheet-user-email {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
 .info-sheet-label {
   color: var(--text-secondary);
   font-size: 0.8rem;
@@ -750,6 +762,25 @@ p {
   flex-direction: column;
   gap: var(--space-3);
   margin-bottom: 12px;
+}
+
+.detail-member-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.eg-chip-member-initial {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(0, 229, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 229, 255, 0.12);
+  color: var(--neon-cyan);
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .detail-banner {
@@ -1549,6 +1580,18 @@ p {
   display: grid;
   gap: var(--space-3);
   margin-top: var(--space-3);
+}
+
+.share-invite-spinner {
+  width: 1rem;
+  height: 1rem;
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: text-bottom;
+  border: 2px solid rgba(0, 229, 255, 0.18);
+  border-top-color: var(--neon-cyan);
+  border-radius: 999px;
+  animation: spin 0.75s linear infinite;
 }
 
 .share-list-label {
