@@ -103,4 +103,26 @@ describe("EntryRow", () => {
 
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
+
+  it("applies enter and exit animation classes and disables pointer events while exiting", () => {
+    render(
+      <EntryRow
+        entry={{ id: "entry-4", text: "Juice", status: "open", icon: null }}
+        isEntering
+        isExiting
+        onDelete={vi.fn()}
+        onEdit={vi.fn()}
+        onToggle={vi.fn()}
+      />
+    );
+
+    const row = screen.getByTestId("entry-row-entry-4");
+
+    expect(row.className).toContain("entry-entering");
+    expect(row.className).toContain("entry-exiting");
+    expect(row.style.pointerEvents).toBe("none");
+    expect(cssSource).toMatch(/@keyframes entryFadeIn/s);
+    expect(cssSource).toMatch(/@keyframes entryFadeOut/s);
+    expect(cssSource).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/s);
+  });
 });

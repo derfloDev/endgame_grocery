@@ -1,23 +1,229 @@
 # Plan
 
-Status: **draft**
+Status: **ready**
 
-Goal: implement the scope defined in `ROADMAP.md`.
+Goal: deliver all UI enhancements defined in `ROADMAP.md` across five focused tasks.
+
+---
 
 ## Scope
-- Replace with concrete feature scope.
 
-## Acceptance Criteria
-- Replace with measurable acceptance criteria.
+Five independent tasks, each ownable as a single commit:
 
-## Implementation Phases
-### Phase 1
-- Replace with phase details.
+| ID | Title |
+|----|-------|
+| T-001 | List item animations |
+| T-002 | Spacing fixes |
+| T-003 | Mobile & visual fixes |
+| T-004 | Feature additions |
+| T-005 | Feature removals |
 
-### Phase 2
-- Replace with phase details.
+---
 
-## Validation
-- `npm run lint`
-- `npm run build`
-- `npm test`
+## T-001 — List Item Animations
+
+### Goal
+Smooth fade-out when an item leaves "Open items" (local toggle, local delete, SSE delete) and smooth fade-in when an item appears in "Open items" (SSE create) or in "Recently used" (any add).
+
+### Acceptance Criteria
+- Marking an item done triggers a ~300 ms fade-out + slight downscale on the row before the row disappears from the list.
+- Hard-deleting an item (swipe or icon) triggers the same exit animation.
+- When a shared user creates an entry via SSE, the new row fades in (~300 ms).
+- When a shared user deletes an entry via SSE, the row fades out before removal.
+- When an item is re-added from "Recently used", the chip fades/slides in.
+- Animations respect `prefers-reduced-motion` (instant show/hide when enabled).
+
+### Implementation
+
+**New CSS keyframes** (`frontend/src/index.css` / `tokens.css`):
+```css
+@keyframes entryFadeIn  { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
+@keyframes entryFadeOut { from { opacity:1; transform: scale(1); }          to { opacity:0; transform: scale(0.95); } }
+```
+Apply via utility classes `.entry-entering` (entryFadeIn 300 ms ease-out forwards) and `.entry-exiting` (entryFadeOut 300 ms ease-out forwards).
+Add `@media (prefers-reduced-motion: reduce)` block that overrides duration to 0 ms.
+
+**`ListDetailPage.jsx`**:
+- Add `exitingIds` state (`Set<string>`) and `enteringIds` state (`Set<string>`).
+- Extract helper `scheduleExit(id, fn)`: adds id to `exitingIds`, waits 300 ms, calls fn, removes from `exitingIds`.
+- **Local toggle done**: call `scheduleExit(entry.id, () => updateEntries(...))` instead of updating immediately.
+- **Local delete**: call `scheduleExit(entry.id, () => deleteEntry(...).then(updateEntries(...)))`.
+- **SSE `entry:deleted`**: replace plain `handleEntryChange` for the deleted event with a diff-aware version that adds the disappeared id to `exitingIds`, waits 300 ms, then calls `loadEntries()`.
+- **SSE `entry:created`**: after `loadEntries()` resolves, compare old vs new entries, add new ids to `enteringIds`, clear after 300 ms.
+- Pass `isExiting={exitingIds.has(entry.id)}` and `isEntering={enteringIds.has(entry.id)}` to each `<EntryRow>`.
+- Pass `newlyAddedTexts` (Set of texts just added back from history) to `<RecentlyUsedSection>`.
+
+**`EntryRow.jsx`**:
+- Accept `isExiting` and `isEntering` props.
+- Apply `.entry-exiting` class when `isExiting`, `.entry-entering` when `isEntering`.
+- When `isExiting`, set `pointer-events: none` via inline style or CSS to prevent interaction during fade.
+
+**`RecentlyUsedSection.jsx`**:
+- Accept `newlyAddedTexts: Set<string>` prop.
+- Apply `.entry-entering` (or a `.chip-entering` variant) class to chips whose `text` is in `newlyAddedTexts`.
+
+### Files to Change
+- `frontend/src/pages/ListDetailPage.jsx`
+- `frontend/src/components/EntryRow.jsx`
+- `frontend/src/components/RecentlyUsedSection.jsx`
+- `frontend/src/index.css` (new keyframes + utility classes + reduced-motion block)
+
+---
+
+## T-002 — Spacing Fixes
+
+### Goal
+Fix four reported spacing/layout inconsistencies.
+
+### Acceptance Criteria
+- In `ListDetailPage`, the gap between the "Owner" chip row and the "Enable notifications" button is visually balanced (≈ 12 px, matching `--space-3`).
+- In `AddItemSheet`, the gap between "Mehr anzeigen" toggle and the "Cancel / Add Item" button row is ≈ 8 px.
+- In `ShareListSheet`, the "Send Invite" button and the success/error banner below it have a consistent gap (≈ 12 px).
+- On mobile, when the "Add item" text input receives focus and the keyboard opens, the input scrolls into view automatically.
+
+### Implementation
+
+**Spacing in `ListDetailPage` (`detail-meta`):**
+The `.detail-meta` div wraps the chip row and the push-notifications button with no gap. Add `display: flex; flex-direction: column; gap: var(--space-3);` (12 px) to `.detail-meta` in `index.css`.
+
+**Spacing in `AddItemSheet` ("Mehr anzeigen" vs Cancel):**
+The `add-item-more-btn` sits directly before the `button-row`. Reduce the `gap` in `.add-item-form` grid for this specific pairing or add `margin-bottom: 0` to `.add-item-more-btn` and adjust `.button-row` margin-top to `var(--space-2)` (8 px). Inspect computed gap; likely the `add-item-form` grid gap (e.g., 16 px) needs a targeted override between these two elements.
+
+**Spacing in `ShareListSheet` (Send Invite → notice/error):**
+Currently `.share-list-form` has `gap: 8px` and the banners sit below the form with no top margin. Add `margin-top: 8px` to `.detail-banner` inside the sheet context, or set a minimum `gap` between the form and banner in the sheet's column layout.
+
+**Mobile keyboard scroll:**
+In `AddItemSheet.jsx`, on the text `<input>`, add an `onFocus` handler that calls `event.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })`. This ensures the input is visible when the iOS/Android soft keyboard resizes the viewport.
+
+### Files to Change
+- `frontend/src/index.css` (`.detail-meta`, `.share-list-form`, `.button-row` / `.add-item-form` spacing)
+- `frontend/src/components/AddItemSheet.jsx` (`onFocus` scrollIntoView)
+
+---
+
+## T-003 — Mobile & Visual Fixes
+
+### Goal
+Fix the FAB clipping on narrow screens, the broken icon-browser search input shadow, the stray divider line above the search input, and the scrollbar flash on icon-browser collapse.
+
+### Acceptance Criteria
+- On any screen ≤ 375 px wide, the FAB is fully visible with at least 16 px right margin.
+- The icon-search `eg-input` box-shadow/glow is fully visible (not clipped).
+- No `border-top` divider appears above the icon-browser search field.
+- Collapsing the icon browser ("Weniger anzeigen") does not cause a viewport-level scrollbar to flash.
+
+### Implementation
+
+**FAB clipping (`index.css`):**
+Current rule: `right: calc(50% - 195px)`. On a 375 px viewport this evaluates to `−7.5 px`, pushing the FAB half off-screen.
+Fix: `right: max(calc(50% - 195px), 16px)`. The `max()` CSS function ensures a minimum 16 px clearance on any narrow screen while preserving the centered layout on wider screens.
+
+**Icon-browser search input shadow (`index.css`):**
+The `.add-item-icon-browser-inner` element has `overflow: hidden`, which clips the `box-shadow` glow of the `eg-input` inside it.
+Fix: Add `padding: 4px 4px 0` to `.add-item-icon-browser-inner` so the shadow has room, and compensate by adjusting the inner grid's gap if needed. Alternatively, change `overflow: hidden` to `overflow: clip` (CSS `overflow: clip` clips layout overflow but does not create a scroll container, so box-shadows can render outside the clip region via `overflow-clip-margin`). If `overflow: clip` is sufficient, set `overflow-clip-margin: 4px` to allow the glow to bleed out.
+
+**Divider line above icon-browser search (`index.css`):**
+Remove `border-top: 1px solid rgba(255, 255, 255, 0.05);` from `.add-item-icon-browser-inner`.
+
+**Scrollbar flash on collapse (`index.css`):**
+The collapse animation of the icon browser (grid-template-rows 1fr → 0fr) briefly causes overflow at the viewport level.
+Fix: Add `overflow-x: hidden` to the `html` element or the `.bottom-sheet` container to prevent the transient horizontal/vertical overflow from producing a visible scrollbar. If this alone is insufficient, also add `contain: layout` to `.add-item-icon-browser`.
+
+### Files to Change
+- `frontend/src/index.css` (FAB `right`, icon-browser `overflow`, `border-top`, overflow-x)
+
+---
+
+## T-004 — Feature Additions
+
+### Goal
+Show the logged-in user in Info & Settings, add a loading state to "Send Invite", and show member-initials badges next to the "Owner" chip.
+
+### Acceptance Criteria
+- "Info & Settings" sheet displays the current user's display name and email.
+- Clicking "Send Invite" disables the button and shows a spinner for the duration of the API call; re-enables on success or error.
+- When the current user is the owner and there are non-owner members, a badge per member (initials, cyan/secondary color distinct from the purple owner chip) appears next to the "Owner" chip in the `detail-meta` area.
+
+### Implementation
+
+**Logged-in user in `InfoSheet.jsx`:**
+`AuthContext` already exposes `user` (the authenticated user object). Destructure `user` from `useAuth()` in `InfoSheet`. Render a new `info-sheet-section` at the top of the sheet (below the logout button, above version) with two rows: display name (bold, `--text-primary`) and email (`--text-secondary`, smaller). Add corresponding CSS classes `.info-sheet-user-name` and `.info-sheet-user-email` to `index.css`.
+
+**Send Invite loading state:**
+- In `ListDetailPage.jsx`, add `isShareSubmitting` state (boolean, default false).
+- In `handleShareSubmit`, set `isShareSubmitting(true)` before the API call, set `isShareSubmitting(false)` in a `finally` block.
+- Pass `isShareSubmitting` to `<ShareListSheet>` as a new prop `isSubmitting`.
+- In `ShareListSheet.jsx`, accept `isSubmitting` prop. On the `<button type="submit">`:
+  - Add `disabled={isSubmitting}` attribute.
+  - Render a small inline `<span className="share-invite-spinner" aria-hidden="true" />` before the label text when `isSubmitting` is true.
+- Add `.share-invite-spinner` CSS (reuse existing `@keyframes spin` + styling from `add-item-preview-spinner` pattern) to `index.css`.
+
+**Member initials badges in `ListDetailPage.jsx`:**
+In the `detail-meta` section, after the existing `list-card-chips` div, when `list.is_owner && members.length > 1`, render an additional row of badges:
+```jsx
+<div className="detail-member-badges">
+  {members.filter(m => !m.is_owner).map(m => (
+    <span key={m.user_id} className="eg-chip-member-initial" title={m.display_name}>
+      {getInitials(m.display_name)}
+    </span>
+  ))}
+</div>
+```
+Add `getInitials(name)` utility inline: split by space, take first letter of first two words, uppercase.
+Add `.detail-member-badges` (flex, gap, margin-top 4px) and `.eg-chip-member-initial` (small circular badge, cyan/pink tint distinct from purple owner chip) to `index.css`.
+
+### Files to Change
+- `frontend/src/components/InfoSheet.jsx`
+- `frontend/src/pages/ListDetailPage.jsx`
+- `frontend/src/components/ShareListSheet.jsx`
+- `frontend/src/index.css` (user info styles, spinner, member badge styles)
+
+---
+
+## T-005 — Feature Removals
+
+### Goal
+Remove three unused UI elements: the Active/All Lists toggle, the stat chips on the start page, and the "Lists" bottom-nav tab.
+
+### Acceptance Criteria
+- The start page (`OverviewPage`) shows no toggle buttons ("Active" / "All Lists").
+- The start page shows no "x lists" or "x shared" stat chips.
+- The bottom navigation bar is absent from all pages (the bar itself and its safe-area padding are gone).
+- No dead CSS rules or unused state remain for the removed elements.
+
+### Implementation
+
+**`OverviewPage.jsx`:**
+- Remove the `view` state and `setView` setter.
+- Remove the `displayLists` derivation (it was `const displayLists = lists;` — just use `lists` directly in the JSX).
+- Remove the `sharedCount` derivation.
+- Remove the entire `<div className="overview-chips">` block.
+- Remove the entire `<div className="overview-toggle">` block.
+
+**`BottomNav.jsx` + usage:**
+- Remove `BottomNav` from wherever it is rendered in `App.jsx` or the layout wrapper.
+- If `BottomNav` is no longer used anywhere, delete `frontend/src/components/ui/BottomNav.jsx` and remove its export from `frontend/src/components/ui/index.js`.
+
+**`index.css`:**
+- Remove `.overview-chips`, `.overview-chips .eg-chip-purple`, `.overview-toggle` rule blocks.
+- Remove `.bottom-nav`, `.bottom-nav-tab`, `.bottom-nav-tab[aria-current="page"]`, `.bottom-nav-tab svg` rule blocks.
+- Remove any `padding-bottom` on the page containers that was added to account for the bottom-nav height (check `.detail-page`, `.overview-page`, `.overview-content`).
+
+### Files to Change
+- `frontend/src/pages/OverviewPage.jsx`
+- `frontend/src/components/ui/BottomNav.jsx` (delete if fully unused)
+- `frontend/src/components/ui/index.js` (remove BottomNav export if deleted)
+- `frontend/src/App.jsx` (remove `<BottomNav />` render)
+- `frontend/src/index.css` (remove dead rule blocks)
+
+---
+
+## Validation (all tasks)
+
+```
+npm run lint
+npm run build
+npm test
+```
+
+Each task must pass all three before moving to `ready_for_review`.

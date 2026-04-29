@@ -2,13 +2,14 @@ import { useRef, useState } from "react";
 import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 import { Icon } from "./ui";
 
-export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
+export default function EntryRow({ entry, isEntering = false, isExiting = false, onDelete, onEdit, onToggle }) {
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
   const startX = useRef(0);
   const currentDx = useRef(0);
   const resolvedIconName = resolveIconName(entry.icon);
   const EntryIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
+  const animationClassName = [isEntering ? "entry-entering" : "", isExiting ? "entry-exiting" : ""].join(" ").trim();
 
   function handleTouchStart(event) {
     startX.current = event.touches[0].clientX;
@@ -38,15 +39,16 @@ export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
   }
 
   return (
-    <div className="entry-row-wrapper">
+    <div className={`entry-row-wrapper ${animationClassName}`.trim()}>
       <div aria-hidden="true" className="entry-delete-zone">
         <Icon color="var(--color-error)" name="trash" size={20} />
       </div>
 
       <div
-        className={`entry-row ${entry.status === "done" ? "entry-row-done" : ""}`}
+        className={`entry-row ${entry.status === "done" ? "entry-row-done" : ""} ${animationClassName}`.trim()}
         data-testid={`entry-row-${entry.id}`}
         style={{
+          pointerEvents: isExiting ? "none" : undefined,
           transform: `translateX(${swipeX}px)`,
           transition: swiping ? "none" : "transform 0.25s var(--ease-out)"
         }}

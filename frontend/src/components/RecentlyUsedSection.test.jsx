@@ -38,11 +38,33 @@ describe("RecentlyUsedSection", () => {
 
   it("renders the fallback icon when an item has no saved icon", () => {
     const { container } = render(
-      <RecentlyUsedSection items={[{ text: "Bread", icon: null, useCount: 4 }]} onAdd={vi.fn()} onDismiss={vi.fn()} />
+      <RecentlyUsedSection
+        items={[{ text: "Bread", icon: null, useCount: 4 }]}
+        newlyAddedTexts={new Set()}
+        onAdd={vi.fn()}
+        onDismiss={vi.fn()}
+      />
     );
 
     expect(screen.getByRole("button", { name: "Bread" })).toBeTruthy();
     expect(container.querySelector(".recently-used-chip-icon")).toBeTruthy();
     expect(container.querySelector(".recently-used-chip-icon")?.getAttribute("data-icon-name")).toBe("IconShoppingCart");
+  });
+
+  it("marks newly added chips with the enter animation class", () => {
+    render(
+      <RecentlyUsedSection
+        items={[
+          { text: "Tomatoes", icon: "IconSalad", useCount: 7 },
+          { text: "Bread", icon: "IconBread", useCount: 4 }
+        ]}
+        newlyAddedTexts={new Set(["Bread"])}
+        onAdd={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Bread" }).className).toContain("entry-entering");
+    expect(screen.getByRole("button", { name: "Tomatoes" }).className).not.toContain("entry-entering");
   });
 });

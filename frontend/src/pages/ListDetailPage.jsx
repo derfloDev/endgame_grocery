@@ -19,6 +19,8 @@ import { useOfflineQueue } from "../hooks/useOfflineQueue";
 import { usePushNotifications } from "../hooks/usePushNotifications";
 import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "./recentlyUsedState";
 
+const MOTION_DURATION_MS = 300;
+
 export default function ListDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -34,12 +36,21 @@ export default function ListDetailPage() {
   const [shareNotice, setShareNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSharingLoading, setIsSharingLoading] = useState(false);
+  const [exitingIds, setExitingIds] = useState(() => new Set());
+  const [enteringIds, setEnteringIds] = useState(() => new Set());
+  const [newlyAddedTexts, setNewlyAddedTexts] = useState(() => new Set());
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(getInitialReducedMotionPreference);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [showOptions, setShowOptions] = useState(false);
   const [showRename, setShowRename] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const isMountedRef = useRef(false);
+  const entriesRef = useRef([]);
+  const exitingIdsRef = useRef(new Set());
+  const activeTimeoutIdsRef = useRef(new Set());
+  const entryAnimationTimeoutsRef = useRef(new Map());
+  const recentlyUsedAnimationTimeoutsRef = useRef(new Map());
   const shouldShowPushToggle = Boolean(list) && (!list.is_owner || members.length > 1);
   const {
     isReady: isPushReady,
@@ -54,20 +65,151 @@ export default function ListDetailPage() {
 
   useEffect(() => {
     isMountedRef.current = true;
+    const entryAnimationTimeouts = entryAnimationTimeoutsRef.current;
+    const recentlyUsedAnimationTimeouts = recentlyUsedAnimationTimeoutsRef.current;
+    const activeTimeoutIds = activeTimeoutIdsRef.current;
 
     return () => {
       isMountedRef.current = false;
+
+      clearTrackedTimeoutMap(entryAnimationTimeouts, activeTimeoutIds);
+      clearTrackedTimeoutMap(recentlyUsedAnimationTimeouts, activeTimeoutIds);
+
+      for (const timeoutId of activeTimeoutIds) {
+        window.clearTimeout(timeoutId);
+      }
+
+      activeTimeoutIds.clear();
     };
   }, []);
 
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
+
+  useEffect(() => {
+    exitingIdsRef.current = exitingIds;
+  }, [exitingIds]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleChange = (event) => {
+      setPrefersReducedMotion(event.matches);
+    };
+
+    setPrefersReducedMotion(mediaQuery.matches);
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleChange);
+
+      return () => {
+        mediaQuery.removeEventListener("change", handleChange);
+      };
+    }
+
+    mediaQuery.addListener?.(handleChange);
+
+    return () => {
+      mediaQuery.removeListener?.(handleChange);
+    };
+  }, []);
+
+  const markEnteringEntries = useCallback(
+    (entryIds) => {
+      if (prefersReducedMotion || !entryIds.length) {
+        return;
+      }
+
+      setEnteringIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+
+        for (const entryId of entryIds) {
+          nextIds.add(entryId);
+          scheduleTransientRemoval(
+            entryAnimationTimeoutsRef.current,
+            activeTimeoutIdsRef.current,
+            entryId,
+            () =>
+              setEnteringIds((currentEnteringIds) => {
+                const nextEnteringIds = new Set(currentEnteringIds);
+                nextEnteringIds.delete(entryId);
+                return nextEnteringIds;
+              }),
+            MOTION_DURATION_MS
+          );
+        }
+
+        return nextIds;
+      });
+    },
+    [prefersReducedMotion]
+  );
+
+  const markRecentlyUsedItems = useCallback(
+    (texts) => {
+      if (prefersReducedMotion || !texts.length) {
+        return;
+      }
+
+      setNewlyAddedTexts((currentTexts) => {
+        const nextTexts = new Set(currentTexts);
+
+        for (const text of texts) {
+          nextTexts.add(text);
+          scheduleTransientRemoval(
+            recentlyUsedAnimationTimeoutsRef.current,
+            activeTimeoutIdsRef.current,
+            text,
+            () =>
+              setNewlyAddedTexts((currentNewlyAddedTexts) => {
+                const nextNewlyAddedTexts = new Set(currentNewlyAddedTexts);
+                nextNewlyAddedTexts.delete(text);
+                return nextNewlyAddedTexts;
+              }),
+            MOTION_DURATION_MS
+          );
+        }
+
+        return nextTexts;
+      });
+    },
+    [prefersReducedMotion]
+  );
+
+  const waitForAnimationDelay = useCallback(() => {
+    if (prefersReducedMotion) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      const timeoutId = window.setTimeout(() => {
+        activeTimeoutIdsRef.current.delete(timeoutId);
+        resolve();
+      }, MOTION_DURATION_MS);
+
+      activeTimeoutIdsRef.current.add(timeoutId);
+    });
+  }, [prefersReducedMotion]);
+
   const loadEntries = useCallback(
-    async ({ historyItems = null, throwOnError = false } = {}) => {
+    async ({ animateEntering = false, historyItems = null, throwOnError = false } = {}) => {
       try {
         const entriesResult = await fetchEntries(id, token);
         const nextEntries = entriesResult.entries ?? [];
+        const previousEntries = entriesRef.current;
 
         if (isMountedRef.current) {
+          entriesRef.current = nextEntries;
           setEntries(nextEntries);
+
+          if (animateEntering) {
+            markEnteringEntries(getEnteringEntryIds(previousEntries, nextEntries));
+          }
+
           setRecentlyUsed((currentItems) => filterRecentlyUsedItems(historyItems ?? currentItems, nextEntries));
         }
 
@@ -84,7 +226,7 @@ export default function ListDetailPage() {
         return [];
       }
     },
-    [id, token]
+    [id, markEnteringEntries, token]
   );
 
   const loadMembers = useCallback(
@@ -136,7 +278,13 @@ export default function ListDetailPage() {
       setShareError("");
       setShareNotice("");
       setIsLoading(true);
+      exitingIdsRef.current = new Set();
+      setExitingIds(new Set());
+      setEnteringIds(new Set());
+      setNewlyAddedTexts(new Set());
       setRecentlyUsed([]);
+      clearTrackedTimeoutMap(entryAnimationTimeoutsRef.current, activeTimeoutIdsRef.current);
+      clearTrackedTimeoutMap(recentlyUsedAnimationTimeoutsRef.current, activeTimeoutIdsRef.current);
 
       try {
         const [listsResult, entriesResult, historyResult] = await Promise.all([
@@ -156,6 +304,7 @@ export default function ListDetailPage() {
         if (!activeList) {
           setEntryError("You no longer have access to this list.");
           setList(null);
+          entriesRef.current = [];
           setEntries([]);
           setMembers([]);
           setRecentlyUsed([]);
@@ -164,6 +313,7 @@ export default function ListDetailPage() {
 
         setList(activeList);
         const nextEntries = entriesResult.entries ?? [];
+        entriesRef.current = nextEntries;
         setEntries(nextEntries);
         setRecentlyUsed(filterRecentlyUsedItems(historyResult?.history ?? [], nextEntries));
 
@@ -182,6 +332,7 @@ export default function ListDetailPage() {
         if (isMountedRef.current) {
           setEntryError(loadError.message);
           setList(null);
+          entriesRef.current = [];
           setEntries([]);
           setMembers([]);
           setRecentlyUsed([]);
@@ -201,23 +352,62 @@ export default function ListDetailPage() {
     void loadEntries();
   }, [loadEntries]);
 
+  const handleCreatedEntry = useCallback(() => {
+    void loadEntries({ animateEntering: true });
+  }, [loadEntries]);
+
+  const handleDeletedEntry = useCallback(
+    ({ entryId } = {}) => {
+      if (!entryId || prefersReducedMotion || !entriesRef.current.some((entry) => entry.id === entryId && entry.status === "open")) {
+        void loadEntries();
+        return;
+      }
+
+      if (exitingIdsRef.current.has(entryId)) {
+        return;
+      }
+
+      const nextExitingIds = new Set(exitingIdsRef.current);
+      nextExitingIds.add(entryId);
+      exitingIdsRef.current = nextExitingIds;
+      setExitingIds(nextExitingIds);
+
+      void (async () => {
+        try {
+          await waitForAnimationDelay();
+          await loadEntries();
+        } finally {
+          if (isMountedRef.current) {
+            const nextExitingIdsAfterLoad = new Set(exitingIdsRef.current);
+            nextExitingIdsAfterLoad.delete(entryId);
+            exitingIdsRef.current = nextExitingIdsAfterLoad;
+            setExitingIds(nextExitingIdsAfterLoad);
+          }
+        }
+      })();
+    },
+    [loadEntries, prefersReducedMotion, waitForAnimationDelay]
+  );
+
   const handleMemberChange = useCallback(() => {
     void loadMembers({ isOwner: list?.is_owner ?? false });
   }, [list?.is_owner, loadMembers]);
 
-  useListEvents("entry:created", id, handleEntryChange);
+  useListEvents("entry:created", id, handleCreatedEntry);
   useListEvents("entry:updated", id, handleEntryChange);
-  useListEvents("entry:deleted", id, handleEntryChange);
+  useListEvents("entry:deleted", id, handleDeletedEntry);
   useListEvents("member:added", id, handleMemberChange);
   useListEvents("member:removed", id, handleMemberChange);
 
-  async function updateEntries(updater) {
-    let nextEntries = [];
+  async function updateEntries(updater, { animateEntering = false } = {}) {
+    const previousEntries = entriesRef.current;
+    const nextEntries = updater(previousEntries);
+    entriesRef.current = nextEntries;
+    setEntries(nextEntries);
 
-    setEntries((currentEntries) => {
-      nextEntries = updater(currentEntries);
-      return nextEntries;
-    });
+    if (animateEntering) {
+      markEnteringEntries(getEnteringEntryIds(previousEntries, nextEntries));
+    }
 
     await writeCachedResource(`entries:${id}`, { entries: nextEntries });
   }
@@ -231,6 +421,49 @@ export default function ListDetailPage() {
     });
 
     await writeCachedResource(`members:${id}`, { members: nextMembers });
+  }
+
+  async function scheduleEntryExit(entryId, action, onComplete) {
+    if (prefersReducedMotion) {
+      const result = await action();
+      await onComplete(result);
+      return;
+    }
+
+    if (exitingIdsRef.current.has(entryId)) {
+      return;
+    }
+
+    const nextExitingIds = new Set(exitingIdsRef.current);
+    nextExitingIds.add(entryId);
+    exitingIdsRef.current = nextExitingIds;
+    setExitingIds(nextExitingIds);
+
+    const waitPromise = waitForAnimationDelay();
+
+    try {
+      const result = await action();
+      await waitPromise;
+      await onComplete(result);
+    } finally {
+      if (isMountedRef.current) {
+        const nextExitingIdsAfterComplete = new Set(exitingIdsRef.current);
+        nextExitingIdsAfterComplete.delete(entryId);
+        exitingIdsRef.current = nextExitingIdsAfterComplete;
+        setExitingIds(nextExitingIdsAfterComplete);
+      }
+    }
+  }
+
+  function addToRecentlyUsed(entry) {
+    const nextText = entry?.text?.trim();
+
+    if (!nextText) {
+      return;
+    }
+
+    markRecentlyUsedItems([nextText]);
+    setRecentlyUsed((currentItems) => upsertRecentlyUsedItems(currentItems, entry));
   }
 
   async function addEntryByText(text, icon, details = "") {
@@ -260,8 +493,9 @@ export default function ListDetailPage() {
         { tempId: temporaryEntry.id }
       );
 
-      await updateEntries((currentEntries) =>
-        sortEntries([...currentEntries, result?.queued ? temporaryEntry : result.entry])
+      await updateEntries(
+        (currentEntries) => sortEntries([...currentEntries, result?.queued ? temporaryEntry : result.entry]),
+        { animateEntering: true }
       );
       return true;
     } catch (submitError) {
@@ -274,26 +508,28 @@ export default function ListDetailPage() {
     try {
       setEntryError("");
       const nextStatus = entry.status === "open" ? "done" : "open";
-      const result = await updateEntry(id, entry.id, token, { status: nextStatus });
+      await scheduleEntryExit(
+        entry.id,
+        () => updateEntry(id, entry.id, token, { status: nextStatus }),
+        async (result) => {
+          await updateEntries((currentEntries) =>
+            sortEntries(
+              currentEntries.map((currentEntry) =>
+                currentEntry.id === entry.id
+                  ? {
+                      ...currentEntry,
+                      ...(result?.queued ? { is_pending_sync: true, status: nextStatus } : result.entry)
+                    }
+                  : currentEntry
+              )
+            )
+          );
 
-      await updateEntries((currentEntries) =>
-        sortEntries(
-          currentEntries.map((currentEntry) =>
-            currentEntry.id === entry.id
-              ? {
-                  ...currentEntry,
-                  ...(result?.queued ? { is_pending_sync: true, status: nextStatus } : result.entry)
-                }
-              : currentEntry
-          )
-        )
+          if (nextStatus === "done") {
+            addToRecentlyUsed(result?.queued ? entry : result?.entry ?? entry);
+          }
+        }
       );
-
-      if (nextStatus === "done") {
-        setRecentlyUsed((currentItems) =>
-          upsertRecentlyUsedItems(currentItems, result?.queued ? entry : result?.entry ?? entry)
-        );
-      }
     } catch (submitError) {
       setEntryError(submitError.message);
     }
@@ -336,13 +572,18 @@ export default function ListDetailPage() {
   async function handleDeleteEntry(entryId) {
     try {
       setEntryError("");
-      const entryToArchive = entries.find((entry) => entry.id === entryId);
-      await deleteEntry(id, entryId, token);
-      await updateEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
+      const entryToArchive = entriesRef.current.find((entry) => entry.id === entryId);
+      await scheduleEntryExit(
+        entryId,
+        () => deleteEntry(id, entryId, token),
+        async () => {
+          await updateEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
 
-      if (entryToArchive) {
-        setRecentlyUsed((currentItems) => upsertRecentlyUsedItems(currentItems, entryToArchive));
-      }
+          if (entryToArchive) {
+            addToRecentlyUsed(entryToArchive);
+          }
+        }
+      );
     } catch (submitError) {
       setEntryError(submitError.message);
     }
@@ -502,6 +743,8 @@ export default function ListDetailPage() {
                   <EntryRow
                     key={entry.id}
                     entry={entry}
+                    isEntering={enteringIds.has(entry.id)}
+                    isExiting={exitingIds.has(entry.id)}
                     onDelete={() => void handleDeleteEntry(entry.id)}
                     onEdit={() => setEditingEntry(entry)}
                     onToggle={() => void toggleStatus(entry)}
@@ -512,6 +755,7 @@ export default function ListDetailPage() {
 
             <RecentlyUsedSection
               items={visibleRecentlyUsed}
+              newlyAddedTexts={newlyAddedTexts}
               onAdd={(text, icon) => void handleAddFromHistory(text, icon)}
               onDismiss={handleDismissFromHistory}
             />
@@ -594,4 +838,49 @@ function normalizeEntryDetails(details) {
 
   const trimmedDetails = details.trim();
   return trimmedDetails ? trimmedDetails : null;
+}
+
+function getInitialReducedMotionPreference() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function getEnteringEntryIds(previousEntries, nextEntries) {
+  const previousOpenEntryIds = new Set(
+    previousEntries.filter((entry) => entry.status === "open").map((entry) => entry.id)
+  );
+
+  return nextEntries
+    .filter((entry) => entry.status === "open" && !previousOpenEntryIds.has(entry.id))
+    .map((entry) => entry.id);
+}
+
+function scheduleTransientRemoval(timeoutMap, activeTimeoutIds, key, onRemove, duration) {
+  const existingTimeoutId = timeoutMap.get(key);
+
+  if (existingTimeoutId) {
+    window.clearTimeout(existingTimeoutId);
+    activeTimeoutIds.delete(existingTimeoutId);
+  }
+
+  const timeoutId = window.setTimeout(() => {
+    timeoutMap.delete(key);
+    activeTimeoutIds.delete(timeoutId);
+    onRemove();
+  }, duration);
+
+  timeoutMap.set(key, timeoutId);
+  activeTimeoutIds.add(timeoutId);
+}
+
+function clearTrackedTimeoutMap(timeoutMap, activeTimeoutIds) {
+  for (const timeoutId of timeoutMap.values()) {
+    window.clearTimeout(timeoutId);
+    activeTimeoutIds.delete(timeoutId);
+  }
+
+  timeoutMap.clear();
 }
