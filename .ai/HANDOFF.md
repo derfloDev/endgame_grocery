@@ -70,11 +70,71 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-002 — implement — 2026-04-29T13:24:01Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Decoupled VAPID-key readiness from service-worker readiness, enabled the module service worker in Vite dev mode, and documented localhost push testing. |
+| Files Changed | .ai/TASKS.md, README.md, frontend/src/hooks/usePushNotifications.js, frontend/src/hooks/usePushNotifications.test.js, frontend/src/vite-config.test.js, frontend/vite.config.js |
+| Validation | `npm run lint` (pass with existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/hooks/usePushNotifications.test.js src/vite-config.test.js` (pass), `npm run build` (pass), `npm test` (pass) |
+| Commit | `<pending> fix(push): enable localhost push testing in Vite dev mode` |
+| Next Role | review |
+
+---
+
 ### Cycle closed — unversioned — 2026-04-29T13:10:30Z
 
 | Field | Value |
 |-------|-------|
 | Summary | All tasks done; cycle closed |
 | Version | unversioned |
+
+---
+
+### T-002 — review — 2026-04-29T13:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed dev-mode SW decoupling fix; all plan phases implemented correctly, lint/build/tests pass (98/98). |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — plan — 2026-04-29T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Diagnosed dev-mode root cause (Promise.all coupling blocks publicKey until serviceWorker.ready resolves, which never happens without a registered SW); planned sequential fetch decoupling in the hook and devOptions in vite.config.js. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-003 — plan — 2026-04-29T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Diagnosed two remaining dev-mode causes after T-002: SW activation crash due to unguarded `self.__WB_MANIFEST`, and redundant `serviceWorker.ready` await in `subscribe()` with no timeout. Planned guard in SW file, `registrationRef` cache in hook, and 8-second timeout fallback. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-29T13:40:07Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Repaired the missed T-002 task commit by creating the isolated product-change commit and preserving the follow-up planning artifacts separately. |
+| Files Changed | .ai/HANDOFF.md, .ai/PLAN.md, .ai/REVIEW.md, .ai/TASKS.md, ROADMAP.md |
+| Validation | not rerun during repaired `commit_task`; using the reviewer-approved `npm run lint`, `npm run build`, and `npm test` results recorded above |
+| Commit | `51ec772 fix(push): enable localhost push testing in Vite dev mode` |
+| Next Role | none |
 
 ---
