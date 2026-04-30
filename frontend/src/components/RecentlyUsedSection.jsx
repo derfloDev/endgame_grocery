@@ -1,7 +1,7 @@
 import { FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 import { Icon } from "./ui";
 
-export default function RecentlyUsedSection({ items, newlyAddedTexts, onAdd, onDismiss }) {
+export default function RecentlyUsedSection({ items, onAdd, onDismiss }) {
   if (!items.length) {
     return null;
   }
@@ -22,7 +22,7 @@ export default function RecentlyUsedSection({ items, newlyAddedTexts, onAdd, onD
             <div key={item.text} className="recently-used-chip-row">
               <button
                 aria-label={item.text}
-                className={`recently-used-chip ${newlyAddedTexts?.has(item.text) ? "entry-entering" : ""}`.trim()}
+                className="recently-used-chip"
                 type="button"
                 onClick={() => onAdd?.(item.text, item.icon ?? null)}
               >

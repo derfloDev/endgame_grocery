@@ -622,7 +622,7 @@ describe("authentication shell", () => {
     expect(fetch.mock.calls.filter(([url]) => url === "/api/lists")).toHaveLength(3);
   });
 
-  it("shows recently used items, re-adds them with an entering row animation, and dismisses them from list detail", async () => {
+  it("shows recently used items, re-adds them, and dismisses them from list detail", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     const queuedResponses = [
       {
@@ -751,7 +751,7 @@ describe("authentication shell", () => {
     });
   }, 10000);
 
-  it("animates rows out and recently used chips in when items are done or deleted locally", async () => {
+  it("adds completed and deleted items to recently used and keeps newest history first", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch
       .mockResolvedValueOnce({
@@ -820,19 +820,10 @@ describe("authentication shell", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
 
-    const milkRow = screen.getByTestId("entry-row-entry-1");
-    await waitFor(() => {
-      expect(milkRow.className).toContain("entry-exiting");
-    });
-    expect(within(recentlyUsedSection).queryByText("Milk")).toBeNull();
-
-    await wait(200);
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: "Mark Milk done" })).toBeNull();
     });
-
-    const milkChip = within(recentlyUsedSection).getByRole("button", { name: "Milk" });
-    expect(milkChip.className).toContain("entry-entering");
+    expect(within(recentlyUsedSection).getByText("Milk")).toBeTruthy();
 
     const chipLabelsAfterDone = within(recentlyUsedSection)
       .getAllByRole("button")
@@ -845,11 +836,6 @@ describe("authentication shell", () => {
     fireEvent.touchEnd(cheeseRow);
 
     await waitFor(() => {
-      expect(screen.getByTestId("entry-row-entry-2").className).toContain("entry-exiting");
-    });
-    expect(within(recentlyUsedSection).queryByText("Cheese")).toBeNull();
-
-    await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/lists/list-1/entries/entry-2",
         expect.objectContaining({
@@ -858,12 +844,9 @@ describe("authentication shell", () => {
       );
     });
 
-    await wait(300);
     await waitFor(() => {
       expect(within(recentlyUsedSection).getByRole("button", { name: "Cheese" })).toBeTruthy();
     });
-
-    expect(within(recentlyUsedSection).getByRole("button", { name: "Cheese" }).className).toContain("entry-entering");
 
     const chipLabelsAfterDelete = within(recentlyUsedSection)
       .getAllByRole("button")
@@ -871,73 +854,7 @@ describe("authentication shell", () => {
     expect(chipLabelsAfterDelete.indexOf("Cheese")).toBeLessThan(chipLabelsAfterDelete.indexOf("Milk"));
   }, 10000);
 
-  it("skips list animation delays when reduced motion is enabled", async () => {
-    stubMatchMedia({ reduced: true });
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          entries: [{ id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" }]
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          history: []
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          members: [
-            {
-              user_id: "user-1",
-              display_name: "Demo User",
-              email: "demo@example.com",
-              joined_at: "2026-04-21T00:00:00Z",
-              is_owner: true
-            }
-          ]
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          entry: {
-            id: "entry-1",
-            text: "Milk",
-            status: "done",
-            icon: "IconMilk",
-            created_at: "2026-04-21T00:00:00Z"
-          }
-        })
-      });
-
-    renderApp(["/lists/list-1"]);
-
-    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Mark Milk done" })).toBeNull();
-    });
-    expect(screen.getByRole("button", { name: "Milk" })).toBeTruthy();
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/lists/list-1/entries/entry-1",
-      expect.objectContaining({
-        method: "PATCH"
-      })
-    );
-  });
-
-  it("animates entry rows and refetches data when SSE events arrive", async () => {
+  it("refetches entries and members for the active list when SSE events arrive", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     const entryResponses = [
       [{ id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" }],
@@ -1067,21 +984,11 @@ describe("authentication shell", () => {
 
     MockEventSource.instances[0].emit("entry:created", { listId: "list-1", entryId: "entry-2" });
     expect(await screen.findByText("Bread")).toBeTruthy();
-    await waitFor(() => {
-      expect(screen.getByTestId("entry-row-entry-2").className).toContain("entry-entering");
-    });
 
     MockEventSource.instances[0].emit("entry:updated", { listId: "list-1", entryId: "entry-1" });
     expect(await screen.findByText("Milk updated")).toBeTruthy();
 
-    await wait(300);
     MockEventSource.instances[0].emit("entry:deleted", { listId: "list-1", entryId: "entry-2" });
-    await waitFor(() => {
-      expect(screen.getByTestId("entry-row-entry-2").className).toContain("entry-exiting");
-    });
-    expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1/entries")).toHaveLength(3);
-
-    await wait(300);
     await waitFor(() => {
       expect(screen.queryByText("Bread")).toBeNull();
     });
@@ -1541,12 +1448,6 @@ function createDeferred() {
   });
 
   return { promise, resolve, reject };
-}
-
-function wait(duration) {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, duration);
-  });
 }
 
 function setNavigatorOnline(value) {

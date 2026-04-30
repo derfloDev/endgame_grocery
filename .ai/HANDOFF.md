@@ -223,3 +223,16 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-001 — revert — 2026-04-30T05:33:13Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Reverted the T-001 list-item animation implementation from the working tree and reset the task to pending implementer work |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `frontend/src/app.test.jsx`, `frontend/src/components/EntryRow.jsx`, `frontend/src/components/RecentlyUsedSection.jsx`, `frontend/src/components/RecentlyUsedSection.test.jsx`, `frontend/src/components/entry-row.test.jsx`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.jsx` |
+| Validation | pending |
+| Commit | n/a |
+| Next Role | implement |
+
+---

@@ -96,30 +96,6 @@ button {
   }
 }
 
-@keyframes entryFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes entryFadeOut {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-}
-
 h1 {
   margin: 0 0 1rem;
   font-size: clamp(2.25rem, 6vw, 4rem);
@@ -1055,19 +1031,6 @@ p {
   border-radius: var(--radius-md);
 }
 
-.entry-row-wrapper.entry-entering,
-.recently-used-chip.entry-entering {
-  transform-origin: top center;
-  will-change: opacity, transform;
-  animation: entryFadeIn 300ms var(--ease-out) forwards;
-}
-
-.entry-row-wrapper.entry-exiting {
-  transform-origin: center;
-  will-change: opacity, transform;
-  animation: entryFadeOut 300ms var(--ease-out) forwards;
-}
-
 .entry-delete-zone {
   position: absolute;
   inset: 0 0 0 auto;
@@ -1089,10 +1052,6 @@ p {
   border: 1px solid rgba(139, 43, 226, 0.2);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
-}
-
-.entry-row.entry-exiting {
-  pointer-events: none;
 }
 
 .entry-row-done {
@@ -1349,14 +1308,6 @@ p {
   background: rgba(255, 69, 96, 0.12);
   outline: none;
   transform: translateY(-1px);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .entry-row-wrapper.entry-entering,
-  .entry-row-wrapper.entry-exiting,
-  .recently-used-chip.entry-entering {
-    animation-duration: 1ms;
-  }
 }
 
 .entry-section-collapse {
