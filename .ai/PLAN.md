@@ -233,6 +233,105 @@ Remove three unused UI elements: the Active/All Lists toggle, the stat chips on 
 
 ---
 
+## T-006 — AddItemSheet Layout Fixes (rework 2)
+
+### Status of Previously Planned Fixes
+
+The three fixes from the original T-006 plan are **already applied to `index.css`**:
+- Bottom padding reduced to `var(--space-5)` (20 px) ✓
+- `:not()` exclusion targets `.add-item-disclosure` ✓
+- `.bottom-sheet--browser-open .add-item-disclosure` is a flex column with `flex: 1; min-height: 0` ✓
+
+Despite those fixes both bugs persist. The actual root cause is `min-height: 0` missing from `.add-item-icon-browser-inner` in two places.
+
+### Root Causes (revised)
+
+**Bug 1 — Excessive spacing in compact mode ("Mehr anzeigen" not clicked)**
+
+`.add-item-icon-browser` uses `display: grid; grid-template-rows: 0fr` to collapse its content. The CSS grid `0fr` collapse trick requires the **grid item** (`.add-item-icon-browser-inner`) to declare `min-height: 0`. Without it, the browser uses the item's intrinsic minimum height — which is the full height of the icon grid (`max-height: min(38vh, 20rem)` ≈ 330 px). The browser element stays ~330 px tall in the closed state, pushing the sheet content past `max-height` and making the whole sheet scrollable.
+
+**Bug 2 — Icon grid not scrollable when browser is open ("Weniger anzeigen" visible)**
+
+In browser-open mode `.add-item-icon-browser-inner` is a grid item inside `.add-item-icon-browser { display: grid; grid-template-rows: 1fr }`. Its row gets a definite height from `flex: 1; min-height: 0` on the browser. But without `min-height: 0` on `.add-item-icon-browser-inner` itself, the grid row cannot constrain the item below its intrinsic minimum height. The item expands to show all icons. The icon grid's `overflow-y: auto` has nothing to overflow against, so no scrollbar appears.
+
+### Acceptance Criteria (unchanged)
+- Before clicking "Mehr anzeigen": the gap below the Cancel/Add Item buttons is at most 20 px (matching the sheet's top padding).
+- After clicking "Mehr anzeigen": the icon browser grid fills the available sheet height and is scrollable; the Cancel and Add Item buttons remain visible at the bottom.
+- Closing the icon browser ("Weniger anzeigen") returns the sheet to its compact state without layout issues.
+
+### Implementation — CSS only, `index.css`
+
+**Fix A: Add `min-height: 0` to base `.add-item-icon-browser-inner` (fixes Bug 1)**
+
+```css
+/* before */
+.add-item-icon-browser-inner {
+  overflow: clip;
+  overflow-clip-margin: 12px;
+  display: grid;
+  gap: 16px;
+  padding: 4px 4px 0;
+}
+
+/* after */
+.add-item-icon-browser-inner {
+  overflow: clip;
+  overflow-clip-margin: 12px;
+  display: grid;
+  gap: 16px;
+  padding: 4px 4px 0;
+  min-height: 0;
+}
+```
+
+With `min-height: 0`, the `grid-template-rows: 0fr` row on `.add-item-icon-browser` can fully collapse to 0 px, removing the phantom ~330 px height in compact mode.
+
+**Fix B: Add `min-height: 0` to `.bottom-sheet--browser-open .add-item-icon-browser-inner` (fixes Bug 2)**
+
+```css
+/* before */
+.bottom-sheet--browser-open .add-item-icon-browser-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: clip;
+}
+
+/* after */
+.bottom-sheet--browser-open .add-item-icon-browser-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: clip;
+  min-height: 0;
+}
+```
+
+With `min-height: 0`, the `grid-template-rows: 1fr` row on `.add-item-icon-browser` can constrain `.add-item-icon-browser-inner` to the available height. The icon grid (`flex: 1; overflow-y: auto`) then receives a bounded height and shows a scrollbar.
+
+**Resulting flex chain when browser is open (corrected):**
+
+```
+.bottom-sheet (fixed, max-height, padding: 20px, overflow: hidden, flex column)
+  .bottom-sheet-handle           (flex-shrink: 0)
+  .bottom-sheet-title            (flex-shrink: 0)
+  .add-item-form                 (flex: 1, min-height: 0, flex column, gap: 16px)
+    .eg-field                    (flex-shrink: 0)
+    .eg-field                    (flex-shrink: 0)
+    .add-item-disclosure         (flex: 1, min-height: 0, flex column)
+      .add-item-more-btn         (natural height)
+      .add-item-icon-browser     (flex: 1, min-height: 0, grid — fills disclosure)
+        .add-item-icon-browser-inner  (grid item, min-height: 0 → flex col — fills browser row)
+          .eg-input              (flex-shrink: 0 — search field)
+          .add-item-icon-browser-grid (flex: 1, overflow-y: auto — scrollable icons)
+    .button-row.add-item-actions (flex-shrink: 0 — always visible at bottom)
+```
+
+### Files to Change
+- `frontend/src/index.css` (2 targeted property additions — no JSX changes required)
+
+---
+
 ## Validation (all tasks)
 
 ```

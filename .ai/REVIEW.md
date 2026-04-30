@@ -1,6 +1,118 @@
 # Review Log
 
-Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
+## Task: T-006
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-30
+
+#### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| — | — | — | No findings. | — |
+
+#### Verification
+
+##### Steps
+1. Read `PLAN.md` T-006 section for root-cause analysis and all three planned CSS changes.
+2. Ran `git diff HEAD` for `index.css` and `AddItemSheet.test.jsx` — only those two files changed.
+3. Cross-referenced all three plan changes against the diff.
+4. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx`.
+5. Ran `npm run build` — clean (pre-existing `onnxruntime-web` eval warning only).
+6. Ran `npm test` — 98 tests (frontend + backend), 0 failures.
+
+##### Findings
+
+**AC: Before "Mehr anzeigen": gap below buttons ≤ 20 px**
+`.bottom-sheet` padding changed from `var(--space-5) var(--space-4) var(--space-12)` to `var(--space-5) var(--space-4) var(--space-5)`. `--space-12` = 48 px (reserved for the now-removed BottomNav); the new `--space-5` = 20 px matches the sheet's top padding for a balanced look. CSS source assertion updated in `AddItemSheet.test.jsx` to require the symmetric value. ✅
+
+**AC: After "Mehr anzeigen": icon grid fills available height, is scrollable, and buttons remain visible**
+Two CSS rule changes together fix the broken flex chain:
+1. `:not(.add-item-icon-browser)` → `:not(.add-item-disclosure)` in the `flex-shrink: 0` rule. The disclosure wrapper (introduced in T-002) is now correctly excluded from `flex-shrink: 0`, allowing it to grow into available space.
+2. New rule `.bottom-sheet--browser-open .add-item-disclosure { display: flex; flex: 1; flex-direction: column; min-height: 0 }` threads the available height down to `.add-item-icon-browser`, which already had `flex: 1; min-height: 0`. The resulting chain: `bottom-sheet (fixed, flex column) → add-item-form (flex: 1) → add-item-disclosure (flex: 1) → add-item-icon-browser (flex: 1) → add-item-icon-browser-inner (flex column) → add-item-icon-browser-grid (flex: 1, overflow-y: auto)` is complete and correct.
+`.button-row.add-item-actions` remains a direct child of `.add-item-form` and is pinned by `flex-shrink: 0` — always visible. ✅
+
+**AC: Closing browser returns compact state**
+The new `.bottom-sheet--browser-open .add-item-disclosure` rule is scoped to the `browser-open` class, which is toggled off when the user closes the browser. The closed state restores the original `add-item-disclosure` grid-based layout (`display: grid; gap: 0`). No residual flex state leaks. ✅
+
+**Test coverage**
+Two new CSS assertions in `AddItemSheet.test.jsx`:
+- `:not(.add-item-disclosure)` flex-shrink rule — verifies the selector was updated.
+- `.add-item-disclosure` flex chain in browser-open context — verifies all four properties in order. ✅
+
+**No JSX changes**
+Confirmed: `AddItemSheet.jsx` is unmodified. This is a pure CSS fix as planned. ✅
+
+##### Risks
+- Low: `--space-5` as the universal sheet bottom padding applies to all sheets (`ShareListSheet`, `InfoSheet`, etc.), not just `AddItemSheet`. This is correct and intentional — the previous 48 px was solely for BottomNav clearance, which is gone.
+- Low: The `flex: 1; min-height: 0` on `.add-item-disclosure` only fires under `.bottom-sheet--browser-open`, so all other disclosure states (closed, partially open) are unaffected.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+### Review Round 2
+
+Status: **PASS**
+
+Reviewed: 2026-04-30
+
+#### Context
+Round 1 passed the three planned CSS fixes (padding, `:not()` exclusion, disclosure flex chain). The implementer identified that both bugs still manifested at runtime. Root-cause analysis revealed that `.add-item-icon-browser-inner` was missing `min-height: 0` in two places: (A) the base rule (causes `grid-template-rows: 0fr` to fail to collapse in compact mode) and (B) the browser-open override (causes the flex column to expand beyond available height, preventing the icon grid scrollbar).
+
+#### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| — | — | — | No findings. | — |
+
+#### Verification
+
+##### Steps
+1. Read `PLAN.md` T-006 rework-2 section for revised root-cause analysis and two targeted CSS additions.
+2. Ran `git diff HEAD` for `index.css` and `AddItemSheet.test.jsx`.
+3. Read `index.css` lines 969–994 to confirm both rules in final form.
+4. Cross-referenced all five accumulated CSS changes against plan.
+5. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx`.
+6. Ran `npm run build` — clean.
+7. Ran `npm test` — 98 tests, 0 failures.
+
+##### Findings
+
+**AC: Before "Mehr anzeigen" — gap ≤ 20 px, sheet not scrollable**
+Fix A: `min-height: 0` added to base `.add-item-icon-browser-inner`. With this property present, the CSS grid `0fr` row on `.add-item-icon-browser` (closed state) can collapse the item to 0 px. Without it the browser retained the item's intrinsic ~330 px height (from `.add-item-icon-browser-grid { max-height: min(38vh, 20rem) }`), making the sheet taller than `max-height` and scrollable. Fix is correct and sufficient. ✅
+
+**AC: After "Mehr anzeigen" — icon grid scrollable, buttons always visible**
+Fix B: `min-height: 0` added to `.bottom-sheet--browser-open .add-item-icon-browser-inner`. With this, the `1fr` grid row can constrain the inner element to the available height. The inner element is now a bounded flex column; `.add-item-icon-browser-grid { flex: 1; overflow-y: auto }` receives a definite height and produces a scrollbar. `.button-row.add-item-actions` is `flex-shrink: 0` on `add-item-form` and thus always visible at the bottom of the sheet. ✅
+
+**AC: Closing browser returns compact state**
+Fix A ensures the `0fr` collapse works fully. The browser-open rules are class-scoped and deactivate when the class is removed. No residual layout state. ✅
+
+**Prior Round 1 fixes intact in the diff**
+All three Round 1 changes present: bottom padding `--space-5`, `:not(.add-item-disclosure)` exclusion, `.bottom-sheet--browser-open .add-item-disclosure` flex chain. ✅
+
+**Test coverage**
+- `iconBrowserInnerRule.toMatch(/min-height:\s*0;/)` — asserts Fix A on the base rule. ✅
+- New regex for `.bottom-sheet--browser-open .add-item-icon-browser-inner` requiring `display: flex; flex-direction: column; gap: 16px; overflow: clip; min-height: 0` in order — asserts Fix B. ✅
+- Prior assertions for Round 1 fixes also present and passing. ✅
+
+##### Risks
+- Low: `min-height: 0` on the base `.add-item-icon-browser-inner` suppresses the item's intrinsic minimum height globally. In open state, `overflow: clip` and the inner flex column keep content contained; in closed state this is exactly the desired behaviour. No other consumer of `.add-item-icon-browser-inner` exists.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
 
 ## Task: T-001
 

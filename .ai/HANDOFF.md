@@ -23,6 +23,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-006 — review — 2026-04-30T09:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-006 rework 2; both `min-height: 0` additions confirmed correct — Fix A enables `0fr` grid collapse in compact mode, Fix B allows `1fr` row to constrain the inner flex column so the icon grid scrollbar works; all validations pass |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — rework_plan — 2026-04-30T09:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reworked T-006: original 3 CSS fixes already applied; actual root cause is missing `min-height: 0` on `.add-item-icon-browser-inner` — add it in both base style (fixes 0fr collapse in compact mode) and browser-open override (enables icon grid scrollbar) |
+| Files Changed | `.ai/PLAN.md` |
+| Next Role | implement |
+
+---
+
+### T-006 — review — 2026-04-30T08:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-006 AddItemSheet layout fixes; all three AC met — bottom padding reduced to 20 px, browser-open flex chain corrected via disclosure wrapper rules, compact state restores correctly; all validations pass |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-004 — rework_plan — 2026-04-30T08:10:00Z
 
 | Field | Value |
@@ -273,6 +308,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-006 — plan — 2026-04-30T08:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned T-006 AddItemSheet layout fixes: reduce `.bottom-sheet` bottom padding from 48 px to 20 px and repair the `bottom-sheet--browser-open` flex chain broken by the T-002 `.add-item-disclosure` wrapper |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
 ### T-004 — implement — 2026-04-30T06:19:26Z
 
 | Field | Value |
@@ -282,6 +328,45 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.test.jsx` |
 | Validation | `not rerun (commit-only step after review approval)` |
 | Commit | `pending fix(ui): align member badges in owner row` |
+| Next Role | none |
+
+---
+
+### T-006 — implement — 2026-04-30T08:53:14Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Reduced the AddItemSheet bottom-sheet dead space and repaired the browser-open disclosure flex chain so the icon grid can grow and scroll while the action buttons stay visible |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/index.css` |
+| Validation | `npm run lint` (pass; existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx` (pass), `npm run build` (pass; existing `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | `pending fix(ui): repair add-item sheet layout flow` |
+| Next Role | review |
+
+---
+
+### T-006 — implement — 2026-04-30T09:26:54Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Completed the second T-006 rework by adding the missing `min-height: 0` constraints on `.add-item-icon-browser-inner` so the collapsed sheet fully closes and the open icon grid scrolls within the available height |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/index.css` |
+| Validation | `npm run lint` (pass; existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx` (pass), `npm run build` (pass; existing `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | `pending fix(ui): finish add-item sheet height constraints` |
+| Next Role | review |
+
+---
+
+### T-006 — implement — 2026-04-30T10:13:38Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-006 add-item sheet height-constraint rework, including the current screenshot artifacts present in the task worktree |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/index.css`, `no_scrollbar_for_icon_list.png`, `too_much_space_under_mehranzeigen.png` |
+| Validation | `not rerun (commit-only step after review approval)` |
+| Commit | `pending fix(ui): finish add-item sheet height constraints` |
 | Next Role | none |
 
 ---

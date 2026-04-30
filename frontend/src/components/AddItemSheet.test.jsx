@@ -70,6 +70,9 @@ describe("AddItemSheet", () => {
     expect(screen.getByLabelText("Details (optional)")).toBeTruthy();
     expect(screen.getByPlaceholderText("Beschreibung, Menge...")).toBeTruthy();
     expect(cssSource).toMatch(
+      /\.bottom-sheet\s*\{[^}]*padding:\s*var\(--space-5\)\s+var\(--space-4\)\s+var\(--space-5\);/s
+    );
+    expect(cssSource).toMatch(
       /\.add-item-disclosure\s*\{[^}]*display:\s*grid;[^}]*gap:\s*0;[^}]*\}/s
     );
     expect(cssSource).toMatch(
@@ -306,8 +309,18 @@ describe("AddItemSheet", () => {
     expect(iconBrowserInnerRule).toMatch(/display:\s*grid;/);
     expect(iconBrowserInnerRule).toMatch(/gap:\s*16px;/);
     expect(iconBrowserInnerRule).toMatch(/padding:\s*4px 4px 0;/);
+    expect(iconBrowserInnerRule).toMatch(/min-height:\s*0;/);
     expect(iconBrowserInnerRule).not.toMatch(/border-top:/);
     expect(cssSource).toMatch(/\.add-item-icon-browser--open\s*\{[^}]*grid-template-rows:\s*1fr;[^}]*opacity:\s*1;/s);
+    expect(cssSource).toMatch(
+      /\.bottom-sheet--browser-open\s+\.add-item-form\s*>\s*:not\(\.add-item-disclosure\)\s*\{[^}]*flex-shrink:\s*0;/s
+    );
+    expect(cssSource).toMatch(
+      /\.bottom-sheet--browser-open\s+\.add-item-disclosure\s*\{[^}]*display:\s*flex;[^}]*flex:\s*1;[^}]*flex-direction:\s*column;[^}]*min-height:\s*0;/s
+    );
+    expect(cssSource).toMatch(
+      /\.bottom-sheet--browser-open\s+\.add-item-icon-browser-inner\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*gap:\s*16px;[^}]*overflow:\s*clip;[^}]*min-height:\s*0;/s
+    );
   });
 
   it("keeps the FAB inset on narrow screens and prevents icon-browser collapse overflow from reaching the viewport", () => {

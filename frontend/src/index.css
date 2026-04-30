@@ -501,7 +501,7 @@ p {
   width: 100%;
   max-height: min(80vh, 44rem);
   max-width: 430px;
-  padding: var(--space-5) var(--space-4) var(--space-12);
+  padding: var(--space-5) var(--space-4) var(--space-5);
   overflow-x: hidden;
   overflow-y: auto;
   border-top: 1px solid rgba(139, 43, 226, 0.4);
@@ -769,8 +769,15 @@ p {
   flex-direction: column;
 }
 
-.bottom-sheet--browser-open .add-item-form > :not(.add-item-icon-browser) {
+.bottom-sheet--browser-open .add-item-form > :not(.add-item-disclosure) {
   flex-shrink: 0;
+}
+
+.bottom-sheet--browser-open .add-item-disclosure {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .icon-picker-sheet {
@@ -965,6 +972,7 @@ p {
   display: grid;
   gap: 16px;
   padding: 4px 4px 0;
+  min-height: 0;
 }
 
 .add-item-icon-browser--open {
@@ -982,6 +990,7 @@ p {
   flex-direction: column;
   gap: 16px;
   overflow: clip;
+  min-height: 0;
 }
 
 .add-item-icon-browser-grid {
