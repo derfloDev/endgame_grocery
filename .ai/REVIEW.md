@@ -251,6 +251,51 @@ Also changes `overflow: hidden` → `overflow: clip` in the browser-open variant
 
 ---
 
+### Review Round 2
+
+Status: **PASS**
+
+Reviewed: 2026-04-30
+
+#### Context
+Rework targeting the Round 1 nit: member badges were rendered in a separate `.detail-member-badges` div below `.list-card-chips` (inside the `flex column` `.detail-meta`), rather than inline with the Owner chip. The rework moves the badge div inside `.list-card-chips` and adds `margin-left: auto` to right-align the badges on the same flex row.
+
+#### Findings
+
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| — | — | — | No findings. | — |
+
+#### Verification
+
+##### Steps
+1. Ran `git diff HEAD` for `ListDetailPage.jsx`, `index.css`, `ListDetailPage.test.jsx`.
+2. Cross-referenced the single rework AC against the diff.
+3. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx`.
+4. Ran `npm run build` — clean (pre-existing `onnxruntime-web` eval warning only).
+5. Ran `npm test` — 98 tests (frontend + backend), 0 failures.
+
+##### Findings
+
+**AC: Member initials badges sit on the same horizontal line as "Owner" chip, right-aligned via `margin-left: auto`; no separate row below**
+
+- `ListDetailPage.jsx` diff: `detail-member-badges` div moved from after the closing `</div>` of `.list-card-chips` to inside `.list-card-chips` as the last child. This places the badges in the same flex row as the Owner/Shared chip and the Queued chip. ✅
+- `index.css` diff: `margin-left: auto` added to `.detail-member-badges`. Because `.list-card-chips` is a flex row, `margin-left: auto` pushes the badge group to the right edge of the row, right-aligned against the Owner chip line. ✅
+- No separate `detail-member-badges` div remains outside `.list-card-chips` in the JSX. ✅
+- CSS test updated: regex now requires `display: flex; margin-left: auto; gap: 8px; flex-wrap: wrap` in that order for `.detail-member-badges`. ✅
+- New source-level test `"renders member badges inside the owner chip row"` asserts via regex that `detail-member-badges` appears inside `list-card-chips` in the JSX. ✅
+
+##### Risks
+- Low: `flex-wrap: wrap` on `.detail-member-badges` means on very narrow screens with many members, badges could wrap below the Owner chip within the same flex container. This is correct CSS behaviour and preferred over overflow.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-002
 
 ### Review Round 1

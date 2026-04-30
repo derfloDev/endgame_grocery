@@ -23,6 +23,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-004 — rework_plan — 2026-04-30T08:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reworked T-004 member badges layout: move badges inside .list-card-chips and add margin-left: auto so they are right-aligned on the same horizontal line as the "Owner" chip |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
 ### T-005 — review — 2026-04-29T17:05:00Z
 
 | Field | Value |
@@ -234,5 +245,43 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Validation | pending |
 | Commit | n/a |
 | Next Role | implement |
+
+---
+
+### T-004 — review — 2026-04-30T08:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 rework; member badges confirmed inside `.list-card-chips` with `margin-left: auto`, right-aligned on Owner chip row; all validations pass |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-04-30T05:56:53Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Moved owner-side member initials badges into the owner chip row and right-aligned the badge group with updated layout regression coverage |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.test.jsx` |
+| Validation | `npm run lint` (pass; existing warning in `frontend/src/context/AuthContext.jsx`), `npm run test --workspace frontend -- src/pages/ListDetailPage.test.jsx` (pass), `npm run build` (pass; existing `onnxruntime-web` eval warning), `npm test` (pass) |
+| Commit | `pending fix(ui): align member badges in owner row` |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-04-30T06:19:26Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-004 member-badge alignment rework using the approved Conventional Commit message |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `frontend/src/index.css`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.test.jsx` |
+| Validation | `not rerun (commit-only step after review approval)` |
+| Commit | `pending fix(ui): align member badges in owner row` |
+| Next Role | none |
 
 ---

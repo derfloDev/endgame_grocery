@@ -159,24 +159,39 @@ Show the logged-in user in Info & Settings, add a loading state to "Send Invite"
 - Add `.share-invite-spinner` CSS (reuse existing `@keyframes spin` + styling from `add-item-preview-spinner` pattern) to `index.css`.
 
 **Member initials badges in `ListDetailPage.jsx`:**
-In the `detail-meta` section, after the existing `list-card-chips` div, when `list.is_owner && members.length > 1`, render an additional row of badges:
+
+The badges must sit **inside** `.list-card-chips`, right-aligned on the same line as the "Owner" chip.
+
+Move `<div className="detail-member-badges">` from its current position (separate row below `.list-card-chips`) into `.list-card-chips` as the last child:
+
 ```jsx
-<div className="detail-member-badges">
-  {members.filter(m => !m.is_owner).map(m => (
-    <span key={m.user_id} className="eg-chip-member-initial" title={m.display_name}>
-      {getInitials(m.display_name)}
-    </span>
-  ))}
+<div className="list-card-chips">
+  <span className={list.is_owner ? "eg-chip-purple" : "eg-chip-cyan"}>
+    {list.is_owner ? "Owner" : `Shared · ${list.owner_name ?? "another member"}`}
+  </span>
+  {list.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
+  {visibleMemberBadges.length > 0 ? (
+    <div className="detail-member-badges">
+      {visibleMemberBadges.map((member) => (
+        <span key={member.user_id} className="eg-chip-member-initial" title={member.display_name}>
+          {getInitials(member.display_name)}
+        </span>
+      ))}
+    </div>
+  ) : null}
 </div>
 ```
-Add `getInitials(name)` utility inline: split by space, take first letter of first two words, uppercase.
-Add `.detail-member-badges` (flex, gap, margin-top 4px) and `.eg-chip-member-initial` (small circular badge, cyan/pink tint distinct from purple owner chip) to `index.css`.
+
+Add `margin-left: auto` to `.detail-member-badges` in `index.css` so the badge group is pushed to the right edge of the chip row, horizontally aligned with "Owner". Remove any `margin-top` that was previously used to separate it as a new row.
+
+Update the test in `ListDetailPage.test.jsx` to assert `margin-left: auto` on `.detail-member-badges`.
 
 ### Files to Change
 - `frontend/src/components/InfoSheet.jsx`
 - `frontend/src/pages/ListDetailPage.jsx`
 - `frontend/src/components/ShareListSheet.jsx`
-- `frontend/src/index.css` (user info styles, spinner, member badge styles)
+- `frontend/src/index.css` (user info styles, spinner, member badge styles — add `margin-left: auto` to `.detail-member-badges`)
+- `frontend/src/pages/ListDetailPage.test.jsx` (update badge CSS assertion)
 
 ---
 

@@ -660,6 +660,7 @@ p {
 
 .detail-member-badges {
   display: flex;
+  margin-left: auto;
   gap: 8px;
   flex-wrap: wrap;
 }
