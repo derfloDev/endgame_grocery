@@ -576,10 +576,40 @@ describe("authentication shell", () => {
     expect(screen.getByText("demo@example.com")).toBeTruthy();
     expect(screen.getByText(/^v\d+\.\d+\.\d+$/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "GNU GPL v3.0" })).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem("endgame_grocery.auth_user"))).toEqual({
+      id: "user-1",
+      display_name: "Demo User",
+      email: "demo@example.com"
+    });
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
 
     expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+  });
+
+  it("rehydrates the stored auth user into the info sheet after a full reload", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    window.localStorage.setItem(
+      "endgame_grocery.auth_user",
+      JSON.stringify({
+        id: "user-1",
+        display_name: "Demo User",
+        email: "demo@example.com"
+      })
+    );
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ lists: [] })
+    });
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(await screen.findByRole("dialog", { name: "Info & Settings" })).toBeTruthy();
+    expect(screen.getByText("Demo User")).toBeTruthy();
+    expect(screen.getByText("demo@example.com")).toBeTruthy();
   });
 
   it("shows a shared badge in the overview with the owner name", async () => {

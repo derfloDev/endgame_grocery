@@ -45,6 +45,17 @@ describe("InfoSheet", () => {
     );
   });
 
+  it("renders the user identity block before the logout action", () => {
+    render(<InfoSheet open onClose={() => {}} />);
+
+    const userName = screen.getByText("Demo User");
+    const logoutButton = screen.getByRole("button", { name: "Log out" });
+
+    expect(
+      userName.compareDocumentPosition(logoutButton) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
   it("does not render when closed", () => {
     render(<InfoSheet open={false} onClose={() => {}} />);
 

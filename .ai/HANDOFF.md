@@ -109,3 +109,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-04-30T19:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 implementation: user identity block confirmed at top of InfoSheet, DOM-order test and reload-rehydration test added, all 122 tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-04-30T16:27:43Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Moved the user identity block to the top of Info & Settings and added tests for DOM order plus auth-user rehydration after reload; no AuthContext fix was needed. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `frontend/src/app.test.jsx`, `frontend/src/components/InfoSheet.jsx`, `frontend/src/components/InfoSheet.test.jsx` |
+| Validation | `npm run lint` (pass; existing `frontend/src/context/AuthContext.jsx` react-refresh warning remains); `npm run build` (pass); `npm test` (pass) |
+| Commit | `fix(ui): show logged-in user at top of info sheet` |
+| Next Role | review |
+
+---
+
+### T-003 — commit_task — 2026-04-30T17:08:58Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-003 done and prepared the reviewed Info & Settings user-identity changes for commit using the recorded task message. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `frontend/src/app.test.jsx`, `frontend/src/components/InfoSheet.jsx`, `frontend/src/components/InfoSheet.test.jsx` |
+| Validation | Reused reviewer-approved validation: `npm run lint`; `npm run build`; `npm test` |
+| Commit | `fix(ui): show logged-in user at top of info sheet` |
+| Next Role | none |
+
+---

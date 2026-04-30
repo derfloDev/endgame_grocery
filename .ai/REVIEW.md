@@ -85,3 +85,44 @@ Reviewed: 2026-04-30
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-04-30
+
+#### Findings
+
+No blocking, major, minor, or nit findings.
+
+#### Verification
+
+##### Steps
+1. Read all changed files (`InfoSheet.jsx`, `InfoSheet.test.jsx`, `app.test.jsx`) and `AuthContext.jsx` (unchanged, rehydration path) against the plan spec.
+2. Confirmed `InfoSheet.jsx`: user identity block (guarded by `showUserIdentity`) is now the first child inside `<BottomSheet>`, rendered before logout, version, and license sections.
+3. Confirmed `AuthContext.jsx` rehydration: `getStoredUser()` reads `USER_STORAGE_KEY` from localStorage on init; `normalizeAuthUser()` preserves `display_name` and `email` when they are non-empty strings. No hydration gap — no fix needed, consistent with the implementer's HANDOFF note.
+4. Confirmed `InfoSheet.test.jsx`: new "renders the user identity block before the logout action" test uses `compareDocumentPosition & DOCUMENT_POSITION_FOLLOWING` to assert correct DOM order.
+5. Confirmed `app.test.jsx`:
+   - Existing "opens the overview info sheet and logs out from it" test extended with a `localStorage` assertion confirming `{ id, display_name, email }` are persisted after login.
+   - New "rehydrates the stored auth user into the info sheet after a full reload" test: pre-seeds `auth_token` and `auth_user` in localStorage, renders a fresh app, opens the sheet, and asserts both fields visible — directly covers the post-reload acceptance criterion.
+6. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx`.
+7. Ran `npm run build` — clean build.
+8. Ran `npm test --workspaces --if-present` — 122 tests (2 new), 0 failures.
+
+##### Findings
+- All acceptance criteria met.
+- No AuthContext changes were needed; the existing rehydration path was already correct.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
