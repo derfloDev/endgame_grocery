@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.8.0](https://github.com/derfloDev/endgame_grocery/compare/v0.7.1...v0.8.0) (2026-04-30)
+
+
+### Features
+
+* **ui:** animate list item transitions ([6d80a8a](https://github.com/derfloDev/endgame_grocery/commit/6d80a8a20892ae0fc6328a70f76877590cb88bf7))
+* **ui:** improve account and list sharing details ([0d3057f](https://github.com/derfloDev/endgame_grocery/commit/0d3057f23eec2e30d59d24865f98a4f5bf7abef9))
+* **ui:** tighten list and sheet spacing ([e19befa](https://github.com/derfloDev/endgame_grocery/commit/e19befad4409260b08ece2603fd446bdd381936f))
+* **ui:** undo T-001 ([1844eec](https://github.com/derfloDev/endgame_grocery/commit/1844eec004b902405961ecf40877f1fda881cdab))
+
+
+### Bug Fixes
+
+* **ui:** align member badges in owner row ([7b48500](https://github.com/derfloDev/endgame_grocery/commit/7b485007bc804d2cb6912b6097f1485ad82bb7b2))
+* **ui:** finish add-item sheet height constraints ([adbfbed](https://github.com/derfloDev/endgame_grocery/commit/adbfbed34b7d7ec9eca691b248f6225062cff342))
+* **ui:** polish mobile FAB and icon browser layout ([ae0e59a](https://github.com/derfloDev/endgame_grocery/commit/ae0e59a8dd38c0dce9e0dd45e3eb8feb556b8570))
+* **ui:** simplify overview navigation ([f6865db](https://github.com/derfloDev/endgame_grocery/commit/f6865db6dda6764f078204f5cd7265632c07b377))
+
 ## [0.7.1](https://github.com/derfloDev/endgame_grocery/compare/v0.7.0...v0.7.1) (2026-04-29)
 
 
