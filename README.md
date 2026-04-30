@@ -130,6 +130,8 @@ docker compose up -d
 
 Compose pulls the app image from `ghcr.io/derfloDev/endgame-grocery`. The app listens on `http://localhost:80`. Nginx serves the built React app, proxies `/api/*` requests to the Node.js backend inside the same container, and returns the SPA `index.html` for deep-link routes. Database migrations run automatically when the app container starts.
 
+Container startup logs also print the app version twice: once from `docker/entrypoint.sh` before migrations and once in the backend JSON startup log entry.
+
 The repository's checked-in `docker-compose.yml` is intentionally kept for local development and starts PostgreSQL only.
 
 ### Environment variables

@@ -71,3 +71,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-04-30T16:20:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 implementation: entrypoint.sh and backend startup log both emit version; all tests pass; docs updated. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-04-30T16:12:53Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added app-version logging to the container entrypoint and backend startup log, with regression coverage and Docker deployment docs updated. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `backend/src/index.js`, `backend/src/index.test.js`, `docker/entrypoint.sh` |
+| Validation | `npm run lint` (pass; existing `frontend/src/context/AuthContext.jsx` react-refresh warning remains); `npm run build` (pass); `npm test` (pass) |
+| Commit | `feat(deploy): log app version during container startup` |
+| Next Role | review |
+
+---
+
+### T-002 — commit_task — 2026-04-30T16:17:47Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and prepared the reviewed startup-version logging changes for commit using the recorded task message. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `backend/src/index.js`, `backend/src/index.test.js`, `docker/entrypoint.sh` |
+| Validation | Reused reviewer-approved validation: `npm run lint`; `npm run build`; `npm test` |
+| Commit | `feat(deploy): log app version during container startup` |
+| Next Role | none |
+
+---
