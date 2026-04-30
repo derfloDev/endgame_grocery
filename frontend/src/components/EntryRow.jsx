@@ -44,7 +44,7 @@ export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
       </div>
 
       <div
-        className={`entry-row ${entry.status === "done" ? "entry-row-done" : ""}`}
+        className={`entry-row ${entry.status === "done" ? "entry-row-done" : ""}`.trim()}
         data-testid={`entry-row-${entry.id}`}
         style={{
           transform: `translateX(${swipeX}px)`,

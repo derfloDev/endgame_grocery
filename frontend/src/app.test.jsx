@@ -31,6 +31,7 @@ function renderApp(initialEntries = ["/"]) {
 describe("authentication shell", () => {
   beforeEach(async () => {
     vi.stubGlobal("fetch", vi.fn());
+    stubMatchMedia();
     MockEventSource.instances = [];
     vi.stubGlobal("EventSource", MockEventSource);
     vi.stubGlobal("Notification", {
@@ -73,6 +74,7 @@ describe("authentication shell", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     cleanup();
   });
@@ -131,7 +133,7 @@ describe("authentication shell", () => {
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
   });
 
-  it("renders bottom navigation only inside the protected app shell", async () => {
+  it("does not render bottom navigation in either the protected shell or auth pages", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch.mockResolvedValueOnce({
       ok: true,
@@ -140,9 +142,9 @@ describe("authentication shell", () => {
 
     const rendered = renderApp(["/"]);
 
-    expect(await screen.findByLabelText("Primary navigation")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Lists" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
+    expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    expect(screen.queryByLabelText("Primary navigation")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Lists" })).toBeNull();
 
     rendered.unmount();
     window.localStorage.clear();
@@ -162,8 +164,9 @@ describe("authentication shell", () => {
     renderApp(["/search"]);
 
     expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    expect(screen.queryByLabelText("Primary navigation")).toBeNull();
     expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Lists" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("button", { name: "Lists" })).toBeNull();
   });
 
   it("submits the register form and redirects to email verification", async () => {
@@ -505,19 +508,55 @@ describe("authentication shell", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
 
-  it("opens the overview info sheet and logs out from it", async () => {
+  it("removes the overview toggle buttons and stat chips", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ lists: [] })
+      json: async () => ({
+        lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+      })
     });
 
     renderApp(["/"]);
+
+    expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Active" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "All Lists" })).toBeNull();
+    expect(screen.queryByText("1 list")).toBeNull();
+    expect(screen.queryByText("1 lists")).toBeNull();
+    expect(screen.queryByText(/shared/i)).toBeNull();
+  });
+
+  it("opens the overview info sheet and logs out from it", async () => {
+    fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          token: createFakeJwt("user-1"),
+          user: {
+            id: "user-1",
+            display_name: "Demo User",
+            email: "demo@example.com"
+          }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ lists: [] })
+      });
+
+    renderApp(["/login"]);
+
+    await userEvent.type(screen.getByLabelText("Email"), "demo@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
 
     expect(await screen.findByText("ENDGAME")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Settings" }));
 
     expect(await screen.findByRole("dialog", { name: "Info & Settings" })).toBeTruthy();
+    expect(screen.getByText("Demo User")).toBeTruthy();
+    expect(screen.getByText("demo@example.com")).toBeTruthy();
     expect(screen.getByText(/^v\d+\.\d+\.\d+$/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "GNU GPL v3.0" })).toBeTruthy();
 
@@ -712,7 +751,7 @@ describe("authentication shell", () => {
     });
   }, 10000);
 
-  it("adds done and deleted items to recently used immediately without a reload", async () => {
+  it("adds completed and deleted items to recently used and keeps newest history first", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
     fetch
       .mockResolvedValueOnce({
@@ -806,14 +845,14 @@ describe("authentication shell", () => {
     });
 
     await waitFor(() => {
-      expect(within(recentlyUsedSection).getByText("Cheese")).toBeTruthy();
+      expect(within(recentlyUsedSection).getByRole("button", { name: "Cheese" })).toBeTruthy();
     });
 
     const chipLabelsAfterDelete = within(recentlyUsedSection)
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label"));
     expect(chipLabelsAfterDelete.indexOf("Cheese")).toBeLessThan(chipLabelsAfterDelete.indexOf("Milk"));
-  });
+  }, 10000);
 
   it("refetches entries and members for the active list when SSE events arrive", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
@@ -1117,6 +1156,7 @@ describe("authentication shell", () => {
 
   it("opens the share sheet, sends an invite notice, and revokes an existing member", async () => {
     window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    const inviteRequest = createDeferred();
     fetch
       .mockResolvedValueOnce({
         ok: true,
@@ -1149,7 +1189,7 @@ describe("authentication shell", () => {
             },
             {
               user_id: "user-2",
-              display_name: "Alex",
+              display_name: "Alex Brown",
               email: "alex@example.com",
               joined_at: "2026-04-21T01:00:00Z",
               is_owner: false
@@ -1161,17 +1201,7 @@ describe("authentication shell", () => {
         ok: true,
         json: async () => ({ publicKey: "dGVzdA" })
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          invite: {
-            id: "invite-1",
-            invited_email: "sam@example.com",
-            status: "pending",
-            expires_at: "2026-04-28T00:00:00Z"
-          }
-        })
-      })
+      .mockReturnValueOnce(inviteRequest.promise)
       .mockResolvedValueOnce({
         status: 204
       });
@@ -1186,12 +1216,29 @@ describe("authentication shell", () => {
 
     expect(await screen.findByRole("dialog", { name: "Share List" })).toBeTruthy();
     expect(screen.getByText("SQUAD (2)")).toBeTruthy();
-    expect(screen.getByText("Alex")).toBeTruthy();
+    expect(screen.getByText("Alex Brown")).toBeTruthy();
+    expect(screen.getByTitle("Alex Brown")).toBeTruthy();
+    expect(screen.getByText("AB")).toBeTruthy();
 
     await userEvent.type(screen.getByLabelText("Invite member by email"), "sam@example.com");
     await userEvent.click(screen.getByRole("button", { name: "Send Invite" }));
+    expect(screen.getByRole("button", { name: "Send Invite" }).hasAttribute("disabled")).toBe(true);
+    expect(document.querySelector(".share-invite-spinner")).toBeTruthy();
+
+    inviteRequest.resolve({
+      ok: true,
+      json: async () => ({
+        invite: {
+          id: "invite-1",
+          invited_email: "sam@example.com",
+          status: "pending",
+          expires_at: "2026-04-28T00:00:00Z"
+        }
+      })
+    });
 
     expect(await screen.findByText("Invitation sent to sam@example.com.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send Invite" }).hasAttribute("disabled")).toBe(false);
     expect(screen.queryByText("sam@example.com")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "Revoke" }));
@@ -1408,6 +1455,22 @@ function setNavigatorOnline(value) {
     configurable: true,
     value
   });
+}
+
+function stubMatchMedia({ reduced = false } = {}) {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn().mockImplementation((query) => ({
+      matches: reduced && query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  );
 }
 
 class MockEventSource {

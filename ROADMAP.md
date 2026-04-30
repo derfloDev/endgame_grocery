@@ -1,40 +1,47 @@
 # ROADMAP
 
-Goal: Fix push notification subscription so "Enable notifications" reliably registers the browser
-and toggles the button state — both in production (mobile/desktop) and in the local dev environment.
+Goal: polish the UI with animations, spacing/layout fixes, mobile fixes, visual corrections, small feature additions, and cleanup of unused features.
 
-## Priority 1 — Production race condition (DONE — T-001)
+## Priority 1 — Animations
 
-Objective: Eliminate the stale-closure bug in `usePushNotifications` that caused
-"Registration failed – push service error" on desktop and a silent no-op on mobile.
+Objective: make list interactions feel smooth and responsive for local actions and real-time shared-user events.
 
-- Fixed: `publicKey` initial state changed from `""` to `null`.
-- Fixed: `subscribe()` guards against empty/null `publicKey` before calling `requestPermission()`.
-- Fixed: `isReady` flag exposed so the button is disabled until the VAPID key is loaded.
-- Fixed: VAPID-key fetch decoupled from `serviceWorker.ready` so `isReady` becomes true
-  as soon as the HTTP response returns.
-- Fixed: `devOptions: { enabled: true, type: "module" }` added to VitePWA.
+- When an item is marked done in "Open items", it fades out and the card height shrinks smoothly.
+- When an item is added back via "Recently used", it fades in.
+- When an item is hard-deleted, it fades out.
+- When a shared user adds or removes an item via SSE (`entry:created` / `entry:deleted`), the same fade-in / fade-out animations play.
+- Affected files: `EntryRow.jsx`, `RecentlyUsedSection.jsx`, `ListDetailPage.jsx` (SSE handler via `useListEvents`), `index.css` / `tokens.css`.
 
-## Priority 2 — Dev-mode push testing (T-003)
+## Priority 2 — Spacing & Layout Fixes
 
-Objective: Allow the full subscribe/unsubscribe cycle to complete on `localhost` with the
-Vite dev server.
+Objective: correct visual spacing inconsistencies reported across several sheets.
 
-Two remaining root causes (confirmed after T-002 landed):
+- Fix gap between "Owner" label and "Enable notifications" toggle in `ShareListSheet.jsx`.
+- Fix gap between "Mehr anzeigen" and "Cancel" button in `RecentlyUsedSection.jsx`.
+- Fix gap between "Send invite" button and "Invitation sent to …" confirmation message in `ShareListSheet.jsx`.
+- On mobile: when the "+" FAB is tapped and the keyboard opens, the "Add item" input must remain visible (scroll/viewport fix in `AddItemSheet.jsx` + `ListDetailPage.jsx`).
 
-1. **`service-worker.js` crashes on activation in dev mode.**
-   `precacheAndRoute(self.__WB_MANIFEST)` throws a `ReferenceError` when
-   `vite-plugin-pwa` does not inject `__WB_MANIFEST` for the `injectManifest` strategy
-   in dev mode. The SW fails to activate → `navigator.serviceWorker.ready` never resolves.
+## Priority 3 — Mobile & Visual Fixes
 
-2. **`subscribe()` makes its own redundant `await navigator.serviceWorker.ready`.**
-   Even when the registration was already obtained in `loadPushState()`, `subscribe()`
-   re-awaits `serviceWorker.ready` independently, causing a hang if the cached result
-   is not reused.
+Objective: correct layout and visual defects on mobile and in the search UI.
 
-Planned outcomes:
-- SW activates in dev mode; `navigator.serviceWorker.ready` resolves.
-- `subscribe()` reuses the already-resolved registration from `loadPushState()`.
-- If SW is somehow unavailable, `subscribe()` fails with a clear error after a timeout
-  instead of hanging forever.
-- `npm run lint`, `npm run build`, and `npm test` pass.
+- "+" FAB is clipped (half outside the screen) on both the start page and the shopping list page — fix positioning in `FAB.jsx` / page layouts.
+- Search input shadow is broken — fix box-shadow in `index.css` or search-related component.
+- Divider line above the search input must be removed — locate and delete the rule in `index.css` or the component.
+- When "Weniger anzeigen" collapses the recently-used list, a scrollbar must not flash — add `overflow: hidden` or equivalent to the collapse animation in `RecentlyUsedSection.jsx`.
+
+## Priority 4 — Feature Additions
+
+Objective: surface missing information and improve interactive feedback.
+
+- Display the currently logged-in user (name / email) inside "Infos & Settings" (`InfoSheet.jsx`, reads from `AuthContext`).
+- After clicking "Send invite", disable the button and show a spinner until the API call resolves (`ShareListSheet.jsx`).
+- When a list is shared, show a badge per shared member (initials, distinct color from owner) next to the "Owner" label in the list detail view (`ListDetailPage.jsx` or `ShareListSheet.jsx`).
+
+## Priority 5 — Feature Removals
+
+Objective: remove unused / unwanted UI elements to reduce visual clutter.
+
+- Remove "Active" and "All Lists" filter tabs from the start page (`OverviewPage.jsx`).
+- Remove "x lists" and "x shared" stat badges from the start page (`OverviewPage.jsx` / `ListCardHome.jsx`).
+- Remove the "Lists" tab from the bottom navigation (`BottomNav.jsx`).

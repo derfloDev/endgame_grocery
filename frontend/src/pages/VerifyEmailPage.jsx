@@ -41,7 +41,7 @@ export default function VerifyEmailPage() {
           return;
         }
 
-        setAuthToken(result.token);
+        setAuthToken(result.token, result.user ?? null);
         navigate("/", { replace: true });
       } catch (verificationError) {
         if (cancelled) {

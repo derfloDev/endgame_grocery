@@ -32,7 +32,7 @@ export default function RegisterPage() {
       });
 
       if (result?.token && result?.listId) {
-        setAuthToken(result.token);
+        setAuthToken(result.token, result.user ?? null);
         navigate(`/lists/${result.listId}`, { replace: true });
         return;
       }

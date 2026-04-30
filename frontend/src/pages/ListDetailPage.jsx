@@ -33,6 +33,7 @@ export default function ListDetailPage() {
   const [shareError, setShareError] = useState("");
   const [shareNotice, setShareNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isShareSubmitting, setIsShareSubmitting] = useState(false);
   const [isSharingLoading, setIsSharingLoading] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -400,6 +401,7 @@ export default function ListDetailPage() {
     }
 
     try {
+      setIsShareSubmitting(true);
       setShareError("");
       setShareNotice("");
       const result = await shareListWithMember(id, token, { email: shareEmail });
@@ -413,6 +415,8 @@ export default function ListDetailPage() {
       setShareEmail("");
     } catch (submitError) {
       setShareError(submitError.message);
+    } finally {
+      setIsShareSubmitting(false);
     }
   }
 
@@ -443,6 +447,7 @@ export default function ListDetailPage() {
 
   const openEntries = entries.filter((entry) => entry.status === "open");
   const visibleRecentlyUsed = filterRecentlyUsedItems(recentlyUsed, openEntries);
+  const visibleMemberBadges = list?.is_owner ? members.filter((member) => !member.is_owner) : [];
 
   return (
     <div className="detail-page">
@@ -470,6 +475,19 @@ export default function ListDetailPage() {
                 {list.is_owner ? "Owner" : `Shared · ${list.owner_name ?? "another member"}`}
               </span>
               {list.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
+              {visibleMemberBadges.length > 0 ? (
+                <div className="detail-member-badges">
+                  {visibleMemberBadges.map((member) => (
+                    <span
+                      key={member.user_id}
+                      className="eg-chip-member-initial"
+                      title={member.display_name}
+                    >
+                      {getInitials(member.display_name)}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
             {shouldShowPushToggle && isPushSupported ? (
               <button
@@ -563,6 +581,7 @@ export default function ListDetailPage() {
       />
       <ShareListSheet
         isSharingLoading={isSharingLoading}
+        isSubmitting={isShareSubmitting}
         members={members}
         open={showShare}
         shareEmail={shareEmail}
@@ -594,4 +613,22 @@ function normalizeEntryDetails(details) {
 
   const trimmedDetails = details.trim();
   return trimmedDetails ? trimmedDetails : null;
+}
+
+function getInitials(name) {
+  if (typeof name !== "string") {
+    return "?";
+  }
+
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (!parts.length) {
+    return "?";
+  }
+
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }

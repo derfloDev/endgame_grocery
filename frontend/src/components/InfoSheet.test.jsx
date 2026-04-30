@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import InfoSheet from "./InfoSheet";
 
 const mockLogout = vi.fn();
+let mockUser = null;
 
 vi.mock("../context/AuthContext", () => ({
   useAuth() {
     return {
+      user: mockUser,
       logout: mockLogout
     };
   }
@@ -16,6 +18,11 @@ vi.mock("../context/AuthContext", () => ({
 describe("InfoSheet", () => {
   beforeEach(() => {
     mockLogout.mockReset();
+    mockUser = {
+      id: "user-1",
+      display_name: "Demo User",
+      email: "demo@example.com"
+    };
     globalThis.__APP_VERSION__ = "9.9.9";
   });
 
@@ -29,6 +36,8 @@ describe("InfoSheet", () => {
 
     expect(screen.getByRole("dialog", { name: "Info & Settings" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Log out" })).toBeTruthy();
+    expect(screen.getByText("Demo User")).toBeTruthy();
+    expect(screen.getByText("demo@example.com")).toBeTruthy();
     expect(screen.getByText("Version")).toBeTruthy();
     expect(screen.getByText("v9.9.9")).toBeTruthy();
     expect(screen.getByRole("link", { name: "GNU GPL v3.0" }).getAttribute("href")).toBe(
