@@ -147,6 +147,7 @@ The repository's checked-in `docker-compose.yml` is intentionally kept for local
 | `SMTP_FROM` | Sender email address used for transactional mails. | `noreply@change-me.example` |
 | `SMTP_FROM_NAME` | Sender display name shown in mail clients. | `Endgame Grocery` |
 | `APP_BASE_URL` | Public frontend base URL used to build e-mail verification, invite, and reset links. | `https://grocery.change-me.example` |
+| `REGISTRATION_ENABLED` | Runtime flag for self-registration. Leave unset or set to `true` to allow `/api/auth/register` and show the register UI; set to `false` to return `404` from registration and hide `/register` in the frontend. | `true` |
 | `VAPID_PUBLIC_KEY` | Public VAPID key sent to the browser so it can create a `PushSubscription`. Generate once with `node -e "const wp=require('web-push');const k=wp.generateVAPIDKeys();console.log(k.publicKey)"` inside the `backend/` directory. Changing this key invalidates all existing subscriptions. | *(generated — see below)* |
 | `VAPID_PRIVATE_KEY` | Private VAPID key used by the backend push worker to sign outbound Web Push requests. **Treat as a secret.** Generated together with `VAPID_PUBLIC_KEY`; the two keys must always be used as a pair. | *(generated — see below)* |
 | `VAPID_CONTACT` | Contact URI included in the VAPID `Authorization` header so push services can reach you if deliveries fail. Must be a `mailto:` address or an HTTPS URL. | `mailto:notifications@change-me.example` |

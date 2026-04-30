@@ -5,6 +5,33 @@ import request from "supertest";
 import { createApp } from "./app.js";
 
 describe("createApp logging", () => {
+  it("returns the public runtime config with registration enabled by default", async () => {
+    const app = createApp({
+      pool: null,
+      startWorkers: false
+    });
+
+    const response = await request(app).get("/api/config");
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { registrationEnabled: true });
+  });
+
+  it("returns the public runtime config when registration is disabled", async () => {
+    const app = createApp({
+      config: {
+        registrationEnabled: false
+      },
+      pool: null,
+      startWorkers: false
+    });
+
+    const response = await request(app).get("/api/config");
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { registrationEnabled: false });
+  });
+
   it("logs requests except the health check", async () => {
     const { logger, getEntries } = createLogCapture();
     let queryCount = 0;

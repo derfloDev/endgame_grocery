@@ -7,6 +7,31 @@ import { createApp } from "./app.js";
 import { createRequireAuth } from "./middleware/auth.js";
 
 describe("authentication routes", () => {
+  it("returns 404 when registration is disabled", async () => {
+    let queryCalled = false;
+    const app = createApp({
+      pool: {
+        async query() {
+          queryCalled = true;
+          throw new Error("register query should not run");
+        }
+      },
+      config: {
+        registrationEnabled: false
+      }
+    });
+
+    const response = await request(app).post("/api/auth/register").send({
+      email: "demo@example.com",
+      password: "password123",
+      display_name: "Demo User"
+    });
+
+    assert.equal(response.status, 404);
+    assert.equal(response.text, "");
+    assert.equal(queryCalled, false);
+  });
+
   it("registers a user, creates a verification token, and sends the verification mail", async () => {
     const sentMessages = [];
     const queries = [];

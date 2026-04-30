@@ -30,6 +30,11 @@ export function createAuthRouter({
   const router = Router();
 
   router.post("/register", async (req, res, next) => {
+    if (config.registrationEnabled === false) {
+      res.status(404).end();
+      return;
+    }
+
     const { email, password, display_name: displayName, invite_token: inviteToken } = req.body ?? {};
 
     if (!email || !password || !displayName) {

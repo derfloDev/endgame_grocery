@@ -9,13 +9,19 @@ import OverviewPage from "./pages/OverviewPage";
 import RegisterPage from "./pages/RegisterPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
+import { useAppConfig } from "./context/appConfigState";
 import "./index.css";
 
 export default function App() {
+  const { registrationEnabled } = useAppConfig();
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      <Route
+        path="/register"
+        element={registrationEnabled ? <RegisterPage /> : <Navigate to="/login" replace />}
+      />
       <Route path="/invite/:token" element={<InviteAcceptPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />

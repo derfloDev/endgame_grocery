@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { AppConfigProvider } from "./context/AppConfigContext";
 import { AuthProvider } from "./context/AuthContext";
 import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
@@ -19,13 +20,15 @@ createRoot(document.getElementById("root")).render(
         v7_startTransition: true
       }}
     >
-      <AuthProvider>
-        <EventSourceProvider>
-          <OfflineQueueProvider>
-            <App />
-          </OfflineQueueProvider>
-        </EventSourceProvider>
-      </AuthProvider>
+      <AppConfigProvider>
+        <AuthProvider>
+          <EventSourceProvider>
+            <OfflineQueueProvider>
+              <App />
+            </OfflineQueueProvider>
+          </EventSourceProvider>
+        </AuthProvider>
+      </AppConfigProvider>
     </BrowserRouter>
   </StrictMode>
 );

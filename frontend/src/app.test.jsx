@@ -4,11 +4,12 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetOfflineStateForTests } from "./api/offlineStore";
 import App from "./App";
+import { StaticAppConfigProvider } from "./context/AppConfigContext";
 import { AuthProvider } from "./context/AuthContext";
 import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 
-function renderApp(initialEntries = ["/"]) {
+function renderApp(initialEntries = ["/"], { registrationEnabled = true } = {}) {
   return render(
     <MemoryRouter
       future={{
@@ -17,13 +18,15 @@ function renderApp(initialEntries = ["/"]) {
       }}
       initialEntries={initialEntries}
     >
-      <AuthProvider>
-        <EventSourceProvider>
-          <OfflineQueueProvider>
-            <App />
-          </OfflineQueueProvider>
-        </EventSourceProvider>
-      </AuthProvider>
+      <StaticAppConfigProvider registrationEnabled={registrationEnabled}>
+        <AuthProvider>
+          <EventSourceProvider>
+            <OfflineQueueProvider>
+              <App />
+            </OfflineQueueProvider>
+          </EventSourceProvider>
+        </AuthProvider>
+      </StaticAppConfigProvider>
     </MemoryRouter>
   );
 }
@@ -100,6 +103,20 @@ describe("authentication shell", () => {
     expect(await screen.findByRole("img", { name: "Endgame Grocery" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Join the Squad" })).toBeTruthy();
     expect(screen.getByText("Create your account to get started.")).toBeTruthy();
+  });
+
+  it("hides the registration link when runtime config disables self-registration", async () => {
+    renderApp(["/login"], { registrationEnabled: false });
+
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Create an account" })).toBeNull();
+  });
+
+  it("redirects /register to /login when runtime config disables self-registration", async () => {
+    renderApp(["/register"], { registrationEnabled: false });
+
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Join the Squad" })).toBeNull();
   });
 
   it("submits the login form and shows the protected overview", async () => {
