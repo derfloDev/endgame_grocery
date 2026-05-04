@@ -159,3 +159,40 @@ No blocking, major, minor, or nit findings.
 
 #### Verdict
 `PASS`
+
+### Review Round 2
+
+Status: **PASS**
+
+Reviewed: 2026-05-04
+
+#### Findings
+
+- **nit** — `AuthContext.jsx` `useEffect` condition checks only `user?.display_name` (not `user?.email`). A user with `email` but no `display_name` would trigger repeated fetch attempts until the server succeeds. In practice this cannot occur since registration requires `display_name` and a successful `fetchCurrentUser` call always returns `display_name`, breaking the loop. No fix required.
+
+#### Verification
+
+##### Steps
+1. Read all changed files against the rework plan spec.
+2. Confirmed `backend/src/routes/auth.js`: `GET /me` appended at end of router; uses `createRequireAuth({ jwtLib, config })` with injected dependencies (consistent with factory pattern); queries `SELECT id, email, display_name FROM users WHERE id = $1`; returns `serializeAuthUser(user)` or 404.
+3. Confirmed `backend/src/auth.test.js`: 3 new tests — valid token → 200 with full user body; no token → 401; missing user → 404. All plan-specified cases covered.
+4. Confirmed `frontend/src/api/auth.js`: `fetchCurrentUser(token)` calls `sendJsonRequest("/api/auth/me", { token })`, which sets `Authorization: Bearer <token>` via the shared client.
+5. Confirmed `frontend/src/context/AuthContext.jsx`: `useEffect` fires when `token` is truthy but `user?.display_name` is absent; uses `cancelled` cleanup flag; silently catches errors; dependency array `[token, user?.display_name, setAuthToken]` is correct.
+6. Confirmed `frontend/src/context/AuthContext.test.jsx` (new file): 3 unit tests — hydrates from `/me` when only token in storage; skips fetch when `display_name` already present; keeps session alive when fetch fails. All plan-specified cases covered.
+7. Confirmed `frontend/src/app.test.jsx`: new integration test "rehydrates missing auth user data from /api/auth/me after a full reload" — seeds only `auth_token` (no `auth_user`), mocks `/api/auth/me` and `/api/lists`, verifies `Authorization` header sent, opens Info sheet, asserts both `display_name` and `email` visible, and asserts `auth_user` written to localStorage. Existing tests updated to use `createAuthUser` / `seedAuthSession` helpers for consistency.
+8. Confirmed `README.md`: sentence added documenting the rehydration behaviour.
+9. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx`.
+10. Ran `npm run build` — clean.
+11. Ran `npm test --workspaces --if-present` — 126 tests (21 files, 4 new), 0 failures.
+
+##### Findings
+- All rework acceptance criteria met, including the "pre-existing JWT session with no stored user data" reload scenario.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

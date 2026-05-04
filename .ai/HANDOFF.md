@@ -198,3 +198,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-05-04T07:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 rework (Round 2): GET /api/auth/me endpoint, AuthContext useEffect rehydration, and all 3 plan-specified test cases verified; 126 tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-05-04T05:22:03Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added `GET /api/auth/me` plus AuthContext session-profile hydration so the Info & Settings sheet shows the signed-in user after reloads that only retain a JWT. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `backend/src/auth.test.js`, `backend/src/routes/auth.js`, `frontend/src/api/auth.js`, `frontend/src/app.test.jsx`, `frontend/src/context/AuthContext.jsx`, `frontend/src/context/AuthContext.test.jsx` |
+| Validation | `npm run lint` (pass; existing `frontend/src/context/AuthContext.jsx` react-refresh warning remains); `npm run build` (pass); `npm test` (pass) |
+| Commit | `fix(auth): rehydrate session user profile from /api/auth/me` |
+| Next Role | review |
+
+---
+
+### T-003 — commit_task — 2026-05-04T05:51:01Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the T-003 rework done and prepared the reviewed session-profile hydration changes for commit using the recorded task message. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `backend/src/auth.test.js`, `backend/src/routes/auth.js`, `frontend/src/api/auth.js`, `frontend/src/app.test.jsx`, `frontend/src/context/AuthContext.jsx`, `frontend/src/context/AuthContext.test.jsx` |
+| Validation | Reused reviewer-approved validation: `npm run lint`; `npm run build`; `npm test` |
+| Commit | `fix(auth): rehydrate session user profile from /api/auth/me` |
+| Next Role | none |
+
+---

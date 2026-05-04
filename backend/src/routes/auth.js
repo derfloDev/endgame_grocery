@@ -7,6 +7,7 @@ import { getConfig } from "../env.js";
 import { acceptInviteForUser, getPendingInviteByToken } from "../inviteService.js";
 import { logger as defaultLogger } from "../logger.js";
 import createMailer from "../mail/mailer.js";
+import { createRequireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
 function createToken({ jwtLib, config, userId }) {
@@ -28,6 +29,7 @@ export function createAuthRouter({
   now = () => new Date()
 } = {}) {
   const router = Router();
+  const requireAuth = createRequireAuth({ jwtLib, config });
 
   router.post("/register", async (req, res, next) => {
     if (config.registrationEnabled === false) {
@@ -425,6 +427,35 @@ export function createAuthRouter({
 
       logger.info({ userId: resetRequest.user_id }, "Password reset completed");
       res.json({ message: "Password updated." });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/me", requireAuth, async (req, res, next) => {
+    if (!pool) {
+      next(new Error("Database connection is not configured."));
+      return;
+    }
+
+    try {
+      const result = await pool.query(
+        `
+          SELECT id, email, display_name
+          FROM users
+          WHERE id = $1
+          LIMIT 1
+        `,
+        [req.user.sub]
+      );
+      const user = result.rows[0];
+
+      if (!user) {
+        res.status(404).json({ error: "User not found." });
+        return;
+      }
+
+      res.json(serializeAuthUser(user));
     } catch (error) {
       next(error);
     }
