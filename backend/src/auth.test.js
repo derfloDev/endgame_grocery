@@ -1,12 +1,38 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { createRequireAuth } from "./middleware/auth.js";
 
 describe("authentication routes", () => {
+  it("returns 404 when registration is disabled", async () => {
+    let queryCalled = false;
+    const app = createApp({
+      pool: {
+        async query() {
+          queryCalled = true;
+          throw new Error("register query should not run");
+        }
+      },
+      config: {
+        registrationEnabled: false
+      }
+    });
+
+    const response = await request(app).post("/api/auth/register").send({
+      email: "demo@example.com",
+      password: "password123",
+      display_name: "Demo User"
+    });
+
+    assert.equal(response.status, 404);
+    assert.equal(response.text, "");
+    assert.equal(queryCalled, false);
+  });
+
   it("registers a user, creates a verification token, and sends the verification mail", async () => {
     const sentMessages = [];
     const queries = [];
@@ -328,6 +354,93 @@ describe("authentication routes", () => {
       msg: "User logged in",
       time: findLogEntry(getEntries(), "User logged in").time,
       userId: "user-1"
+    });
+  });
+
+  it("returns the current auth user for a valid bearer token", async () => {
+    let currentUserQuery = null;
+    const token = jwt.sign({ sub: "user-1" }, "test-secret", { expiresIn: "7d" });
+    const pool = {
+      async query(text, params) {
+        currentUserQuery = [normalizeSql(text), params];
+
+        return {
+          rows: [
+            {
+              id: "user-1",
+              email: "demo@example.com",
+              display_name: "Demo User"
+            }
+          ]
+        };
+      }
+    };
+
+    const app = createApp({
+      pool,
+      config: {
+        jwtSecret: "test-secret",
+        jwtExpiresIn: "7d"
+      }
+    });
+
+    const response = await request(app)
+      .get("/api/auth/me")
+      .set("Authorization", `Bearer ${token}`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      id: "user-1",
+      email: "demo@example.com",
+      display_name: "Demo User"
+    });
+    assert.match(currentUserQuery[0], /SELECT id, email, display_name FROM users/);
+    assert.deepEqual(currentUserQuery[1], ["user-1"]);
+  });
+
+  it("returns 401 for /me when the bearer token is missing", async () => {
+    let queryCalled = false;
+    const app = createApp({
+      pool: {
+        async query() {
+          queryCalled = true;
+          return { rows: [] };
+        }
+      }
+    });
+
+    const response = await request(app).get("/api/auth/me");
+
+    assert.equal(response.status, 401);
+    assert.deepEqual(response.body, {
+      error: "Authentication token is required."
+    });
+    assert.equal(queryCalled, false);
+  });
+
+  it("returns 404 for /me when the authenticated user no longer exists", async () => {
+    const token = jwt.sign({ sub: "user-missing" }, "test-secret", { expiresIn: "7d" });
+    const pool = {
+      async query() {
+        return { rows: [] };
+      }
+    };
+
+    const app = createApp({
+      pool,
+      config: {
+        jwtSecret: "test-secret",
+        jwtExpiresIn: "7d"
+      }
+    });
+
+    const response = await request(app)
+      .get("/api/auth/me")
+      .set("Authorization", `Bearer ${token}`);
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(response.body, {
+      error: "User not found."
     });
   });
 

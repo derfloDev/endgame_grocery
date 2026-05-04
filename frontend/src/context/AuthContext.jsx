@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useState } from "react";
-import { loginUser, registerUser } from "../api/auth";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { fetchCurrentUser, loginUser, registerUser } from "../api/auth";
 
 const STORAGE_KEY = "endgame_grocery.auth_token";
 const USER_STORAGE_KEY = "endgame_grocery.auth_user";
@@ -50,6 +50,29 @@ export function AuthProvider({ children }) {
 
     setUser(normalizedUser);
   }, []);
+
+  useEffect(() => {
+    if (!token || user?.display_name) {
+      return;
+    }
+
+    let cancelled = false;
+
+    // Restore profile details for older or partially cleared sessions that still have a valid JWT.
+    fetchCurrentUser(token)
+      .then((profile) => {
+        if (!cancelled) {
+          setAuthToken(token, profile);
+        }
+      })
+      .catch(() => {
+        // Keep the session active even if profile rehydration is temporarily unavailable.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.display_name, setAuthToken]);
 
   async function login(credentials) {
     const result = await loginUser(credentials);

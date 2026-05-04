@@ -130,6 +130,8 @@ docker compose up -d
 
 Compose pulls the app image from `ghcr.io/derfloDev/endgame-grocery`. The app listens on `http://localhost:80`. Nginx serves the built React app, proxies `/api/*` requests to the Node.js backend inside the same container, and returns the SPA `index.html` for deep-link routes. Database migrations run automatically when the app container starts.
 
+Container startup logs also print the app version twice: once from `docker/entrypoint.sh` before migrations and once in the backend JSON startup log entry.
+
 The repository's checked-in `docker-compose.yml` is intentionally kept for local development and starts PostgreSQL only.
 
 ### Environment variables
@@ -147,6 +149,7 @@ The repository's checked-in `docker-compose.yml` is intentionally kept for local
 | `SMTP_FROM` | Sender email address used for transactional mails. | `noreply@change-me.example` |
 | `SMTP_FROM_NAME` | Sender display name shown in mail clients. | `Endgame Grocery` |
 | `APP_BASE_URL` | Public frontend base URL used to build e-mail verification, invite, and reset links. | `https://grocery.change-me.example` |
+| `REGISTRATION_ENABLED` | Runtime flag for self-registration. Leave unset or set to `true` to allow `/api/auth/register` and show the register UI; set to `false` to return `404` from registration and hide `/register` in the frontend. | `true` |
 | `VAPID_PUBLIC_KEY` | Public VAPID key sent to the browser so it can create a `PushSubscription`. Generate once with `node -e "const wp=require('web-push');const k=wp.generateVAPIDKeys();console.log(k.publicKey)"` inside the `backend/` directory. Changing this key invalidates all existing subscriptions. | *(generated — see below)* |
 | `VAPID_PRIVATE_KEY` | Private VAPID key used by the backend push worker to sign outbound Web Push requests. **Treat as a secret.** Generated together with `VAPID_PUBLIC_KEY`; the two keys must always be used as a pair. | *(generated — see below)* |
 | `VAPID_CONTACT` | Contact URI included in the VAPID `Authorization` header so push services can reach you if deliveries fail. Must be a `mailto:` address or an HTTPS URL. | `mailto:notifications@change-me.example` |
@@ -235,6 +238,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - The protected React app uses a dark Endgame-themed shell with bottom navigation for Lists.
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
 - Authentication supports register, email verification, password reset, and login flows backed by JWT access tokens.
+- When a browser still has a valid JWT but has lost the cached `endgame_grocery.auth_user` entry, the frontend rehydrates `display_name` and `email` from `GET /api/auth/me` so the Info & Settings sheet still shows the signed-in identity after reload.
 - Lists support create, rename, delete, ownership, and shared-access visibility.
 - The overview refetches lists when list rename/delete SSE events arrive, and the list detail page refetches the active list's entries or members when matching entry/member SSE events arrive over `GET /api/events?token=<jwt>`.
 - The authenticated frontend keeps one shared SSE connection open while a JWT is present, then closes it again on logout so pages can subscribe to list-scoped events without creating their own connections.

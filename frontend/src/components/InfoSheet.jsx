@@ -9,6 +9,7 @@ function getAppVersion() {
 export default function InfoSheet({ open, onClose }) {
   const { logout, user } = useAuth();
   const appVersion = getAppVersion();
+  const showUserIdentity = Boolean(user?.display_name || user?.email);
 
   function handleLogout() {
     onClose();
@@ -17,18 +18,18 @@ export default function InfoSheet({ open, onClose }) {
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Info & Settings">
+      {showUserIdentity ? (
+        <div className="info-sheet-section">
+          {user?.display_name ? <div className="info-sheet-user-name">{user.display_name}</div> : null}
+          {user?.email ? <div className="info-sheet-user-email">{user.email}</div> : null}
+        </div>
+      ) : null}
       <div className="info-sheet-section">
         <button className="eg-btn eg-btn-danger info-sheet-logout" type="button" onClick={handleLogout}>
           <Icon name="logOut" size={16} color="currentColor" />
           Log out
         </button>
       </div>
-      {user?.display_name || user?.email ? (
-        <div className="info-sheet-section">
-          {user?.display_name ? <div className="info-sheet-user-name">{user.display_name}</div> : null}
-          {user?.email ? <div className="info-sheet-user-email">{user.email}</div> : null}
-        </div>
-      ) : null}
       <div className="info-sheet-section info-sheet-meta">
         <span className="info-sheet-label">Version</span>
         <span className="info-sheet-value">v{appVersion}</span>

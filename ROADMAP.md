@@ -1,47 +1,44 @@
 # ROADMAP
 
-Goal: polish the UI with animations, spacing/layout fixes, mobile fixes, visual corrections, small feature additions, and cleanup of unused features.
+Goal: Harden the Docker deployment with configurable registration, version logging, and a visible logged-in user in the Info sheet.
 
-## Priority 1 — Animations
+## Priority 1 — Disable Registration via Runtime Configuration
 
-Objective: make list interactions feel smooth and responsive for local actions and real-time shared-user events.
+Objective: Allow administrators to disable self-registration entirely via a Docker environment variable, without a rebuild.
 
-- When an item is marked done in "Open items", it fades out and the card height shrinks smoothly.
-- When an item is added back via "Recently used", it fades in.
-- When an item is hard-deleted, it fades out.
-- When a shared user adds or removes an item via SSE (`entry:created` / `entry:deleted`), the same fade-in / fade-out animations play.
-- Affected files: `EntryRow.jsx`, `RecentlyUsedSection.jsx`, `ListDetailPage.jsx` (SSE handler via `useListEvents`), `index.css` / `tokens.css`.
+- New env var `REGISTRATION_ENABLED` (default: `true`); when `false`, the backend `/api/auth/register` endpoint returns `404`.
+- New public backend endpoint `GET /api/config` returns `{ registrationEnabled: boolean }` — no authentication required.
+- Frontend fetches `/api/config` on app startup and stores the flag in a React context or top-level state.
+- When `registrationEnabled` is `false`:
+  - The `/register` route redirects to `/login`.
+  - The "Create an account" link on `LoginPage` is hidden.
+- Dockerfile documents the `REGISTRATION_ENABLED` env var in a comment.
+- `env.js` and `README.md` (or equivalent docs) updated with the new variable.
 
-## Priority 2 — Spacing & Layout Fixes
+Acceptance criteria:
+- Container started with `REGISTRATION_ENABLED=false`: POST to `/api/auth/register` returns `404`; the frontend shows no registration link or route.
+- Container started without the variable (or `REGISTRATION_ENABLED=true`): registration works as before.
 
-Objective: correct visual spacing inconsistencies reported across several sheets.
+## Priority 2 — Log Software Version at Container Start
 
-- Fix gap between "Owner" label and "Enable notifications" toggle in `ShareListSheet.jsx`.
-- Fix gap between "Mehr anzeigen" and "Cancel" button in `RecentlyUsedSection.jsx`.
-- Fix gap between "Send invite" button and "Invitation sent to …" confirmation message in `ShareListSheet.jsx`.
-- On mobile: when the "+" FAB is tapped and the keyboard opens, the "Add item" input must remain visible (scroll/viewport fix in `AddItemSheet.jsx` + `ListDetailPage.jsx`).
+Objective: Make the running software version immediately visible in Docker logs.
 
-## Priority 3 — Mobile & Visual Fixes
+- Backend `index.js` reads the version from the root `package.json` (already read by `vite.config.js`) and includes it in the existing `"Backend started"` log entry.
+- `docker/entrypoint.sh` prints the version via `node -p "require('/app/package.json').version"` before starting supervisord.
 
-Objective: correct layout and visual defects on mobile and in the search UI.
+Acceptance criteria:
+- `docker logs <container>` shows the version string (e.g. `0.8.0`) both in the entrypoint output and in the backend startup JSON log.
 
-- "+" FAB is clipped (half outside the screen) on both the start page and the shopping list page — fix positioning in `FAB.jsx` / page layouts.
-- Search input shadow is broken — fix box-shadow in `index.css` or search-related component.
-- Divider line above the search input must be removed — locate and delete the rule in `index.css` or the component.
-- When "Weniger anzeigen" collapses the recently-used list, a scrollbar must not flash — add `overflow: hidden` or equivalent to the collapse animation in `RecentlyUsedSection.jsx`.
+## Priority 3 — Show Logged-in User in Info & Settings
 
-## Priority 4 — Feature Additions
+Objective: The currently logged-in user's display name is always visible in the Info & Settings sheet, above the logout button.
 
-Objective: surface missing information and improve interactive feedback.
+- `display_name` is required at registration (already enforced); `email` is also always stored.
+- Fix the root cause why `display_name` / `email` are currently not rendered in `InfoSheet` (likely a storage or context hydration issue on page load).
+- Move the user block (display name + email) to the **top** of the `InfoSheet`, above the logout button.
+- `display_name` is the primary label; `email` shown below it as secondary text.
+- If for any reason `display_name` is missing, fall back to showing `email`; if both are missing, show nothing (defensive, should not occur in normal flow).
 
-- Display the currently logged-in user (name / email) inside "Infos & Settings" (`InfoSheet.jsx`, reads from `AuthContext`).
-- After clicking "Send invite", disable the button and show a spinner until the API call resolves (`ShareListSheet.jsx`).
-- When a list is shared, show a badge per shared member (initials, distinct color from owner) next to the "Owner" label in the list detail view (`ListDetailPage.jsx` or `ShareListSheet.jsx`).
-
-## Priority 5 — Feature Removals
-
-Objective: remove unused / unwanted UI elements to reduce visual clutter.
-
-- Remove "Active" and "All Lists" filter tabs from the start page (`OverviewPage.jsx`).
-- Remove "x lists" and "x shared" stat badges from the start page (`OverviewPage.jsx` / `ListCardHome.jsx`).
-- Remove the "Lists" tab from the bottom navigation (`BottomNav.jsx`).
+Acceptance criteria:
+- After login, the Info & Settings sheet shows the user's display name at the top, above the logout button, without requiring a page reload.
+- After a full page reload the user info is still visible (persisted in localStorage).

@@ -14,14 +14,17 @@ describe("getConfig", () => {
     const previousPort = process.env.PORT;
     const previousSmtpPort = process.env.SMTP_PORT;
     const previousLogLevel = process.env.LOG_LEVEL;
+    const previousRegistrationEnabled = process.env.REGISTRATION_ENABLED;
 
     delete process.env.PORT;
     delete process.env.SMTP_PORT;
     delete process.env.LOG_LEVEL;
+    delete process.env.REGISTRATION_ENABLED;
 
     assert.equal(getConfig().port, 4000);
     assert.equal(getConfig().smtpPort, 587);
     assert.equal(getConfig().logLevel, "info");
+    assert.equal(getConfig().registrationEnabled, true);
 
     if (previousPort) {
       process.env.PORT = previousPort;
@@ -32,6 +35,19 @@ describe("getConfig", () => {
     }
 
     restoreEnvVar("LOG_LEVEL", previousLogLevel);
+    restoreEnvVar("REGISTRATION_ENABLED", previousRegistrationEnabled);
+  });
+
+  it("disables registration only when REGISTRATION_ENABLED is false", () => {
+    const previousRegistrationEnabled = process.env.REGISTRATION_ENABLED;
+
+    process.env.REGISTRATION_ENABLED = "false";
+    assert.equal(getConfig().registrationEnabled, false);
+
+    process.env.REGISTRATION_ENABLED = "true";
+    assert.equal(getConfig().registrationEnabled, true);
+
+    restoreEnvVar("REGISTRATION_ENABLED", previousRegistrationEnabled);
   });
 
   it("loads DATABASE_URL from the project root .env regardless of cwd", async () => {

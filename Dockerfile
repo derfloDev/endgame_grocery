@@ -18,6 +18,9 @@ RUN apk add --no-cache nginx supervisor
 
 WORKDIR /app
 
+# Runtime configuration:
+# REGISTRATION_ENABLED - set to "false" to disable self-registration (default: "true")
+
 COPY package*.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/

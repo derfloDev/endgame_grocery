@@ -2,9 +2,11 @@ import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
+import { useAppConfig } from "../context/appConfigState";
 
 export default function LoginPage() {
   const { login, token } = useAuth();
+  const { registrationEnabled } = useAppConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -82,9 +84,11 @@ export default function LoginPage() {
             <Link className="eg-link" to="/forgot-password">
               Forgot password?
             </Link>
-            <Link className="eg-link" to="/register">
-              Create an account
-            </Link>
+            {registrationEnabled ? (
+              <Link className="eg-link" to="/register">
+                Create an account
+              </Link>
+            ) : null}
           </div>
         </form>
       </section>

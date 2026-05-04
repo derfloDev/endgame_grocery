@@ -6,6 +6,7 @@ import createEventsRouter from "./routes/events.js";
 import entryRoutes from "./routes/entries.js";
 import historyRoutes from "./routes/history.js";
 import invitesRoutes from "./routes/invites.js";
+import { getConfig } from "./env.js";
 import { logger as defaultLogger } from "./logger.js";
 import listRoutes from "./routes/lists.js";
 import pushRoutes from "./routes/push.js";
@@ -18,16 +19,21 @@ import { startPushWorker } from "./workers/pushWorker.js";
 export function createApp(options = {}) {
   const app = express();
   const logger = options.logger ?? defaultLogger;
+  const config = {
+    ...getConfig(),
+    ...(options.config ?? {})
+  };
   const shouldStartWorkers = options.startWorkers ?? !("pool" in options);
   const sseManager = options.sseManager ?? defaultSseManager;
   const requireAuthFn =
     options.requireAuthFn ??
     createRequireAuthFn({
       jwtLib: options.jwtLib,
-      config: options.config
+      config
     });
   const routerOptions = {
     ...options,
+    config,
     sseManager
   };
 
@@ -45,6 +51,10 @@ export function createApp(options = {}) {
 
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
+  });
+
+  app.get("/api/config", (_req, res) => {
+    res.json({ registrationEnabled: config.registrationEnabled });
   });
 
   app.use(

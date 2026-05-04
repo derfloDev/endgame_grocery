@@ -1,343 +1,326 @@
 # Plan
 
-Status: **ready**
+Status: **rework — T-001 doc gap + T-003 me-endpoint**
 
-Goal: deliver all UI enhancements defined in `ROADMAP.md` across five focused tasks.
-
----
+Goal: Harden the Docker deployment with configurable registration, version logging, and a visible logged-in user in the Info sheet.
 
 ## Scope
 
-Five independent tasks, each ownable as a single commit:
+- **T-001** Disable registration via runtime environment variable (`REGISTRATION_ENABLED`)
+- **T-002** Log the software version at Docker container start
+- **T-003** Show logged-in user's display name at the top of the Info & Settings sheet
 
-| ID | Title |
-|----|-------|
-| T-001 | List item animations |
-| T-002 | Spacing fixes |
-| T-003 | Mobile & visual fixes |
-| T-004 | Feature additions |
-| T-005 | Feature removals |
+## Acceptance Criteria
+
+- `REGISTRATION_ENABLED=false` → `POST /api/auth/register` returns `404`; frontend hides the route and login-page link.
+- `docker logs <container>` shows the version string in both the entrypoint output and the backend JSON startup log.
+- Info & Settings sheet always shows `display_name` (and `email` below it) at the very top, above the logout button, immediately after login and after a full page reload.
 
 ---
 
-## T-001 — List Item Animations
+## T-001 — Disable Registration via Runtime Configuration
 
-### Goal
-Smooth fade-out when an item leaves "Open items" (local toggle, local delete, SSE delete) and smooth fade-in when an item appears in "Open items" (SSE create) or in "Recently used" (any add).
+### Overview
 
-### Acceptance Criteria
-- Marking an item done triggers a ~300 ms fade-out + slight downscale on the row before the row disappears from the list.
-- Hard-deleting an item (swipe or icon) triggers the same exit animation.
-- When a shared user creates an entry via SSE, the new row fades in (~300 ms).
-- When a shared user deletes an entry via SSE, the row fades out before removal.
-- When an item is re-added from "Recently used", the chip fades/slides in.
-- Animations respect `prefers-reduced-motion` (instant show/hide when enabled).
+A new `REGISTRATION_ENABLED` runtime env var (default `true`) gates the register endpoint and surfaces a public `/api/config` endpoint so the frontend can adjust its UI without a rebuild.
 
-### Implementation
+### Backend changes
 
-**New CSS keyframes** (`frontend/src/index.css` / `tokens.css`):
-```css
-@keyframes entryFadeIn  { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
-@keyframes entryFadeOut { from { opacity:1; transform: scale(1); }          to { opacity:0; transform: scale(0.95); } }
+#### 1. `backend/src/env.js`
+Add `registrationEnabled` to `getConfig()`:
+```js
+registrationEnabled: process.env.REGISTRATION_ENABLED !== 'false'
 ```
-Apply via utility classes `.entry-entering` (entryFadeIn 300 ms ease-out forwards) and `.entry-exiting` (entryFadeOut 300 ms ease-out forwards).
-Add `@media (prefers-reduced-motion: reduce)` block that overrides duration to 0 ms.
+Default is `true`; only the exact string `'false'` disables it.
 
-**`ListDetailPage.jsx`**:
-- Add `exitingIds` state (`Set<string>`) and `enteringIds` state (`Set<string>`).
-- Extract helper `scheduleExit(id, fn)`: adds id to `exitingIds`, waits 300 ms, calls fn, removes from `exitingIds`.
-- **Local toggle done**: call `scheduleExit(entry.id, () => updateEntries(...))` instead of updating immediately.
-- **Local delete**: call `scheduleExit(entry.id, () => deleteEntry(...).then(updateEntries(...)))`.
-- **SSE `entry:deleted`**: replace plain `handleEntryChange` for the deleted event with a diff-aware version that adds the disappeared id to `exitingIds`, waits 300 ms, then calls `loadEntries()`.
-- **SSE `entry:created`**: after `loadEntries()` resolves, compare old vs new entries, add new ids to `enteringIds`, clear after 300 ms.
-- Pass `isExiting={exitingIds.has(entry.id)}` and `isEntering={enteringIds.has(entry.id)}` to each `<EntryRow>`.
-- Pass `newlyAddedTexts` (Set of texts just added back from history) to `<RecentlyUsedSection>`.
+#### 2. `backend/src/env.test.js`
+- Add a test case: `REGISTRATION_ENABLED=false` → `getConfig().registrationEnabled === false`.
+- Add a test case: env var absent → `getConfig().registrationEnabled === true`.
 
-**`EntryRow.jsx`**:
-- Accept `isExiting` and `isEntering` props.
-- Apply `.entry-exiting` class when `isExiting`, `.entry-entering` when `isEntering`.
-- When `isExiting`, set `pointer-events: none` via inline style or CSS to prevent interaction during fade.
+#### 3. `backend/src/routes/auth.js`
+In `createAuthRouter`, guard the `POST /register` handler:
+```js
+router.post("/register", async (req, res, next) => {
+  if (!config.registrationEnabled) {
+    res.status(404).end();
+    return;
+  }
+  // existing logic …
+});
+```
+The `config` object is already injected via the factory parameter.
 
-**`RecentlyUsedSection.jsx`**:
-- Accept `newlyAddedTexts: Set<string>` prop.
-- Apply `.entry-entering` (or a `.chip-entering` variant) class to chips whose `text` is in `newlyAddedTexts`.
+#### 4. `backend/src/auth.test.js`
+Add a test: when `config.registrationEnabled` is `false`, `POST /register` returns `404` with no body.
 
-### Files to Change
-- `frontend/src/pages/ListDetailPage.jsx`
-- `frontend/src/components/EntryRow.jsx`
-- `frontend/src/components/RecentlyUsedSection.jsx`
-- `frontend/src/index.css` (new keyframes + utility classes + reduced-motion block)
+#### 5. `backend/src/app.js`
+Add a public config route **before** authenticated routes:
+```js
+app.get("/api/config", (_req, res) => {
+  const cfg = options.config ?? getConfig();
+  res.json({ registrationEnabled: cfg.registrationEnabled });
+});
+```
 
----
+#### 6. `backend/src/app.test.js`
+Add tests:
+- `GET /api/config` with default config → `{ registrationEnabled: true }`.
+- `GET /api/config` with `registrationEnabled: false` → `{ registrationEnabled: false }`.
 
-## T-002 — Spacing Fixes
+### Frontend changes
 
-### Goal
-Fix four reported spacing/layout inconsistencies.
+#### 7. `frontend/src/api/config.js` *(new file)*
+```js
+import { sendJsonRequest } from "./client";
 
-### Acceptance Criteria
-- In `ListDetailPage`, the gap between the "Owner" chip row and the "Enable notifications" button is visually balanced (≈ 12 px, matching `--space-3`).
-- In `AddItemSheet`, the gap between "Mehr anzeigen" toggle and the "Cancel / Add Item" button row is ≈ 8 px.
-- In `ShareListSheet`, the "Send Invite" button and the success/error banner below it have a consistent gap (≈ 12 px).
-- On mobile, when the "Add item" text input receives focus and the keyboard opens, the input scrolls into view automatically.
+export function fetchAppConfig() {
+  return sendJsonRequest("/api/config");
+}
+```
 
-### Implementation
+#### 8. `frontend/src/context/AppConfigContext.jsx` *(new file)*
+- Creates `AppConfigContext` with default `{ registrationEnabled: true }`.
+- `AppConfigProvider` fetches `/api/config` on mount via `useEffect`; updates state on success; silently keeps default on error (fail-open = registration stays visible if config endpoint unreachable).
+- Exports `useAppConfig()` hook.
 
-**Spacing in `ListDetailPage` (`detail-meta`):**
-The `.detail-meta` div wraps the chip row and the push-notifications button with no gap. Add `display: flex; flex-direction: column; gap: var(--space-3);` (12 px) to `.detail-meta` in `index.css`.
-
-**Spacing in `AddItemSheet` ("Mehr anzeigen" vs Cancel):**
-The `add-item-more-btn` sits directly before the `button-row`. Reduce the `gap` in `.add-item-form` grid for this specific pairing or add `margin-bottom: 0` to `.add-item-more-btn` and adjust `.button-row` margin-top to `var(--space-2)` (8 px). Inspect computed gap; likely the `add-item-form` grid gap (e.g., 16 px) needs a targeted override between these two elements.
-
-**Spacing in `ShareListSheet` (Send Invite → notice/error):**
-Currently `.share-list-form` has `gap: 8px` and the banners sit below the form with no top margin. Add `margin-top: 8px` to `.detail-banner` inside the sheet context, or set a minimum `gap` between the form and banner in the sheet's column layout.
-
-**Mobile keyboard scroll:**
-In `AddItemSheet.jsx`, on the text `<input>`, add an `onFocus` handler that calls `event.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' })`. This ensures the input is visible when the iOS/Android soft keyboard resizes the viewport.
-
-### Files to Change
-- `frontend/src/index.css` (`.detail-meta`, `.share-list-form`, `.button-row` / `.add-item-form` spacing)
-- `frontend/src/components/AddItemSheet.jsx` (`onFocus` scrollIntoView)
-
----
-
-## T-003 — Mobile & Visual Fixes
-
-### Goal
-Fix the FAB clipping on narrow screens, the broken icon-browser search input shadow, the stray divider line above the search input, and the scrollbar flash on icon-browser collapse.
-
-### Acceptance Criteria
-- On any screen ≤ 375 px wide, the FAB is fully visible with at least 16 px right margin.
-- The icon-search `eg-input` box-shadow/glow is fully visible (not clipped).
-- No `border-top` divider appears above the icon-browser search field.
-- Collapsing the icon browser ("Weniger anzeigen") does not cause a viewport-level scrollbar to flash.
-
-### Implementation
-
-**FAB clipping (`index.css`):**
-Current rule: `right: calc(50% - 195px)`. On a 375 px viewport this evaluates to `−7.5 px`, pushing the FAB half off-screen.
-Fix: `right: max(calc(50% - 195px), 16px)`. The `max()` CSS function ensures a minimum 16 px clearance on any narrow screen while preserving the centered layout on wider screens.
-
-**Icon-browser search input shadow (`index.css`):**
-The `.add-item-icon-browser-inner` element has `overflow: hidden`, which clips the `box-shadow` glow of the `eg-input` inside it.
-Fix: Add `padding: 4px 4px 0` to `.add-item-icon-browser-inner` so the shadow has room, and compensate by adjusting the inner grid's gap if needed. Alternatively, change `overflow: hidden` to `overflow: clip` (CSS `overflow: clip` clips layout overflow but does not create a scroll container, so box-shadows can render outside the clip region via `overflow-clip-margin`). If `overflow: clip` is sufficient, set `overflow-clip-margin: 4px` to allow the glow to bleed out.
-
-**Divider line above icon-browser search (`index.css`):**
-Remove `border-top: 1px solid rgba(255, 255, 255, 0.05);` from `.add-item-icon-browser-inner`.
-
-**Scrollbar flash on collapse (`index.css`):**
-The collapse animation of the icon browser (grid-template-rows 1fr → 0fr) briefly causes overflow at the viewport level.
-Fix: Add `overflow-x: hidden` to the `html` element or the `.bottom-sheet` container to prevent the transient horizontal/vertical overflow from producing a visible scrollbar. If this alone is insufficient, also add `contain: layout` to `.add-item-icon-browser`.
-
-### Files to Change
-- `frontend/src/index.css` (FAB `right`, icon-browser `overflow`, `border-top`, overflow-x)
-
----
-
-## T-004 — Feature Additions
-
-### Goal
-Show the logged-in user in Info & Settings, add a loading state to "Send Invite", and show member-initials badges next to the "Owner" chip.
-
-### Acceptance Criteria
-- "Info & Settings" sheet displays the current user's display name and email.
-- Clicking "Send Invite" disables the button and shows a spinner for the duration of the API call; re-enables on success or error.
-- When the current user is the owner and there are non-owner members, a badge per member (initials, cyan/secondary color distinct from the purple owner chip) appears next to the "Owner" chip in the `detail-meta` area.
-
-### Implementation
-
-**Logged-in user in `InfoSheet.jsx`:**
-`AuthContext` already exposes `user` (the authenticated user object). Destructure `user` from `useAuth()` in `InfoSheet`. Render a new `info-sheet-section` at the top of the sheet (below the logout button, above version) with two rows: display name (bold, `--text-primary`) and email (`--text-secondary`, smaller). Add corresponding CSS classes `.info-sheet-user-name` and `.info-sheet-user-email` to `index.css`.
-
-**Send Invite loading state:**
-- In `ListDetailPage.jsx`, add `isShareSubmitting` state (boolean, default false).
-- In `handleShareSubmit`, set `isShareSubmitting(true)` before the API call, set `isShareSubmitting(false)` in a `finally` block.
-- Pass `isShareSubmitting` to `<ShareListSheet>` as a new prop `isSubmitting`.
-- In `ShareListSheet.jsx`, accept `isSubmitting` prop. On the `<button type="submit">`:
-  - Add `disabled={isSubmitting}` attribute.
-  - Render a small inline `<span className="share-invite-spinner" aria-hidden="true" />` before the label text when `isSubmitting` is true.
-- Add `.share-invite-spinner` CSS (reuse existing `@keyframes spin` + styling from `add-item-preview-spinner` pattern) to `index.css`.
-
-**Member initials badges in `ListDetailPage.jsx`:**
-
-The badges must sit **inside** `.list-card-chips`, right-aligned on the same line as the "Owner" chip.
-
-Move `<div className="detail-member-badges">` from its current position (separate row below `.list-card-chips`) into `.list-card-chips` as the last child:
-
+#### 9. `frontend/src/main.jsx`
+Wrap the provider tree with `<AppConfigProvider>` (outside `<AuthProvider>`, no auth needed):
 ```jsx
-<div className="list-card-chips">
-  <span className={list.is_owner ? "eg-chip-purple" : "eg-chip-cyan"}>
-    {list.is_owner ? "Owner" : `Shared · ${list.owner_name ?? "another member"}`}
-  </span>
-  {list.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
-  {visibleMemberBadges.length > 0 ? (
-    <div className="detail-member-badges">
-      {visibleMemberBadges.map((member) => (
-        <span key={member.user_id} className="eg-chip-member-initial" title={member.display_name}>
-          {getInitials(member.display_name)}
-        </span>
-      ))}
+<AppConfigProvider>
+  <AuthProvider>
+    …
+  </AuthProvider>
+</AppConfigProvider>
+```
+
+#### 10. `frontend/src/App.jsx`
+Import `useAppConfig`. In the route for `/register`:
+```jsx
+<Route
+  path="/register"
+  element={
+    registrationEnabled ? <RegisterPage /> : <Navigate to="/login" replace />
+  }
+/>
+```
+
+#### 11. `frontend/src/pages/LoginPage.jsx`
+Import `useAppConfig`. Conditionally render the "Create an account" link:
+```jsx
+{registrationEnabled ? (
+  <Link className="eg-link" to="/register">Create an account</Link>
+) : null}
+```
+
+### Documentation changes
+
+#### 12. `Dockerfile`
+Add a comment block in the `runtime` stage documenting `REGISTRATION_ENABLED`:
+```dockerfile
+# REGISTRATION_ENABLED — set to "false" to disable self-registration (default: "true")
+```
+
+#### 13. `README.md`
+Add `REGISTRATION_ENABLED` to the environment variable reference table/section.
+
+---
+
+## T-002 — Log Software Version at Container Start
+
+### Overview
+
+Read the version from `/app/package.json` (root workspace manifest) and emit it in two places: the shell entrypoint and the backend startup log.
+
+### Changes
+
+#### 1. `docker/entrypoint.sh`
+Add a version echo before the database migration step:
+```sh
+APP_VERSION=$(node -p "JSON.parse(require('fs').readFileSync('/app/package.json','utf8')).version")
+echo "Version: ${APP_VERSION}"
+```
+
+#### 2. `backend/src/index.js`
+Read the version from `package.json` using `fs.readFileSync` (already available in the Node runtime; avoids static import assertions which need `--experimental-json-modules` in some Node versions):
+```js
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const _dir = dirname(fileURLToPath(import.meta.url));
+const { version } = JSON.parse(readFileSync(resolve(_dir, "../../package.json"), "utf8"));
+```
+Include `version` in the startup log object:
+```js
+logger.info({ port, version, dbConfigured: …, … }, "Backend started");
+```
+
+#### 3. `backend/src/index.test.js`
+Update the existing `"logs backend startup details"` test to assert `version` is present in the logged fields. Pass version via the existing config mock or as a separate option.
+
+---
+
+## T-003 — Show Logged-in User in Info & Settings
+
+### Overview
+
+The user block (`display_name` + `email`) is already rendered in `InfoSheet` but placed **below** the logout button, making it easy to miss or cut off if the sheet has no scroll. The fix is:
+1. Move the user block to the **top** of the sheet content.
+2. Verify that `display_name` and `email` arrive in the `user` object from `AuthContext` after login and after page reload; fix any hydration gap if found.
+
+### Changes
+
+#### 1. `frontend/src/components/InfoSheet.jsx`
+Reorder the sections so the user block comes first:
+```jsx
+return (
+  <BottomSheet open={open} onClose={onClose} title="Info & Settings">
+    {/* 1. User identity — always at top */}
+    {user?.display_name || user?.email ? (
+      <div className="info-sheet-section">
+        {user.display_name ? <div className="info-sheet-user-name">{user.display_name}</div> : null}
+        {user.email ? <div className="info-sheet-user-email">{user.email}</div> : null}
+      </div>
+    ) : null}
+
+    {/* 2. Logout */}
+    <div className="info-sheet-section">
+      <button …>Log out</button>
     </div>
-  ) : null}
-</div>
+
+    {/* 3. Version / License meta */}
+    …
+  </BottomSheet>
+);
 ```
 
-Add `margin-left: auto` to `.detail-member-badges` in `index.css` so the badge group is pushed to the right edge of the chip row, horizontally aligned with "Owner". Remove any `margin-top` that was previously used to separate it as a new row.
+#### 2. `frontend/src/context/AuthContext.jsx` *(if investigation reveals a hydration gap)*
+During implementation, verify the following invariant in the browser after login:
+- `localStorage["endgame_grocery.auth_user"]` contains `display_name` and `email`.
+- On a fresh page load, `getStoredUser` re-hydrates both fields into the `user` state.
 
-Update the test in `ListDetailPage.test.jsx` to assert `margin-left: auto` on `.detail-member-badges`.
+If a bug is found (e.g., `normalizeAuthUser` discards `display_name`/`email` due to a type mismatch, or the stored key is missing), fix it here. Document the fix in the HANDOFF entry.
 
-### Files to Change
-- `frontend/src/components/InfoSheet.jsx`
-- `frontend/src/pages/ListDetailPage.jsx`
-- `frontend/src/components/ShareListSheet.jsx`
-- `frontend/src/index.css` (user info styles, spinner, member badge styles — add `margin-left: auto` to `.detail-member-badges`)
-- `frontend/src/pages/ListDetailPage.test.jsx` (update badge CSS assertion)
+#### 3. `frontend/src/components/InfoSheet.test.jsx`
+- Add/update a test that asserts the user name block appears **before** the logout button in DOM order.
+- Existing coverage for rendering `display_name` and `email` is already present; extend rather than replace.
 
 ---
 
-## T-005 — Feature Removals
+---
 
-### Goal
-Remove three unused UI elements: the Active/All Lists toggle, the stat chips on the start page, and the "Lists" bottom-nav tab.
+## Rework: T-001 — docker-compose.example.yml gap
 
-### Acceptance Criteria
-- The start page (`OverviewPage`) shows no toggle buttons ("Active" / "All Lists").
-- The start page shows no "x lists" or "x shared" stat chips.
-- The bottom navigation bar is absent from all pages (the bar itself and its safe-area padding are gone).
-- No dead CSS rules or unused state remain for the removed elements.
+### Problem
 
-### Implementation
+`docker-compose.example.yml` was not updated with `REGISTRATION_ENABLED`. Administrators deploying from the example file have no hint that the option exists.
 
-**`OverviewPage.jsx`:**
-- Remove the `view` state and `setView` setter.
-- Remove the `displayLists` derivation (it was `const displayLists = lists;` — just use `lists` directly in the JSX).
-- Remove the `sharedCount` derivation.
-- Remove the entire `<div className="overview-chips">` block.
-- Remove the entire `<div className="overview-toggle">` block.
+### Fix
 
-**`BottomNav.jsx` + usage:**
-- Remove `BottomNav` from wherever it is rendered in `App.jsx` or the layout wrapper.
-- If `BottomNav` is no longer used anywhere, delete `frontend/src/components/ui/BottomNav.jsx` and remove its export from `frontend/src/components/ui/index.js`.
-
-**`index.css`:**
-- Remove `.overview-chips`, `.overview-chips .eg-chip-purple`, `.overview-toggle` rule blocks.
-- Remove `.bottom-nav`, `.bottom-nav-tab`, `.bottom-nav-tab[aria-current="page"]`, `.bottom-nav-tab svg` rule blocks.
-- Remove any `padding-bottom` on the page containers that was added to account for the bottom-nav height (check `.detail-page`, `.overview-page`, `.overview-content`).
-
-### Files to Change
-- `frontend/src/pages/OverviewPage.jsx`
-- `frontend/src/components/ui/BottomNav.jsx` (delete if fully unused)
-- `frontend/src/components/ui/index.js` (remove BottomNav export if deleted)
-- `frontend/src/App.jsx` (remove `<BottomNav />` render)
-- `frontend/src/index.css` (remove dead rule blocks)
+#### `docker-compose.example.yml`
+Add a commented-out entry in the `environment` block, grouped with the other app-behaviour vars (near `LOG_LEVEL`):
+```yaml
+# Self-registration: set to "false" to disable the /register route (default: "true")
+# REGISTRATION_ENABLED: "true"
+```
 
 ---
 
-## T-006 — AddItemSheet Layout Fixes (rework 2)
+## Rework: T-003 — User profile not hydrated for existing sessions
 
-### Status of Previously Planned Fixes
+### Problem
 
-The three fixes from the original T-006 plan are **already applied to `index.css`**:
-- Bottom padding reduced to `var(--space-5)` (20 px) ✓
-- `:not()` exclusion targets `.add-item-disclosure` ✓
-- `.bottom-sheet--browser-open .add-item-disclosure` is a flex column with `flex: 1; min-height: 0` ✓
+`AuthContext` initialises `user` from `localStorage` on every page load. For users with a valid JWT but no `USER_STORAGE_KEY` entry (sessions created before user-data persistence was added, or after a browser storage clear), `getStoredUser` returns only `{ id: sub }` — no `display_name`, no `email`. Because `InfoSheet` only renders the identity block when at least one of those fields is truthy, the block is invisible.
 
-Despite those fixes both bugs persist. The actual root cause is `min-height: 0` missing from `.add-item-icon-browser-inner` in two places.
+A fresh login resolves it for that session, but the app must not rely on the user logging out and back in.
 
-### Root Causes (revised)
+### Fix
 
-**Bug 1 — Excessive spacing in compact mode ("Mehr anzeigen" not clicked)**
+#### 1. Backend — `backend/src/routes/auth.js`
 
-`.add-item-icon-browser` uses `display: grid; grid-template-rows: 0fr` to collapse its content. The CSS grid `0fr` collapse trick requires the **grid item** (`.add-item-icon-browser-inner`) to declare `min-height: 0`. Without it, the browser uses the item's intrinsic minimum height — which is the full height of the icon grid (`max-height: min(38vh, 20rem)` ≈ 330 px). The browser element stays ~330 px tall in the closed state, pushing the sheet content past `max-height` and making the whole sheet scrollable.
+Add a new authenticated route **at the end of `createAuthRouter`**, using the `requireAuth` middleware (already injected in `app.js` as `requireAuthFn` but the auth router has its own `config`/`pool` scope):
 
-**Bug 2 — Icon grid not scrollable when browser is open ("Weniger anzeigen" visible)**
-
-In browser-open mode `.add-item-icon-browser-inner` is a grid item inside `.add-item-icon-browser { display: grid; grid-template-rows: 1fr }`. Its row gets a definite height from `flex: 1; min-height: 0` on the browser. But without `min-height: 0` on `.add-item-icon-browser-inner` itself, the grid row cannot constrain the item below its intrinsic minimum height. The item expands to show all icons. The icon grid's `overflow-y: auto` has nothing to overflow against, so no scrollbar appears.
-
-### Acceptance Criteria (unchanged)
-- Before clicking "Mehr anzeigen": the gap below the Cancel/Add Item buttons is at most 20 px (matching the sheet's top padding).
-- After clicking "Mehr anzeigen": the icon browser grid fills the available sheet height and is scrollable; the Cancel and Add Item buttons remain visible at the bottom.
-- Closing the icon browser ("Weniger anzeigen") returns the sheet to its compact state without layout issues.
-
-### Implementation — CSS only, `index.css`
-
-**Fix A: Add `min-height: 0` to base `.add-item-icon-browser-inner` (fixes Bug 1)**
-
-```css
-/* before */
-.add-item-icon-browser-inner {
-  overflow: clip;
-  overflow-clip-margin: 12px;
-  display: grid;
-  gap: 16px;
-  padding: 4px 4px 0;
-}
-
-/* after */
-.add-item-icon-browser-inner {
-  overflow: clip;
-  overflow-clip-margin: 12px;
-  display: grid;
-  gap: 16px;
-  padding: 4px 4px 0;
-  min-height: 0;
-}
+```js
+router.get("/me", requireAuth, async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, email, display_name FROM users WHERE id = $1 LIMIT 1",
+      [req.user.sub]
+    );
+    const user = result.rows[0];
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+    res.json(serializeAuthUser(user));
+  } catch (error) {
+    next(error);
+  }
+});
 ```
 
-With `min-height: 0`, the `grid-template-rows: 0fr` row on `.add-item-icon-browser` can fully collapse to 0 px, removing the phantom ~330 px height in compact mode.
+`requireAuth` from `../middleware/auth.js` is already available; import it in the router file.
 
-**Fix B: Add `min-height: 0` to `.bottom-sheet--browser-open .add-item-icon-browser-inner` (fixes Bug 2)**
+#### 2. Backend tests — `backend/src/auth.test.js`
 
-```css
-/* before */
-.bottom-sheet--browser-open .add-item-icon-browser-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  overflow: clip;
-}
+Add tests for `GET /api/auth/me`:
+- Returns `{ id, email, display_name }` for a valid token whose user exists.
+- Returns `401` when no token is provided.
+- Returns `404` when the user row is missing (edge case).
 
-/* after */
-.bottom-sheet--browser-open .add-item-icon-browser-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  overflow: clip;
-  min-height: 0;
+#### 3. Frontend — `frontend/src/api/auth.js`
+
+Add:
+```js
+export function fetchCurrentUser(token) {
+  return sendJsonRequest("/api/auth/me", { token });
 }
 ```
 
-With `min-height: 0`, the `grid-template-rows: 1fr` row on `.add-item-icon-browser` can constrain `.add-item-icon-browser-inner` to the available height. The icon grid (`flex: 1; overflow-y: auto`) then receives a bounded height and shows a scrollbar.
+#### 4. Frontend — `frontend/src/context/AuthContext.jsx`
 
-**Resulting flex chain when browser is open (corrected):**
+Add a `useEffect` that fires whenever `token` is set but `user?.display_name` is missing:
 
+```js
+useEffect(() => {
+  if (!token || user?.display_name) {
+    return;
+  }
+
+  let cancelled = false;
+
+  fetchCurrentUser(token)
+    .then((profile) => {
+      if (!cancelled) {
+        setAuthToken(token, profile);
+      }
+    })
+    .catch(() => {
+      // fail silently — user stays logged in, identity block stays hidden
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [token, user?.display_name, setAuthToken]);
 ```
-.bottom-sheet (fixed, max-height, padding: 20px, overflow: hidden, flex column)
-  .bottom-sheet-handle           (flex-shrink: 0)
-  .bottom-sheet-title            (flex-shrink: 0)
-  .add-item-form                 (flex: 1, min-height: 0, flex column, gap: 16px)
-    .eg-field                    (flex-shrink: 0)
-    .eg-field                    (flex-shrink: 0)
-    .add-item-disclosure         (flex: 1, min-height: 0, flex column)
-      .add-item-more-btn         (natural height)
-      .add-item-icon-browser     (flex: 1, min-height: 0, grid — fills disclosure)
-        .add-item-icon-browser-inner  (grid item, min-height: 0 → flex col — fills browser row)
-          .eg-input              (flex-shrink: 0 — search field)
-          .add-item-icon-browser-grid (flex: 1, overflow-y: auto — scrollable icons)
-    .button-row.add-item-actions (flex-shrink: 0 — always visible at bottom)
-```
 
-### Files to Change
-- `frontend/src/index.css` (2 targeted property additions — no JSX changes required)
+Import `fetchCurrentUser` from `../api/auth`.
+
+#### 5. Frontend tests — `frontend/src/context/AuthContext` (or existing auth test file)
+
+Add tests:
+- When `token` is present but `user` has only `id`, `fetchCurrentUser` is called and the returned profile is merged into state.
+- When `user.display_name` is already set, `fetchCurrentUser` is **not** called (no redundant fetch).
+- When `fetchCurrentUser` rejects, the user remains logged in (state unchanged beyond what was already there).
 
 ---
 
-## Validation (all tasks)
+## Validation
 
+Run after each task before marking `ready_for_review`:
 ```
 npm run lint
 npm run build
 npm test
 ```
-
-Each task must pass all three before moving to `ready_for_review`.

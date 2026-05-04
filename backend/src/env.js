@@ -17,6 +17,7 @@ export function getConfig() {
     jwtSecret: process.env.JWT_SECRET ?? "",
     port: Number(process.env.PORT ?? 4000),
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
+    registrationEnabled: process.env.REGISTRATION_ENABLED !== "false",
     smtpHost: process.env.SMTP_HOST ?? "",
     smtpPort: Number(process.env.SMTP_PORT ?? 587),
     smtpUser: process.env.SMTP_USER ?? "",

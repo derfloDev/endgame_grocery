@@ -4,11 +4,12 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetOfflineStateForTests } from "./api/offlineStore";
 import App from "./App";
+import { StaticAppConfigProvider } from "./context/AppConfigContext";
 import { AuthProvider } from "./context/AuthContext";
 import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 
-function renderApp(initialEntries = ["/"]) {
+function renderApp(initialEntries = ["/"], { registrationEnabled = true } = {}) {
   return render(
     <MemoryRouter
       future={{
@@ -17,13 +18,15 @@ function renderApp(initialEntries = ["/"]) {
       }}
       initialEntries={initialEntries}
     >
-      <AuthProvider>
-        <EventSourceProvider>
-          <OfflineQueueProvider>
-            <App />
-          </OfflineQueueProvider>
-        </EventSourceProvider>
-      </AuthProvider>
+      <StaticAppConfigProvider registrationEnabled={registrationEnabled}>
+        <AuthProvider>
+          <EventSourceProvider>
+            <OfflineQueueProvider>
+              <App />
+            </OfflineQueueProvider>
+          </EventSourceProvider>
+        </AuthProvider>
+      </StaticAppConfigProvider>
     </MemoryRouter>
   );
 }
@@ -102,11 +105,28 @@ describe("authentication shell", () => {
     expect(screen.getByText("Create your account to get started.")).toBeTruthy();
   });
 
+  it("hides the registration link when runtime config disables self-registration", async () => {
+    renderApp(["/login"], { registrationEnabled: false });
+
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Create an account" })).toBeNull();
+  });
+
+  it("redirects /register to /login when runtime config disables self-registration", async () => {
+    renderApp(["/register"], { registrationEnabled: false });
+
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Join the Squad" })).toBeNull();
+  });
+
   it("submits the login form and shows the protected overview", async () => {
     fetch
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ token: createFakeJwt("user-123") })
+        json: async () => ({
+          token: createFakeJwt("user-123"),
+          user: createAuthUser("user-123")
+        })
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -134,7 +154,7 @@ describe("authentication shell", () => {
   });
 
   it("does not render bottom navigation in either the protected shell or auth pages", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ lists: [] })
@@ -155,7 +175,7 @@ describe("authentication shell", () => {
   });
 
   it("redirects the removed /search route back to the overview", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ lists: [] })
@@ -200,7 +220,11 @@ describe("authentication shell", () => {
     fetch
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ token: createFakeJwt("user-5"), listId: "list-1" })
+        json: async () => ({
+          token: createFakeJwt("user-5"),
+          listId: "list-1",
+          user: createAuthUser("user-5")
+        })
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -251,7 +275,10 @@ describe("authentication shell", () => {
     fetch
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ token: createFakeJwt("user-1") })
+        json: async () => ({
+          token: createFakeJwt("user-1"),
+          user: createAuthUser("user-1")
+        })
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -277,7 +304,10 @@ describe("authentication shell", () => {
     fetch
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ token: createFakeJwt("user-1") })
+        json: async () => ({
+          token: createFakeJwt("user-1"),
+          user: createAuthUser("user-1")
+        })
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -436,7 +466,7 @@ describe("authentication shell", () => {
   });
 
   it("creates, renames, and deletes a list from the overview", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     vi.stubGlobal("confirm", vi.fn(() => true));
     fetch
       .mockResolvedValueOnce({
@@ -489,7 +519,7 @@ describe("authentication shell", () => {
   });
 
   it("shows the loading and error states on the overview", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
 
     let rejectFetch;
     fetch.mockReturnValueOnce(
@@ -509,7 +539,7 @@ describe("authentication shell", () => {
   });
 
   it("removes the overview toggle buttons and stat chips", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -559,14 +589,98 @@ describe("authentication shell", () => {
     expect(screen.getByText("demo@example.com")).toBeTruthy();
     expect(screen.getByText(/^v\d+\.\d+\.\d+$/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "GNU GPL v3.0" })).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem("endgame_grocery.auth_user"))).toEqual({
+      id: "user-1",
+      display_name: "Demo User",
+      email: "demo@example.com"
+    });
 
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
 
     expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
   });
 
+  it("rehydrates the stored auth user into the info sheet after a full reload", async () => {
+    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    window.localStorage.setItem(
+      "endgame_grocery.auth_user",
+      JSON.stringify({
+        id: "user-1",
+        display_name: "Demo User",
+        email: "demo@example.com"
+      })
+    );
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ lists: [] })
+    });
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(await screen.findByRole("dialog", { name: "Info & Settings" })).toBeTruthy();
+    expect(screen.getByText("Demo User")).toBeTruthy();
+    expect(screen.getByText("demo@example.com")).toBeTruthy();
+  });
+
+  it("rehydrates missing auth user data from /api/auth/me after a full reload", async () => {
+    const token = createFakeJwt("user-1");
+    window.localStorage.setItem("endgame_grocery.auth_token", token);
+    fetch.mockImplementation(async (input) => {
+      const url = String(input);
+
+      if (url === "/api/auth/me") {
+        return {
+          ok: true,
+          json: async () => ({
+            id: "user-1",
+            display_name: "Demo User",
+            email: "demo@example.com"
+          })
+        };
+      }
+
+      if (url === "/api/lists") {
+        return {
+          ok: true,
+          json: async () => ({ lists: [] })
+        };
+      }
+
+      throw new Error(`Unexpected fetch in test: ${url}`);
+    });
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("Create your first mission to get started.")).toBeTruthy();
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/me",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${token}`
+          }),
+          method: "GET"
+        })
+      );
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(await screen.findByRole("dialog", { name: "Info & Settings" })).toBeTruthy();
+    expect(screen.getByText("Demo User")).toBeTruthy();
+    expect(screen.getByText("demo@example.com")).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem("endgame_grocery.auth_user"))).toEqual({
+      id: "user-1",
+      display_name: "Demo User",
+      email: "demo@example.com"
+    });
+  });
+
   it("shows a shared badge in the overview with the owner name", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-2"));
+    seedAuthSession("user-2");
     fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -581,7 +695,7 @@ describe("authentication shell", () => {
   });
 
   it("refreshes the overview when list SSE events arrive", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     const listResponses = [
       [{ id: "list-1", name: "Weekend groceries", owner_name: "Demo User", is_owner: true }],
       [{ id: "list-1", name: "Renamed groceries", owner_name: "Demo User", is_owner: true }],
@@ -623,7 +737,7 @@ describe("authentication shell", () => {
   });
 
   it("shows recently used items, re-adds them, and dismisses them from list detail", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     const queuedResponses = [
       {
         ok: true,
@@ -752,7 +866,7 @@ describe("authentication shell", () => {
   }, 10000);
 
   it("adds completed and deleted items to recently used and keeps newest history first", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     fetch
       .mockResolvedValueOnce({
         ok: true,
@@ -855,7 +969,7 @@ describe("authentication shell", () => {
   }, 10000);
 
   it("refetches entries and members for the active list when SSE events arrive", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     const entryResponses = [
       [{ id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" }],
       [
@@ -1009,7 +1123,7 @@ describe("authentication shell", () => {
   }, 10000);
 
   it("adds and edits entry details from the list detail sheet", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
 
     fetch.mockImplementation(async (input, init = {}) => {
       const url = String(input);
@@ -1155,7 +1269,7 @@ describe("authentication shell", () => {
   }, 10000);
 
   it("opens the share sheet, sends an invite notice, and revokes an existing member", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     const inviteRequest = createDeferred();
     fetch
       .mockResolvedValueOnce({
@@ -1249,7 +1363,7 @@ describe("authentication shell", () => {
   });
 
   it("shows the notifications toggle only for shared lists", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
 
     fetch
       .mockResolvedValueOnce({
@@ -1326,7 +1440,7 @@ describe("authentication shell", () => {
   });
 
   it("shows the redesigned list detail loading and error states", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
 
     let rejectFetch;
     fetch
@@ -1358,7 +1472,7 @@ describe("authentication shell", () => {
   });
 
   it("shows cached lists while offline and displays the offline banner", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -1381,7 +1495,7 @@ describe("authentication shell", () => {
   });
 
   it("queues offline writes and refreshes after reconnect", async () => {
-    window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+    seedAuthSession("user-1");
     vi.stubGlobal("confirm", vi.fn(() => true));
     fetch
       .mockResolvedValueOnce({
@@ -1437,6 +1551,22 @@ function createFakeJwt(sub) {
   const payload = btoa(JSON.stringify({ sub }));
 
   return `${header}.${payload}.signature`;
+}
+
+function createAuthUser(sub, overrides = {}) {
+  return {
+    id: sub,
+    display_name: overrides.display_name ?? "Demo User",
+    email: overrides.email ?? `${sub}@example.com`
+  };
+}
+
+function seedAuthSession(sub, overrides = {}) {
+  window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt(sub));
+  window.localStorage.setItem(
+    "endgame_grocery.auth_user",
+    JSON.stringify(createAuthUser(sub, overrides))
+  );
 }
 
 function createDeferred() {
