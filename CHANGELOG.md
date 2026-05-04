@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.0](https://github.com/derfloDev/endgame_grocery/compare/v0.8.0...v0.9.0) (2026-05-04)
+
+
+### Features
+
+* **auth:** disable self-registration via runtime config ([1229dae](https://github.com/derfloDev/endgame_grocery/commit/1229dae09872fc61236c93587baeab1fdfa0c12f))
+* **deploy:** log app version during container startup ([c429d96](https://github.com/derfloDev/endgame_grocery/commit/c429d96834037612bf75d9e01cc5552cf8581adb))
+
+
+### Bug Fixes
+
+* **auth:** rehydrate session user profile from /api/auth/me ([c717bd8](https://github.com/derfloDev/endgame_grocery/commit/c717bd8ccf066cc9cc872bdfaf13b68699165e30))
+* **ui:** show logged-in user at top of info sheet ([208bd4b](https://github.com/derfloDev/endgame_grocery/commit/208bd4b9e77683ee87762adc86c54e598746c085))
+
 ## [0.8.0](https://github.com/derfloDev/endgame_grocery/compare/v0.7.1...v0.8.0) (2026-04-30)
 
 
