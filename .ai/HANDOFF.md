@@ -147,3 +147,54 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-001/T-003 — rework_plan — 2026-04-30T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reworked T-001 to add missing `docker-compose.example.yml` documentation for `REGISTRATION_ENABLED`; reworked T-003 to add `GET /api/auth/me` backend endpoint and AuthContext `useEffect` that re-hydrates `display_name`/`email` for existing JWT sessions that have no stored user data |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+---
+
+### T-001 — review — 2026-04-30T20:05:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-001 rework (Round 2): `docker-compose.example.yml` addition matches plan spec exactly; no runtime changes; all 122 tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-001 — implement — 2026-04-30T17:59:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Completed the T-001 documentation rework by adding the `REGISTRATION_ENABLED` hint to `docker-compose.example.yml`, keeping the shipped runtime behavior unchanged. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `docker-compose.example.yml` |
+| Validation | `npm run lint` (pass; existing `frontend/src/context/AuthContext.jsx` react-refresh warning remains); `npm run build` (pass); `npm test` (pass) |
+| Commit | `docs(deploy): document registration toggle in compose example` |
+| Next Role | review |
+
+---
+
+### T-001 — commit_task — 2026-04-30T18:42:53Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the T-001 documentation rework done and prepared the reviewed compose-example registration-toggle update for commit using the recorded task message. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `docker-compose.example.yml` |
+| Validation | Reused reviewer-approved validation: `npm run lint`; `npm run build`; `npm test` |
+| Commit | `docs(deploy): document registration toggle in compose example` |
+| Next Role | none |
+
+---

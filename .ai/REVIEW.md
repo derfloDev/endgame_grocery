@@ -46,6 +46,39 @@ Reviewed: 2026-04-30
 #### Verdict
 `PASS`
 
+### Review Round 2
+
+Status: **PASS**
+
+Reviewed: 2026-04-30
+
+#### Findings
+
+No findings.
+
+#### Verification
+
+##### Steps
+1. Read changed file (`docker-compose.example.yml`) against rework plan spec.
+2. Confirmed two lines added immediately after `LOG_LEVEL: info`, grouped with app-behaviour vars as specified.
+3. Comment text and commented-out value exactly match the plan spec.
+4. No runtime code changed — documentation-only diff.
+5. Ran `npm run lint` — 0 errors.
+6. Ran `npm run build` — clean.
+7. Ran `npm test --workspaces --if-present` — 122 tests, 0 failures.
+
+##### Findings
+- Rework acceptance criterion met: `docker-compose.example.yml` now documents `REGISTRATION_ENABLED`.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
 ---
 
 ## Task: T-002

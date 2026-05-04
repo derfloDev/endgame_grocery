@@ -1,6 +1,6 @@
 # Plan
 
-Status: **ready**
+Status: **rework — T-001 doc gap + T-003 me-endpoint**
 
 Goal: Harden the Docker deployment with configurable registration, version logging, and a visible logged-in user in the Info sheet.
 
@@ -204,6 +204,115 @@ If a bug is found (e.g., `normalizeAuthUser` discards `display_name`/`email` due
 #### 3. `frontend/src/components/InfoSheet.test.jsx`
 - Add/update a test that asserts the user name block appears **before** the logout button in DOM order.
 - Existing coverage for rendering `display_name` and `email` is already present; extend rather than replace.
+
+---
+
+---
+
+## Rework: T-001 — docker-compose.example.yml gap
+
+### Problem
+
+`docker-compose.example.yml` was not updated with `REGISTRATION_ENABLED`. Administrators deploying from the example file have no hint that the option exists.
+
+### Fix
+
+#### `docker-compose.example.yml`
+Add a commented-out entry in the `environment` block, grouped with the other app-behaviour vars (near `LOG_LEVEL`):
+```yaml
+# Self-registration: set to "false" to disable the /register route (default: "true")
+# REGISTRATION_ENABLED: "true"
+```
+
+---
+
+## Rework: T-003 — User profile not hydrated for existing sessions
+
+### Problem
+
+`AuthContext` initialises `user` from `localStorage` on every page load. For users with a valid JWT but no `USER_STORAGE_KEY` entry (sessions created before user-data persistence was added, or after a browser storage clear), `getStoredUser` returns only `{ id: sub }` — no `display_name`, no `email`. Because `InfoSheet` only renders the identity block when at least one of those fields is truthy, the block is invisible.
+
+A fresh login resolves it for that session, but the app must not rely on the user logging out and back in.
+
+### Fix
+
+#### 1. Backend — `backend/src/routes/auth.js`
+
+Add a new authenticated route **at the end of `createAuthRouter`**, using the `requireAuth` middleware (already injected in `app.js` as `requireAuthFn` but the auth router has its own `config`/`pool` scope):
+
+```js
+router.get("/me", requireAuth, async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, email, display_name FROM users WHERE id = $1 LIMIT 1",
+      [req.user.sub]
+    );
+    const user = result.rows[0];
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+    res.json(serializeAuthUser(user));
+  } catch (error) {
+    next(error);
+  }
+});
+```
+
+`requireAuth` from `../middleware/auth.js` is already available; import it in the router file.
+
+#### 2. Backend tests — `backend/src/auth.test.js`
+
+Add tests for `GET /api/auth/me`:
+- Returns `{ id, email, display_name }` for a valid token whose user exists.
+- Returns `401` when no token is provided.
+- Returns `404` when the user row is missing (edge case).
+
+#### 3. Frontend — `frontend/src/api/auth.js`
+
+Add:
+```js
+export function fetchCurrentUser(token) {
+  return sendJsonRequest("/api/auth/me", { token });
+}
+```
+
+#### 4. Frontend — `frontend/src/context/AuthContext.jsx`
+
+Add a `useEffect` that fires whenever `token` is set but `user?.display_name` is missing:
+
+```js
+useEffect(() => {
+  if (!token || user?.display_name) {
+    return;
+  }
+
+  let cancelled = false;
+
+  fetchCurrentUser(token)
+    .then((profile) => {
+      if (!cancelled) {
+        setAuthToken(token, profile);
+      }
+    })
+    .catch(() => {
+      // fail silently — user stays logged in, identity block stays hidden
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [token, user?.display_name, setAuthToken]);
+```
+
+Import `fetchCurrentUser` from `../api/auth`.
+
+#### 5. Frontend tests — `frontend/src/context/AuthContext` (or existing auth test file)
+
+Add tests:
+- When `token` is present but `user` has only `id`, `fetchCurrentUser` is called and the returned profile is merged into state.
+- When `user.display_name` is already set, `fetchCurrentUser` is **not** called (no redundant fetch).
+- When `fetchCurrentUser` rejects, the user remains logged in (state unchanged beyond what was already there).
 
 ---
 
