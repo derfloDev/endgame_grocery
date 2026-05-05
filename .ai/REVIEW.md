@@ -2,74 +2,22 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
-## Task: T-001
+## Task: T-XXX
 
 ### Review Round 1
 
-Status: **PASS**
+Status: **pending**
 
-Reviewed: 2026-04-30
+Reviewed: YYYY-MM-DD
 
 #### Findings
-
-- **nit** — `backend/src/routes/auth.js` line 33: guard uses `config.registrationEnabled === false` (strict equality) rather than `!config.registrationEnabled`. Not a bug — the value is always boolean from `getConfig()` and tests inject `{ registrationEnabled: false }` — but reads slightly less idiomatically. No fix required.
-- **nit** — `frontend/src/context/AppConfigContext.jsx`: exports `StaticAppConfigProvider` which was not listed in the plan. The addition is well-motivated (test utility) and does not affect production behaviour. No fix required.
+- Pending review.
 
 #### Verification
-
 ##### Steps
-1. Read all changed files against the plan specification.
-2. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unrelated to T-001).
-3. Ran `npm run build` — clean build, no errors.
-4. Ran `npm test` (backend node:test runner) — 102 tests, 0 failures.
-5. Ran `npm run test --workspaces --if-present` (frontend vitest with `--environment jsdom`) — 120 tests, 0 failures.
-   - Note: running `npx vitest run` directly (without `--environment jsdom`) triggers pre-existing `document is not defined` failures across the whole suite; this is a workspace-level environment quirk unrelated to T-001.
-6. Verified acceptance criteria:
-   - `POST /api/auth/register` returns 404 when `registrationEnabled: false` — covered by `auth.test.js` (new test).
-   - `GET /api/config` returns `{ registrationEnabled: false }` — covered by `app.test.js` (new tests).
-   - `/register` route redirects to `/login` when disabled — covered by `app.test.jsx`.
-   - "Create an account" link hidden when disabled — covered by `app.test.jsx`.
-7. Confirmed `AppConfigProvider` is placed outside `AuthProvider` in `main.jsx` (no auth required for public config endpoint).
-8. Confirmed fail-open default (`registrationEnabled: true`) is preserved on fetch error.
-9. Confirmed `Dockerfile` and `README.md` updated with `REGISTRATION_ENABLED` documentation.
-
+- Pending verification.
 ##### Findings
-- All acceptance criteria met.
-- Pre-existing frontend test environment issue (missing `--environment jsdom` when running vitest directly) is not caused by this task.
-
-##### Risks
-- None. The `/api/config` endpoint is unauthenticated and leaks only the `registrationEnabled` flag — no sensitive data.
-
-#### Open Questions
 - None.
-
-#### Verdict
-`PASS`
-
-### Review Round 2
-
-Status: **PASS**
-
-Reviewed: 2026-04-30
-
-#### Findings
-
-No findings.
-
-#### Verification
-
-##### Steps
-1. Read changed file (`docker-compose.example.yml`) against rework plan spec.
-2. Confirmed two lines added immediately after `LOG_LEVEL: info`, grouped with app-behaviour vars as specified.
-3. Comment text and commented-out value exactly match the plan spec.
-4. No runtime code changed — documentation-only diff.
-5. Ran `npm run lint` — 0 errors.
-6. Ran `npm run build` — clean.
-7. Ran `npm test --workspaces --if-present` — 122 tests, 0 failures.
-
-##### Findings
-- Rework acceptance criterion met: `docker-compose.example.yml` now documents `REGISTRATION_ENABLED`.
-
 ##### Risks
 - None.
 
@@ -77,122 +25,4 @@ No findings.
 - None.
 
 #### Verdict
-`PASS`
-
----
-
-## Task: T-002
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-30
-
-#### Findings
-
-- **nit** — `backend/src/index.js`: the diff also changes `createApp({ logger })` → `createApp({ logger, config })`, passing the already-computed config to `createApp` (which previously called `getConfig()` internally). Not a plan requirement, but it's a clean consistency improvement with no behaviour change in production. No fix required.
-- **nit** — `backend/src/index.test.js`: the second new test ("prints the app version from the root package in the container entrypoint") validates `entrypoint.sh` content via regex instead of execution — appropriate as a unit test, though it only verifies presence of the pattern, not correctness of the shell script at runtime. Acceptable; Docker integration test would be needed for full coverage. No fix required.
-
-#### Verification
-
-##### Steps
-1. Read all changed files (`backend/src/index.js`, `backend/src/index.test.js`, `docker/entrypoint.sh`, `README.md`) against the plan spec.
-2. Confirmed `docker/entrypoint.sh`: version echo added immediately before migration step, reads from `/app/package.json` via `node -p`.
-3. Confirmed `backend/src/index.js`: `readFileSync` reads root `package.json` at module load time; `version` field included in `logger.info` startup log object.
-4. Confirmed `backend/src/index.test.js`: existing "logs backend startup details" test updated to assert `version: packageJson.version`; new "prints the app version from the root package in the container entrypoint" test added.
-5. Confirmed `README.md`: sentence added in the Docker section stating version is logged twice on container start.
-6. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx`.
-7. Ran `npm run build` — clean build.
-8. Ran `npm test --workspaces --if-present` — 120 frontend + 102 backend tests, 0 failures. Both T-002 test cases (`startServer` suite) pass.
-
-##### Findings
-- All acceptance criteria met.
-- Path `../../package.json` relative to `backend/src/` resolves to the workspace root — correct for the Docker container where root `package.json` is at `/app/package.json`.
-
-##### Risks
-- None. Version string is emitted to container logs only; no user-facing or security impact.
-
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-003
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-04-30
-
-#### Findings
-
-No blocking, major, minor, or nit findings.
-
-#### Verification
-
-##### Steps
-1. Read all changed files (`InfoSheet.jsx`, `InfoSheet.test.jsx`, `app.test.jsx`) and `AuthContext.jsx` (unchanged, rehydration path) against the plan spec.
-2. Confirmed `InfoSheet.jsx`: user identity block (guarded by `showUserIdentity`) is now the first child inside `<BottomSheet>`, rendered before logout, version, and license sections.
-3. Confirmed `AuthContext.jsx` rehydration: `getStoredUser()` reads `USER_STORAGE_KEY` from localStorage on init; `normalizeAuthUser()` preserves `display_name` and `email` when they are non-empty strings. No hydration gap — no fix needed, consistent with the implementer's HANDOFF note.
-4. Confirmed `InfoSheet.test.jsx`: new "renders the user identity block before the logout action" test uses `compareDocumentPosition & DOCUMENT_POSITION_FOLLOWING` to assert correct DOM order.
-5. Confirmed `app.test.jsx`:
-   - Existing "opens the overview info sheet and logs out from it" test extended with a `localStorage` assertion confirming `{ id, display_name, email }` are persisted after login.
-   - New "rehydrates the stored auth user into the info sheet after a full reload" test: pre-seeds `auth_token` and `auth_user` in localStorage, renders a fresh app, opens the sheet, and asserts both fields visible — directly covers the post-reload acceptance criterion.
-6. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx`.
-7. Ran `npm run build` — clean build.
-8. Ran `npm test --workspaces --if-present` — 122 tests (2 new), 0 failures.
-
-##### Findings
-- All acceptance criteria met.
-- No AuthContext changes were needed; the existing rehydration path was already correct.
-
-##### Risks
-- None.
-
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
-
-### Review Round 2
-
-Status: **PASS**
-
-Reviewed: 2026-05-04
-
-#### Findings
-
-- **nit** — `AuthContext.jsx` `useEffect` condition checks only `user?.display_name` (not `user?.email`). A user with `email` but no `display_name` would trigger repeated fetch attempts until the server succeeds. In practice this cannot occur since registration requires `display_name` and a successful `fetchCurrentUser` call always returns `display_name`, breaking the loop. No fix required.
-
-#### Verification
-
-##### Steps
-1. Read all changed files against the rework plan spec.
-2. Confirmed `backend/src/routes/auth.js`: `GET /me` appended at end of router; uses `createRequireAuth({ jwtLib, config })` with injected dependencies (consistent with factory pattern); queries `SELECT id, email, display_name FROM users WHERE id = $1`; returns `serializeAuthUser(user)` or 404.
-3. Confirmed `backend/src/auth.test.js`: 3 new tests — valid token → 200 with full user body; no token → 401; missing user → 404. All plan-specified cases covered.
-4. Confirmed `frontend/src/api/auth.js`: `fetchCurrentUser(token)` calls `sendJsonRequest("/api/auth/me", { token })`, which sets `Authorization: Bearer <token>` via the shared client.
-5. Confirmed `frontend/src/context/AuthContext.jsx`: `useEffect` fires when `token` is truthy but `user?.display_name` is absent; uses `cancelled` cleanup flag; silently catches errors; dependency array `[token, user?.display_name, setAuthToken]` is correct.
-6. Confirmed `frontend/src/context/AuthContext.test.jsx` (new file): 3 unit tests — hydrates from `/me` when only token in storage; skips fetch when `display_name` already present; keeps session alive when fetch fails. All plan-specified cases covered.
-7. Confirmed `frontend/src/app.test.jsx`: new integration test "rehydrates missing auth user data from /api/auth/me after a full reload" — seeds only `auth_token` (no `auth_user`), mocks `/api/auth/me` and `/api/lists`, verifies `Authorization` header sent, opens Info sheet, asserts both `display_name` and `email` visible, and asserts `auth_user` written to localStorage. Existing tests updated to use `createAuthUser` / `seedAuthSession` helpers for consistency.
-8. Confirmed `README.md`: sentence added documenting the rehydration behaviour.
-9. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.jsx`.
-10. Ran `npm run build` — clean.
-11. Ran `npm test --workspaces --if-present` — 126 tests (21 files, 4 new), 0 failures.
-
-##### Findings
-- All rework acceptance criteria met, including the "pre-existing JWT session with no stored user data" reload scenario.
-
-##### Risks
-- None.
-
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
+`PENDING`
