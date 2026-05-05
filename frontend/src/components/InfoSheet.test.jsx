@@ -45,6 +45,14 @@ describe("InfoSheet", () => {
     );
   });
 
+  it("renders a Buy Me a Coffee donate link", () => {
+    render(<InfoSheet open onClose={() => {}} />);
+
+    expect(screen.getByRole("link", { name: "Buy Me a Coffee" }).getAttribute("href")).toBe(
+      "https://www.buymeacoffee.com/derflodev"
+    );
+  });
+
   it("renders the user identity block before the logout action", () => {
     render(<InfoSheet open onClose={() => {}} />);
 

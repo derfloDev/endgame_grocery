@@ -72,3 +72,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — implement — 2026-05-05T12:45:12Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the Buy Me a Coffee button to the Info & Settings sheet with CSS, test coverage, and README support documentation. |
+| Files Changed | `frontend/src/components/InfoSheet.jsx`, `frontend/src/components/InfoSheet.test.jsx`, `frontend/src/index.css`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Red phase: `npm run test --workspace frontend -- InfoSheet.test.jsx` failed before implementation because the BMC link was missing; after implementation `npm run test --workspace frontend -- InfoSheet.test.jsx`, `npm run lint`, `npm run build`, and `npm test` passed |
+| Commit | `feat(ui): add support link to info sheet` |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-05-05T10:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed InfoSheet donate section, CSS rule, and test; all acceptance criteria met, all validations pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-05T13:40:56Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and committed the approved in-app support link changes. |
+| Files Changed | `frontend/src/components/InfoSheet.jsx`, `frontend/src/components/InfoSheet.test.jsx`, `frontend/src/index.css`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md` |
+| Validation | Reused review-approved validation: `npm run test --workspace frontend -- InfoSheet.test.jsx`, `npm run lint`, `npm run build`, and `npm test` passed |
+| Commit | `feat(ui): add support link to info sheet` |
+| Next Role | none |
+
+---

@@ -21,6 +21,8 @@ Shared grocery list monorepo with a React frontend, an Express backend, and Post
 
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-support-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/DerFloDev)
 
+The app also exposes the Buy Me a Coffee link from the authenticated Info & Settings sheet.
+
 ## Prerequisites
 
 - Node.js 22.x
