@@ -1,29 +1,33 @@
 # ROADMAP
 
-Goal: define and deliver the scope for this cycle.
+Goal: Extend the icon system with additional tabler/lucide icons and lay the foundation for custom (hand-crafted) SVG icons.
 
-Delete any unused example sections below. Only the Goal and one concrete priority are required.
+## Priority 1 — Add missing tabler/lucide icons
 
-## Priority 1
+Objective: Make all requested grocery-relevant icons available in the icon selector.
 
-Objective: replace with objective.
+Icons to add (not yet in registry):
 
-- Replace with planned outcome.
+| Requested name | Source | Registry key |
+|---|---|---|
+| paper-bag | tabler | `IconPaperBag` |
+| grape | tabler (primary) | `IconGrape` |
+| cannabis | tabler (primary) | `IconCannabis` |
+| beef | tabler (primary) | `IconBeef` |
+| bean | tabler (primary) | `IconBean` |
+| biceps-flexed | lucide (no tabler equivalent) | `BicepsFlexed` |
 
-## Examples
+Already registered (no action required): `chef-hat`, `soup`, `wheat`, `bowl-spoon`, `ice-cream`, `salt`.
 
-These example sections are optional illustrations, not required structure.
+For each icon: if the tabler variant does not exist in the installed version, fall back to the lucide equivalent wrapped in `fromLucide()`.
 
-<!-- Example: remove or replace this section -->
-## Priority 2
+## Priority 2 — Custom icon infrastructure + Kornflakes example
 
-Objective: optional second objective.
+Objective: Establish a pattern that lets developers add hand-crafted SVG icons alongside tabler/lucide icons, and ship two Kornflakes icons as the first working examples.
 
-- Replace with optional planned outcome.
-
-<!-- Example: remove or replace this section -->
-## Priority 3
-
-Objective: optional third objective.
-
-- Replace with optional planned outcome.
+- A `fromCustomSVG()` factory in `frontend/src/data/customIcons.js` that produces React components with the same prop surface as tabler/normalized-lucide icons (`size`, `stroke`/`strokeWidth`, `color`).
+- Custom icon definitions live in `customIcons.js`; each icon is a named export and registered in `ICON_REGISTRY` with a `Custom` prefix.
+- Two example icons:
+  - `CustomKornflakesBowl` — a bowl with cereal flakes (hand-drawn SVG paths)
+  - `CustomKornflakesBox`  — a cereal-box silhouette (hand-drawn SVG paths)
+- Both appear in the icon browser like any other icon.

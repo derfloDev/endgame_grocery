@@ -20,4 +20,5 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
+| T-001 | Add missing tabler/lucide icons (IconPaperBag, IconGrape, IconCannabis, IconBeef, IconBean, BicepsFlexed) to ICON_REGISTRY | done | All six icons appear in the icon browser and are selectable; lint and build pass | `npm run lint`; `npm run build`; `npm test` | none |
+| T-002 | Custom icon infrastructure (fromCustomSVG factory) + CustomKornflakesBowl and CustomKornflakesBox example icons; update formatIconName for Custom prefix | ready_for_implement | Both Kornflakes icons render at size=22 and size=32 with currentColor stroke; appear in icon browser; formatIconName strips Custom prefix; lint and build pass | n/a | implement |
