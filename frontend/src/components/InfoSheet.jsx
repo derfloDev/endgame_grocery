@@ -1,6 +1,7 @@
 /* global __APP_VERSION__ */
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
+import LanguageSwitcher from "./LanguageSwitcher";
 import { BottomSheet, Icon } from "./ui";
 
 function getAppVersion() {
@@ -26,6 +27,10 @@ export default function InfoSheet({ open, onClose }) {
           {user?.email ? <div className="info-sheet-user-email">{user.email}</div> : null}
         </div>
       ) : null}
+      <div className="info-sheet-section info-sheet-language">
+        <span className="info-sheet-label">{t("settings.language")}</span>
+        <LanguageSwitcher />
+      </div>
       <div className="info-sheet-section">
         <button className="eg-btn eg-btn-danger info-sheet-logout" type="button" onClick={handleLogout}>
           <Icon name="logOut" size={16} color="currentColor" />

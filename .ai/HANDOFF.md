@@ -8,6 +8,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-003 — review — 2026-05-06T14:42:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | T-003 LanguageSwitcher reviewed: component correct (aria-pressed, normalizeLanguage, resolvedLanguage); InfoSheet integration placed below identity/above logout; 3 unit tests cover all plan scenarios with real i18next; both T-003 locale keys now consumed; 135 tests green; lint and build pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-002 — review — 2026-05-06T14:10:00Z
 
 | Field | Value |
@@ -138,6 +151,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, approved T-002 implementation files |
 | Validation | Reused reviewer-approved validation: JSX/user-facing string scan, locale key parity test, `npm run lint`, `npm run build`, `npm test` PASS |
 | Commit | `pending feat(i18n): localize app UI strings` |
+| Next Role | none |
+
+---
+
+### T-003 — implement — 2026-05-06T12:32:09Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the DE/EN language switcher to Info & Settings, styled it as a segmented control, documented the visible switcher, and covered switching plus localStorage persistence in tests. |
+| Files Changed | `frontend/src/components/LanguageSwitcher.jsx`, `frontend/src/components/LanguageSwitcher.test.jsx`, `frontend/src/components/InfoSheet.jsx`, `frontend/src/index.css`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run test --workspace frontend -- src/components/LanguageSwitcher.test.jsx src/components/InfoSheet.test.jsx` PASS; `npm run lint` PASS (existing frontend fast-refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS; `npm test` PASS |
+| Commit | `feat(i18n): add language switcher` |
+| Next Role | review |
+
+---
+
+### T-003 — implement — 2026-05-06T12:41:31Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed approved T-003 language switcher changes after reviewer PASS. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, approved T-003 implementation files |
+| Validation | Reused reviewer-approved validation: `npm run test --workspace frontend -- src/components/LanguageSwitcher.test.jsx src/components/InfoSheet.test.jsx`, `npm run lint`, `npm run build`, `npm test` PASS |
+| Commit | `pending feat(i18n): add language switcher` |
 | Next Role | none |
 
 ---

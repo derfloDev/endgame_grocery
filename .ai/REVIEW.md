@@ -148,3 +148,55 @@ None identified.
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-06
+
+#### Findings
+
+1. **[nit]** `frontend/src/index.css` — `.language-switcher` block
+   Two hardcoded `rgba()` values: `rgba(255, 255, 255, 0.08)` (border) and `rgba(13, 17, 40, 0.84)` (container background). Plan asks to use design tokens. These are glass-morphism decorative values that lack named tokens; the functionally important states (active, focus) correctly use `var(--gradient-brand)`, `var(--glow-cyan)`, `var(--neon-cyan)`.
+   Not a required fix.
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-003 in `ready_for_review`, owner `review`.
+2. Re-read `.ai/PLAN.md` — T-003 scope: `LanguageSwitcher.jsx` component, integrate into `InfoSheet`, write unit test.
+3. Read `frontend/src/components/LanguageSwitcher.jsx` — renders `<div role="group" aria-label={t("settings.languageLabel")}>` with two buttons (DE, EN); `aria-pressed` set correctly; `i18n.changeLanguage()` called on click; `normalizeLanguage()` handles `"de-AT"` → `"de"` subtag stripping gracefully; uses `i18n.resolvedLanguage` (preferred over raw `i18n.language`). ✓
+4. Read `frontend/src/components/InfoSheet.jsx` — `<LanguageSwitcher />` placed in a new `info-sheet-language` section, correctly positioned below the user identity block and above the logout button. `settings.language` label rendered above the switcher. ✓
+5. Read `frontend/src/components/LanguageSwitcher.test.jsx` — 3 tests covering all 4 plan-specified scenarios:
+   - "renders the English and German language buttons" ✓
+   - "marks English as active when the current language is English" (aria-pressed for both buttons) ✓
+   - "switches to German and persists the preference" (click → waitFor aria-pressed; localStorage check) ✓
+   Uses real i18next (better than mocking); `beforeEach` resets language to "en" to prevent pollution. ✓
+6. Read `frontend/src/components/InfoSheet.test.jsx` — existing 6 tests pass; LanguageSwitcher renders inside InfoSheet without errors. ✓
+7. Read `frontend/src/index.css` (lines 575–643) — `.language-switcher` CSS block; active state uses `var(--gradient-brand)`, `var(--bg-base)`, `var(--glow-cyan)`; focus uses `var(--neon-cyan)`, `var(--radius-sm)`, `var(--text-sm)`. Two `rgba()` container values not tokenized (nit). ✓
+8. Confirmed `settings.language` and `settings.languageLabel` keys (reserved in T-002) are now consumed: `settings.language` in InfoSheet label, `settings.languageLabel` as the aria-label on the group. ✓
+9. Ran `npm run lint` → 0 errors. **PASS**.
+10. Ran `npm run build` → succeeded. **PASS**.
+11. Ran `npm test` → 23 test files, **135 tests**, all green (3 new LanguageSwitcher tests, 6 existing InfoSheet tests still passing). **PASS**.
+
+##### Findings
+All T-003 acceptance criteria confirmed met:
+- Toggle renders DE and EN buttons ✅
+- Clicking switches language immediately ✅ (verified by `waitFor` in test)
+- Selection persists to localStorage ✅ (`localStorage.getItem("i18nextLng") === "de"` in test)
+- `npm test` passes for LanguageSwitcher ✅ (3/3 tests green)
+
+##### Risks
+None identified.
+
+#### Verdict
+`PASS`

@@ -241,7 +241,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 ## Feature Overview
 
 - The protected React app uses a dark Endgame-themed shell with bottom navigation for Lists.
-- The frontend has English and German localization infrastructure with browser language detection and persistent language preference storage.
+- The frontend has English and German localization infrastructure with browser language detection, persistent language preference storage, and a DE/EN switcher in the Info & Settings sheet.
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
 - Authentication supports register, email verification, password reset, and login flows backed by JWT access tokens.
 - When a browser still has a valid JWT but has lost the cached `endgame_grocery.auth_user` entry, the frontend rehydrates `display_name` and `email` from `GET /api/auth/me` so the Info & Settings sheet still shows the signed-in identity after reload.
