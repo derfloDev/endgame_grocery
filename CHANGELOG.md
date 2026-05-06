@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.0](https://github.com/derfloDev/endgame_grocery/compare/v0.10.0...v0.11.0) (2026-05-06)
+
+
+### Features
+
+* **i18n:** add language switcher ([4590eb4](https://github.com/derfloDev/endgame_grocery/commit/4590eb4e53d2362370f83d08d95a04ac7016efb2))
+* **i18n:** add localization infrastructure ([828bb17](https://github.com/derfloDev/endgame_grocery/commit/828bb17aca357a570544e356746352b639f8a261))
+* **i18n:** localize app UI strings ([b7d7585](https://github.com/derfloDev/endgame_grocery/commit/b7d7585700c7034659551411bdafb46121e506e5))
+
 ## [0.10.0](https://github.com/derfloDev/endgame_grocery/compare/v0.9.0...v0.10.0) (2026-05-06)
 
 
