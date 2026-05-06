@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/derfloDev/endgame_grocery/compare/v0.9.0...v0.10.0) (2026-05-06)
+
+
+### Features
+
+* **ui:** add support link to info sheet ([d3b1e50](https://github.com/derfloDev/endgame_grocery/commit/d3b1e50f4b1d3ea13343b3444e953d744da4f223))
+
 ## [0.9.0](https://github.com/derfloDev/endgame_grocery/compare/v0.8.0...v0.9.0) (2026-05-04)
 
 
