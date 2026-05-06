@@ -592,6 +592,17 @@ p {
   text-decoration: underline;
 }
 
+.info-sheet-donate {
+  display: flex;
+  justify-content: center;
+  padding-top: 1rem;
+}
+
+.info-sheet-donate img {
+  display: block;
+  height: 40px;
+}
+
 .overview-header {
   display: flex;
   justify-content: space-between;

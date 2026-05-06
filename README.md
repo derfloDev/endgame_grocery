@@ -262,6 +262,18 @@ The semantic matcher runs in an ES-module web worker so the ONNX runtime can ini
 
 This project uses the persistent planner/implementer/reviewer workflow defined in `AGENTS.md`.
 
+## Built With
+
+This project is vibe-coded with aide, the AI workflow tooling from [agentinit](https://github.com/riadshalaby/agentinit).
+
+## Support
+
+<a href="https://www.buymeacoffee.com/derflodev">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="40" />
+</a>
+
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-support-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/DerFloDev)
+
 ## License
 
 This project is licensed under the [GNU General Public License v3.0](./LICENSE).

@@ -45,6 +45,11 @@ export default function InfoSheet({ open, onClose }) {
           GNU GPL v3.0
         </a>
       </div>
+      <div className="info-sheet-section info-sheet-donate">
+        <a href="https://www.buymeacoffee.com/derflodev" target="_blank" rel="noopener noreferrer">
+          <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" />
+        </a>
+      </div>
     </BottomSheet>
   );
 }
