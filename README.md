@@ -13,6 +13,16 @@
 
 Shared grocery list monorepo with a React frontend, an Express backend, and PostgreSQL persistence.
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/demo_lists.png" alt="List overview" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/demo_listitems.png" alt="List detail with open items" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/demo_add_item.png" alt="Add item with icon picker" width="220" />
+</p>
+
 ## Prerequisites
 
 - Node.js 22.x
@@ -75,6 +85,8 @@ This starts both apps concurrently:
 During local development, the frontend Vite server proxies `/api` requests to `http://localhost:4000`, so the backend must be running before the browser can register, log in, or load list data.
 
 The Vite PWA plugin also enables the module service worker in dev mode, so localhost can exercise the same push-subscription flow as production. After updating the service worker code or switching branches, reload the page once before retesting push notifications so the browser picks up the latest dev worker.
+
+The frontend initializes i18next before React renders, detects English or German from local storage and the browser, and keeps the document `<html lang>` attribute aligned with the active language. Translation catalogs live in `frontend/src/locales/{en,de}/translation.json` and are delivered through Vite code splitting; JSON assets are included in the service worker precache patterns for offline-first locale support.
 
 ### 7. Generate VAPID keys for push notifications (optional)
 
@@ -178,6 +190,9 @@ Run these checks before merging changes:
 - `npm test`
 - `npm run e2e`
 
+Frontend Vitest runs load `frontend/src/test/setup.js` before each suite so component
+tests start with the i18next runtime initialized and the language reset to English.
+
 ## E2E Tests
 
 Playwright E2E coverage exercises the registration, login, and core shopping-list CRUD flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first. The non-production backend also exposes `POST /api/test/create-verified-user` specifically for E2E setup, and transactional mail delivery is skipped with a warning when `SMTP_HOST` is not configured.
@@ -228,7 +243,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 
 ## Tech Stack
 
-- Frontend: React, Vite, React Router, Vitest
+- Frontend: React, Vite, React Router, i18next, Vitest
 - Backend: Node.js, Express, JWT authentication
 - Database: PostgreSQL
 - Tooling: ESLint, Prettier, Docker Compose
@@ -236,6 +251,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 ## Feature Overview
 
 - The protected React app uses a dark Endgame-themed shell with bottom navigation for Lists.
+- The frontend has English and German localization infrastructure with browser language detection, persistent language preference storage, and a DE/EN switcher in the Info & Settings sheet.
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
 - Authentication supports register, email verification, password reset, and login flows backed by JWT access tokens.
 - When a browser still has a valid JWT but has lost the cached `endgame_grocery.auth_user` entry, the frontend rehydrates `display_name` and `email` from `GET /api/auth/me` so the Info & Settings sheet still shows the signed-in identity after reload.

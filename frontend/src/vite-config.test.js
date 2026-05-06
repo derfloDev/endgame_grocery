@@ -42,6 +42,10 @@ describe("vite worker config", () => {
     expect(viteConfigSource).toMatch(/filename:\s*["']service-worker\.js["']/);
   });
 
+  it("precaches JSON assets for offline locale delivery", () => {
+    expect(viteConfigSource).toMatch(/globPatterns:\s*\[[^\]]*json[^\]]*\]/);
+  });
+
   it("enables the module service worker in Vite dev mode", () => {
     expect(viteConfigSource).toMatch(/devOptions:\s*\{/);
     expect(viteConfigSource).toMatch(/enabled:\s*true/);

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { BottomSheet } from "./ui";
 
 export default function RenameListSheet({ open, onClose, currentName, onRename }) {
+  const { t } = useTranslation();
   const [value, setValue] = useState(currentName);
 
   useEffect(() => {
@@ -24,10 +26,10 @@ export default function RenameListSheet({ open, onClose, currentName, onRename }
   }
 
   return (
-    <BottomSheet open={open} title="Rename List" onClose={onClose}>
+    <BottomSheet open={open} title={t("list.renameList")} onClose={onClose}>
       <form className="rename-list-form" onSubmit={(event) => void handleSubmit(event)}>
         <div className="eg-field">
-          <label htmlFor="rename-list-sheet-value">Rename list</label>
+          <label htmlFor="rename-list-sheet-value">{t("list.renameList")}</label>
           <input
             id="rename-list-sheet-value"
             autoFocus
@@ -38,10 +40,10 @@ export default function RenameListSheet({ open, onClose, currentName, onRename }
         </div>
         <div className="button-row">
           <button className="eg-btn-ghost" type="button" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button className="eg-btn-primary" disabled={!value.trim() || value.trim() === currentName} type="submit">
-            Save
+            {t("common.save")}
           </button>
         </div>
       </form>

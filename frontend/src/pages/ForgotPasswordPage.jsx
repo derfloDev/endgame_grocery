@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { forgotPassword } from "../api/auth";
 
 export default function ForgotPasswordPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -17,7 +19,7 @@ export default function ForgotPasswordPage() {
 
     try {
       await forgotPassword(email.trim());
-      setNotice("If the account exists, a reset email is on its way.");
+      setNotice(t("auth.resetSuccess"));
     } catch (submitError) {
       setError(submitError.message);
     } finally {
@@ -29,19 +31,19 @@ export default function ForgotPasswordPage() {
     <main className="auth-layout">
       <section className="auth-card">
         <div className="auth-brand">
-          <img alt="Endgame Grocery" className="auth-logo" src={logo} />
+          <img alt={t("app.brandName")} className="auth-logo" src={logo} />
           <div className="auth-brand-text">
-            <div className="auth-brand-title eg-orbitron eg-gradient-text">ENDGAME</div>
-            <div className="auth-brand-sub">GROCERY</div>
+            <div className="auth-brand-title eg-orbitron eg-gradient-text">{t("app.brandMain")}</div>
+            <div className="auth-brand-sub">{t("app.brandSub")}</div>
           </div>
         </div>
-        <h1>Reset your password</h1>
-        <p>Enter your email address and we&apos;ll send you a reset link.</p>
+        <h1>{t("auth.resetTitle")}</h1>
+        <p>{t("auth.resetBody")}</p>
         <form className="auth-form" onSubmit={handleSubmit}>
           {notice ? <p className="eg-success-banner">{notice}</p> : null}
           {error ? <p className="eg-error-banner">{error}</p> : null}
           <div className="eg-field">
-            <label htmlFor="forgot-password-email">Email</label>
+            <label htmlFor="forgot-password-email">{t("auth.email")}</label>
             <input
               id="forgot-password-email"
               autoComplete="email"
@@ -55,10 +57,10 @@ export default function ForgotPasswordPage() {
           </div>
           <div className="button-row">
             <button className="eg-btn-primary" disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Sending..." : "Send reset email"}
+              {isSubmitting ? t("auth.sending") : t("auth.sendReset")}
             </button>
             <Link className="eg-link" to="/login">
-              Back to login
+              {t("auth.backToLogin")}
             </Link>
           </div>
         </form>

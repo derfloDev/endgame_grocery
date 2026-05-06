@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { formatIconName, ICON_REGISTRY, ICON_REGISTRY_KEYS, resolveIconName } from "../data/iconRegistry";
 import { useAutocomplete } from "../hooks/useAutocomplete";
@@ -20,6 +21,7 @@ export default function AddItemSheet({
   onAdd,
   onClose
 }) {
+  const { t } = useTranslation();
   const { token } = useAuth();
   const [text, setText] = useState(initialText);
   const [details, setDetails] = useState(initialDetails);
@@ -41,10 +43,10 @@ export default function AddItemSheet({
   const textInputId = isEditMode ? "edit-item-sheet-text" : "add-item-sheet-text";
   const detailsInputId = isEditMode ? "edit-item-sheet-details" : "add-item-sheet-details";
   const iconSearchInputId = isEditMode ? "edit-item-icon-browser-search" : "add-item-icon-browser-search";
-  const sheetTitle = isEditMode ? "Edit Item" : "Add Item";
-  const inputLabel = isEditMode ? "Edit item" : "Add item";
-  const submitLabel = isEditMode ? "Save Item" : "Add Item";
-  const iconBrowserToggleLabel = showIconBrowser ? "Weniger anzeigen" : "Mehr anzeigen";
+  const sheetTitle = isEditMode ? t("item.editTitle") : t("item.addTitle");
+  const inputLabel = isEditMode ? t("item.editLabel") : t("item.addLabel");
+  const submitLabel = isEditMode ? t("item.saveItem") : t("item.addTitle");
+  const iconBrowserToggleLabel = showIconBrowser ? t("item.showLess") : t("item.showMore");
   const sheetClassName = showIconBrowser ? "bottom-sheet--browser-open" : "";
 
   useEffect(() => {
@@ -172,7 +174,7 @@ export default function AddItemSheet({
                 autoComplete="off"
                 autoFocus={!showIconBrowser}
                 className="eg-input"
-                placeholder="Add milk, lemons, bread..."
+                placeholder={t("item.addPlaceholder")}
                 value={text}
                 onFocus={handleInputFocus}
                 onChange={handleInputChange}
@@ -183,7 +185,7 @@ export default function AddItemSheet({
             </div>
             {loading ? (
               <div aria-live="polite" className="add-item-preview add-item-preview-loading">
-                <span aria-label="Loading icon suggestion" className="add-item-preview-spinner" />
+                <span aria-label={t("item.loadingIcon")} className="add-item-preview-spinner" />
               </div>
             ) : PreviewIcon ? (
               <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
@@ -194,25 +196,25 @@ export default function AddItemSheet({
         </div>
 
         <div className="eg-field">
-          <label htmlFor={detailsInputId}>Details (optional)</label>
+          <label htmlFor={detailsInputId}>{t("item.detailsLabel")}</label>
           <input
             id={detailsInputId}
             className="eg-input"
-            placeholder="Beschreibung, Menge..."
+            placeholder={t("item.detailsPlaceholder")}
             value={details}
             onChange={(event) => setDetails(event.target.value)}
           />
         </div>
 
         {suggestedIconNames.length > 0 ? (
-          <div className="add-item-icon-picker" role="group" aria-label="Suggested icons">
+          <div className="add-item-icon-picker" role="group" aria-label={t("item.suggestedIcons")}>
             {suggestedIconNames.map((suggestedIconName) => {
               const SuggestedIcon = ICON_REGISTRY[suggestedIconName];
 
               return (
                 <button
                   key={suggestedIconName}
-                  aria-label={`Choose ${formatIconName(suggestedIconName)}`}
+                  aria-label={t("item.chooseSpecificIcon", { name: formatIconName(suggestedIconName) })}
                   className={`add-item-icon-picker-btn ${
                     selectedIconName === suggestedIconName ? "add-item-icon-picker-btn--selected" : ""
                   }`}
@@ -242,13 +244,13 @@ export default function AddItemSheet({
           >
             <div className="add-item-icon-browser-inner">
               <label className="visually-hidden" htmlFor={iconSearchInputId}>
-                Search icons
+                {t("item.searchIcons")}
               </label>
               <input
                 ref={iconSearchRef}
                 id={iconSearchInputId}
                 className="eg-input"
-                placeholder="Search icons"
+                placeholder={t("item.searchIcons")}
                 value={iconBrowserSearchText}
                 onChange={(event) => setIconBrowserSearchText(event.target.value)}
               />
@@ -260,7 +262,7 @@ export default function AddItemSheet({
                   return (
                     <button
                       key={browserIconName}
-                      aria-label={`Browse ${formatIconName(browserIconName)}`}
+                      aria-label={t("item.browseSpecificIcon", { name: formatIconName(browserIconName) })}
                       className={`add-item-icon-browser-btn ${
                         selectedIconName === browserIconName ? "add-item-icon-browser-btn--selected" : ""
                       }`}
@@ -283,7 +285,7 @@ export default function AddItemSheet({
 
         <div className="button-row add-item-actions">
           <button className="eg-btn-ghost" type="button" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button className="eg-btn-primary" disabled={!text.trim()} type="submit">
             {submitLabel}

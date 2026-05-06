@@ -1,12 +1,15 @@
+import { useTranslation } from "react-i18next";
 import { BottomSheet, Icon } from "./ui";
 
 export default function ListOptionsSheet({ open, onClose, isOwner, onRenameSelect, onShareSelect }) {
+  const { t } = useTranslation();
+
   if (!open || !isOwner) {
     return null;
   }
 
   return (
-    <BottomSheet open={open} title="List Options" onClose={onClose}>
+    <BottomSheet open={open} title={t("list.optionsTitle")} onClose={onClose}>
       <div className="list-options-sheet">
         <button
           className="list-option-row"
@@ -20,8 +23,8 @@ export default function ListOptionsSheet({ open, onClose, isOwner, onRenameSelec
             <Icon color="var(--neon-violet)" name="edit" size={22} />
           </div>
           <div className="list-option-text">
-            <span className="list-option-label">Rename list</span>
-            <span className="list-option-desc">Change the name of this list</span>
+            <span className="list-option-label">{t("list.optionsRename")}</span>
+            <span className="list-option-desc">{t("list.optionsRenameDesc")}</span>
           </div>
           <Icon color="var(--text-disabled)" name="chevronRight" size={16} />
         </button>
@@ -38,8 +41,8 @@ export default function ListOptionsSheet({ open, onClose, isOwner, onRenameSelec
             <Icon color="var(--neon-cyan)" name="share" size={22} />
           </div>
           <div className="list-option-text">
-            <span className="list-option-label">Share list</span>
-            <span className="list-option-desc">Manage squad access</span>
+            <span className="list-option-label">{t("list.optionsShare")}</span>
+            <span className="list-option-desc">{t("list.optionsShareDesc")}</span>
           </div>
           <Icon color="var(--text-disabled)" name="chevronRight" size={16} />
         </button>

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { BottomSheet, LoadingState } from "./ui";
 
 export default function ShareListSheet({
@@ -13,15 +14,17 @@ export default function ShareListSheet({
   onShareSubmit,
   onRevoke
 }) {
+  const { t } = useTranslation();
+
   return (
-    <BottomSheet open={open} title="Share List" onClose={onClose}>
+    <BottomSheet open={open} title={t("share.title")} onClose={onClose}>
       <form className="share-list-form" onSubmit={onShareSubmit}>
         <label className="eg-field" htmlFor="share-list-sheet-email">
-          <span className="share-list-label">Invite member by email</span>
+          <span className="share-list-label">{t("share.inviteLabel")}</span>
           <input
             id="share-list-sheet-email"
             className="eg-input"
-            placeholder="alex@example.com"
+            placeholder={t("share.invitePlaceholder")}
             type="email"
             value={shareEmail}
             onChange={(event) => onEmailChange(event.target.value)}
@@ -29,7 +32,7 @@ export default function ShareListSheet({
         </label>
         <button className="eg-btn-secondary" disabled={isSubmitting} type="submit">
           {isSubmitting ? <span aria-hidden="true" className="share-invite-spinner" /> : null}
-          Send Invite
+          {t("share.sendInvite")}
         </button>
       </form>
 
@@ -40,7 +43,7 @@ export default function ShareListSheet({
         </div>
       ) : null}
 
-      <div className="eg-orbitron share-sheet-members-label">SQUAD ({members.length})</div>
+      <div className="eg-orbitron share-sheet-members-label">{t("share.squadLabel")} ({members.length})</div>
       {isSharingLoading ? <LoadingState rows={2} /> : null}
       {!isSharingLoading
         ? members.map((member) => (
@@ -51,16 +54,16 @@ export default function ShareListSheet({
               </div>
               <div className="member-row-actions">
                 <span className={member.is_owner ? "eg-chip-purple" : "eg-chip-cyan"}>
-                  {member.is_owner ? "Owner" : "Member"}
+                  {member.is_owner ? t("common.owner") : t("common.member")}
                 </span>
-                {member.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
+                {member.is_pending_sync ? <span className="eg-chip-queued">{t("common.queued")}</span> : null}
                 {!member.is_owner ? (
                   <button
                     className="eg-btn-danger member-row-revoke"
                     type="button"
                     onClick={() => void onRevoke(member.user_id)}
                   >
-                    Revoke
+                    {t("share.revoke")}
                   </button>
                 ) : null}
               </div>

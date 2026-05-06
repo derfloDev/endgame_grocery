@@ -1,6 +1,10 @@
+import { useTranslation } from "react-i18next";
+
 export default function LoadingState({ rows = 4 }) {
+  const { t } = useTranslation();
+
   return (
-    <div aria-label="Loading" className="loading-state">
+    <div aria-label={t("loading.label")} className="loading-state">
       {Array.from({ length: rows }, (_, index) => (
         <div
           key={index}

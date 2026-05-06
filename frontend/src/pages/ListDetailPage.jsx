@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
 import { createEntry, deleteEntry, fetchEntries, updateEntry } from "../api/entries";
@@ -20,6 +21,7 @@ import { usePushNotifications } from "../hooks/usePushNotifications";
 import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "./recentlyUsedState";
 
 export default function ListDetailPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams();
   const { token } = useAuth();
@@ -155,7 +157,7 @@ export default function ListDetailPage() {
         }
 
         if (!activeList) {
-          setEntryError("You no longer have access to this list.");
+          setEntryError(t("detail.accessError"));
           setList(null);
           setEntries([]);
           setMembers([]);
@@ -196,7 +198,7 @@ export default function ListDetailPage() {
     }
 
     void loadListDetail();
-  }, [id, loadEntries, loadMembers, syncVersion, token]);
+  }, [id, loadEntries, loadMembers, syncVersion, t, token]);
 
   const handleEntryChange = useCallback(() => {
     void loadEntries();
@@ -407,9 +409,9 @@ export default function ListDetailPage() {
       const result = await shareListWithMember(id, token, { email: shareEmail });
 
       if (result?.queued) {
-        setShareNotice(`Invitation queued for ${shareEmail.trim()}.`);
+        setShareNotice(t("share.inviteQueued", { email: shareEmail.trim() }));
       } else if (result?.invite?.invited_email) {
-        setShareNotice(`Invitation sent to ${result.invite.invited_email}.`);
+        setShareNotice(t("share.inviteSent", { email: result.invite.invited_email }));
       }
 
       setShareEmail("");
@@ -456,14 +458,14 @@ export default function ListDetailPage() {
           list?.is_owner
             ? [
                 {
-                  ariaLabel: "List options",
+                  ariaLabel: t("list.optionsAction"),
                   icon: <Icon color="var(--text-secondary)" name="moreVertical" size={20} />,
                   onClick: () => setShowOptions(true)
                 }
               ]
             : []
         }
-        title={list?.name ?? "List"}
+        title={list?.name ?? t("list.fallbackTitle")}
         onBack={() => navigate("/")}
       />
 
@@ -472,9 +474,9 @@ export default function ListDetailPage() {
           <div className="detail-meta">
             <div className="list-card-chips">
               <span className={list.is_owner ? "eg-chip-purple" : "eg-chip-cyan"}>
-                {list.is_owner ? "Owner" : `Shared · ${list.owner_name ?? "another member"}`}
+                {list.is_owner ? t("common.owner") : `${t("common.shared")} · ${list.owner_name ?? t("common.anotherMember")}`}
               </span>
-              {list.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
+              {list.is_pending_sync ? <span className="eg-chip-queued">{t("common.queued")}</span> : null}
               {visibleMemberBadges.length > 0 ? (
                 <div className="detail-member-badges">
                   {visibleMemberBadges.map((member) => (
@@ -496,7 +498,7 @@ export default function ListDetailPage() {
                 type="button"
                 onClick={() => void handlePushToggle()}
               >
-                {isSubscribed ? "Disable notifications" : "Enable notifications"}
+                {isSubscribed ? t("detail.notificationsOff") : t("detail.notificationsOn")}
               </button>
             ) : null}
           </div>
@@ -509,12 +511,12 @@ export default function ListDetailPage() {
           <>
             <section className="entry-section">
               <div className="entry-section-header">
-                <span className="detail-section-label">OPEN ITEMS</span>
+                <span className="detail-section-label">{t("detail.openItems").toUpperCase()}</span>
                 <span className="eg-chip-purple">{openEntries.length}</span>
               </div>
 
               {openEntries.length === 0 ? (
-                <EmptyState body="No open items. Add one with the + button." title="All clear" />
+                <EmptyState body={t("detail.noOpenItems")} title={t("detail.allClearTitle")} />
               ) : (
                 openEntries.map((entry) => (
                   <EntryRow

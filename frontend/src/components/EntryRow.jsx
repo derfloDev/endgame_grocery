@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 import { Icon } from "./ui";
 
 export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
+  const { t } = useTranslation();
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
   const startX = useRef(0);
@@ -55,7 +57,11 @@ export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
         onTouchStart={handleTouchStart}
       >
         <button
-          aria-label={entry.status === "done" ? `Mark ${entry.text} open` : `Mark ${entry.text} done`}
+          aria-label={
+            entry.status === "done"
+              ? t("entry.markOpen", { name: entry.text })
+              : t("entry.markDone", { name: entry.text })
+          }
           className="eg-icon-btn entry-icon-btn"
           type="button"
           onClick={() => onToggle?.()}
@@ -79,11 +85,11 @@ export default function EntryRow({ entry, onDelete, onEdit, onToggle }) {
         <div className="entry-row-copy">
           <p className={`entry-row-text ${entry.status === "done" ? "entry-row-text-done" : ""}`}>{entry.text}</p>
           {entry.details ? <p className="entry-row-details">{entry.details}</p> : null}
-          {entry.is_pending_sync ? <span className="eg-chip-queued entry-row-chip">Queued</span> : null}
+          {entry.is_pending_sync ? <span className="eg-chip-queued entry-row-chip">{t("common.queued")}</span> : null}
         </div>
 
         <button
-          aria-label={`Edit ${entry.text}`}
+          aria-label={t("entry.edit", { name: entry.text })}
           className="eg-icon-btn entry-icon-btn"
           type="button"
           onClick={() => onEdit?.()}

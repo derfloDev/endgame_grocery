@@ -68,7 +68,7 @@ describe("AddItemSheet", () => {
     render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.getByLabelText("Details (optional)")).toBeTruthy();
-    expect(screen.getByPlaceholderText("Beschreibung, Menge...")).toBeTruthy();
+    expect(screen.getByPlaceholderText("Description, amount...")).toBeTruthy();
     expect(cssSource).toMatch(
       /\.bottom-sheet\s*\{[^}]*padding:\s*var\(--space-5\)\s+var\(--space-4\)\s+var\(--space-5\);/s
     );

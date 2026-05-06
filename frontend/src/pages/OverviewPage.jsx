@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
 import { writeCachedResource } from "../api/offlineStore";
@@ -15,6 +16,7 @@ import { useOfflineQueue } from "../hooks/useOfflineQueue";
 const LISTS_CACHE_KEY = "lists";
 
 export default function OverviewPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { token } = useAuth();
   const { syncVersion } = useOfflineQueue();
@@ -127,7 +129,7 @@ export default function OverviewPage() {
   }
 
   async function handleDelete(listId) {
-    if (!window.confirm("Delete this list?")) {
+    if (!window.confirm(t("list.deleteConfirm"))) {
       return;
     }
 
@@ -145,12 +147,12 @@ export default function OverviewPage() {
       <div className="overview-topbar">
         <div className="overview-brand">
           <div>
-            <div className="eg-gradient-text eg-orbitron overview-brand-title">ENDGAME</div>
-            <div className="overview-brand-sub">GROCERY</div>
+            <div className="eg-gradient-text eg-orbitron overview-brand-title">{t("app.brandMain")}</div>
+            <div className="overview-brand-sub">{t("app.brandSub")}</div>
           </div>
           <div className="overview-actions">
-            <img alt="Endgame Grocery" className="overview-logo" src={logo} />
-            <button aria-label="Settings" className="eg-icon-btn" type="button" onClick={() => setShowInfo(true)}>
+            <img alt={t("app.brandName")} className="overview-logo" src={logo} />
+            <button aria-label={t("settings.open")} className="eg-icon-btn" type="button" onClick={() => setShowInfo(true)}>
               <Icon name="settings" color="var(--text-secondary)" size={18} />
             </button>
           </div>
@@ -162,9 +164,9 @@ export default function OverviewPage() {
         {isLoading ? <LoadingState rows={3} /> : null}
         {!isLoading && !error && lists.length === 0 ? (
           <EmptyState
-            action="New List"
-            body="Create your first mission to get started."
-            title="No lists yet"
+            action={t("list.newListAction")}
+            body={t("list.noListsBody")}
+            title={t("list.noListsTitle")}
             onAction={() => setShowNew(true)}
           />
         ) : null}

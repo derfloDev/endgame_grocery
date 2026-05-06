@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 import { useAppConfig } from "../context/appConfigState";
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const { login, token } = useAuth();
   const { registrationEnabled } = useAppConfig();
   const navigate = useNavigate();
@@ -40,19 +42,19 @@ export default function LoginPage() {
     <main className="auth-layout">
       <section className="auth-card">
         <div className="auth-brand">
-          <img alt="Endgame Grocery" className="auth-logo" src={logo} />
+          <img alt={t("app.brandName")} className="auth-logo" src={logo} />
           <div className="auth-brand-text">
-            <div className="auth-brand-title eg-orbitron eg-gradient-text">ENDGAME</div>
-            <div className="auth-brand-sub">GROCERY</div>
+            <div className="auth-brand-title eg-orbitron eg-gradient-text">{t("app.brandMain")}</div>
+            <div className="auth-brand-sub">{t("app.brandSub")}</div>
           </div>
         </div>
-        <h1>Welcome Back</h1>
-        <p>Sign in to access your mission.</p>
+        <h1>{t("auth.welcomeBack")}</h1>
+        <p>{t("auth.signIn")}</p>
         <form className="auth-form" onSubmit={handleSubmit}>
           {successMessage ? <p className="eg-success-banner">{successMessage}</p> : null}
           {error ? <p className="eg-error-banner">{error}</p> : null}
           <div className="eg-field">
-            <label htmlFor="login-email">Email</label>
+            <label htmlFor="login-email">{t("auth.email")}</label>
             <input
               id="login-email"
               autoComplete="email"
@@ -65,7 +67,7 @@ export default function LoginPage() {
             />
           </div>
           <div className="eg-field">
-            <label htmlFor="login-password">Password</label>
+            <label htmlFor="login-password">{t("auth.password")}</label>
             <input
               id="login-password"
               autoComplete="current-password"
@@ -79,14 +81,14 @@ export default function LoginPage() {
           </div>
           <div className="button-row">
             <button className="eg-btn-primary" disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Signing in..." : "Log in"}
+              {isSubmitting ? t("auth.signingIn") : t("auth.logIn")}
             </button>
             <Link className="eg-link" to="/forgot-password">
-              Forgot password?
+              {t("auth.forgotPassword")}
             </Link>
             {registrationEnabled ? (
               <Link className="eg-link" to="/register">
-                Create an account
+                {t("auth.createAccount")}
               </Link>
             ) : null}
           </div>
