@@ -1,12 +1,15 @@
+import { useTranslation } from "react-i18next";
 import { FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 
 export default function AutocompleteSuggestions({ suggestions, onSelect }) {
+  const { t } = useTranslation();
+
   if (!suggestions.length) {
     return null;
   }
 
   return (
-    <div className="autocomplete-suggestions" role="listbox" aria-label="Autocomplete suggestions">
+    <div className="autocomplete-suggestions" role="listbox" aria-label={t("autocomplete.label")}>
       {suggestions.map((suggestion, index) => {
         const resolvedIconName = resolveIconName(suggestion.icon) ?? FALLBACK_ICON_NAME;
         const SuggestionIcon = ICON_REGISTRY[resolvedIconName];

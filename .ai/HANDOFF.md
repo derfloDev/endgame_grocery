@@ -8,6 +8,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-002 — review — 2026-05-06T14:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | T-002 string extraction reviewed: all 126 t() keys used in JSX present in both locales; ICU plurals in OfflineBanner correct; German strings fixed; test infrastructure (setup.js, useSuspense: false) properly wired; 132 tests green; lint and build pass. 18 orphaned plan-catalogue keys noted as minor. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-001 — implement — 2026-05-06T07:00:51Z
 
 | Field | Value |
@@ -99,6 +112,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, approved T-001 implementation files |
 | Validation | Reused reviewer-approved validation: `npm run lint`, `npm run build`, `npm test` PASS |
 | Commit | `pending feat(i18n): add localization infrastructure` |
+| Next Role | none |
+
+---
+
+### T-002 — implement — 2026-05-06T11:28:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Replaced hardcoded frontend UI copy with i18next translation lookups, completed English and German locale catalogs, added ICU offline plurals, and covered German render/key parity in tests. |
+| Files Changed | `README.md`, `frontend/vite.config.js`, `frontend/src/i18n.js`, `frontend/src/i18n.test.js`, `frontend/src/test/setup.js`, `frontend/src/app.test.jsx`, `frontend/src/locales/en/translation.json`, `frontend/src/locales/de/translation.json`, `frontend/src/components/**/*.jsx`, `frontend/src/pages/**/*.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | JSX/user-facing string scan PASS; `npm run test --workspace frontend -- src/app.test.jsx` PASS; `npm run lint` PASS (existing frontend fast-refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS; `npm test` PASS |
+| Commit | `feat(i18n): localize app UI strings` |
+| Next Role | review |
+
+---
+
+### T-002 — implement — 2026-05-06T12:11:48Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed approved T-002 string extraction and locale catalog changes after reviewer PASS_WITH_NOTES. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, approved T-002 implementation files |
+| Validation | Reused reviewer-approved validation: JSX/user-facing string scan, locale key parity test, `npm run lint`, `npm run build`, `npm test` PASS |
+| Commit | `pending feat(i18n): localize app UI strings` |
 | Next Role | none |
 
 ---

@@ -1,13 +1,16 @@
+import { useTranslation } from "react-i18next";
 import Icon from "./Icon";
 
 export default function ErrorState({ onRetry }) {
+  const { t } = useTranslation();
+
   return (
     <div className="error-state">
       <Icon name="alertCircle" size={48} color="var(--color-error)" />
-      <div className="error-state-title">Mission Failed</div>
-      <div className="error-state-body">Something went wrong. Try again.</div>
+      <div className="error-state-title">{t("error.title")}</div>
+      <div className="error-state-body">{t("error.message")}</div>
       <button className="eg-btn-secondary error-state-action" type="button" onClick={onRetry}>
-        Retry
+        {t("error.retry")}
       </button>
     </div>
   );

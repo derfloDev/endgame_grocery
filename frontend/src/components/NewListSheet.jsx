@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { BottomSheet } from "./ui";
 
 export default function NewListSheet({ open, onAdd, onClose }) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
 
   useEffect(() => {
@@ -25,25 +27,25 @@ export default function NewListSheet({ open, onAdd, onClose }) {
   }
 
   return (
-    <BottomSheet open={open} title="New List" onClose={onClose}>
+    <BottomSheet open={open} title={t("list.newListTitle")} onClose={onClose}>
       <form className="new-list-form" onSubmit={handleSubmit}>
         <div className="eg-field">
-          <label htmlFor="new-list-sheet-name">New list</label>
+          <label htmlFor="new-list-sheet-name">{t("list.newList")}</label>
           <input
             id="new-list-sheet-name"
             autoFocus
             className="eg-input"
-            placeholder="Weekend groceries"
+            placeholder={t("list.newListPlaceholder")}
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
         </div>
         <div className="button-row">
           <button className="eg-btn-ghost" type="button" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button className="eg-btn-primary" disabled={!name.trim()} type="submit">
-            Create list
+            {t("list.createList")}
           </button>
         </div>
       </form>

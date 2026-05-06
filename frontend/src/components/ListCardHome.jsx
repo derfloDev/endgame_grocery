@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icon } from "./ui";
 
 export default function ListCardHome({ list, onOpen, onRename, onDelete }) {
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [renamingMode, setRenamingMode] = useState(false);
   const [renameValue, setRenameValue] = useState(list.name);
@@ -41,14 +43,14 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }) {
           <div className="eg-orbitron list-card-name">{list.name}</div>
           <div className="list-card-chips">
             <span className={list.is_owner ? "eg-chip-purple" : "eg-chip-cyan"}>
-              {list.is_owner ? "Owner" : `Shared · ${list.owner_name}`}
+              {list.is_owner ? t("common.owner") : `${t("common.shared")} · ${list.owner_name}`}
             </span>
-            {list.is_pending_sync ? <span className="eg-chip-queued">Queued</span> : null}
+            {list.is_pending_sync ? <span className="eg-chip-queued">{t("common.queued")}</span> : null}
           </div>
         </div>
         {list.is_owner ? (
           <button
-            aria-label={`Actions for ${list.name}`}
+            aria-label={t("list.actionsFor", { name: list.name })}
             className="eg-icon-btn"
             type="button"
             onClick={(event) => {
@@ -73,7 +75,7 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }) {
               setRenameValue(list.name);
             }}
           >
-            Rename
+            {t("common.rename")}
           </button>
           <button
             className="eg-btn-danger list-card-menu-btn"
@@ -83,7 +85,7 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }) {
               onDelete?.();
             }}
           >
-            Delete
+            {t("common.delete")}
           </button>
         </div>
       ) : null}
@@ -91,7 +93,7 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }) {
       {menuOpen && renamingMode ? (
         <div className="list-card-menu" onClick={(event) => event.stopPropagation()}>
           <label className="visually-hidden" htmlFor={`rename-${list.id}`}>
-            Rename list
+            {t("list.renameList")}
           </label>
           <input
             id={`rename-${list.id}`}
@@ -112,10 +114,10 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }) {
           />
           <div className="button-row list-card-menu-actions">
             <button className="eg-btn-ghost" type="button" onClick={closeMenu}>
-              Cancel
+              {t("common.cancel")}
             </button>
             <button className="eg-btn-secondary" type="button" onClick={submitRename}>
-              Save name
+              {t("listCard.saveName")}
             </button>
           </div>
         </div>

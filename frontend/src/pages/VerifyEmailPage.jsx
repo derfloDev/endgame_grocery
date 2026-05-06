@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { resendVerification, verifyEmail } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 
 export default function VerifyEmailPage() {
+  const { t } = useTranslation();
   const { token, setAuthToken } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,7 +67,7 @@ export default function VerifyEmailPage() {
 
   async function handleResend() {
     if (!email.trim()) {
-      setError("Email is required.");
+      setError(t("auth.emailRequired"));
       setNotice("");
       return;
     }
@@ -76,7 +78,7 @@ export default function VerifyEmailPage() {
 
     try {
       await resendVerification(email.trim());
-      setNotice("A fresh verification email is on its way if your account is still pending.");
+      setNotice(t("auth.verifySuccess"));
     } catch (resendError) {
       setError(resendError.message);
     } finally {
@@ -88,21 +90,19 @@ export default function VerifyEmailPage() {
     <main className="auth-layout">
       <section className="auth-card">
         <div className="auth-brand">
-          <img alt="Endgame Grocery" className="auth-logo" src={logo} />
+          <img alt={t("app.brandName")} className="auth-logo" src={logo} />
           <div className="auth-brand-text">
-            <div className="auth-brand-title eg-orbitron eg-gradient-text">ENDGAME</div>
-            <div className="auth-brand-sub">GROCERY</div>
+            <div className="auth-brand-title eg-orbitron eg-gradient-text">{t("app.brandMain")}</div>
+            <div className="auth-brand-sub">{t("app.brandSub")}</div>
           </div>
         </div>
-        <h1>{verificationToken && !error ? "Verifying your email" : "Check your inbox"}</h1>
-        <p>
-          Open the verification link we sent you. If you need a new one, resend it from here.
-        </p>
+        <h1>{verificationToken && !error ? t("auth.verifying") : t("auth.checkInbox")}</h1>
+        <p>{t("auth.verifyBody")}</p>
         <div className="auth-form">
           {error ? <p className="eg-error-banner">{error}</p> : null}
           {notice ? <p className="eg-success-banner">{notice}</p> : null}
           <div className="eg-field">
-            <label htmlFor="verify-email-address">Email</label>
+            <label htmlFor="verify-email-address">{t("auth.email")}</label>
             <input
               id="verify-email-address"
               autoComplete="email"
@@ -121,10 +121,10 @@ export default function VerifyEmailPage() {
               type="button"
               onClick={handleResend}
             >
-              {isSubmitting ? "Sending..." : "Resend verification email"}
+              {isSubmitting ? t("auth.sending") : t("auth.resendVerify")}
             </button>
             <Link className="eg-link" to="/login">
-              Back to login
+              {t("auth.backToLogin")}
             </Link>
           </div>
         </div>

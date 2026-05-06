@@ -94,3 +94,57 @@ None identified.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS_WITH_NOTES**
+
+Reviewed: 2026-05-06
+
+#### Findings
+
+1. **[minor]** `src/locales/en/translation.json`, `src/locales/de/translation.json` — 18 orphaned keys
+   The locale files contain 146 keys each; only 126 are referenced by non-test JSX. The 18 unused keys (`common.close`, `common.back`, `common.retry`, `common.loading`, `common.add`, `list.saveListName`, `list.cancelRename`, `list.options`, `detail.owner`, `detail.shared`, `item.chooseIcon`, `item.browseIcon`, `auth.resetTokenError`, `auth.passwordUpdated`, `auth.verifyTitle`, `auth.resending`, `listCard.renameLabel`, `listCard.cancelRename`) are carry-overs from the plan's abbreviated Key Catalogue. The components use more specific or differently-named keys (e.g. `auth.resetTokenRequired` instead of `auth.resetTokenError`). The remaining 2 orphaned keys (`settings.language`, `settings.languageLabel`) are intentionally reserved for T-003.
+   **Not a required fix** — does not affect any acceptance criterion. Recommend cleaning up in a future pass.
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps
+1. Re-read `.ai/TASKS.md` — T-002 in `ready_for_review`, owner `review`.
+2. Re-read `.ai/PLAN.md` — T-002 scope: replace ~130 hardcoded strings; ICU plurals in OfflineBanner; fix German strings in AddItemSheet.
+3. Confirmed all 25 expected files (16 components + 9 pages) import `useTranslation`. Verified via `rg -l "useTranslation"`.
+4. Read `OfflineBanner.jsx` — ICU plural calls correct: `t("offline.queued", { count })`, `t("offline.syncing", { count })`, `t("offline.waiting", { count })`. ✓
+5. Read `AddItemSheet.jsx` — all strings via `t()`. German strings fixed. Two new keys (`item.chooseSpecificIcon`, `item.browseSpecificIcon`) added with variable interpolation — an improvement over generic plan keys; both present in both locales. ✓
+6. Read `InfoSheet.jsx`, `ListCardHome.jsx`, `OverviewPage.jsx`, `LoginPage.jsx`, `ShareListSheet.jsx`, `ListOptionsSheet.jsx`, `ResetPasswordPage.jsx`, `VerifyEmailPage.jsx` — all strings via `t()`. ✓
+7. Ran Node.js key parity check: 126 unique t() keys in non-test JSX; all 126 present in both locales. ✓
+8. Ran key parity check between locales: both have 146 keys, zero key set difference. ✓
+9. Reviewed `vite.config.js` diff: added `test.setupFiles` pointing to `src/test/setup.js`. ✓
+10. Reviewed `src/i18n.js` diff: added `typeof document === "undefined"` guard; added `react: { useSuspense: false }`. Both are correct for test environments and production. ✓
+11. Reviewed `src/test/setup.js`: resets i18next to `"en"` before every test — prevents language-pollution between tests. ✓
+12. Reviewed `src/app.test.jsx` diff: imports i18n; resets to `"en"` in `beforeEach`; adds a new integration test `"renders translated auth copy when German is selected"` that verifies German rendering at the app level. ✓
+13. Ran `npm run lint` → 0 errors. **PASS**.
+14. Ran `npm run build` → succeeded. **PASS**.
+15. Ran `npm test` → 22 test files, **132 tests**, all green. **PASS**.
+
+##### Findings
+All T-002 acceptance criteria confirmed met:
+- All user-visible strings rendered via `t()` ✓
+- Both locale files fully populated (146 keys each, zero parity gap) ✓
+- `npm run lint` passes ✓
+- App renders correct language on load (verified by integration test for German) ✓
+
+Minor: 18 orphaned locale keys (plan catalogue artefacts, not affecting runtime).
+
+##### Risks
+None identified.
+
+#### Verdict
+`PASS_WITH_NOTES`

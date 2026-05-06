@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { acceptInvite } from "../api/sharing";
 import { useAuth } from "../context/AuthContext";
 
 export default function InviteAcceptPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { token } = useAuth();
   const { token: inviteToken = "" } = useParams();
@@ -12,7 +14,7 @@ export default function InviteAcceptPage() {
 
   useEffect(() => {
     if (!inviteToken) {
-      setError("Invitation link is invalid or has expired.");
+      setError(t("invite.invalidLink"));
       return;
     }
 
@@ -48,30 +50,30 @@ export default function InviteAcceptPage() {
     return () => {
       cancelled = true;
     };
-  }, [inviteToken, navigate, token]);
+  }, [inviteToken, navigate, t, token]);
 
   return (
     <main className="auth-layout">
       <section className="auth-card">
         <div className="auth-brand">
-          <img alt="Endgame Grocery" className="auth-logo" src={logo} />
+          <img alt={t("app.brandName")} className="auth-logo" src={logo} />
           <div className="auth-brand-text">
-            <div className="auth-brand-title eg-orbitron eg-gradient-text">ENDGAME</div>
-            <div className="auth-brand-sub">GROCERY</div>
+            <div className="auth-brand-title eg-orbitron eg-gradient-text">{t("app.brandMain")}</div>
+            <div className="auth-brand-sub">{t("app.brandSub")}</div>
           </div>
         </div>
-        <h1>{error ? "Invite unavailable" : "Joining shared list"}</h1>
+        <h1>{error ? t("invite.unavailable") : t("invite.joining")}</h1>
         <p>
           {error
-            ? "This invite can no longer be used. Ask the list owner to send a fresh one."
-            : "We are connecting this invite to your account now."}
+            ? t("invite.unavailableMsg")
+            : t("invite.connecting")}
         </p>
         <div className="auth-form">
           {error ? <p className="eg-error-banner">{error}</p> : null}
-          {!error ? <p className="eg-success-banner">Opening your shared list...</p> : null}
+          {!error ? <p className="eg-success-banner">{t("invite.opening")}</p> : null}
           <div className="button-row">
             <Link className="eg-link" to="/login">
-              Back to login
+              {t("auth.backToLogin")}
             </Link>
           </div>
         </div>

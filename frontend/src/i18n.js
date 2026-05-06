@@ -5,7 +5,7 @@ import resourcesToBackend from "i18next-resources-to-backend";
 import { initReactI18next } from "react-i18next";
 
 function applyLangAttribute(language) {
-  if (!language) {
+  if (!language || typeof document === "undefined") {
     return;
   }
 
@@ -30,6 +30,9 @@ i18next
     },
     interpolation: {
       escapeValue: false
+    },
+    react: {
+      useSuspense: false
     }
   });
 

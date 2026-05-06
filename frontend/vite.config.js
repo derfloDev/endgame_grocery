@@ -30,6 +30,9 @@ export default defineConfig({
     // transformers.js relies on the worker bundle staying ESM so ONNX runtime can register its backend.
     format: "es"
   },
+  test: {
+    setupFiles: "./src/test/setup.js"
+  },
   server: {
     proxy: {
       "/api": "http://localhost:4000"

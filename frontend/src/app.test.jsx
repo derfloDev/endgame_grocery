@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import i18next from "i18next";
+import "./i18n";
 import { resetOfflineStateForTests } from "./api/offlineStore";
 import App from "./App";
 import { StaticAppConfigProvider } from "./context/AppConfigContext";
@@ -72,6 +74,7 @@ describe("authentication shell", () => {
       }
     });
     window.localStorage.clear();
+    await i18next.changeLanguage("en");
     await resetOfflineStateForTests();
     setNavigatorOnline(true);
   });
@@ -103,6 +106,17 @@ describe("authentication shell", () => {
     expect(await screen.findByRole("img", { name: "Endgame Grocery" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Join the Squad" })).toBeTruthy();
     expect(screen.getByText("Create your account to get started.")).toBeTruthy();
+  });
+
+  it("renders translated auth copy when German is selected", async () => {
+    window.localStorage.setItem("i18nextLng", "de");
+    await i18next.changeLanguage("de");
+
+    renderApp(["/login"]);
+
+    expect(await screen.findByRole("heading", { name: "Willkommen zurück" })).toBeTruthy();
+    expect(screen.getByText("Melde dich an, um fortzufahren.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Anmelden" })).toBeTruthy();
   });
 
   it("hides the registration link when runtime config disables self-registration", async () => {

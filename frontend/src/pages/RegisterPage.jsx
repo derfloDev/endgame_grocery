@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 
 export default function RegisterPage() {
+  const { t } = useTranslation();
   const { register, setAuthToken, token } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -49,22 +51,22 @@ export default function RegisterPage() {
     <main className="auth-layout">
       <section className="auth-card">
         <div className="auth-brand">
-          <img alt="Endgame Grocery" className="auth-logo" src={logo} />
+          <img alt={t("app.brandName")} className="auth-logo" src={logo} />
           <div className="auth-brand-text">
-            <div className="auth-brand-title eg-orbitron eg-gradient-text">ENDGAME</div>
-            <div className="auth-brand-sub">GROCERY</div>
+            <div className="auth-brand-title eg-orbitron eg-gradient-text">{t("app.brandMain")}</div>
+            <div className="auth-brand-sub">{t("app.brandSub")}</div>
           </div>
         </div>
-        <h1>Join the Squad</h1>
+        <h1>{t("auth.joinSquad")}</h1>
         <p>
           {inviteToken
-            ? "Create your account to unlock the shared list right away."
-            : "Create your account to get started."}
+            ? t("auth.createForInvite")
+            : t("auth.createGeneric")}
         </p>
         <form className="auth-form" onSubmit={handleSubmit}>
           {error ? <p className="eg-error-banner">{error}</p> : null}
           <div className="eg-field">
-            <label htmlFor="register-display-name">Display name</label>
+            <label htmlFor="register-display-name">{t("auth.displayName")}</label>
             <input
               id="register-display-name"
               autoComplete="name"
@@ -77,7 +79,7 @@ export default function RegisterPage() {
             />
           </div>
           <div className="eg-field">
-            <label htmlFor="register-email">Email</label>
+            <label htmlFor="register-email">{t("auth.email")}</label>
             <input
               id="register-email"
               autoComplete="email"
@@ -90,7 +92,7 @@ export default function RegisterPage() {
             />
           </div>
           <div className="eg-field">
-            <label htmlFor="register-password">Password</label>
+            <label htmlFor="register-password">{t("auth.password")}</label>
             <input
               id="register-password"
               autoComplete="new-password"
@@ -105,10 +107,10 @@ export default function RegisterPage() {
           </div>
           <div className="button-row">
             <button className="eg-btn-primary" disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Creating..." : "Create account"}
+              {isSubmitting ? t("auth.creating") : t("auth.createAccountBtn")}
             </button>
             <Link className="eg-link" to="/login">
-              Already have an account?
+              {t("auth.alreadyHave")}
             </Link>
           </div>
         </form>

@@ -1,15 +1,18 @@
+import { useTranslation } from "react-i18next";
 import { FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 import { Icon } from "./ui";
 
 export default function RecentlyUsedSection({ items, onAdd, onDismiss }) {
+  const { t } = useTranslation();
+
   if (!items.length) {
     return null;
   }
 
   return (
-    <section aria-label="Recently Used" className="entry-section recently-used-section">
+    <section aria-label={t("recent.sectionLabel")} className="entry-section recently-used-section">
       <div className="entry-section-header">
-        <span className="detail-section-label">RECENTLY USED</span>
+        <span className="detail-section-label">{t("recent.sectionLabel").toUpperCase()}</span>
         <span className="eg-chip-purple">{items.length}</span>
       </div>
 
@@ -37,7 +40,7 @@ export default function RecentlyUsedSection({ items, onAdd, onDismiss }) {
               </button>
 
               <button
-                aria-label={`Dismiss ${item.text}`}
+                aria-label={t("recent.dismiss", { name: item.text })}
                 className="recently-used-chip-dismiss"
                 type="button"
                 onClick={() => onDismiss?.(item.text)}

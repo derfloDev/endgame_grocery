@@ -1,20 +1,22 @@
+import { useTranslation } from "react-i18next";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 
 export default function OfflineBanner() {
+  const { t } = useTranslation();
   const { isOffline, isSyncing, queuedCount, syncError } = useOfflineQueue();
 
   if (!isOffline && !isSyncing && !queuedCount && !syncError) {
     return null;
   }
 
-  let message = "Offline mode: cached data is available.";
+  let message = t("offline.cached");
 
   if (queuedCount > 0 && isOffline) {
-    message = `Offline mode: ${queuedCount} change${queuedCount === 1 ? "" : "s"} waiting to sync.`;
+    message = t("offline.queued", { count: queuedCount });
   } else if (isSyncing) {
-    message = `Syncing ${queuedCount} queued change${queuedCount === 1 ? "" : "s"}...`;
+    message = t("offline.syncing", { count: queuedCount });
   } else if (queuedCount > 0) {
-    message = `${queuedCount} queued change${queuedCount === 1 ? "" : "s"} still waiting to sync.`;
+    message = t("offline.waiting", { count: queuedCount });
   }
 
   return (

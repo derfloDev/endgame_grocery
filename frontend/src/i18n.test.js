@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import enTranslations from "./locales/en/translation.json";
 import deTranslations from "./locales/de/translation.json";
 
 describe("i18n", () => {
@@ -26,5 +27,9 @@ describe("i18n", () => {
     expect(values).not.toMatch(
       /\b(?:Loeschen|Schliessen|Zurueck|Hinzufuegen|Aenderung|Aenderungen|fuer|Eintraege|oeffnen|ungueltig)\b/
     );
+  });
+
+  it("keeps English and German catalog keys in sync", () => {
+    expect(Object.keys(deTranslations).sort()).toEqual(Object.keys(enTranslations).sort());
   });
 });

@@ -1,11 +1,14 @@
 import { isValidElement } from "react";
+import { useTranslation } from "react-i18next";
 import Icon from "./Icon";
 
 export default function TopBar({ title, subtitle, onBack, actions = [] }) {
+  const { t } = useTranslation();
+
   return (
     <div className="topbar">
       {onBack ? (
-        <button aria-label="Back" className="eg-icon-btn" type="button" onClick={onBack}>
+        <button aria-label={t("topbar.back")} className="eg-icon-btn" type="button" onClick={onBack}>
           <Icon name="arrowLeft" size={20} color="var(--text-primary)" />
         </button>
       ) : null}
@@ -16,7 +19,7 @@ export default function TopBar({ title, subtitle, onBack, actions = [] }) {
       {actions.map((action, index) => (
         <button
           key={action.label ?? action.ariaLabel ?? index}
-          aria-label={action.ariaLabel ?? action.label ?? "Action"}
+          aria-label={action.ariaLabel ?? action.label ?? t("topbar.action")}
           className="eg-icon-btn"
           type="button"
           onClick={action.onClick}
