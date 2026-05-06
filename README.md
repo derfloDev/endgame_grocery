@@ -13,6 +13,16 @@
 
 Shared grocery list monorepo with a React frontend, an Express backend, and PostgreSQL persistence.
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/demo_lists.png" alt="List overview" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/demo_listitems.png" alt="List detail with open items" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/demo_add_item.png" alt="Add item with icon picker" width="220" />
+</p>
+
 ## Prerequisites
 
 - Node.js 22.x
