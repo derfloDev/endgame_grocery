@@ -76,6 +76,8 @@ During local development, the frontend Vite server proxies `/api` requests to `h
 
 The Vite PWA plugin also enables the module service worker in dev mode, so localhost can exercise the same push-subscription flow as production. After updating the service worker code or switching branches, reload the page once before retesting push notifications so the browser picks up the latest dev worker.
 
+The frontend initializes i18next before React renders, detects English or German from local storage and the browser, and keeps the document `<html lang>` attribute aligned with the active language. Translation catalogs live in `frontend/src/locales/{en,de}/translation.json` and are delivered through Vite code splitting; JSON assets are included in the service worker precache patterns for offline-first locale support.
+
 ### 7. Generate VAPID keys for push notifications (optional)
 
 Push notifications require a VAPID key pair. The `web-push` package bundled with the backend provides a one-shot generator:
@@ -228,7 +230,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 
 ## Tech Stack
 
-- Frontend: React, Vite, React Router, Vitest
+- Frontend: React, Vite, React Router, i18next, Vitest
 - Backend: Node.js, Express, JWT authentication
 - Database: PostgreSQL
 - Tooling: ESLint, Prettier, Docker Compose
@@ -236,6 +238,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 ## Feature Overview
 
 - The protected React app uses a dark Endgame-themed shell with bottom navigation for Lists.
+- The frontend has English and German localization infrastructure with browser language detection and persistent language preference storage.
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
 - Authentication supports register, email verification, password reset, and login flows backed by JWT access tokens.
 - When a browser still has a valid JWT but has lost the cached `endgame_grocery.auth_user` entry, the frontend rehydrates `display_name` and `email` from `GET /api/auth/me` so the Info & Settings sheet still shows the signed-in identity after reload.
