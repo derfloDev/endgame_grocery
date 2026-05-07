@@ -37,6 +37,23 @@ describe("resolveIconName", () => {
     }
   });
 
+  it("includes the added custom grocery and hygiene icons in selectable registry keys", () => {
+    const customIconNames = [
+      "CustomCottonPads",
+      "CustomDentalFloss",
+      "CustomGarlic",
+      "CustomHummus",
+      "CustomPasta",
+      "CustomToothpaste"
+    ];
+
+    for (const iconName of customIconNames) {
+      expect(ICON_REGISTRY[iconName]).toBeTruthy();
+      expect(ICON_REGISTRY_KEYS).toContain(iconName);
+      expect(resolveIconName(iconName)).toBe(iconName);
+    }
+  });
+
   it("returns null for unknown names without aliases", () => {
     expect(resolveIconName("IconDoesNotExist")).toBeNull();
   });
@@ -56,17 +73,35 @@ describe("formatIconName", () => {
     expect(formatIconName("ForkKnife")).toBe("Fork Knife");
     expect(formatIconName("Banana")).toBe("Banana");
     expect(formatIconName("IconBowlChopsticks")).toBe("Bowl Chopsticks");
+    expect(formatIconName("CustomCottonPads")).toBe("Cotton Pads");
+    expect(formatIconName("CustomDentalFloss")).toBe("Dental Floss");
+    expect(formatIconName("CustomGarlic")).toBe("Garlic");
+    expect(formatIconName("CustomHummus")).toBe("Hummus");
     expect(formatIconName("CustomKornflakesBowl")).toBe("Kornflakes Bowl");
     expect(formatIconName("CustomKornflakesBox")).toBe("Kornflakes Box");
+    expect(formatIconName("CustomPasta")).toBe("Pasta");
+    expect(formatIconName("CustomToothpaste")).toBe("Toothpaste");
   });
 });
 
 describe("custom icons", () => {
   it.each([
+    ["CustomCottonPads", 22],
+    ["CustomCottonPads", 32],
+    ["CustomDentalFloss", 22],
+    ["CustomDentalFloss", 32],
+    ["CustomGarlic", 22],
+    ["CustomGarlic", 32],
+    ["CustomHummus", 22],
+    ["CustomHummus", 32],
     ["CustomKornflakesBowl", 22],
     ["CustomKornflakesBowl", 32],
     ["CustomKornflakesBox", 22],
-    ["CustomKornflakesBox", 32]
+    ["CustomKornflakesBox", 32],
+    ["CustomPasta", 22],
+    ["CustomPasta", 32],
+    ["CustomToothpaste", 22],
+    ["CustomToothpaste", 32]
   ])("renders %s at the requested size with currentColor stroke", (iconName, size) => {
     const CustomIcon = ICON_REGISTRY[iconName];
 

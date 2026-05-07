@@ -1,5 +1,14 @@
 import { createElement } from "react";
-import { CustomKornflakesBowl, CustomKornflakesBox } from "./customIcons.js";
+import {
+  CustomCottonPads,
+  CustomDentalFloss,
+  CustomGarlic,
+  CustomHummus,
+  CustomKornflakesBowl,
+  CustomKornflakesBox,
+  CustomPasta,
+  CustomToothpaste
+} from "./customIcons.js";
 import {
   IconApple,
   IconAvocado,
@@ -167,8 +176,14 @@ export const ICON_REGISTRY = Object.freeze({
   Citrus: fromLucide(Citrus),
   CookingPot: fromLucide(CookingPot),
   Croissant: fromLucide(Croissant),
+  CustomCottonPads,
+  CustomDentalFloss,
+  CustomGarlic,
+  CustomHummus,
   CustomKornflakesBox,
   CustomKornflakesBowl,
+  CustomPasta,
+  CustomToothpaste,
   CupSoda: fromLucide(CupSoda),
   Dessert: fromLucide(Dessert),
   Donut: fromLucide(Donut),

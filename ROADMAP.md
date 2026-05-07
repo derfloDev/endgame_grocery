@@ -25,3 +25,18 @@ Objective: Establish a pattern that lets developers add hand-crafted SVG icons a
   - `kornflakesBowl.svg` — a bowl with cereal flakes
   - `kornflakesBox.svg` — a cereal-box silhouette
 - Both appear in the icon browser at any size with `currentColor` stroke.
+
+## Priority 3 — Additional custom icons: grocery & hygiene batch
+
+Objective: Add six more hand-crafted SVG icons for product categories not covered by tabler/lucide.
+
+Icons (all follow the T-003 SVG conventions and `Custom` prefix):
+
+| German | SVG file | Registry key |
+|---|---|---|
+| Knoblauch | `garlic.svg` | `CustomGarlic` |
+| Humus | `hummus.svg` | `CustomHummus` |
+| Zahnseide | `dentalFloss.svg` | `CustomDentalFloss` |
+| Zahncreme | `toothpaste.svg` | `CustomToothpaste` |
+| Wattepads | `cottonPads.svg` | `CustomCottonPads` |
+| Pasta/Nudeln | `pasta.svg` | `CustomPasta` |

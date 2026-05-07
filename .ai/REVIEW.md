@@ -125,3 +125,44 @@ Reviewed: 2026-05-07
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-05-07
+
+#### Findings
+- No issues found.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Inspected working-tree diffs for `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, and all six new SVG files.
+3. Confirmed all six SVG files follow T-003 conventions: `viewBox="0 0 24 24"`, no `width`/`height` on root, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root, no `stroke-width` on elements.
+4. Verified design briefs: garlic (bulb + clove lines + stem), hummus (bowl arc + mound + depression), dentalFloss (box body + floss strand), toothpaste (tube body + cap + crimped end), cottonPads (stacked ellipses + texture marks), pasta (wavy noodle lines + fork silhouette).
+5. Confirmed alphabetical import order in `customIcons.js`: CottonPads, DentalFloss, Garlic, Hummus, KornflakesBowl, KornflakesBox, Pasta, Toothpaste.
+6. Confirmed alphabetical registry insertion: new entries (CottonPads, DentalFloss, Garlic, Hummus, Pasta, Toothpaste) placed correctly relative to the existing Kornflakes entries.
+7. Verified test additions: `resolveIconName` presence test for all six; `formatIconName` assertions (e.g. "Dental Floss", "Cotton Pads", "Garlic"); DOM render tests at size=22 and size=32 for all six.
+8. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
+9. Ran `npm run build` — success, no SVG import warnings.
+10. Ran `npm test` — 155 pass (+13 over T-003 baseline of 142), 0 fail.
+11. Ran `vitest run --environment jsdom iconRegistry.test.js` — 24/24 pass (12 new render tests, all six icons at size=22 and size=32).
+
+##### Findings
+- All six SVG files strictly follow the T-003 convention for interoperability with `normalizeCustomIcon`.
+- The KornflakesBox/KornflakesBowl ordering in the registry (Box before Bowl) is a pre-existing artifact from T-002 and is not a T-004 concern.
+- `formatIconName` correctly splits multi-word names: "Cotton Pads", "Dental Floss", "Toothpaste" (single word), etc.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

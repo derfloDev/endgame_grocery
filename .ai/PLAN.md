@@ -8,11 +8,13 @@ Goal: Extend the icon registry with additional tabler/lucide icons and introduce
 
 - T-001: Add six missing tabler/lucide icons to `ICON_REGISTRY` ✅ done
 - T-002: Initial custom icon infrastructure (JS-embedded paths) ✅ done — superseded by T-003
-- T-003: Refactor custom icon system to use filesystem SVG files via `vite-plugin-svgr`
+- T-003: Refactor custom icon system to use filesystem SVG files via `vite-plugin-svgr` ✅ done
+- T-004: Add six new custom SVG icons (Garlic, Hummus, DentalFloss, Toothpaste, CottonPads, Pasta)
 
 ## Acceptance Criteria
 
-- T-003: `CustomKornflakesBowl` and `CustomKornflakesBox` render correctly at `size=22` and `size=32` with `currentColor` stroke; both appear in the icon browser; the icons are defined as `.svg` files under `frontend/src/assets/icons/custom/`; `npm run lint`, `npm run build`, and `npm test` pass with no new errors.
+- T-003: ✅ done
+- T-004: All six icons (`CustomGarlic`, `CustomHummus`, `CustomDentalFloss`, `CustomToothpaste`, `CustomCottonPads`, `CustomPasta`) appear in the icon browser and render correctly at `size=22` and `size=32` with `currentColor` stroke; SVG files exist under `frontend/src/assets/icons/custom/`; `npm run lint`, `npm run build`, and `npm test` pass.
 
 ---
 
@@ -138,6 +140,125 @@ npm test
 ```
 
 Confirm: no new lint errors; build does not warn about unresolved SVG imports; all registry tests pass.
+
+---
+
+---
+
+## T-004 — Add six new custom SVG icons (grocery & hygiene batch)
+
+### Context
+
+T-003 established the pattern: SVG file on disk → `?react` import → `normalizeCustomIcon()` wrapper → `ICON_REGISTRY` entry. T-004 adds six more icons following the same pattern exactly.
+
+### SVG file conventions (same as T-003)
+
+- `viewBox="0 0 24 24"`, no `width`/`height` on the `<svg>` root
+- `fill="none"` on the root `<svg>`
+- `stroke="currentColor"` on all stroked elements
+- `stroke-width` omitted on individual elements (set by the normalizer at render time)
+- `stroke-linecap="round"` and `stroke-linejoin="round"` on root or each element
+
+### Files to create / change
+
+| File | Action |
+|---|---|
+| `frontend/src/assets/icons/custom/garlic.svg` | **Create** |
+| `frontend/src/assets/icons/custom/hummus.svg` | **Create** |
+| `frontend/src/assets/icons/custom/dentalFloss.svg` | **Create** |
+| `frontend/src/assets/icons/custom/toothpaste.svg` | **Create** |
+| `frontend/src/assets/icons/custom/cottonPads.svg` | **Create** |
+| `frontend/src/assets/icons/custom/pasta.svg` | **Create** |
+| `frontend/src/data/customIcons.js` | **Extend** — add six imports and exports |
+| `frontend/src/data/iconRegistry.js` | **Extend** — add six registry entries |
+| `frontend/src/data/iconRegistry.test.js` | **Extend** — add resolveIconName + formatIconName assertions for all six |
+
+### SVG design briefs
+
+**`garlic.svg`** — garlic bulb:
+- Round bulb base with a slightly pointed top
+- 2–3 vertical curved lines across the bulb suggesting clove segments
+- Short stem/root lines at the top
+
+**`hummus.svg`** — bowl of hummus:
+- Wide shallow bowl (same arc style as `kornflakesBowl.svg`)
+- Smooth rounded mound of filling inside the bowl
+- Small oval depression in the centre of the mound (the olive-oil pool)
+
+**`dentalFloss.svg`** — dental floss dispenser:
+- Small rectangular box body (the dispenser)
+- Rounded corners on the box
+- A short curved strand of floss exiting from the top-centre of the box
+
+**`toothpaste.svg`** — toothpaste tube:
+- Elongated rounded tube body (horizontal or slightly diagonal)
+- Flat, rolled/crimped closed end at one side
+- Small cap shape at the other end
+- Optional: a short curved ribbon of paste emerging from the cap
+
+**`cottonPads.svg`** — stack of cotton pads:
+- Two or three flat ellipses stacked with slight vertical offset to show depth
+- Edges slightly irregular/soft (short tick marks or bumped curves) to suggest cotton texture
+
+**`pasta.svg`** — pasta / noodles:
+- Three wavy parallel horizontal lines (spaghetti strands) in the centre of the canvas
+- A simple fork silhouette to the right with 3 tines, partially behind the strands
+
+### Implementation steps
+
+1. **Create the six SVG files** following the design briefs and conventions above.
+
+2. **Extend `customIcons.js`** — add imports and exports (alphabetical within each block):
+
+   ```js
+   import CottonPadsSvg  from "../assets/icons/custom/cottonPads.svg?react";
+   import DentalFlossSvg from "../assets/icons/custom/dentalFloss.svg?react";
+   import GarlicSvg      from "../assets/icons/custom/garlic.svg?react";
+   import HummusSvg      from "../assets/icons/custom/hummus.svg?react";
+   import PastaSvg       from "../assets/icons/custom/pasta.svg?react";
+   import ToothpasteSvg  from "../assets/icons/custom/toothpaste.svg?react";
+
+   export const CustomCottonPads  = normalizeCustomIcon(CottonPadsSvg,  "CustomCottonPads");
+   export const CustomDentalFloss = normalizeCustomIcon(DentalFlossSvg, "CustomDentalFloss");
+   export const CustomGarlic      = normalizeCustomIcon(GarlicSvg,      "CustomGarlic");
+   export const CustomHummus      = normalizeCustomIcon(HummusSvg,      "CustomHummus");
+   export const CustomPasta       = normalizeCustomIcon(PastaSvg,       "CustomPasta");
+   export const CustomToothpaste  = normalizeCustomIcon(ToothpasteSvg,  "CustomToothpaste");
+   ```
+
+3. **Extend `iconRegistry.js`** — add imports and registry entries (alphabetical):
+
+   ```js
+   import {
+     CustomCottonPads,
+     CustomDentalFloss,
+     CustomGarlic,
+     CustomHummus,
+     CustomKornflakesBox,
+     CustomKornflakesBowl,
+     CustomPasta,
+     CustomToothpaste,
+   } from "./customIcons.js";
+
+   // In ICON_REGISTRY (alphabetical):
+   CustomCottonPads,
+   CustomDentalFloss,
+   CustomGarlic,
+   CustomHummus,
+   CustomPasta,
+   CustomToothpaste,
+   ```
+
+4. **Extend `iconRegistry.test.js`** — for each new key assert:
+   - `resolveIconName("CustomGarlic")` === `"CustomGarlic"` (and same for the other five)
+   - `formatIconName("CustomDentalFloss")` === `"Dental Floss"` (strip `Custom`, split camelCase)
+
+5. **Validate:**
+   ```bash
+   npm run lint
+   npm run build
+   npm test
+   ```
 
 ---
 
