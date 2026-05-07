@@ -38,7 +38,7 @@ describe("icon registry and database", () => {
     expect(EXACT_MATCH_MAP.wasser).toBe("IconDroplet");
     expect(EXACT_MATCH_MAP["toilet paper"]).toBe("IconToiletPaper");
     expect(EXACT_MATCH_MAP.toilettenpapier).toBe("IconToiletPaper");
-    expect(EXACT_MATCH_MAP.shampoo).toBe("IconFlask");
+    expect(EXACT_MATCH_MAP.shampoo).toBe("CustomShampoo");
     expect(EXACT_MATCH_MAP.zahnpasta).toBe("CustomToothpaste");
     expect(EXACT_MATCH_MAP["olive oil"]).toBe("IconBottle");
     expect(EXACT_MATCH_MAP["olivenöl"]).toBe("IconBottle");
@@ -141,6 +141,55 @@ describe("icon registry and database", () => {
       joghurt: "CustomYogurt",
       quark: "CustomQuark",
       speisequark: "CustomQuark"
+    };
+
+    for (const [term, iconName] of Object.entries(expectedMatches)) {
+      expect(EXACT_MATCH_MAP[term]).toBe(iconName);
+    }
+  });
+
+  it("routes drugstore and household exact matches to dedicated icons", () => {
+    const expectedMatches = {
+      shampoo: "CustomShampoo",
+      haarshampoo: "CustomShampoo",
+      conditioner: "CustomConditioner",
+      spülung: "CustomConditioner",
+      "body wash": "CustomBodyWash",
+      duschgel: "CustomBodyWash",
+      toothbrush: "CustomToothbrush",
+      zahnbürste: "CustomToothbrush",
+      mouthwash: "CustomMouthwash",
+      mundspülung: "CustomMouthwash",
+      "shaving cream": "CustomShavingCream",
+      rasiercreme: "CustomShavingCream",
+      sunscreen: "CustomSunscreen",
+      sonnencreme: "CustomSunscreen",
+      "after sun": "CustomAfterSun",
+      aftersun: "CustomAfterSun",
+      diapers: "CustomDiapers",
+      windeln: "CustomDiapers",
+      "glasses cleaner": "CustomGlassesCleaner",
+      brillenreiniger: "CustomGlassesCleaner",
+      "cleaning cloth": "CustomCleaningCloth",
+      putztuch: "CustomCleaningCloth",
+      "storage bags": "CustomStorageBags",
+      frischhaltebeutel: "CustomStorageBags",
+      "baking paper": "CustomBakingPaper",
+      backpapier: "CustomBakingPaper",
+      foil: "CustomFoil",
+      alufolie: "CustomFoil",
+      mop: "CustomMop",
+      wischmopp: "CustomMop",
+      sponge: "CustomSponge",
+      schwamm: "CustomSponge",
+      "hand soap": "CustomHandSoap",
+      handseife: "CustomHandSoap",
+      "fabric softener": "CustomFabricSoftener",
+      weichspüler: "CustomFabricSoftener",
+      detergent: "CustomDetergent",
+      waschmittel: "CustomDetergent",
+      "paper towels": "CustomPaperTowels",
+      küchenrolle: "CustomPaperTowels"
     };
 
     for (const [term, iconName] of Object.entries(expectedMatches)) {

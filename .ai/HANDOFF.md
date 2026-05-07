@@ -350,3 +350,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
 | Commit | `feat(icons): add dedicated food and produce icons` |
 | Next Role | none |
+
+---
+
+### T-008 — implement — 2026-05-07T14:11:30Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added dedicated drugstore and household icon coverage with 20 custom SVG icons including the missing Tabler mop fallback, registry entries, exact-match DB redirects, and documentation for dedicated household suggestions. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/assets/icons/custom/afterSun.svg`, `frontend/src/assets/icons/custom/bakingPaper.svg`, `frontend/src/assets/icons/custom/bodyWash.svg`, `frontend/src/assets/icons/custom/cleaningCloth.svg`, `frontend/src/assets/icons/custom/conditioner.svg`, `frontend/src/assets/icons/custom/detergent.svg`, `frontend/src/assets/icons/custom/diapers.svg`, `frontend/src/assets/icons/custom/fabricSoftener.svg`, `frontend/src/assets/icons/custom/foil.svg`, `frontend/src/assets/icons/custom/glassesCleaner.svg`, `frontend/src/assets/icons/custom/handSoap.svg`, `frontend/src/assets/icons/custom/mop.svg`, `frontend/src/assets/icons/custom/mouthwash.svg`, `frontend/src/assets/icons/custom/paperTowels.svg`, `frontend/src/assets/icons/custom/shampoo.svg`, `frontend/src/assets/icons/custom/shavingCream.svg`, `frontend/src/assets/icons/custom/sponge.svg`, `frontend/src/assets/icons/custom/storageBags.svg`, `frontend/src/assets/icons/custom/sunscreen.svg`, `frontend/src/assets/icons/custom/toothbrush.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconDatabase.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `frontend/src/utils/cosineSimilarity.test.js` |
+| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run test --workspace frontend -- cosineSimilarity.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval and chunk-size warnings; `npm test` PASS |
+| Package Icon Check | Tabler export absent and implemented as custom fallback: `IconMop` -> `CustomMop` |
+| Commit | `feat(icons): add dedicated drugstore and household icons` |
+| Next Role | review |
+
+### T-008 — review — 2026-05-07T15:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-008 Drugstore & Household icon set: verified all 20 custom SVGs follow conventions (IconMop absent from tabler, CustomMop created as fallback), DB redirects correct for all 20 entries, README updated, all validations pass. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-008 — implement — 2026-05-07T15:47:31Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-008 dedicated drugstore and household icon changes. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/assets/icons/custom/afterSun.svg`, `frontend/src/assets/icons/custom/bakingPaper.svg`, `frontend/src/assets/icons/custom/bodyWash.svg`, `frontend/src/assets/icons/custom/cleaningCloth.svg`, `frontend/src/assets/icons/custom/conditioner.svg`, `frontend/src/assets/icons/custom/detergent.svg`, `frontend/src/assets/icons/custom/diapers.svg`, `frontend/src/assets/icons/custom/fabricSoftener.svg`, `frontend/src/assets/icons/custom/foil.svg`, `frontend/src/assets/icons/custom/glassesCleaner.svg`, `frontend/src/assets/icons/custom/handSoap.svg`, `frontend/src/assets/icons/custom/mop.svg`, `frontend/src/assets/icons/custom/mouthwash.svg`, `frontend/src/assets/icons/custom/paperTowels.svg`, `frontend/src/assets/icons/custom/shampoo.svg`, `frontend/src/assets/icons/custom/shavingCream.svg`, `frontend/src/assets/icons/custom/sponge.svg`, `frontend/src/assets/icons/custom/storageBags.svg`, `frontend/src/assets/icons/custom/sunscreen.svg`, `frontend/src/assets/icons/custom/toothbrush.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconDatabase.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `frontend/src/utils/cosineSimilarity.test.js` |
+| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
+| Commit | `feat(icons): add dedicated drugstore and household icons` |
+| Next Role | none |

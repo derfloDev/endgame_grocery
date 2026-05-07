@@ -297,3 +297,48 @@ All acceptance criteria met:
 #### Risks
 
 None identified.
+
+---
+
+## T-008 — Drugstore & Household: 20 custom SVG icons
+
+**verdict:** PASS
+
+### Findings
+
+None.
+
+### Verification
+
+#### Steps performed
+
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` before starting review.
+2. Checked tabler availability: `IconMop` absent — correctly implemented as `CustomMop` custom SVG per plan fallback requirement.
+3. Ran `git status` and `git diff HEAD` to enumerate all changes:
+   - 20 new SVG files under `frontend/src/assets/icons/custom/` (AfterSun, BakingPaper, BodyWash, CleaningCloth, Conditioner, Detergent, Diapers, FabricSoftener, Foil, GlassesCleaner, HandSoap, Mop, Mouthwash, PaperTowels, Shampoo, ShavingCream, Sponge, StorageBags, Sunscreen, Toothbrush).
+   - `customIcons.js`: 20 new imports and `normalizeCustomIcon()` exports (alphabetical).
+   - `iconRegistry.js`: 20 new `Custom*` entries in `ICON_REGISTRY` and import block (alphabetical).
+   - `iconDatabase.js`: 20 DB redirects (shampoo → `CustomShampoo`, conditioner → `CustomConditioner`, body wash → `CustomBodyWash`, toothbrush → `CustomToothbrush`, mouthwash → `CustomMouthwash`, shaving cream → `CustomShavingCream`, sunscreen → `CustomSunscreen`, after sun → `CustomAfterSun`, diapers → `CustomDiapers`, glasses cleaner → `CustomGlassesCleaner`, cleaning cloth → `CustomCleaningCloth`, storage bags → `CustomStorageBags`, baking paper → `CustomBakingPaper`, foil → `CustomFoil`, mop → `CustomMop`, sponge → `CustomSponge`, hand soap → `CustomHandSoap`, fabric softener → `CustomFabricSoftener`, detergent → `CustomDetergent`, paper towels → `CustomPaperTowels`) with enriched tags (≥5 per entry).
+   - `iconRegistry.test.js`: new `resolveIconName` test for all 20 icons, `formatIconName` assertions, render tests at size=22 and size=32 for all 20 custom icons.
+   - `cosineSimilarity.test.js`: updated `shampoo` assertion (was `IconFlask`, now `CustomShampoo`); new `"routes drugstore and household exact matches to dedicated icons"` test with 40 key-value checks.
+   - `README.md`: documentation updated to mention drugstore and household dedicated icons.
+4. Inspected all 20 SVG files: all use `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root; no `stroke-width` on individual elements; no `width`/`height` attributes. Conventions correct.
+5. Ran `npm run lint` → 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unrelated).
+6. Ran `npm run build` → success, no errors.
+7. Ran `npx vitest run --environment jsdom src/data/iconRegistry.test.js` → 134 passed, 0 fail.
+8. Ran `npx vitest run --environment jsdom src/utils/cosineSimilarity.test.js` → 12 passed, 0 fail.
+
+#### Findings
+
+All acceptance criteria met:
+- All 20 icons resolvable from the registry (20 custom SVGs; `CustomMop` created as fallback since `IconMop` absent from tabler).
+- All custom icons render at size=22 and size=32 with `currentColor` stroke.
+- SVG files present under `frontend/src/assets/icons/custom/`.
+- `formatIconName` strips `Custom` prefix correctly for all 20 icons.
+- DB redirects in place for all 20 entries with ≥5 tags each.
+- README documentation updated to reflect expanded icon coverage.
+- Lint, build, and tests pass.
+
+#### Risks
+
+None identified.
