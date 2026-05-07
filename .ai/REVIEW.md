@@ -253,3 +253,47 @@ Reviewed: 2026-05-07
 
 #### Verdict
 `PASS`
+
+---
+
+## T-007 — Food & Produce: 19 custom SVG icons
+
+**verdict:** PASS
+
+### Findings
+
+None.
+
+### Verification
+
+#### Steps performed
+
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` before starting review.
+2. Checked tabler/lucide availability: `IconBaguette` present in `@tabler/icons-react`; `IconChocolate`, `IconFries`, `IconTomato` absent — correctly implemented as custom SVGs per plan fallback requirement.
+3. Ran `git diff HEAD` and `git status` to enumerate all changes:
+   - 18 new SVG files under `frontend/src/assets/icons/custom/` (BellPepper, BreadRoll, Butter, Chips, Chocolate, Cream, Cucumber, Fries, FrozenBerries, FrozenVegetables, Jam, Onion, PastaSauce, Potato, Quark, Rice, Tomato, Yogurt).
+   - `customIcons.js`: 18 new imports and `normalizeCustomIcon()` exports.
+   - `iconRegistry.js`: `IconBaguette` added to tabler import block; 18 new `Custom*` entries in `ICON_REGISTRY`.
+   - `iconDatabase.js`: 19 DB redirects (e.g., tomato → `CustomTomato`, baguette → `IconBaguette`, chocolate → `CustomChocolate`) with enriched tags (≥5 per entry).
+   - `iconRegistry.test.js`: new `resolveIconName` test for all 19 icons, `formatIconName` assertions, render tests at size=22 and size=32 for all 18 custom icons.
+   - `cosineSimilarity.test.js`: updated `chocolate`/`schokolade` assertions; new `"routes food and produce exact matches to dedicated icons"` test with 36 key-value checks.
+4. Inspected all 18 SVG files: all use `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root; no `stroke-width` on individual elements; no `width`/`height` attributes. Conventions correct.
+5. Ran `npm run lint` → 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unrelated).
+6. Ran `npm run build` → success, no errors.
+7. Ran `npm test` (full suite, backend) → 106 pass, 0 fail.
+8. Ran `npx vitest run --environment jsdom src/data/iconRegistry.test.js` → 93 pass, 0 fail.
+9. Ran `npx vitest run --environment jsdom src/utils/cosineSimilarity.test.js` → 11 pass, 0 fail.
+
+#### Findings
+
+All acceptance criteria met:
+- All 19 icons resolvable from the registry (18 custom + `IconBaguette` from tabler).
+- All custom icons render at size=22 and size=32 with `currentColor` stroke.
+- SVG files present under `frontend/src/assets/icons/custom/`.
+- `formatIconName` strips `Custom` prefix correctly.
+- DB redirects in place for all 19 entries.
+- Lint, build, and tests pass.
+
+#### Risks
+
+None identified.

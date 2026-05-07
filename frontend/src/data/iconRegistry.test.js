@@ -90,6 +90,36 @@ describe("resolveIconName", () => {
     }
   });
 
+  it("includes the food and produce icon set in selectable registry keys", () => {
+    const foodIconNames = [
+      "CustomBellPepper",
+      "CustomBreadRoll",
+      "CustomButter",
+      "CustomChips",
+      "CustomChocolate",
+      "CustomCream",
+      "CustomCucumber",
+      "CustomFries",
+      "CustomFrozenBerries",
+      "CustomFrozenVegetables",
+      "CustomJam",
+      "CustomOnion",
+      "CustomPastaSauce",
+      "CustomPotato",
+      "CustomQuark",
+      "CustomRice",
+      "CustomTomato",
+      "CustomYogurt",
+      "IconBaguette"
+    ];
+
+    for (const iconName of foodIconNames) {
+      expect(ICON_REGISTRY[iconName]).toBeTruthy();
+      expect(ICON_REGISTRY_KEYS).toContain(iconName);
+      expect(resolveIconName(iconName)).toBe(iconName);
+    }
+  });
+
   it("returns null for unknown names without aliases", () => {
     expect(resolveIconName("IconDoesNotExist")).toBeNull();
   });
@@ -112,56 +142,97 @@ describe("formatIconName", () => {
     expect(formatIconName("ForkKnife")).toBe("Fork Knife");
     expect(formatIconName("Banana")).toBe("Banana");
     expect(formatIconName("CustomBlueberries")).toBe("Blueberries");
+    expect(formatIconName("CustomBellPepper")).toBe("Bell Pepper");
+    expect(formatIconName("IconBaguette")).toBe("Baguette");
+    expect(formatIconName("CustomBreadRoll")).toBe("Bread Roll");
+    expect(formatIconName("CustomButter")).toBe("Butter");
+    expect(formatIconName("CustomChips")).toBe("Chips");
+    expect(formatIconName("CustomChocolate")).toBe("Chocolate");
+    expect(formatIconName("CustomCream")).toBe("Cream");
     expect(formatIconName("CustomCan")).toBe("Can");
     expect(formatIconName("IconBowlChopsticks")).toBe("Bowl Chopsticks");
     expect(formatIconName("CustomCottonPads")).toBe("Cotton Pads");
     expect(formatIconName("CustomCottonSwabs")).toBe("Cotton Swabs");
+    expect(formatIconName("CustomCucumber")).toBe("Cucumber");
     expect(formatIconName("CustomCreamJar")).toBe("Cream Jar");
     expect(formatIconName("CustomCreamTube")).toBe("Cream Tube");
     expect(formatIconName("CustomDentalFloss")).toBe("Dental Floss");
     expect(formatIconName("CustomELiquid")).toBe("E Liquid");
+    expect(formatIconName("CustomFries")).toBe("Fries");
+    expect(formatIconName("CustomFrozenBerries")).toBe("Frozen Berries");
+    expect(formatIconName("CustomFrozenVegetables")).toBe("Frozen Vegetables");
     expect(formatIconName("CustomGarlic")).toBe("Garlic");
     expect(formatIconName("CustomHummus")).toBe("Hummus");
     expect(formatIconName("CustomInterdentalSticks")).toBe("Interdental Sticks");
+    expect(formatIconName("CustomJam")).toBe("Jam");
     expect(formatIconName("CustomKiwi")).toBe("Kiwi");
     expect(formatIconName("CustomKornflakesBowl")).toBe("Kornflakes Bowl");
     expect(formatIconName("CustomKornflakesBox")).toBe("Kornflakes Box");
     expect(formatIconName("CustomMango")).toBe("Mango");
+    expect(formatIconName("CustomOnion")).toBe("Onion");
     expect(formatIconName("CustomPasta")).toBe("Pasta");
+    expect(formatIconName("CustomPastaSauce")).toBe("Pasta Sauce");
     expect(formatIconName("CustomPants")).toBe("Pants");
     expect(formatIconName("CustomPeach")).toBe("Peach");
     expect(formatIconName("CustomPineapple")).toBe("Pineapple");
     expect(formatIconName("CustomPlum")).toBe("Plum");
+    expect(formatIconName("CustomPotato")).toBe("Potato");
+    expect(formatIconName("CustomQuark")).toBe("Quark");
+    expect(formatIconName("CustomRice")).toBe("Rice");
+    expect(formatIconName("CustomTomato")).toBe("Tomato");
     expect(formatIconName("CustomToothpaste")).toBe("Toothpaste");
     expect(formatIconName("CustomWatermelon")).toBe("Watermelon");
     expect(formatIconName("CustomWetWipes")).toBe("Wet Wipes");
+    expect(formatIconName("CustomYogurt")).toBe("Yogurt");
   });
 });
 
 describe("custom icons", () => {
   it.each([
+    ["CustomBellPepper", 22],
+    ["CustomBellPepper", 32],
     ["CustomBlueberries", 22],
     ["CustomBlueberries", 32],
+    ["CustomBreadRoll", 22],
+    ["CustomBreadRoll", 32],
+    ["CustomButter", 22],
+    ["CustomButter", 32],
     ["CustomCan", 22],
     ["CustomCan", 32],
+    ["CustomChips", 22],
+    ["CustomChips", 32],
+    ["CustomChocolate", 22],
+    ["CustomChocolate", 32],
     ["CustomCottonPads", 22],
     ["CustomCottonPads", 32],
     ["CustomCottonSwabs", 22],
     ["CustomCottonSwabs", 32],
+    ["CustomCream", 22],
+    ["CustomCream", 32],
     ["CustomCreamJar", 22],
     ["CustomCreamJar", 32],
     ["CustomCreamTube", 22],
     ["CustomCreamTube", 32],
+    ["CustomCucumber", 22],
+    ["CustomCucumber", 32],
     ["CustomDentalFloss", 22],
     ["CustomDentalFloss", 32],
     ["CustomELiquid", 22],
     ["CustomELiquid", 32],
+    ["CustomFries", 22],
+    ["CustomFries", 32],
+    ["CustomFrozenBerries", 22],
+    ["CustomFrozenBerries", 32],
+    ["CustomFrozenVegetables", 22],
+    ["CustomFrozenVegetables", 32],
     ["CustomGarlic", 22],
     ["CustomGarlic", 32],
     ["CustomHummus", 22],
     ["CustomHummus", 32],
     ["CustomInterdentalSticks", 22],
     ["CustomInterdentalSticks", 32],
+    ["CustomJam", 22],
+    ["CustomJam", 32],
     ["CustomKiwi", 22],
     ["CustomKiwi", 32],
     ["CustomKornflakesBowl", 22],
@@ -170,8 +241,12 @@ describe("custom icons", () => {
     ["CustomKornflakesBox", 32],
     ["CustomMango", 22],
     ["CustomMango", 32],
+    ["CustomOnion", 22],
+    ["CustomOnion", 32],
     ["CustomPasta", 22],
     ["CustomPasta", 32],
+    ["CustomPastaSauce", 22],
+    ["CustomPastaSauce", 32],
     ["CustomPants", 22],
     ["CustomPants", 32],
     ["CustomPeach", 22],
@@ -180,12 +255,22 @@ describe("custom icons", () => {
     ["CustomPineapple", 32],
     ["CustomPlum", 22],
     ["CustomPlum", 32],
+    ["CustomPotato", 22],
+    ["CustomPotato", 32],
+    ["CustomQuark", 22],
+    ["CustomQuark", 32],
+    ["CustomRice", 22],
+    ["CustomRice", 32],
+    ["CustomTomato", 22],
+    ["CustomTomato", 32],
     ["CustomToothpaste", 22],
     ["CustomToothpaste", 32],
     ["CustomWatermelon", 22],
     ["CustomWatermelon", 32],
     ["CustomWetWipes", 22],
-    ["CustomWetWipes", 32]
+    ["CustomWetWipes", 32],
+    ["CustomYogurt", 22],
+    ["CustomYogurt", 32]
   ])("renders %s at the requested size with currentColor stroke", (iconName, size) => {
     const CustomIcon = ICON_REGISTRY[iconName];
 

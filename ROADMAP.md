@@ -22,7 +22,9 @@ Objective: Make the icon suggestion system find the right icon for any common in
 - Redirect "garlic" and "pasta" DB entries to the dedicated custom icons.
 - Enrich every existing `iconDatabase.js` entry across all categories with additional German and English tags (target ≥ 5 tags per entry).
 
-## Priority 5 — Expanded icon set: clothing, fruit, hygiene & misc (T-006)
+## Priority 5 — Expanded icon set: clothing, fruit, hygiene & misc ✅ done (T-006 / T-005)
+
+## Priority 6 — Replace generic icons with dedicated custom icons
 
 Objective: Cover product categories not yet represented in the icon browser.
 
@@ -62,3 +64,21 @@ Objective: Cover product categories not yet represented in the icon browser.
 | Knopfzellen | `IconBattery` | Add DB entry |
 
 All T-006 icons receive `iconDatabase.js` entries with German + English tags within the same task.
+
+## Priority 6 — Replace generic icons with dedicated custom icons
+
+Objective: Replace all DB entries that use a generic/mismatched icon with a dedicated custom SVG. Each custom icon also redirects its existing DB entry and receives enriched tags.
+
+### T-007 — Food & Produce (19 custom icons)
+
+Replaces generic icons for: Tomato, Cucumber, BellPepper, Onion, Potato, BreadRoll, Baguette, Rice, Jam, PastaSauce, Chips, Fries, Chocolate, FrozenVegetables, FrozenBerries, Butter, Cream, Yogurt, Quark.
+
+Tabler candidates to verify first (custom SVG fallback if absent): `IconChocolate`, `IconFries`, `IconBaguette`, `IconTomato`.
+
+### T-008 — Drugstore & Household (19 custom icons)
+
+Replaces generic icons for: Shampoo, Conditioner, BodyWash, Toothbrush, Mouthwash, ShavingCream, Sunscreen, AfterSun, Diapers, GlassesCleaner, CleaningCloth, StorageBags, BakingPaper, Foil, Sponge, HandSoap, FabricSoftener, Detergent, PaperTowels.
+
+Tabler candidate to verify first (custom SVG fallback if absent): `IconMop`.
+
+Each task delivers: SVG files + `customIcons.js` exports + `iconRegistry.js` entries + DB redirects + enriched tags + `iconRegistry.test.js` assertions.

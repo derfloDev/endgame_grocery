@@ -42,8 +42,8 @@ describe("icon registry and database", () => {
     expect(EXACT_MATCH_MAP.zahnpasta).toBe("CustomToothpaste");
     expect(EXACT_MATCH_MAP["olive oil"]).toBe("IconBottle");
     expect(EXACT_MATCH_MAP["olivenöl"]).toBe("IconBottle");
-    expect(EXACT_MATCH_MAP.chocolate).toBe("IconCandy");
-    expect(EXACT_MATCH_MAP.schokolade).toBe("IconCandy");
+    expect(EXACT_MATCH_MAP.chocolate).toBe("CustomChocolate");
+    expect(EXACT_MATCH_MAP.schokolade).toBe("CustomChocolate");
     expect(EXACT_MATCH_MAP.croissant).toBe("Croissant");
     expect(EXACT_MATCH_MAP.schinken).toBe("Ham");
     expect(EXACT_MATCH_MAP.shrimp).toBe("Shrimp");
@@ -97,6 +97,50 @@ describe("icon registry and database", () => {
       "e-liquid": "CustomELiquid",
       "t-shirt": "IconShirt",
       knopfzelle: "IconBattery"
+    };
+
+    for (const [term, iconName] of Object.entries(expectedMatches)) {
+      expect(EXACT_MATCH_MAP[term]).toBe(iconName);
+    }
+  });
+
+  it("routes food and produce exact matches to dedicated icons", () => {
+    const expectedMatches = {
+      tomato: "CustomTomato",
+      paradeiser: "CustomTomato",
+      cucumber: "CustomCucumber",
+      gurke: "CustomCucumber",
+      "bell pepper": "CustomBellPepper",
+      paprika: "CustomBellPepper",
+      onion: "CustomOnion",
+      zwiebel: "CustomOnion",
+      potato: "CustomPotato",
+      kartoffel: "CustomPotato",
+      "bread roll": "CustomBreadRoll",
+      broetchen: "CustomBreadRoll",
+      baguette: "IconBaguette",
+      reis: "CustomRice",
+      jam: "CustomJam",
+      marmelade: "CustomJam",
+      "pasta sauce": "CustomPastaSauce",
+      pastasauce: "CustomPastaSauce",
+      chips: "CustomChips",
+      kartoffelchips: "CustomChips",
+      fries: "CustomFries",
+      pommes: "CustomFries",
+      chocolate: "CustomChocolate",
+      schokolade: "CustomChocolate",
+      "frozen vegetables": "CustomFrozenVegetables",
+      "tiefkühlgemüse": "CustomFrozenVegetables",
+      "frozen berries": "CustomFrozenBerries",
+      "tiefkühlbeeren": "CustomFrozenBerries",
+      butter: "CustomButter",
+      cream: "CustomCream",
+      sahne: "CustomCream",
+      yogurt: "CustomYogurt",
+      joghurt: "CustomYogurt",
+      quark: "CustomQuark",
+      speisequark: "CustomQuark"
     };
 
     for (const [term, iconName] of Object.entries(expectedMatches)) {

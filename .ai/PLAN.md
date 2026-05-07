@@ -10,14 +10,17 @@ Goal: Extend the icon registry with additional tabler/lucide icons and introduce
 - T-002: Initial custom icon infrastructure (JS-embedded paths) ✅ done — superseded by T-003
 - T-003: Refactor custom icon system to use filesystem SVG files via `vite-plugin-svgr` ✅ done
 - T-004: Add six new custom SVG icons (Garlic, Hummus, DentalFloss, Toothpaste, CottonPads, Pasta) ✅ done
-- T-006: Expanded icon set — seven tabler/lucide candidates + eleven custom SVGs (registry only, no DB entries)
-- T-005: Comprehensive `iconDatabase.js` enrichment — covers all icons from T-001–T-006; runs after T-006
+- T-006: Expanded icon set — seven tabler/lucide candidates + eleven custom SVGs (registry only, no DB entries) ✅ done
+- T-005: Comprehensive `iconDatabase.js` enrichment — covers all icons from T-001–T-006 ✅ done
+- T-007: Food & Produce custom icons — 19 dedicated SVGs replacing generic icons, with DB redirects
+- T-008: Drugstore & Household custom icons — 19 dedicated SVGs replacing generic icons, with DB redirects
 
 ## Acceptance Criteria
 
-- T-001–T-004: ✅ done
-- T-006: All new icons appear in the icon browser; tabler/lucide icons imported correctly (custom SVG fallback where absent); all eleven custom SVGs render at `size=22` and `size=32` with `currentColor` stroke; `npm run lint`, `npm run build`, and `npm test` pass.
-- T-005 (depends on T-006 being done): All icons from T-001–T-006 have DB entries and appear as suggestions; "garlic"/"knoblauch" resolves to `CustomGarlic`; "pasta"/"nudeln" resolves to `CustomPasta`; "grapes" resolves to `IconGrape`; every existing entry has ≥ 5 tags; `npm run lint`, `npm run build`, and `npm test` pass.
+- T-001–T-006: ✅ done
+- T-005: ✅ done
+- T-007: All 19 Food & Produce custom icons appear in the icon browser; each renders at `size=22` and `size=32` with `currentColor` stroke; existing DB entries for each label point to the new custom icon; `npm run lint`, `npm run build`, and `npm test` pass.
+- T-008: All 19 Drugstore & Household custom icons appear in the icon browser; each renders at `size=22` and `size=32` with `currentColor` stroke; existing DB entries for each label point to the new custom icon; `npm run lint`, `npm run build`, and `npm test` pass.
 
 ---
 
@@ -535,3 +538,251 @@ npm run lint
 npm run build
 npm test
 ```
+
+---
+
+## T-007 — Food & Produce custom icons (19 icons)
+
+### Context
+
+Many food/produce DB entries point to generic or unrelated icons. T-007 creates dedicated custom SVGs for each item, redirects the existing DB entry to the new icon, and enriches tags.
+
+### Tabler candidates to verify first
+
+| Item | Candidate | Fallback |
+|---|---|---|
+| Chocolate | tabler `IconChocolate` | `CustomChocolate` |
+| Fries | tabler `IconFries` | `CustomFries` |
+| Baguette | tabler `IconBaguette` | `CustomBaguette` |
+| Tomato | tabler `IconTomato` | `CustomTomato` |
+
+If a tabler icon is found: add it to the tabler import block in `iconRegistry.js` and use it as the DB redirect target. If absent: create the custom SVG.
+
+### Files to create / change
+
+| File | Action |
+|---|---|
+| `frontend/src/assets/icons/custom/tomato.svg` | **Create** (if tabler absent) |
+| `frontend/src/assets/icons/custom/cucumber.svg` | **Create** |
+| `frontend/src/assets/icons/custom/bellPepper.svg` | **Create** |
+| `frontend/src/assets/icons/custom/onion.svg` | **Create** |
+| `frontend/src/assets/icons/custom/potato.svg` | **Create** |
+| `frontend/src/assets/icons/custom/breadRoll.svg` | **Create** |
+| `frontend/src/assets/icons/custom/baguette.svg` | **Create** (if tabler absent) |
+| `frontend/src/assets/icons/custom/rice.svg` | **Create** |
+| `frontend/src/assets/icons/custom/jam.svg` | **Create** |
+| `frontend/src/assets/icons/custom/pastaSauce.svg` | **Create** |
+| `frontend/src/assets/icons/custom/chips.svg` | **Create** |
+| `frontend/src/assets/icons/custom/fries.svg` | **Create** (if tabler absent) |
+| `frontend/src/assets/icons/custom/chocolate.svg` | **Create** (if tabler absent) |
+| `frontend/src/assets/icons/custom/frozenVegetables.svg` | **Create** |
+| `frontend/src/assets/icons/custom/frozenBerries.svg` | **Create** |
+| `frontend/src/assets/icons/custom/butter.svg` | **Create** |
+| `frontend/src/assets/icons/custom/cream.svg` | **Create** |
+| `frontend/src/assets/icons/custom/yogurt.svg` | **Create** |
+| `frontend/src/assets/icons/custom/quark.svg` | **Create** |
+| `frontend/src/data/customIcons.js` | **Extend** — imports + exports for all custom icons |
+| `frontend/src/data/iconRegistry.js` | **Extend** — tabler imports (if found) + custom registry entries |
+| `frontend/src/data/iconDatabase.js` | **Extend** — redirect existing DB entries + enrich tags |
+| `frontend/src/data/iconRegistry.test.js` | **Extend** — assertions for all new registry keys |
+
+### SVG conventions (same as T-003/T-004/T-006)
+
+- `viewBox="0 0 24 24"`, no `width`/`height` on `<svg>` root
+- `fill="none"` on root `<svg>`
+- `stroke="currentColor"` on all stroked elements
+- `stroke-width` omitted on elements (set by normalizer)
+- `stroke-linecap="round"` and `stroke-linejoin="round"` on root or each element
+
+### SVG design briefs
+
+`tomato.svg` — round tomato body, small five-point calyx star at top, short stem
+
+`cucumber.svg` — elongated slightly tapered oval, short stem at one end, two or three faint vertical lines suggesting skin texture
+
+`bellPepper.svg` — three-lobed blocky bell pepper outline viewed slightly from above, short stem with two small leaves
+
+`onion.svg` — round bulb with two or three concentric arcs suggesting layers, small dried roots at the bottom, short stem at top
+
+`potato.svg` — irregular lumpy oval outline with two or three small dimple/eye marks on the surface
+
+`breadRoll.svg` — round bun shape with a single curved score line across the top and a hint of a flat base
+
+`baguette.svg` — long thin loaf (landscape orientation), three or four diagonal score lines along the top
+
+`rice.svg` — small rounded bowl viewed slightly from the side, a few small oval grain shapes peeking above the rim
+
+`jam.svg` — wide-mouth glass jar with a screw lid, a small label rectangle on the front, optional bow-tie or fruit silhouette on the label
+
+`pastaSauce.svg` — tall cylindrical glass jar with a metal lid, slightly tapered, a small label on the front
+
+`chips.svg` — a sealed snack bag (wider in the middle, pinched at top and bottom), a single curved chip/crisp shape on the front
+
+`fries.svg` — a folded cardboard fry holder/cup with several vertical fry sticks protruding from the top
+
+`chocolate.svg` — a rectangular chocolate bar with a 3×2 grid of segment lines embossed on the surface
+
+`frozenVegetables.svg` — a rectangular pouch/bag with a small snowflake in the upper area and a simple broccoli or mixed-vegetable silhouette in the lower area
+
+`frozenBerries.svg` — same bag style as frozenVegetables with a small snowflake and a cluster of three small circle-berries
+
+`butter.svg` — a rectangular block/pat of butter with a wrapper partially folded back at one end, showing the block inside
+
+`cream.svg` — a small carton (like a cream carton) with a triangular gable top and a pouring lip at one corner
+
+`yogurt.svg` — a short cylindrical pot with a flat foil lid, the lid slightly peeled back at one corner
+
+`quark.svg` — a wider, shorter tub (like a fromage frais pot) with a flat lid, slightly more squat than the yogurt
+
+### DB redirects and tag enrichment
+
+For each item below, update the existing `iconDatabase.js` entry to point to the new icon and enrich tags:
+
+| Label | Old icon | New icon | Additional tags to add |
+|---|---|---|---|
+| tomato | `IconSalad` | `CustomTomato` / `IconTomato` | paradeiser, cocktailtomaten, rispentomaten, kirschtomaten, cherry tomatoes |
+| cucumber | `IconSalad` | `CustomCucumber` | gurke, gurken, mini gurke, snackgurke, salat |
+| bell pepper | `IconPepper` | `CustomBellPepper` | paprika, paprikaschote, rote paprika, grüne paprika, gelbe paprika |
+| onion | `IconLeaf2` | `CustomOnion` | zwiebel, zwiebeln, schalotte, frühlingszwiebel, rote zwiebel |
+| potato | `IconCarrot` | `CustomPotato` | kartoffel, kartoffeln, erdäpfel, süßkartoffel |
+| bread roll | `IconBread` | `CustomBreadRoll` | brötchen, broetchen, semmel, schrippe, wecken |
+| baguette | `IconBread` | `CustomBaguette` / `IconBaguette` | baguette, franzosenbrot, weißbrot stange |
+| rice | `IconCup` | `CustomRice` | reis, basmatireis, langkornreis, vollkornreis, risotto |
+| jam | `IconCherry` | `CustomJam` | marmelade, konfitüre, konfituere, erdbeermarmelade, fruchtaufstrich |
+| pasta sauce | `IconBottle` | `CustomPastaSauce` | pastasauce, tomatensoße, arrabiata, bolognese, pesto |
+| chips | `IconBurger` | `CustomChips` | kartoffelchips, chips, crisps, pringles |
+| fries | `IconBurger` | `CustomFries` / `IconFries` | pommes, pommes frites, fritten, french fries |
+| chocolate | `IconCandy` | `CustomChocolate` / `IconChocolate` | schokolade, tafelschokolade, milchschokolade, zartbitterschokolade |
+| frozen vegetables | `IconSnowflake` | `CustomFrozenVegetables` | tiefkühlgemüse, tk gemüse, gefrorenes gemüse, erbsen |
+| frozen berries | `IconSnowflake` | `CustomFrozenBerries` | tiefkühlbeeren, tk beeren, gefrorene früchte |
+| cream | `IconBottle` | `CustomCream` | sahne, schlagsahne, obers, kaffeesahne, kokosmilch |
+| yogurt | `IconMilkshake` | `CustomYogurt` | joghurt, naturjoghurt, fruchtjoghurt, skyr |
+| butter | `IconBottle` | `CustomButter` | butter, süßrahmbutter, salzbutter, margarine |
+| quark | `IconCheese` | `CustomQuark` | quark, speisequark, magerquark, frischkäse |
+
+### Implementation steps
+
+1. Verify four tabler candidates; for each found, add to tabler import block. For each absent, create custom SVG.
+2. Create all required custom SVG files (up to 19) following design briefs and conventions.
+3. Extend `customIcons.js` with imports and `normalizeCustomIcon()` exports (alphabetical).
+4. Extend `iconRegistry.js` with new registry entries (alphabetical).
+5. Update `iconDatabase.js`: redirect each existing entry's `icon` field, add the new tags from the table above.
+6. Extend `iconRegistry.test.js` with `resolveIconName` assertions for all new registry keys.
+7. Validate: `npm run lint && npm run build && npm test`.
+
+---
+
+## T-008 — Drugstore & Household custom icons (19 icons)
+
+### Context
+
+Drugstore and household DB entries mostly share three generic icons (`IconWash`, `IconDental`, `IconRazor`). T-008 gives each product category its own recognisable custom icon.
+
+### Tabler candidate to verify first
+
+| Item | Candidate | Fallback |
+|---|---|---|
+| Mop | tabler `IconMop` | `CustomMop` |
+
+### Files to create / change
+
+| File | Action |
+|---|---|
+| `frontend/src/assets/icons/custom/shampoo.svg` | **Create** |
+| `frontend/src/assets/icons/custom/conditioner.svg` | **Create** |
+| `frontend/src/assets/icons/custom/bodyWash.svg` | **Create** |
+| `frontend/src/assets/icons/custom/toothbrush.svg` | **Create** |
+| `frontend/src/assets/icons/custom/mouthwash.svg` | **Create** |
+| `frontend/src/assets/icons/custom/shavingCream.svg` | **Create** |
+| `frontend/src/assets/icons/custom/sunscreen.svg` | **Create** |
+| `frontend/src/assets/icons/custom/afterSun.svg` | **Create** |
+| `frontend/src/assets/icons/custom/diapers.svg` | **Create** |
+| `frontend/src/assets/icons/custom/glassesCleaner.svg` | **Create** |
+| `frontend/src/assets/icons/custom/cleaningCloth.svg` | **Create** |
+| `frontend/src/assets/icons/custom/storageBags.svg` | **Create** |
+| `frontend/src/assets/icons/custom/bakingPaper.svg` | **Create** |
+| `frontend/src/assets/icons/custom/foil.svg` | **Create** |
+| `frontend/src/assets/icons/custom/sponge.svg` | **Create** |
+| `frontend/src/assets/icons/custom/handSoap.svg` | **Create** |
+| `frontend/src/assets/icons/custom/fabricSoftener.svg` | **Create** |
+| `frontend/src/assets/icons/custom/detergent.svg` | **Create** |
+| `frontend/src/assets/icons/custom/paperTowels.svg` | **Create** |
+| `frontend/src/data/customIcons.js` | **Extend** |
+| `frontend/src/data/iconRegistry.js` | **Extend** |
+| `frontend/src/data/iconDatabase.js` | **Extend** — redirect existing DB entries + enrich tags |
+| `frontend/src/data/iconRegistry.test.js` | **Extend** |
+
+### SVG design briefs
+
+`shampoo.svg` — tall rounded bottle with a flip-top cap, oval label area in the centre
+
+`conditioner.svg` — tall bottle, slightly wider in proportion than the shampoo bottle, screw cap, oval label
+
+`bodyWash.svg` — pump-dispenser bottle: tall rectangular body with a pump mechanism (vertical tube + horizontal nozzle) at the top
+
+`toothbrush.svg` — toothbrush handle (slight taper), oval bristle head at one end with a few short horizontal lines for bristle rows
+
+`mouthwash.svg` — angular bottle (like a Listerine shape): flat sides, slightly narrowed neck, small screw cap
+
+`shavingCream.svg` — aerosol/pressurized can: cylindrical body, narrow shoulder, small cap on top, a single horizontal line near the bottom suggesting a fill level
+
+`sunscreen.svg` — flat oval tube with a flip cap at the top, a small "SPF" text-block rectangle on the front
+
+`afterSun.svg` — taller, slightly more slender tube than sunscreen, flip cap, optional sun-and-lines motif on label
+
+`diapers.svg` — a single diaper viewed from the front: trapezoidal middle section, two rounded tab fasteners on the sides, elastic leg cuffs suggested by curved lines
+
+`glassesCleaner.svg` — small spray bottle (rectangular body, trigger/nozzle) next to a simple eyeglasses outline
+
+`cleaningCloth.svg` — a folded rectangular cloth with a few faint horizontal texture lines and slightly wavy edges to suggest softness
+
+`storageBags.svg` — a zip-lock bag: rectangular body with open ruffled top pinched into a double-track zip closure
+
+`bakingPaper.svg` — a roll of paper partially unrolled: the cylindrical roll core visible, a flat sheet extending from it with a torn/cut edge
+
+`foil.svg` — same as bakingPaper but with closely spaced parallel diagonal lines across the flat sheet to suggest metallic sheen
+
+`sponge.svg` — a rectangular block with rounded corners; two or three horizontal texture lines across the upper half (the scrubbing side); lower half is plain
+
+`handSoap.svg` — pump soap dispenser: wide rounded bottle body, long pump neck, angled nozzle at top
+
+`fabricSoftener.svg` — a bottle with a distinctively wide rounded body tapering to a narrow neck (Lenor-bottle silhouette), screw cap
+
+`detergent.svg` — a rectangular laundry-powder box: tall box shape, a small dosing flap or scoop suggested on the top/side
+
+`paperTowels.svg` — a large roll of paper towel: cylindrical roll with visible perforations (small dashes) along one vertical line, a single sheet partially unrolled at the bottom
+
+### DB redirects and tag enrichment
+
+| Label | Old icon | New icon | Additional tags to add |
+|---|---|---|---|
+| shampoo | `IconFlask` | `CustomShampoo` | haarshampoo, shampoo, haarpflege, kopfhautpflege |
+| conditioner | `IconFlask2` | `CustomConditioner` | spülung, haarspülung, conditioner, haarpflege |
+| body wash | `IconDroplet` | `CustomBodyWash` | duschgel, shower gel, duschlotion, körperpflege |
+| toothbrush | `IconDental` | `CustomToothbrush` | zahnbürste, electric toothbrush, elektrische zahnbürste |
+| mouthwash | `IconDental` | `CustomMouthwash` | mundspülung, mundwasser, listerine |
+| shaving cream | `IconRazor` | `CustomShavingCream` | rasiercreme, rasierschaum, shaving foam |
+| sunscreen | `IconSun` | `CustomSunscreen` | sonnencreme, sonnenschutz, lsf, spf, sunblock |
+| after sun | `IconSunHigh` | `CustomAfterSun` | aftersun, after sun lotion, after sun pflege |
+| diapers | `IconBabyCarriage` | `CustomDiapers` | windeln, babywindeln, pampers, nappy |
+| glasses cleaner | `IconEyeglass` | `CustomGlassesCleaner` | brillenreiniger, lens cleaner, optik |
+| cleaning cloth | `IconShirt` | `CustomCleaningCloth` | putztuch, microfasertuch, reinigungstuch, wischtuch |
+| storage bags | `IconToolsKitchen3` | `CustomStorageBags` | frischhaltebeutel, zip bag, gefrierbeutel, ziploc |
+| baking paper | `IconToolsKitchen2` | `CustomBakingPaper` | backpapier, pergamentpapier, parchment paper |
+| foil | `IconToolsKitchen` | `CustomFoil` | alufolie, aluminium foil, frischhaltefolie |
+| mop | `IconBucketDroplet` | `CustomMop` / `IconMop` | wischmopp, mopp, bodenwischer, floor mop |
+| sponge | `IconSparkles` | `CustomSponge` | schwamm, spülschwamm, abwaschwamm, cleaning sponge |
+| hand soap | `IconWash` | `CustomHandSoap` | handseife, flüssigseife, seifenspender |
+| fabric softener | `IconWash` | `CustomFabricSoftener` | weichspüler, wäscheweichspüler, softener, lenor |
+| detergent | `IconWashMachine` | `CustomDetergent` | waschmittel, waschpulver, waschmittelkapseln, laundry |
+| paper towels | `IconToiletPaper` | `CustomPaperTowels` | küchenrolle, küchenpapier, haushaltsrolle, paper towel |
+
+### Implementation steps
+
+1. Verify `IconMop` in tabler; if found use it; if absent create `CustomMop` custom SVG.
+2. Create all required custom SVG files (up to 19) following design briefs and conventions.
+3. Extend `customIcons.js` with imports and `normalizeCustomIcon()` exports (alphabetical).
+4. Extend `iconRegistry.js` with new registry entries (alphabetical).
+5. Update `iconDatabase.js`: redirect each existing entry's `icon` field, add the new tags from the table above.
+6. Extend `iconRegistry.test.js` with `resolveIconName` assertions for all new registry keys.
+7. Validate: `npm run lint && npm run build && npm test`.
