@@ -211,3 +211,54 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-005/T-006 — plan — 2026-05-07T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned iconDatabase.js enrichment (T-005) and expanded icon set with 7 tabler/lucide candidates + 11 custom SVGs + DB entries (T-006) |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-05-07T11:04:53Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the expanded registry-only icon set with three available Tabler icons, custom SVG fallbacks for missing package icons, and eleven planned custom SVG icons. No iconDatabase.js entries were changed. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `ROADMAP.md`, `frontend/src/assets/icons/custom/blueberries.svg`, `frontend/src/assets/icons/custom/can.svg`, `frontend/src/assets/icons/custom/cottonSwabs.svg`, `frontend/src/assets/icons/custom/creamJar.svg`, `frontend/src/assets/icons/custom/creamTube.svg`, `frontend/src/assets/icons/custom/eLiquid.svg`, `frontend/src/assets/icons/custom/interdentalSticks.svg`, `frontend/src/assets/icons/custom/kiwi.svg`, `frontend/src/assets/icons/custom/mango.svg`, `frontend/src/assets/icons/custom/pants.svg`, `frontend/src/assets/icons/custom/peach.svg`, `frontend/src/assets/icons/custom/pineapple.svg`, `frontend/src/assets/icons/custom/plum.svg`, `frontend/src/assets/icons/custom/watermelon.svg`, `frontend/src/assets/icons/custom/wetWipes.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js` |
+| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval warning; `npm test` PASS |
+| Package Icon Check | Tabler exports found: `IconSock`, `IconShoe`, `IconFlame`; absent and implemented as custom fallbacks: `IconPants` -> `CustomPants`, `IconPineapple` -> `CustomPineapple`, `IconCan` -> `CustomCan`, Lucide `Watermelon` -> `CustomWatermelon` |
+| Commit | `feat(icons): add expanded grocery icon set` |
+| Next Role | review |
+
+---
+
+### T-006 — review — 2026-05-07T13:14:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed expanded icon set; 3 tabler icons confirmed and 4 custom SVG fallbacks correctly substituted; all 15 new SVG files follow T-003 conventions; all validations pass with 187 tests. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-05-07T11:14:14Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-006 expanded registry-only icon set. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `ROADMAP.md`, `frontend/src/assets/icons/custom/blueberries.svg`, `frontend/src/assets/icons/custom/can.svg`, `frontend/src/assets/icons/custom/cottonSwabs.svg`, `frontend/src/assets/icons/custom/creamJar.svg`, `frontend/src/assets/icons/custom/creamTube.svg`, `frontend/src/assets/icons/custom/eLiquid.svg`, `frontend/src/assets/icons/custom/interdentalSticks.svg`, `frontend/src/assets/icons/custom/kiwi.svg`, `frontend/src/assets/icons/custom/mango.svg`, `frontend/src/assets/icons/custom/pants.svg`, `frontend/src/assets/icons/custom/peach.svg`, `frontend/src/assets/icons/custom/pineapple.svg`, `frontend/src/assets/icons/custom/plum.svg`, `frontend/src/assets/icons/custom/watermelon.svg`, `frontend/src/assets/icons/custom/wetWipes.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js` |
+| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
+| Commit | `feat(icons): add expanded grocery icon set` |
+| Next Role | none |
+
+---

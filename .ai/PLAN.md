@@ -9,12 +9,15 @@ Goal: Extend the icon registry with additional tabler/lucide icons and introduce
 - T-001: Add six missing tabler/lucide icons to `ICON_REGISTRY` ✅ done
 - T-002: Initial custom icon infrastructure (JS-embedded paths) ✅ done — superseded by T-003
 - T-003: Refactor custom icon system to use filesystem SVG files via `vite-plugin-svgr` ✅ done
-- T-004: Add six new custom SVG icons (Garlic, Hummus, DentalFloss, Toothpaste, CottonPads, Pasta)
+- T-004: Add six new custom SVG icons (Garlic, Hummus, DentalFloss, Toothpaste, CottonPads, Pasta) ✅ done
+- T-006: Expanded icon set — seven tabler/lucide candidates + eleven custom SVGs (registry only, no DB entries)
+- T-005: Comprehensive `iconDatabase.js` enrichment — covers all icons from T-001–T-006; runs after T-006
 
 ## Acceptance Criteria
 
-- T-003: ✅ done
-- T-004: All six icons (`CustomGarlic`, `CustomHummus`, `CustomDentalFloss`, `CustomToothpaste`, `CustomCottonPads`, `CustomPasta`) appear in the icon browser and render correctly at `size=22` and `size=32` with `currentColor` stroke; SVG files exist under `frontend/src/assets/icons/custom/`; `npm run lint`, `npm run build`, and `npm test` pass.
+- T-001–T-004: ✅ done
+- T-006: All new icons appear in the icon browser; tabler/lucide icons imported correctly (custom SVG fallback where absent); all eleven custom SVGs render at `size=22` and `size=32` with `currentColor` stroke; `npm run lint`, `npm run build`, and `npm test` pass.
+- T-005 (depends on T-006 being done): All icons from T-001–T-006 have DB entries and appear as suggestions; "garlic"/"knoblauch" resolves to `CustomGarlic`; "pasta"/"nudeln" resolves to `CustomPasta`; "grapes" resolves to `IconGrape`; every existing entry has ≥ 5 tags; `npm run lint`, `npm run build`, and `npm test` pass.
 
 ---
 
@@ -259,6 +262,269 @@ T-003 established the pattern: SVG file on disk → `?react` import → `normali
    npm run build
    npm test
    ```
+
+---
+
+## T-006 — Expanded icon set: clothing, fruit, hygiene & misc
+
+### Context
+
+New product categories (clothing, exotic fruits, hygiene accessories, misc) need icon coverage. Seven items may already exist in tabler/lucide; eleven require custom SVG files.
+
+### Files to create / change
+
+| File | Action |
+|---|---|
+| `frontend/src/assets/icons/custom/cottonSwabs.svg` | **Create** |
+| `frontend/src/assets/icons/custom/wetWipes.svg` | **Create** |
+| `frontend/src/assets/icons/custom/interdentalSticks.svg` | **Create** |
+| `frontend/src/assets/icons/custom/creamTube.svg` | **Create** |
+| `frontend/src/assets/icons/custom/creamJar.svg` | **Create** |
+| `frontend/src/assets/icons/custom/mango.svg` | **Create** |
+| `frontend/src/assets/icons/custom/kiwi.svg` | **Create** |
+| `frontend/src/assets/icons/custom/peach.svg` | **Create** |
+| `frontend/src/assets/icons/custom/plum.svg` | **Create** |
+| `frontend/src/assets/icons/custom/blueberries.svg` | **Create** |
+| `frontend/src/assets/icons/custom/eLiquid.svg` | **Create** |
+| `frontend/src/data/customIcons.js` | **Extend** — 11 new imports + exports |
+| `frontend/src/data/iconRegistry.js` | **Extend** — Group A tabler/lucide + Group B custom icons |
+| `frontend/src/data/iconRegistry.test.js` | **Extend** — assertions for all new registry keys |
+
+> ⚠️ No `iconDatabase.js` changes in T-006. All DB entries are written in T-005 (which runs after T-006).
+
+### Implementation steps
+
+#### Step 1 — Group A: tabler/lucide icons
+
+For each candidate, verify the export exists in the installed version of the library. If absent, create a custom SVG fallback instead and document the substitution in the HANDOFF entry.
+
+| Item | Primary candidate | Fallback |
+|---|---|---|
+| Socken | tabler `IconSock` | custom SVG |
+| Hose | tabler `IconPants` | custom SVG |
+| Schuhe | tabler `IconShoe` | custom SVG |
+| Ananas | tabler `IconPineapple` | custom SVG |
+| Wassermelone | lucide `Watermelon` (via `fromLucide()`) | custom SVG |
+| Feuerzeug | tabler `IconFlame` | custom SVG |
+| Konservendose | tabler `IconCan` | custom SVG |
+
+Add confirmed tabler icons to the tabler import block in `iconRegistry.js` (alphabetical). Wrap confirmed lucide icons with `fromLucide()`.
+
+#### Step 2 — Group B: custom SVG files
+
+All files follow the T-003 conventions:
+- `viewBox="0 0 24 24"`, no `width`/`height` on `<svg>` root
+- `fill="none"` on root `<svg>`
+- `stroke="currentColor"` on all stroked elements
+- `stroke-width` omitted (set by normalizer)
+- `stroke-linecap="round"` and `stroke-linejoin="round"` on root or each element
+
+**Design briefs:**
+
+`cottonSwabs.svg` — Wattestäbchen:
+- Two parallel thin sticks, each with a small oval cotton tip at both ends
+- Sticks arranged side by side or slightly crossed
+
+`wetWipes.svg` — Feuchtes Klopapier:
+- Rectangular package with rounded corners
+- A single wipe/tissue sheet partially pulled out from a slot on top
+- One or two gentle wave lines on the exposed sheet to suggest moisture
+
+`interdentalSticks.svg` — Interdental Sticks:
+- A slim elongated stick
+- Small tapered cylindrical brush head at one end (a few short strokes radiating outward)
+- Two stylised tooth outlines with the brush positioned between them
+
+`creamTube.svg` — Creme Tube:
+- Elongated tube body (portrait orientation)
+- Flat crimped/sealed bottom end
+- Small round screw cap at the top
+- Optional short curl of cream emerging from the cap
+
+`creamJar.svg` — Creme Tiegel:
+- Short wide cylinder (the jar body)
+- Flat lid shown slightly lifted or separated above the jar
+- Optional thin shine line on the jar side
+
+`mango.svg` — Mango:
+- Teardrop / kidney-bean outline for the fruit body
+- Short stem at the narrow top end
+- One small leaf off the stem
+
+`kiwi.svg` — Kiwi:
+- Oval outline for the whole fruit
+- Cross-section detail inside: central circle with radiating segments and small seed marks
+
+`peach.svg` — Pfirsich:
+- Round fruit outline with a subtle vertical cleft line
+- Short stem plus one small leaf at the top
+
+`plum.svg` — Pflaume:
+- Oval fruit outline, slightly wider in the middle
+- Shallow cleft indent at the top
+- Short stem
+
+`blueberries.svg` — Blaubeeren:
+- Three small circles clustered together representing berries
+- Small five-point star crown mark on top of each berry
+- Thin connecting stems
+
+`eLiquid.svg` — E-Liquid / Vape:
+- Small bottle with a narrow dropper/nozzle top (resembling a unicorn-bottle shape)
+- Two or three small wavy/curling vapor wisps rising from the nozzle tip
+
+#### Step 3 — Extend `customIcons.js`
+
+Add imports and exports for all eleven new custom icons (alphabetical):
+
+```js
+import BlueberriesSvg      from "../assets/icons/custom/blueberries.svg?react";
+import CottonSwabsSvg      from "../assets/icons/custom/cottonSwabs.svg?react";
+import CreamJarSvg         from "../assets/icons/custom/creamJar.svg?react";
+import CreamTubeSvg        from "../assets/icons/custom/creamTube.svg?react";
+import ELiquidSvg          from "../assets/icons/custom/eLiquid.svg?react";
+import InterdentalSticksSvg from "../assets/icons/custom/interdentalSticks.svg?react";
+import KiwiSvg             from "../assets/icons/custom/kiwi.svg?react";
+import MangoSvg            from "../assets/icons/custom/mango.svg?react";
+import PeachSvg            from "../assets/icons/custom/peach.svg?react";
+import PlumSvg             from "../assets/icons/custom/plum.svg?react";
+import WetWipesSvg         from "../assets/icons/custom/wetWipes.svg?react";
+
+export const CustomBlueberries       = normalizeCustomIcon(BlueberriesSvg,       "CustomBlueberries");
+export const CustomCottonSwabs       = normalizeCustomIcon(CottonSwabsSvg,       "CustomCottonSwabs");
+export const CustomCreamJar          = normalizeCustomIcon(CreamJarSvg,          "CustomCreamJar");
+export const CustomCreamTube         = normalizeCustomIcon(CreamTubeSvg,         "CustomCreamTube");
+export const CustomELiquid           = normalizeCustomIcon(ELiquidSvg,           "CustomELiquid");
+export const CustomInterdentalSticks = normalizeCustomIcon(InterdentalSticksSvg, "CustomInterdentalSticks");
+export const CustomKiwi              = normalizeCustomIcon(KiwiSvg,              "CustomKiwi");
+export const CustomMango             = normalizeCustomIcon(MangoSvg,             "CustomMango");
+export const CustomPeach             = normalizeCustomIcon(PeachSvg,             "CustomPeach");
+export const CustomPlum              = normalizeCustomIcon(PlumSvg,              "CustomPlum");
+export const CustomWetWipes          = normalizeCustomIcon(WetWipesSvg,          "CustomWetWipes");
+```
+
+#### Step 4 — Update tests
+
+In `iconRegistry.test.js`, add `resolveIconName` + `formatIconName` assertions for every new registry key added in Group A and Group B.
+
+#### Step 5 — Validate
+
+```bash
+npm run lint
+npm run build
+npm test
+```
+
+---
+
+## T-005 — Comprehensive iconDatabase.js enrichment
+
+### Context
+
+T-005 is the single authoritative DB task and runs **after T-006**. It covers: all custom icons from T-002–T-004, all icons added in T-006 (Groups A, B, C), redirections of garlic/pasta/grapes, and synonym enrichment across every existing category.
+
+### Prerequisite
+
+T-006 must be `done` before T-005 begins (T-005 references registry keys created in T-006).
+
+### Files to change
+
+| File | Action |
+|---|---|
+| `frontend/src/data/iconDatabase.js` | **Rewrite** — redirect entries, add new entries, enrich all existing tags |
+
+### Implementation steps
+
+#### Step 1 — Redirect three existing entries
+
+```js
+// garlic: IconPepper → CustomGarlic
+{ label: "garlic", icon: "CustomGarlic", tags: ["knoblauch", "knoblauchzehe", "knoblauchknolle", "garlic clove", "garlic bulb"] }
+
+// pasta: IconToolsKitchen2 → CustomPasta
+{ label: "pasta", icon: "CustomPasta", tags: ["nudeln", "spaghetti", "penne", "fusilli", "rigatoni", "tagliatelle", "linguine", "farfalle", "noodles"] }
+
+// grapes: IconCherry → IconGrape
+{ label: "grapes", icon: "IconGrape", tags: ["trauben", "weintrauben", "grape", "raisins", "rosinen", "traube"] }
+```
+
+#### Step 2 — Add DB entries for custom icons from T-002–T-004
+
+| Registry key | Label | German tags | English tags |
+|---|---|---|---|
+| `CustomKornflakesBowl` | cornflakes bowl | kornflakes, müsli, cerealien, frühstücksflocken, getreideflocken | cereal bowl, breakfast cereal |
+| `CustomKornflakesBox` | cornflakes box | cornflakes packung, müsli packung, cerealien packung | cereal box, cereal package |
+| `CustomGarlic` | garlic | _(covered by redirect above)_ | |
+| `CustomHummus` | hummus | hummus, kichererbsenpaste, hummus dip, aufstrich | chickpea dip, hummus paste |
+| `CustomDentalFloss` | dental floss | zahnseide, zahnfaden, interdental | floss, dental floss |
+| `CustomToothpaste` | toothpaste | zahncreme, zahnpasta, zahnputzmittel, elmex, blend-a-med | toothpaste, tooth cream |
+| `CustomCottonPads` | cotton pads | wattepads, abschminkpads, kosmetikpads, reinigungspads | cotton pads, makeup remover pads |
+| `CustomPasta` | pasta | _(covered by redirect above)_ | |
+
+#### Step 3 — Add DB entries for T-006 icons (Groups A, B, C)
+
+| Registry key | Label | German tags | English tags |
+|---|---|---|---|
+| `IconSock` / fallback | sock | socken, strümpfe, kniestrümpfe, söckchen | socks, stockings |
+| `IconPants` / fallback | pants | hose, jeans, jogginghose, shorts, leggings, chinos | trousers, pants, jeans, shorts |
+| `IconShoe` / fallback | shoe | schuhe, sneaker, turnschuhe, stiefel, sandalen, pumps | shoes, sneakers, boots, sandals |
+| `IconPineapple` / fallback | pineapple | ananas, ananasscheibe | pineapple |
+| `Watermelon` / fallback | watermelon | wassermelone, melone, wassermelonenscheibe | watermelon |
+| `IconFlame` / fallback | lighter | feuerzeug, anzünder, gasfeuerzeug, sturmfeuerzeug | lighter, fire starter |
+| `IconCan` / fallback | canned food | konservendose, dose, dosengemüse, dosensuppe, thunfischdose, sardinen, konserve | tin can, canned food, canned goods |
+| `CustomCottonSwabs` | cotton swabs | wattestäbchen, q-tips, ohrenstäbchen | cotton swabs, q-tips, ear swabs |
+| `CustomWetWipes` | wet wipes | feuchtes klopapier, feuchttücher, nasspapier, feuchtes toilettenpapier | wet wipes, moist toilet paper |
+| `CustomInterdentalSticks` | interdental sticks | interdentalbürste, zahnzwischenraumbürste, interdental, zahnreinigung | interdental brush, interdental sticks |
+| `CustomCreamTube` | cream tube | creme tube, hautcreme, gesichtscreme, körpercreme, lotion, salbe | cream tube, lotion, face cream |
+| `CustomCreamJar` | cream jar | cremetiegel, cremendose, tiegel, gesichtspflege, feuchtigkeitscreme, nachtcreme | cream jar, moisturizer, face cream pot |
+| `CustomMango` | mango | mango, mangos, tropenfrucht | mango, mangoes |
+| `CustomKiwi` | kiwi | kiwi, kiwis, kiwifrucht | kiwi, kiwifruit |
+| `CustomPeach` | peach | pfirsich, pfirsiche, nektarine | peach, nectarine |
+| `CustomPlum` | plum | pflaume, pflaumen, zwetschge, zwetschgen | plum, plums |
+| `CustomBlueberries` | blueberries | blaubeeren, heidelbeeren, blaubeere | blueberries, blueberry |
+| `CustomELiquid` | e-liquid | e-liquid, liquid, vape liquid, dampfliquid, e-zigarette liquid | e-liquid, vape juice, e-cigarette liquid |
+| `IconShirt` (existing) | t-shirt clothing | t-shirt, shirt, oberteil, top, unterhemd, poloshirt | t-shirt, shirt, top |
+| `IconBattery` (existing) | coin cell | knopfzelle, knopfzellen, uhrbatterie, cr2032 | coin cell, button battery, watch battery |
+
+#### Step 4 — Enrich all existing entries
+
+For **every** existing entry in `ICON_DB`, expand `tags` to at minimum **5 tags total** (label + tags combined). Guiding principles:
+
+- **German regional variants**: Austrian/Swiss German (e.g., Paradeiser, Erdäpfel, Rüebli, Obers)
+- **Plural / singular pairs**: ensure both forms are present
+- **Brand-name synonyms**: "Tempo" → toilet paper; "Nutella" → spread/jam; "Elmex" → toothpaste
+- **Compound word variants**: "Vollmilch", "Halbfettmilch", "Laktosefrei" → milk
+- **Related product names** mapping to the same icon: "Latte", "Cappuccino", "Espresso" → coffee
+- **Umlaut alternates written out**: ä→ae, ö→oe, ü→ue
+- **English synonyms** for common English-typed inputs
+
+Minimum enrichment guidance per category:
+
+_Dairy_: milk → "laktosefrei", "h-milch", "frischmilch", "uht", "obers"; yogurt → "skyr", "kefir", "naturjoghurt", "fruchtjoghurt"; cheese → "frischkäse", "parmesan", "feta", "brie", "schnittkäse"
+
+_Produce_: tomato → "paradeiser", "cocktailtomaten", "rispentomaten", "kirschtomaten"; potato → "erdäpfel", "süßkartoffel", "yams", "kartoffelbrei"; onion → "schalotte", "frühlingszwiebel", "lauch", "porree"; carrot → "rüebli", "baby karotten"; mushroom → "steinpilz", "pfifferlinge", "austernpilze", "shiitake"
+
+_Bakery_: bread → "vollkornbrot", "weißbrot", "toastbrot", "ciabatta", "laugenbrot"; cake → "torte", "geburtstagskuchen", "käsekuchen", "cheesecake"
+
+_Meat & Fish_: chicken → "geflügel", "filet", "schnitzel", "hähnchenfilet"; beef → "hackfleisch", "steak", "rinderhack", "gulasch"; fish → "thunfisch", "seelachs", "forelle", "kabeljau", "tilapia"
+
+_Beverages_: coffee → "latte", "cappuccino", "espresso", "americano", "filterkaffee"; tea → "grüner tee", "schwarztee", "kräutertee", "kamille", "pfefferminze"; beer → "pils", "weizen", "weißbier", "lager", "radler"; juice → "direktsaft", "nektar", "smoothie", "multivitamin"
+
+_Household_: toilet paper → "tempo", "klopapier", "wc-papier", "toilettenpapier"; detergent → "colorwaschmittel", "vollwaschmittel", "waschmittel pods"; cleaner → "badreiniger", "küchenreiniger", "wc-reiniger"
+
+_Condiments_: olive oil → "rapsöl", "sonnenblumenöl", "kokosöl", "bratöl"; ketchup → "tomatensauce", "tomatenmark"; honey → "blütenhonig", "waldhonig", "akazienhonig"
+
+_Pantry_: soup → "brühe", "gemüsebrühe", "hühnerbrühe", "instantsuppe", "dosensuppe"
+
+_Drugstore_: toothpaste → "zahncreme", "elmex", "blend-a-med", "zahnputzmittel"; medicine → "ibuprofen", "aspirin", "paracetamol", "schmerztabletten"
+
+#### Step 5 — Validate
+
+```bash
+npm run lint
+npm run build
+npm test
+```
 
 ---
 

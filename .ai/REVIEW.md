@@ -166,3 +166,46 @@ Reviewed: 2026-05-07
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-05-07
+
+#### Findings
+
+1. **nit** — `customIcons.js` lines 17–18 & 57–58; `iconRegistry.js` import block lines 18–19 and registry lines 212–213: `CustomPants` / `PantsSvg` is placed after `CustomPasta` / `PastaSvg` in all three locations. Alphabetically "Pants" (Pa-n) precedes "Pasta" (Pa-s). Not required — does not affect functionality or tests.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Verified tabler/lucide availability for all seven Group A candidates: `IconSock` ✓ tabler, `IconShoe` ✓ tabler, `IconFlame` ✓ tabler; `IconPants`, `IconPineapple`, `IconCan` absent from tabler; `Watermelon` absent from lucide — all four correctly replaced with custom SVG fallbacks.
+3. Confirmed 15 new SVG files created (11 planned + 4 fallbacks: can, pants, pineapple, watermelon). All follow T-003 conventions: `viewBox="0 0 24 24"`, no `width`/`height` on root, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root, no `stroke-width` on elements.
+4. Confirmed `customIcons.js` imports and exports extended with all 15 new custom icons (Blueberries, Can, CottonSwabs, CreamJar, CreamTube, ELiquid, InterdentalSticks, Kiwi, Mango, Pants, Peach, Pineapple, Plum, Watermelon, WetWipes).
+5. Confirmed `iconRegistry.js` import block and `ICON_REGISTRY` extended with all new entries; `IconSock`, `IconShoe`, `IconFlame` registered directly from tabler.
+6. Confirmed test additions: `resolveIconName` presence tests for all new tabler-backed keys (IconFlame, IconShoe, IconSock) and all custom keys; `formatIconName` assertions for all new icons; DOM render tests at size=22 and size=32 for all 15 new custom icons.
+7. Noted `CustomELiquid` → `"E Liquid"` is correct (the `([A-Z]+)([A-Z][a-z])` regex splits "EL" → "E L" → "E Liquid").
+8. Identified `CustomPants`/`PantsSvg` placed after `CustomPasta`/`PastaSvg` in all three locations — nit, not a required fix.
+9. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
+10. Ran `npm run build` — success, no SVG import warnings.
+11. Ran `npm test` — 187 pass (+32 over T-004 baseline of 155), 0 fail.
+12. Ran `vitest run --environment jsdom iconRegistry.test.js` — 56/56 pass (32 new render tests, all 15 custom icons at size=22 and size=32 plus 3 tabler presence checks).
+
+##### Findings
+- `IconPants`, `IconPineapple`, `IconCan`, and `Watermelon` are absent from the installed tabler/lucide packages; custom SVG fallbacks correctly applied and registered under `CustomPants`, `CustomPineapple`, `CustomCan`, `CustomWatermelon`.
+- All SVG files strictly follow the T-003 convention for interoperability with `normalizeCustomIcon`.
+- `CustomPants`/`PantsSvg` is ordered after `CustomPasta`/`PastaSvg` — alphabetically reversed. Non-blocking nit.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`

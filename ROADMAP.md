@@ -2,41 +2,63 @@
 
 Goal: Extend the icon system with additional tabler/lucide icons and lay the foundation for custom (hand-crafted) SVG icons.
 
-## Priority 1 — Add missing tabler/lucide icons ✅ done
-
-Objective: Make all requested grocery-relevant icons available in the icon selector.
+## Priority 1 — Add missing tabler/lucide icons ✅ done (T-001)
 
 Icons added: `IconPaperBag`, `IconGrape`, `IconCannabis`, `IconBeef`, `IconBean`, `BicepsFlexed`.
 
-Already registered (no action required): `chef-hat`, `soup`, `wheat`, `bowl-spoon`, `ice-cream`, `salt`.
+## Priority 2 — Custom icon infrastructure + Kornflakes example ✅ done (T-002 / T-003)
 
-## Priority 2 — Custom icon infrastructure + Kornflakes example (reworked)
+Custom icons stored as `.svg` files under `frontend/src/assets/icons/custom/`, imported via `vite-plugin-svgr`, normalized through `normalizeCustomIcon()`, registered in `ICON_REGISTRY` with `Custom` prefix.
 
-Objective: Establish a pattern that lets developers add hand-crafted SVG icons alongside tabler/lucide icons, and ship two Kornflakes icons as the first working examples.
+## Priority 3 — Additional custom icons: grocery & hygiene batch ✅ done (T-004)
 
-**Approach (T-003, replaces T-002 implementation):**
+CustomGarlic, CustomHummus, CustomDentalFloss, CustomToothpaste, CustomCottonPads, CustomPasta.
 
-- Custom icons are stored as `.svg` files on disk under `frontend/src/assets/icons/custom/`.
-- `vite-plugin-svgr` is installed and configured so SVG files can be imported as React components via the `?react` suffix.
-- A `normalizeCustomIcon(SvgComponent)` wrapper in `frontend/src/data/customIcons.js` adapts the vite-plugin-svgr component to the same prop surface used by tabler/lucide icons (`size`, `stroke`/`strokeWidth`, `color`).
-- `customIcons.js` imports each `.svg?react` file, wraps it, and exports the result with a `Custom` prefix.
-- Exports are registered in `ICON_REGISTRY` exactly as before — the registry and icon browser require no further changes.
-- Two example SVG files:
-  - `kornflakesBowl.svg` — a bowl with cereal flakes
-  - `kornflakesBox.svg` — a cereal-box silhouette
-- Both appear in the icon browser at any size with `currentColor` stroke.
+## Priority 4 — Icon suggestion quality (T-005)
 
-## Priority 3 — Additional custom icons: grocery & hygiene batch
+Objective: Make the icon suggestion system find the right icon for any common input — including synonyms, regional variants, compound words, and brand names.
 
-Objective: Add six more hand-crafted SVG icons for product categories not covered by tabler/lucide.
+- Register all existing custom icons (T-002–T-004) in `iconDatabase.js` so they are suggested.
+- Redirect "garlic" and "pasta" DB entries to the dedicated custom icons.
+- Enrich every existing `iconDatabase.js` entry across all categories with additional German and English tags (target ≥ 5 tags per entry).
 
-Icons (all follow the T-003 SVG conventions and `Custom` prefix):
+## Priority 5 — Expanded icon set: clothing, fruit, hygiene & misc (T-006)
 
-| German | SVG file | Registry key |
+Objective: Cover product categories not yet represented in the icon browser.
+
+### Group A — tabler/lucide (implementer verifies availability; custom SVG fallback if absent)
+
+| Item | Candidate | Registry key |
 |---|---|---|
-| Knoblauch | `garlic.svg` | `CustomGarlic` |
-| Humus | `hummus.svg` | `CustomHummus` |
-| Zahnseide | `dentalFloss.svg` | `CustomDentalFloss` |
-| Zahncreme | `toothpaste.svg` | `CustomToothpaste` |
-| Wattepads | `cottonPads.svg` | `CustomCottonPads` |
-| Pasta/Nudeln | `pasta.svg` | `CustomPasta` |
+| Socken | tabler `IconSock` | `IconSock` |
+| Hose | tabler `IconPants` | `IconPants` |
+| Schuhe | tabler `IconShoe` | `IconShoe` |
+| Ananas | tabler `IconPineapple` | `IconPineapple` |
+| Wassermelone | lucide `Watermelon` | `Watermelon` |
+| Feuerzeug | tabler `IconFlame` | `IconFlame` |
+| Konservendose | tabler `IconCan` | `IconCan` |
+
+### Group B — Custom SVG icons
+
+| Item | SVG file | Registry key |
+|---|---|---|
+| Wattestäbchen | `cottonSwabs.svg` | `CustomCottonSwabs` |
+| Feuchtes Klopapier | `wetWipes.svg` | `CustomWetWipes` |
+| Interdental Sticks | `interdentalSticks.svg` | `CustomInterdentalSticks` |
+| Creme Tube | `creamTube.svg` | `CustomCreamTube` |
+| Creme Tiegel | `creamJar.svg` | `CustomCreamJar` |
+| Mango | `mango.svg` | `CustomMango` |
+| Kiwi | `kiwi.svg` | `CustomKiwi` |
+| Pfirsich | `peach.svg` | `CustomPeach` |
+| Pflaume | `plum.svg` | `CustomPlum` |
+| Blaubeeren | `blueberries.svg` | `CustomBlueberries` |
+| E-Liquid / Vape | `eLiquid.svg` | `CustomELiquid` |
+
+### Group C — DB entries only (existing icons, no new registry key)
+
+| Item | Icon to use | Action |
+|---|---|---|
+| T-Shirt (Kleidung) | `IconShirt` | Add clothing DB entry |
+| Knopfzellen | `IconBattery` | Add DB entry |
+
+All T-006 icons receive `iconDatabase.js` entries with German + English tags within the same task.
