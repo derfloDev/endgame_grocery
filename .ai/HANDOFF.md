@@ -262,3 +262,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-005 — implement — 2026-05-07T11:31:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Enriched the curated icon suggestion database with redirects, all custom and expanded icon entries, and broader bilingual synonym coverage; normalized two pre-existing staged SVG edits back to the custom icon contract so validation passes. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/assets/icons/custom/cottonSwabs.svg`, `frontend/src/assets/icons/custom/interdentalSticks.svg`, `frontend/src/data/iconDatabase.js`, `frontend/src/utils/cosineSimilarity.test.js` |
+| Validation | `npm run test --workspace frontend -- cosineSimilarity.test.js` PASS; `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval warning; `npm test` PASS |
+| Commit | `feat(icons): enrich icon suggestions` |
+| Next Role | review |
+
+---
+
+### T-005 — review — 2026-05-07T14:06:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed comprehensive iconDatabase.js enrichment; all three redirections correct, all T-002–T-006 icon entries present, ≥5 terms verified by automated test, SVG design fixes preserve conventions, all 190 tests pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — implement — 2026-05-07T12:13:10Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-005 icon suggestion enrichment. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/assets/icons/custom/cottonSwabs.svg`, `frontend/src/assets/icons/custom/interdentalSticks.svg`, `frontend/src/data/iconDatabase.js`, `frontend/src/utils/cosineSimilarity.test.js` |
+| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
+| Commit | `feat(icons): enrich icon suggestions` |
+| Next Role | none |
+
+---

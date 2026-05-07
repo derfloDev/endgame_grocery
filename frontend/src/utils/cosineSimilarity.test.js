@@ -19,6 +19,14 @@ describe("icon registry and database", () => {
     }
   });
 
+  it("keeps every database entry enriched with at least five searchable terms", () => {
+    for (const entry of ICON_DB) {
+      const terms = new Set([entry.label, ...(entry.tags ?? [])].filter(Boolean));
+
+      expect(terms.size, `${entry.label} should have at least five terms`).toBeGreaterThanOrEqual(5);
+    }
+  });
+
   it("resolves known English and German exact matches to registry icon names", () => {
     expect(EXACT_MATCH_MAP.milk).toBe("IconMilk");
     expect(EXACT_MATCH_MAP.milch).toBe("IconMilk");
@@ -31,7 +39,7 @@ describe("icon registry and database", () => {
     expect(EXACT_MATCH_MAP["toilet paper"]).toBe("IconToiletPaper");
     expect(EXACT_MATCH_MAP.toilettenpapier).toBe("IconToiletPaper");
     expect(EXACT_MATCH_MAP.shampoo).toBe("IconFlask");
-    expect(EXACT_MATCH_MAP.zahnpasta).toBe("IconDental");
+    expect(EXACT_MATCH_MAP.zahnpasta).toBe("CustomToothpaste");
     expect(EXACT_MATCH_MAP["olive oil"]).toBe("IconBottle");
     expect(EXACT_MATCH_MAP["olivenöl"]).toBe("IconBottle");
     expect(EXACT_MATCH_MAP.chocolate).toBe("IconCandy");
@@ -46,6 +54,54 @@ describe("icon registry and database", () => {
     expect(EXACT_MATCH_MAP.wein).toBe("Wine");
     expect(EXACT_MATCH_MAP.nuts).toBe("IconNut");
     expect(EXACT_MATCH_MAP.seed).toBe("IconSeedling");
+  });
+
+  it("routes redirected and custom icon exact matches to the dedicated registry keys", () => {
+    expect(EXACT_MATCH_MAP.garlic).toBe("CustomGarlic");
+    expect(EXACT_MATCH_MAP.knoblauch).toBe("CustomGarlic");
+    expect(EXACT_MATCH_MAP.pasta).toBe("CustomPasta");
+    expect(EXACT_MATCH_MAP.nudeln).toBe("CustomPasta");
+    expect(EXACT_MATCH_MAP.grapes).toBe("IconGrape");
+    expect(EXACT_MATCH_MAP.trauben).toBe("IconGrape");
+    expect(EXACT_MATCH_MAP.zahnseide).toBe("CustomDentalFloss");
+    expect(EXACT_MATCH_MAP.zahncreme).toBe("CustomToothpaste");
+    expect(EXACT_MATCH_MAP.wattepads).toBe("CustomCottonPads");
+    expect(EXACT_MATCH_MAP.hummus).toBe("CustomHummus");
+    expect(EXACT_MATCH_MAP.kornflakes).toBe("CustomKornflakesBowl");
+    expect(EXACT_MATCH_MAP.bohnen).toBe("IconBean");
+    expect(EXACT_MATCH_MAP.rindersteak).toBe("IconBeef");
+    expect(EXACT_MATCH_MAP.cannabis).toBe("IconCannabis");
+    expect(EXACT_MATCH_MAP.papiertüte).toBe("IconPaperBag");
+    expect(EXACT_MATCH_MAP.protein).toBe("BicepsFlexed");
+  });
+
+  it("includes all expanded T-006 icon entries in the exact match map", () => {
+    const expectedMatches = {
+      socken: "IconSock",
+      hose: "CustomPants",
+      schuhe: "IconShoe",
+      ananas: "CustomPineapple",
+      wassermelone: "CustomWatermelon",
+      feuerzeug: "IconFlame",
+      konservendose: "CustomCan",
+      "wattestäbchen": "CustomCottonSwabs",
+      "feuchtes klopapier": "CustomWetWipes",
+      interdentalbürste: "CustomInterdentalSticks",
+      "creme tube": "CustomCreamTube",
+      cremetiegel: "CustomCreamJar",
+      mango: "CustomMango",
+      kiwi: "CustomKiwi",
+      pfirsich: "CustomPeach",
+      pflaume: "CustomPlum",
+      blaubeeren: "CustomBlueberries",
+      "e-liquid": "CustomELiquid",
+      "t-shirt": "IconShirt",
+      knopfzelle: "IconBattery"
+    };
+
+    for (const [term, iconName] of Object.entries(expectedMatches)) {
+      expect(EXACT_MATCH_MAP[term]).toBe(iconName);
+    }
   });
 });
 

@@ -268,7 +268,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 
 ### Icon Assignment
 
-New and edited entries can be assigned icons locally in the browser without sending item text to an external AI service. Exact EN/DE matches resolve immediately from the curated Tabler and Lucide icon catalogue, while broader terms fall back to a local `transformers.js` similarity check that suggests from the same expanded food, household, and health icon set. The picker shows human-readable labels such as `Ice Cream 2` instead of raw registry keys.
+New and edited entries can be assigned icons locally in the browser without sending item text to an external AI service. Exact EN/DE matches resolve immediately from the curated Tabler, Lucide, and custom SVG icon catalogue, including enriched synonym, regional, brand-name, and compound-word matches for grocery, household, clothing, and drugstore items. Broader terms fall back to a local `transformers.js` similarity check that suggests from the same expanded icon set. The picker shows human-readable labels such as `Ice Cream 2` instead of raw registry keys.
 
 Hand-crafted custom icons live as SVG files in `frontend/src/assets/icons/custom/` and are imported with `*.svg?react` through `vite-plugin-svgr`. Wrap new SVG imports with `normalizeCustomIcon` in `frontend/src/data/customIcons.js`, export them with a `Custom` prefix, and register those exports in `ICON_REGISTRY` so they render with the same `size`, `stroke`/`strokeWidth`, and `color` props as Tabler and Lucide icons.
 

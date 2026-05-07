@@ -209,3 +209,47 @@ Reviewed: 2026-05-07
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-05-07
+
+#### Findings
+- No issues found.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Read full `iconDatabase.js` — verified all three redirections, all new entries, and enrichment quality.
+3. Verified three redirections: `garlic` → `CustomGarlic` (was IconPepper); `pasta` → `CustomPasta` (was IconToolsKitchen2); `grapes` → `IconGrape` (was IconCherry).
+4. Verified DB entries for all T-002–T-004 custom icons: `CustomKornflakesBowl`, `CustomKornflakesBox`, `CustomHummus`, `CustomDentalFloss`, `CustomToothpaste`, `CustomCottonPads` (garlic and pasta covered by redirections).
+5. Verified DB entries for all T-006 icons: `IconSock`, `CustomPants`, `IconShoe`, `CustomPineapple`, `CustomWatermelon`, `IconFlame`, `CustomCan`, `CustomCottonSwabs`, `CustomWetWipes`, `CustomInterdentalSticks`, `CustomCreamTube`, `CustomCreamJar`, `CustomMango`, `CustomKiwi`, `CustomPeach`, `CustomPlum`, `CustomBlueberries`, `CustomELiquid`, plus existing `IconShirt` and `IconBattery` entries.
+6. Spot-checked ≥5 unique searchable terms for borderline entries (mango, kiwi, blueberries, plum, peach — all exactly 5 due to duplicate label/tag) — all pass.
+7. Confirmed plan-specified enrichments: dairy, produce, bakery, meat/fish, beverages, household, condiments, pantry, drugstore categories all enriched with German regional variants, plural/singular pairs, brand synonyms, and compound-word forms.
+8. Reviewed `cottonSwabs.svg` and `interdentalSticks.svg` diffs — both are visual design improvements; SVG conventions (viewBox, fill=none, stroke=currentColor, round caps/joins, no stroke-width) preserved ✓.
+9. Verified `cosineSimilarity.test.js` changes: updated `zahnpasta → CustomToothpaste` (correct); new ≥5-terms automated test; new redirections test (16 spot checks); new T-006 exact-match test (20 spot checks).
+10. Verified README paragraph updated to mention custom SVG icons, enriched synonyms, and expanded catalogue scope.
+11. Ran `npm run lint` — 0 errors, 1 pre-existing warning.
+12. Ran `npm run build` — success.
+13. Ran `npm test` — 190 pass (+3 over T-006 baseline of 187), 0 fail.
+14. Ran `vitest run --environment jsdom cosineSimilarity.test.js` — 10/10 pass (3 new tests).
+
+##### Findings
+- `zahnpasta` correctly maps to `CustomToothpaste` (the previous `IconDental` mapping was outdated; the test assertion was updated accordingly).
+- Entries where the label text also appears in the tags (mango, kiwi, blueberries, e-liquid) still satisfy the ≥5-unique-terms constraint because the `createExactMatchMap` just overwrites with the same icon value.
+- SVG design improvements to `cottonSwabs.svg` and `interdentalSticks.svg` are an appropriate cosmetic fix within this task's scope.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
