@@ -36,6 +36,11 @@ describe("vite worker config", () => {
     expect(viteConfig.define.__APP_VERSION__).toMatch(/^"\d+\.\d+\.\d+"$/);
   });
 
+  it("registers svgr for custom SVG React icon imports", () => {
+    expect(viteConfigSource).toMatch(/from\s+["']vite-plugin-svgr["']/);
+    expect(viteConfigSource).toMatch(/svgr\(\)/);
+  });
+
   it("uses injectManifest for the custom push-aware service worker", () => {
     expect(viteConfigSource).toMatch(/strategies:\s*["']injectManifest["']/);
     expect(viteConfigSource).toMatch(/srcDir:\s*["']src\/sw["']/);

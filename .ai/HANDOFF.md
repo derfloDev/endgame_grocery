@@ -111,3 +111,53 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — plan — 2026-05-07T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Rework-plan: refactor custom icon system to use filesystem SVG files via vite-plugin-svgr, replacing JS-embedded paths from T-002 |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-05-07T06:24:57Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Refactored custom icons to filesystem SVG assets imported through vite-plugin-svgr and normalized through the existing registry contract. |
+| Files Changed | `README.md`, `frontend/package.json`, `package-lock.json`, `frontend/vite.config.js`, `frontend/src/assets/icons/custom/kornflakesBowl.svg`, `frontend/src/assets/icons/custom/kornflakesBox.svg`, `frontend/src/data/customIcons.js`, `frontend/src/vite-config.test.js`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run test --workspace frontend -- vite-config.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval warning; `npm test` PASS |
+| Commit | `refactor(icons): load custom icons from SVG files` |
+| Next Role | review |
+
+---
+
+### T-003 — review — 2026-05-07T08:40:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed svgr refactor; SVG files, normalizeCustomIcon wrapper, vite config, and README all match plan spec; all validations pass with 142 tests. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-05-07T06:53:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-003 svgr custom icon refactor. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `ROADMAP.md`, `frontend/package.json`, `package-lock.json`, `frontend/vite.config.js`, `frontend/src/assets/icons/custom/kornflakesBowl.svg`, `frontend/src/assets/icons/custom/kornflakesBox.svg`, `frontend/src/data/customIcons.js`, `frontend/src/vite-config.test.js` |
+| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
+| Commit | `refactor(icons): load custom icons from SVG files` |
+| Next Role | none |
+
+---

@@ -82,3 +82,46 @@ Reviewed: 2026-05-07
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-05-07
+
+#### Findings
+- No issues found.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Inspected working-tree diffs for `frontend/src/data/customIcons.js`, `frontend/vite.config.js`, `frontend/src/vite-config.test.js`, `README.md`, `frontend/package.json`, and the two new SVG files under `frontend/src/assets/icons/custom/`.
+3. Confirmed `vite-plugin-svgr@^5.2.0` added to `frontend/package.json` devDependencies and `svgr()` registered as the second plugin in `vite.config.js` (between `react()` and `VitePWA`).
+4. Confirmed SVG file conventions match plan requirements: `viewBox="0 0 24 24"`, no `width`/`height` on root, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root; no `stroke-width` on elements (controlled by wrapper).
+5. Verified `normalizeCustomIcon(SvgComponent, displayName)` factory: accepts `(size, stroke, strokeWidth, color, ...rest)`, passes `width`, `height`, `stroke`, `strokeWidth` through to SVG component; `color` defaults to `"currentColor"`, `strokeWidth` falls back to 1.5. Exported for future custom icon use.
+6. Confirmed `iconRegistry.js` unchanged — T-002 imports/entries remain valid since exports keep the same names.
+7. Confirmed `iconRegistry.test.js` unchanged — all 11 tests (including four DOM render tests) still pass against the svgr-backed implementation.
+8. Verified new `vite-config.test.js` test asserts `vite-plugin-svgr` import and `svgr()` call in config source.
+9. Confirmed README updated with SVG workflow documentation (file location, import convention, `normalizeCustomIcon` usage, `Custom` prefix, registry contract).
+10. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
+11. Ran `npm run build` — success, no SVG import warnings.
+12. Ran `npm test` — 142 pass (141 pre-existing + 1 new vite-config test), 0 fail.
+13. Ran `vitest run --environment jsdom iconRegistry.test.js` — 11/11 pass including all four size×icon render tests.
+
+##### Findings
+- `stroke-linecap` and `stroke-linejoin` are correctly encoded in the SVG root (rather than the wrapper), so they remain in the component's default output and can be overridden at call-site via `...rest`.
+- `normalizeCustomIcon` is exported, enabling future custom icons to follow the same pattern without duplicating logic.
+- Build output size unchanged (SVG content is equivalent to the T-002 JS-embedded paths).
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
