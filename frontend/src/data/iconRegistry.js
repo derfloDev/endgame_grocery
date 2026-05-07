@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { CustomKornflakesBowl, CustomKornflakesBox } from "./customIcons.js";
 import {
   IconApple,
   IconAvocado,
@@ -166,6 +167,8 @@ export const ICON_REGISTRY = Object.freeze({
   Citrus: fromLucide(Citrus),
   CookingPot: fromLucide(CookingPot),
   Croissant: fromLucide(Croissant),
+  CustomKornflakesBox,
+  CustomKornflakesBowl,
   CupSoda: fromLucide(CupSoda),
   Dessert: fromLucide(Dessert),
   Donut: fromLucide(Donut),
@@ -324,7 +327,8 @@ export function formatIconName(name) {
     return "";
   }
 
-  const stripped = name.startsWith("Icon") ? name.slice(4) : name;
+  // Registry names from shared icon sources use Icon*, while hand-crafted SVGs use Custom*.
+  const stripped = name.startsWith("Icon") ? name.slice(4) : name.startsWith("Custom") ? name.slice(6) : name;
 
   return stripped
     .replace(/([a-z])([A-Z])/g, "$1 $2")

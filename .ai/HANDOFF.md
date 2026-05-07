@@ -72,3 +72,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | implement |
 
 ---
+
+### T-002 — implement — 2026-05-07T04:32:10Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added custom SVG icon infrastructure and registered two selectable Kornflakes icons with Custom-prefix display formatting. |
+| Files Changed | `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval warning; `npm test` PASS |
+| Commit | `feat(icons): add custom Kornflakes icon choices` |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-05-07T06:43:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed custom icon infrastructure and Kornflakes icons; factory, registry entries, formatIconName update, and render tests all correct; all validations pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-07T05:01:58Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-002 custom icon infrastructure and Kornflakes icon changes. |
+| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js` |
+| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
+| Commit | `feat(icons): add custom Kornflakes icon choices` |
+| Next Role | none |
+
+---
