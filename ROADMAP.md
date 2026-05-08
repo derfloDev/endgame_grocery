@@ -1,42 +1,84 @@
 # ROADMAP
 
-Goal: Add full i18n support (German + English) to Endgame Grocery with offline-first locale delivery via the Service Worker.
+Goal: Extend the icon system with additional tabler/lucide icons and lay the foundation for custom (hand-crafted) SVG icons.
 
-## Priority 1 — i18n Infrastructure
+## Priority 1 — Add missing tabler/lucide icons ✅ done (T-001)
 
-Objective: Wire up i18next with ICU message format, language detection, and offline-capable locale delivery.
+Icons added: `IconPaperBag`, `IconGrape`, `IconCannabis`, `IconBeef`, `IconBean`, `BicepsFlexed`.
 
-- `i18next`, `react-i18next`, `i18next-browser-languagedetector`, `i18next-icu`, and `i18next-resources-to-backend` installed in `frontend/`.
-- Single `translation` namespace; locale files at `frontend/src/locales/{en,de}/translation.json`.
-- Lazy loading via Vite code-splitting (`i18next-resources-to-backend` + dynamic `import()`).
-- Language detection priority: `localStorage` → `navigator.language` → fallback `en`.
-- Workbox `globPatterns` extended with `**/*.json` so locale chunks are precached by the Service Worker.
-- `document.documentElement.lang` updated reactively on every language change.
-- i18n initialised in `main.jsx` before the React tree renders.
+## Priority 2 — Custom icon infrastructure + Kornflakes example ✅ done (T-002 / T-003)
 
-## Priority 2 — String Extraction
+Custom icons stored as `.svg` files under `frontend/src/assets/icons/custom/`, imported via `vite-plugin-svgr`, normalized through `normalizeCustomIcon()`, registered in `ICON_REGISTRY` with `Custom` prefix.
 
-Objective: Replace every hardcoded UI string in components and pages with `t()` calls.
+## Priority 3 — Additional custom icons: grocery & hygiene batch ✅ done (T-004)
 
-- All ~130 user-visible strings extracted into `en/translation.json` and translated into `de/translation.json`.
-- ICU plural syntax (`{count, plural, one {…} other {…}}`) used for count-dependent messages (offline queue banner, squad count, etc.).
-- German placeholders already present in `AddItemSheet.jsx` ("Beschreibung, Menge…", "Weniger anzeigen", "Mehr anzeigen") corrected and moved to locale files.
-- Aria-labels, placeholders, and confirmation dialogs all translated.
+CustomGarlic, CustomHummus, CustomDentalFloss, CustomToothpaste, CustomCottonPads, CustomPasta.
 
-## Priority 3 — Language Switcher UI
+## Priority 4 — Icon suggestion quality (T-005)
 
-Objective: Allow users to switch language inside the "Info & Settings" sheet.
+Objective: Make the icon suggestion system find the right icon for any common input — including synonyms, regional variants, compound words, and brand names.
 
-- `LanguageSwitcher` component: two-state `DE` / `EN` button-group toggle styled to existing design tokens.
-- Mounted inside `InfoSheet` below the user identity section.
-- Selection persisted to `localStorage` via i18next-browser-languagedetector; UI re-renders immediately on change.
-- Unit test for `LanguageSwitcher` covering toggle behaviour and persistence.
+- Register all existing custom icons (T-002–T-004) in `iconDatabase.js` so they are suggested.
+- Redirect "garlic" and "pasta" DB entries to the dedicated custom icons.
+- Enrich every existing `iconDatabase.js` entry across all categories with additional German and English tags (target ≥ 5 tags per entry).
 
-## Decisions
+## Priority 5 — Expanded icon set: clothing, fruit, hygiene & misc ✅ done (T-006 / T-005)
 
-| # | Topic | Decision |
-|---|-------|----------|
-| 1 | Type safety | Plain JS — no TypeScript migration |
-| 2 | Namespace granularity | Single namespace (`translation`) |
-| 3 | SW caching | `**/*.json` added to Workbox `globPatterns` |
-| 4 | Language switcher UI | Custom `DE` / `EN` button-group toggle |
+## Priority 6 — Replace generic icons with dedicated custom icons
+
+Objective: Cover product categories not yet represented in the icon browser.
+
+### Group A — tabler/lucide (implementer verifies availability; custom SVG fallback if absent)
+
+| Item | Candidate | Registry key |
+|---|---|---|
+| Socken | tabler `IconSock` | `IconSock` |
+| Hose | tabler `IconPants` | `IconPants` |
+| Schuhe | tabler `IconShoe` | `IconShoe` |
+| Ananas | tabler `IconPineapple` | `IconPineapple` |
+| Wassermelone | lucide `Watermelon` | `Watermelon` |
+| Feuerzeug | tabler `IconFlame` | `IconFlame` |
+| Konservendose | tabler `IconCan` | `IconCan` |
+
+### Group B — Custom SVG icons
+
+| Item | SVG file | Registry key |
+|---|---|---|
+| Wattestäbchen | `cottonSwabs.svg` | `CustomCottonSwabs` |
+| Feuchtes Klopapier | `wetWipes.svg` | `CustomWetWipes` |
+| Interdental Sticks | `interdentalSticks.svg` | `CustomInterdentalSticks` |
+| Creme Tube | `creamTube.svg` | `CustomCreamTube` |
+| Creme Tiegel | `creamJar.svg` | `CustomCreamJar` |
+| Mango | `mango.svg` | `CustomMango` |
+| Kiwi | `kiwi.svg` | `CustomKiwi` |
+| Pfirsich | `peach.svg` | `CustomPeach` |
+| Pflaume | `plum.svg` | `CustomPlum` |
+| Blaubeeren | `blueberries.svg` | `CustomBlueberries` |
+| E-Liquid / Vape | `eLiquid.svg` | `CustomELiquid` |
+
+### Group C — DB entries only (existing icons, no new registry key)
+
+| Item | Icon to use | Action |
+|---|---|---|
+| T-Shirt (Kleidung) | `IconShirt` | Add clothing DB entry |
+| Knopfzellen | `IconBattery` | Add DB entry |
+
+All T-006 icons receive `iconDatabase.js` entries with German + English tags within the same task.
+
+## Priority 6 — Replace generic icons with dedicated custom icons
+
+Objective: Replace all DB entries that use a generic/mismatched icon with a dedicated custom SVG. Each custom icon also redirects its existing DB entry and receives enriched tags.
+
+### T-007 — Food & Produce (19 custom icons)
+
+Replaces generic icons for: Tomato, Cucumber, BellPepper, Onion, Potato, BreadRoll, Baguette, Rice, Jam, PastaSauce, Chips, Fries, Chocolate, FrozenVegetables, FrozenBerries, Butter, Cream, Yogurt, Quark.
+
+Tabler candidates to verify first (custom SVG fallback if absent): `IconChocolate`, `IconFries`, `IconBaguette`, `IconTomato`.
+
+### T-008 — Drugstore & Household (19 custom icons)
+
+Replaces generic icons for: Shampoo, Conditioner, BodyWash, Toothbrush, Mouthwash, ShavingCream, Sunscreen, AfterSun, Diapers, GlassesCleaner, CleaningCloth, StorageBags, BakingPaper, Foil, Sponge, HandSoap, FabricSoftener, Detergent, PaperTowels.
+
+Tabler candidate to verify first (custom SVG fallback if absent): `IconMop`.
+
+Each task delivers: SVG files + `customIcons.js` exports + `iconRegistry.js` entries + DB redirects + enriched tags + `iconRegistry.test.js` assertions.

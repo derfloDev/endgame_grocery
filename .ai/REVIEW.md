@@ -2,95 +2,40 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
----
-
 ## Task: T-001
 
 ### Review Round 1
 
-Status: **FAIL**
+Status: **complete**
 
 Reviewed: 2026-05-06
 
 #### Findings
-
-1. **[major — required]** `frontend/src/locales/de/translation.json` — entire file
-   German locale file systematically replaces every umlaut and ß with ASCII digraphs throughout all 130 values (e.g. `"Loeschen"` instead of `"Löschen"`, `"Zurueck"` instead of `"Zurück"`, `"Schliessen"` instead of `"Schließen"`, `"Laedt"` instead of `"Lädt"`, `"Hinzufuegen"` instead of `"Hinzufügen"`, `"Aenderung"` instead of `"Änderung"`, `"ausstehende"` key strings, etc.).
-   These render as visibly misspelled German to every German-speaking user. The locale file is an explicit T-001 deliverable (Plan §1.2) and must contain correct Unicode content.
-   **Required fix:** Replace all ASCII digraph substitutions with proper German Unicode characters (ä, ö, ü, ß).
-
-#### Required Fixes
-
-1. Replace every `ae`→`ä`, `oe`→`ö`, `ue`→`ü`, `ss`→`ß` substitution in `frontend/src/locales/de/translation.json` with the corresponding Unicode character.
-   Verify with a quick scan that no ASCII-substituted umlaut remains after the fix.
+- No issues found.
 
 #### Verification
-
 ##### Steps
-1. Read `.ai/PLAN.md` (T-001 scope confirmed: §1.1–1.6).
-2. Read `frontend/src/i18n.js` — verified against Plan §1.3.
-3. Read `frontend/src/main.jsx` — verified `import "./i18n"` is first import (Plan §1.4).
-4. Read `frontend/vite.config.js` — verified `globPatterns` includes `json` (Plan §1.5).
-5. Read `frontend/index.html` — confirmed `lang="en"` present (Plan §1.6).
-6. Read `frontend/package.json` — all 5 required packages present (`i18next`, `react-i18next`, `i18next-browser-languagedetector`, `i18next-icu`, `i18next-resources-to-backend`).
-7. Read `frontend/src/locales/en/translation.json` — 130 keys, correct English content, all keys from Key Catalogue present.
-8. Read `frontend/src/locales/de/translation.json` — 130 keys present (key parity ✓); content uses ASCII digraphs throughout (finding #1).
-9. Read `frontend/src/i18n.test.js` — tests `document.documentElement.lang` sync via `changeLanguage('de')`. Covers acceptance criterion.
-10. Read `frontend/src/vite-config.test.js` — `"precaches JSON assets for offline locale delivery"` test present and passes.
-11. Ran `npm run lint` → 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unrelated to T-001). **PASS**.
-12. Ran `npm run build` → build succeeded; emitted `dist/assets/translation-BMjHrVUO.js` and `dist/assets/translation-CXi3lF1I.js` (two separate translation chunks). SW precache includes JSON glob. **PASS**.
-13. Ran `npm test` → 22 test files, 129 tests, all green. **PASS**.
-14. Ran `git diff --stat HEAD` to confirm scope of changes aligns with T-001 deliverables.
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Inspected `git diff HEAD` for `frontend/src/data/iconRegistry.js` and `frontend/src/data/iconRegistry.test.js`.
+3. Verified tabler package exports: `IconPaperBag` and `IconCannabis` exist in `@tabler/icons-react`; `IconBean`, `IconBeef`, `IconGrape` do not — lucide fallbacks correctly used.
+4. Confirmed alphabetical ordering of imports and registry entries.
+5. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
+6. Ran `npm run build` — success.
+7. Ran `npm test` — 106 pass, 0 fail.
+8. Ran targeted `vitest run src/data/iconRegistry.test.js` — 6 tests pass including new coverage for all six added icons.
 
 ##### Findings
-- All T-001 acceptance criteria are met structurally (build, chunks, SW precache, lang sync).
-- German locale content is incorrect: ASCII substitutions throughout (`ae/oe/ue/ss` instead of `ä/ö/ü/ß`).
+- All six icons are present in `ICON_REGISTRY` and `ICON_REGISTRY_KEYS`.
+- Lucide fallbacks for `IconBean`, `IconBeef`, `IconGrape` are correctly aliased and wrapped with `fromLucide()`.
+- `IconCannabis` and `IconPaperBag` are imported directly from tabler and registered as-is.
+- `BicepsFlexed` is imported from lucide and wrapped with `fromLucide()`.
+- Alphabetical ordering is maintained throughout imports and registry.
 
 ##### Risks
-- If German strings are committed with ASCII digraphs they will be directly visible to German-speaking users in T-002 and will require a follow-up fix touching many files; better to correct in the locale file now while only T-001 is in scope.
+- None.
 
----
-
-### Review Round 2
-
-Status: **PASS**
-
-Reviewed: 2026-05-06
-
-#### Findings
-
-No new findings. Required fix from Round 1 fully addressed.
-
-- **[resolved]** `frontend/src/locales/de/translation.json` — all ASCII digraph substitutions replaced with proper Unicode characters (ä, ö, ü, ß) throughout all 130 values. Verified by direct file read and `rg` scan.
-- A regression test was added (`i18n.test.js`) that asserts correct umlaut values for key entries and rejects known bad patterns — this prevents re-introduction of the issue.
-- Test count increased 129 → 130 reflecting the new test case.
-
-#### Required Fixes
-
-None.
-
-#### Verification
-
-##### Steps
-1. Re-read `.ai/TASKS.md` — task in `ready_for_review`, owner `review`.
-2. Read `frontend/src/locales/de/translation.json` — all umlauts correct (ä, ö, ü, ß); no ASCII digraph substitutions remain.
-3. Ran `rg` scan for known bad forms (`Loeschen`, `Schliessen`, `Zurueck`, `Laedt`, `Hinzufuegen`, `Aenderung`, `Oeffnen`) — zero matches in the locale file.
-4. Read `frontend/src/i18n.test.js` — new regression test asserts `common.delete == "Löschen"`, `common.close == "Schließen"`, `common.back == "Zurück"`, `common.add == "Hinzufügen"`, and rejects the full set of known bad digraph forms.
-5. Ran `npm run lint` → 0 errors (pre-existing `AuthContext.jsx` warning unrelated). **PASS**.
-6. Ran `npm run build` → succeeded; two translation chunks emitted; SW precache 14 entries. **PASS**.
-7. Ran `npm test` → 22 test files, **130 tests**, all green. **PASS**.
-
-##### Findings
-All four T-001 acceptance criteria confirmed met:
-- `npm run build` succeeds ✅
-- dist contains separate translation chunks for en and de ✅
-- SW precache manifest includes JSON glob ✅
-- `document.documentElement.lang` updates on language change ✅
-
-German locale content now correct throughout.
-
-##### Risks
-None identified.
+#### Open Questions
+- None.
 
 #### Verdict
 `PASS`
@@ -101,53 +46,42 @@ None identified.
 
 ### Review Round 1
 
-Status: **PASS_WITH_NOTES**
+Status: **complete**
 
-Reviewed: 2026-05-06
+Reviewed: 2026-05-07
 
 #### Findings
-
-1. **[minor]** `src/locales/en/translation.json`, `src/locales/de/translation.json` — 18 orphaned keys
-   The locale files contain 146 keys each; only 126 are referenced by non-test JSX. The 18 unused keys (`common.close`, `common.back`, `common.retry`, `common.loading`, `common.add`, `list.saveListName`, `list.cancelRename`, `list.options`, `detail.owner`, `detail.shared`, `item.chooseIcon`, `item.browseIcon`, `auth.resetTokenError`, `auth.passwordUpdated`, `auth.verifyTitle`, `auth.resending`, `listCard.renameLabel`, `listCard.cancelRename`) are carry-overs from the plan's abbreviated Key Catalogue. The components use more specific or differently-named keys (e.g. `auth.resetTokenRequired` instead of `auth.resetTokenError`). The remaining 2 orphaned keys (`settings.language`, `settings.languageLabel`) are intentionally reserved for T-003.
-   **Not a required fix** — does not affect any acceptance criterion. Recommend cleaning up in a future pass.
-
-#### Required Fixes
-
-None.
+- No issues found.
 
 #### Verification
-
 ##### Steps
-1. Re-read `.ai/TASKS.md` — T-002 in `ready_for_review`, owner `review`.
-2. Re-read `.ai/PLAN.md` — T-002 scope: replace ~130 hardcoded strings; ICU plurals in OfflineBanner; fix German strings in AddItemSheet.
-3. Confirmed all 25 expected files (16 components + 9 pages) import `useTranslation`. Verified via `rg -l "useTranslation"`.
-4. Read `OfflineBanner.jsx` — ICU plural calls correct: `t("offline.queued", { count })`, `t("offline.syncing", { count })`, `t("offline.waiting", { count })`. ✓
-5. Read `AddItemSheet.jsx` — all strings via `t()`. German strings fixed. Two new keys (`item.chooseSpecificIcon`, `item.browseSpecificIcon`) added with variable interpolation — an improvement over generic plan keys; both present in both locales. ✓
-6. Read `InfoSheet.jsx`, `ListCardHome.jsx`, `OverviewPage.jsx`, `LoginPage.jsx`, `ShareListSheet.jsx`, `ListOptionsSheet.jsx`, `ResetPasswordPage.jsx`, `VerifyEmailPage.jsx` — all strings via `t()`. ✓
-7. Ran Node.js key parity check: 126 unique t() keys in non-test JSX; all 126 present in both locales. ✓
-8. Ran key parity check between locales: both have 146 keys, zero key set difference. ✓
-9. Reviewed `vite.config.js` diff: added `test.setupFiles` pointing to `src/test/setup.js`. ✓
-10. Reviewed `src/i18n.js` diff: added `typeof document === "undefined"` guard; added `react: { useSuspense: false }`. Both are correct for test environments and production. ✓
-11. Reviewed `src/test/setup.js`: resets i18next to `"en"` before every test — prevents language-pollution between tests. ✓
-12. Reviewed `src/app.test.jsx` diff: imports i18n; resets to `"en"` in `beforeEach`; adds a new integration test `"renders translated auth copy when German is selected"` that verifies German rendering at the app level. ✓
-13. Ran `npm run lint` → 0 errors. **PASS**.
-14. Ran `npm run build` → succeeded. **PASS**.
-15. Ran `npm test` → 22 test files, **132 tests**, all green. **PASS**.
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Inspected working-tree diff for `frontend/src/data/customIcons.js` (new), `frontend/src/data/iconRegistry.js`, and `frontend/src/data/iconRegistry.test.js`.
+3. Verified `fromCustomSVG` factory signature and default props match plan spec exactly.
+4. Verified `CustomKornflakesBowl` (bowl + 4 flake paths) and `CustomKornflakesBox` (body + angled top + label lines) SVG element sets.
+5. Verified alphabetical registry insertion: `CustomKornflakesBox` before `CustomKornflakesBowl` ✓
+6. Verified `formatIconName` strips `Custom` prefix (6 chars) with inline comment documenting the rule.
+7. Confirmed test additions: registry presence, `formatIconName` output, and DOM render tests for size=22 and size=32 at `currentColor` stroke.
+8. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
+9. Ran `npm run build` — success.
+10. Ran `npm test` — 141 pass, 0 fail.
+11. Ran targeted `vitest run --environment jsdom src/data/iconRegistry.test.js` — 11/11 pass (all four size×icon render tests pass under jsdom).
 
 ##### Findings
-All T-002 acceptance criteria confirmed met:
-- All user-visible strings rendered via `t()` ✓
-- Both locale files fully populated (146 keys each, zero parity gap) ✓
-- `npm run lint` passes ✓
-- App renders correct language on load (verified by integration test for German) ✓
-
-Minor: 18 orphaned locale keys (plan catalogue artefacts, not affecting runtime).
+- `fromCustomSVG` factory matches plan spec: `color = "currentColor"`, `strokeWidth: stroke ?? strokeWidth ?? 1.5`, `strokeLinecap/strokeLinejoin: "round"`, `fill: "none"`.
+- Both Kornflakes icons export as named constants with `displayName` set.
+- `formatIconName("CustomKornflakesBowl")` → `"Kornflakes Bowl"` ✓; `formatIconName("CustomKornflakesBox")` → `"Kornflakes Box"` ✓.
+- Render tests confirm correct `width`, `height`, `viewBox`, `stroke`, and `fill` at both size=22 and size=32.
+- Note: the targeted vitest run must use `--environment jsdom` (or run via `npm test`) since `@testing-library/react` requires a DOM. This is expected given the existing project test setup.
 
 ##### Risks
-None identified.
+- None.
+
+#### Open Questions
+- None.
 
 #### Verdict
-`PASS_WITH_NOTES`
+`PASS`
 
 ---
 
@@ -155,48 +89,256 @@ None identified.
 
 ### Review Round 1
 
-Status: **PASS**
+Status: **complete**
 
-Reviewed: 2026-05-06
+Reviewed: 2026-05-07
 
 #### Findings
-
-1. **[nit]** `frontend/src/index.css` — `.language-switcher` block
-   Two hardcoded `rgba()` values: `rgba(255, 255, 255, 0.08)` (border) and `rgba(13, 17, 40, 0.84)` (container background). Plan asks to use design tokens. These are glass-morphism decorative values that lack named tokens; the functionally important states (active, focus) correctly use `var(--gradient-brand)`, `var(--glow-cyan)`, `var(--neon-cyan)`.
-   Not a required fix.
-
-#### Required Fixes
-
-None.
+- No issues found.
 
 #### Verification
-
 ##### Steps
-1. Re-read `.ai/TASKS.md` — T-003 in `ready_for_review`, owner `review`.
-2. Re-read `.ai/PLAN.md` — T-003 scope: `LanguageSwitcher.jsx` component, integrate into `InfoSheet`, write unit test.
-3. Read `frontend/src/components/LanguageSwitcher.jsx` — renders `<div role="group" aria-label={t("settings.languageLabel")}>` with two buttons (DE, EN); `aria-pressed` set correctly; `i18n.changeLanguage()` called on click; `normalizeLanguage()` handles `"de-AT"` → `"de"` subtag stripping gracefully; uses `i18n.resolvedLanguage` (preferred over raw `i18n.language`). ✓
-4. Read `frontend/src/components/InfoSheet.jsx` — `<LanguageSwitcher />` placed in a new `info-sheet-language` section, correctly positioned below the user identity block and above the logout button. `settings.language` label rendered above the switcher. ✓
-5. Read `frontend/src/components/LanguageSwitcher.test.jsx` — 3 tests covering all 4 plan-specified scenarios:
-   - "renders the English and German language buttons" ✓
-   - "marks English as active when the current language is English" (aria-pressed for both buttons) ✓
-   - "switches to German and persists the preference" (click → waitFor aria-pressed; localStorage check) ✓
-   Uses real i18next (better than mocking); `beforeEach` resets language to "en" to prevent pollution. ✓
-6. Read `frontend/src/components/InfoSheet.test.jsx` — existing 6 tests pass; LanguageSwitcher renders inside InfoSheet without errors. ✓
-7. Read `frontend/src/index.css` (lines 575–643) — `.language-switcher` CSS block; active state uses `var(--gradient-brand)`, `var(--bg-base)`, `var(--glow-cyan)`; focus uses `var(--neon-cyan)`, `var(--radius-sm)`, `var(--text-sm)`. Two `rgba()` container values not tokenized (nit). ✓
-8. Confirmed `settings.language` and `settings.languageLabel` keys (reserved in T-002) are now consumed: `settings.language` in InfoSheet label, `settings.languageLabel` as the aria-label on the group. ✓
-9. Ran `npm run lint` → 0 errors. **PASS**.
-10. Ran `npm run build` → succeeded. **PASS**.
-11. Ran `npm test` → 23 test files, **135 tests**, all green (3 new LanguageSwitcher tests, 6 existing InfoSheet tests still passing). **PASS**.
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Inspected working-tree diffs for `frontend/src/data/customIcons.js`, `frontend/vite.config.js`, `frontend/src/vite-config.test.js`, `README.md`, `frontend/package.json`, and the two new SVG files under `frontend/src/assets/icons/custom/`.
+3. Confirmed `vite-plugin-svgr@^5.2.0` added to `frontend/package.json` devDependencies and `svgr()` registered as the second plugin in `vite.config.js` (between `react()` and `VitePWA`).
+4. Confirmed SVG file conventions match plan requirements: `viewBox="0 0 24 24"`, no `width`/`height` on root, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root; no `stroke-width` on elements (controlled by wrapper).
+5. Verified `normalizeCustomIcon(SvgComponent, displayName)` factory: accepts `(size, stroke, strokeWidth, color, ...rest)`, passes `width`, `height`, `stroke`, `strokeWidth` through to SVG component; `color` defaults to `"currentColor"`, `strokeWidth` falls back to 1.5. Exported for future custom icon use.
+6. Confirmed `iconRegistry.js` unchanged — T-002 imports/entries remain valid since exports keep the same names.
+7. Confirmed `iconRegistry.test.js` unchanged — all 11 tests (including four DOM render tests) still pass against the svgr-backed implementation.
+8. Verified new `vite-config.test.js` test asserts `vite-plugin-svgr` import and `svgr()` call in config source.
+9. Confirmed README updated with SVG workflow documentation (file location, import convention, `normalizeCustomIcon` usage, `Custom` prefix, registry contract).
+10. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
+11. Ran `npm run build` — success, no SVG import warnings.
+12. Ran `npm test` — 142 pass (141 pre-existing + 1 new vite-config test), 0 fail.
+13. Ran `vitest run --environment jsdom iconRegistry.test.js` — 11/11 pass including all four size×icon render tests.
 
 ##### Findings
-All T-003 acceptance criteria confirmed met:
-- Toggle renders DE and EN buttons ✅
-- Clicking switches language immediately ✅ (verified by `waitFor` in test)
-- Selection persists to localStorage ✅ (`localStorage.getItem("i18nextLng") === "de"` in test)
-- `npm test` passes for LanguageSwitcher ✅ (3/3 tests green)
+- `stroke-linecap` and `stroke-linejoin` are correctly encoded in the SVG root (rather than the wrapper), so they remain in the component's default output and can be overridden at call-site via `...rest`.
+- `normalizeCustomIcon` is exported, enabling future custom icons to follow the same pattern without duplicating logic.
+- Build output size unchanged (SVG content is equivalent to the T-002 JS-embedded paths).
 
 ##### Risks
-None identified.
+- None.
+
+#### Open Questions
+- None.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-05-07
+
+#### Findings
+- No issues found.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Inspected working-tree diffs for `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, and all six new SVG files.
+3. Confirmed all six SVG files follow T-003 conventions: `viewBox="0 0 24 24"`, no `width`/`height` on root, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root, no `stroke-width` on elements.
+4. Verified design briefs: garlic (bulb + clove lines + stem), hummus (bowl arc + mound + depression), dentalFloss (box body + floss strand), toothpaste (tube body + cap + crimped end), cottonPads (stacked ellipses + texture marks), pasta (wavy noodle lines + fork silhouette).
+5. Confirmed alphabetical import order in `customIcons.js`: CottonPads, DentalFloss, Garlic, Hummus, KornflakesBowl, KornflakesBox, Pasta, Toothpaste.
+6. Confirmed alphabetical registry insertion: new entries (CottonPads, DentalFloss, Garlic, Hummus, Pasta, Toothpaste) placed correctly relative to the existing Kornflakes entries.
+7. Verified test additions: `resolveIconName` presence test for all six; `formatIconName` assertions (e.g. "Dental Floss", "Cotton Pads", "Garlic"); DOM render tests at size=22 and size=32 for all six.
+8. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
+9. Ran `npm run build` — success, no SVG import warnings.
+10. Ran `npm test` — 155 pass (+13 over T-003 baseline of 142), 0 fail.
+11. Ran `vitest run --environment jsdom iconRegistry.test.js` — 24/24 pass (12 new render tests, all six icons at size=22 and size=32).
+
+##### Findings
+- All six SVG files strictly follow the T-003 convention for interoperability with `normalizeCustomIcon`.
+- The KornflakesBox/KornflakesBowl ordering in the registry (Box before Bowl) is a pre-existing artifact from T-002 and is not a T-004 concern.
+- `formatIconName` correctly splits multi-word names: "Cotton Pads", "Dental Floss", "Toothpaste" (single word), etc.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-05-07
+
+#### Findings
+
+1. **nit** — `customIcons.js` lines 17–18 & 57–58; `iconRegistry.js` import block lines 18–19 and registry lines 212–213: `CustomPants` / `PantsSvg` is placed after `CustomPasta` / `PastaSvg` in all three locations. Alphabetically "Pants" (Pa-n) precedes "Pasta" (Pa-s). Not required — does not affect functionality or tests.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Verified tabler/lucide availability for all seven Group A candidates: `IconSock` ✓ tabler, `IconShoe` ✓ tabler, `IconFlame` ✓ tabler; `IconPants`, `IconPineapple`, `IconCan` absent from tabler; `Watermelon` absent from lucide — all four correctly replaced with custom SVG fallbacks.
+3. Confirmed 15 new SVG files created (11 planned + 4 fallbacks: can, pants, pineapple, watermelon). All follow T-003 conventions: `viewBox="0 0 24 24"`, no `width`/`height` on root, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root, no `stroke-width` on elements.
+4. Confirmed `customIcons.js` imports and exports extended with all 15 new custom icons (Blueberries, Can, CottonSwabs, CreamJar, CreamTube, ELiquid, InterdentalSticks, Kiwi, Mango, Pants, Peach, Pineapple, Plum, Watermelon, WetWipes).
+5. Confirmed `iconRegistry.js` import block and `ICON_REGISTRY` extended with all new entries; `IconSock`, `IconShoe`, `IconFlame` registered directly from tabler.
+6. Confirmed test additions: `resolveIconName` presence tests for all new tabler-backed keys (IconFlame, IconShoe, IconSock) and all custom keys; `formatIconName` assertions for all new icons; DOM render tests at size=22 and size=32 for all 15 new custom icons.
+7. Noted `CustomELiquid` → `"E Liquid"` is correct (the `([A-Z]+)([A-Z][a-z])` regex splits "EL" → "E L" → "E Liquid").
+8. Identified `CustomPants`/`PantsSvg` placed after `CustomPasta`/`PastaSvg` in all three locations — nit, not a required fix.
+9. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
+10. Ran `npm run build` — success, no SVG import warnings.
+11. Ran `npm test` — 187 pass (+32 over T-004 baseline of 155), 0 fail.
+12. Ran `vitest run --environment jsdom iconRegistry.test.js` — 56/56 pass (32 new render tests, all 15 custom icons at size=22 and size=32 plus 3 tabler presence checks).
+
+##### Findings
+- `IconPants`, `IconPineapple`, `IconCan`, and `Watermelon` are absent from the installed tabler/lucide packages; custom SVG fallbacks correctly applied and registered under `CustomPants`, `CustomPineapple`, `CustomCan`, `CustomWatermelon`.
+- All SVG files strictly follow the T-003 convention for interoperability with `normalizeCustomIcon`.
+- `CustomPants`/`PantsSvg` is ordered after `CustomPasta`/`PastaSvg` — alphabetically reversed. Non-blocking nit.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`
+
+---
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-05-07
+
+#### Findings
+- No issues found.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Read full `iconDatabase.js` — verified all three redirections, all new entries, and enrichment quality.
+3. Verified three redirections: `garlic` → `CustomGarlic` (was IconPepper); `pasta` → `CustomPasta` (was IconToolsKitchen2); `grapes` → `IconGrape` (was IconCherry).
+4. Verified DB entries for all T-002–T-004 custom icons: `CustomKornflakesBowl`, `CustomKornflakesBox`, `CustomHummus`, `CustomDentalFloss`, `CustomToothpaste`, `CustomCottonPads` (garlic and pasta covered by redirections).
+5. Verified DB entries for all T-006 icons: `IconSock`, `CustomPants`, `IconShoe`, `CustomPineapple`, `CustomWatermelon`, `IconFlame`, `CustomCan`, `CustomCottonSwabs`, `CustomWetWipes`, `CustomInterdentalSticks`, `CustomCreamTube`, `CustomCreamJar`, `CustomMango`, `CustomKiwi`, `CustomPeach`, `CustomPlum`, `CustomBlueberries`, `CustomELiquid`, plus existing `IconShirt` and `IconBattery` entries.
+6. Spot-checked ≥5 unique searchable terms for borderline entries (mango, kiwi, blueberries, plum, peach — all exactly 5 due to duplicate label/tag) — all pass.
+7. Confirmed plan-specified enrichments: dairy, produce, bakery, meat/fish, beverages, household, condiments, pantry, drugstore categories all enriched with German regional variants, plural/singular pairs, brand synonyms, and compound-word forms.
+8. Reviewed `cottonSwabs.svg` and `interdentalSticks.svg` diffs — both are visual design improvements; SVG conventions (viewBox, fill=none, stroke=currentColor, round caps/joins, no stroke-width) preserved ✓.
+9. Verified `cosineSimilarity.test.js` changes: updated `zahnpasta → CustomToothpaste` (correct); new ≥5-terms automated test; new redirections test (16 spot checks); new T-006 exact-match test (20 spot checks).
+10. Verified README paragraph updated to mention custom SVG icons, enriched synonyms, and expanded catalogue scope.
+11. Ran `npm run lint` — 0 errors, 1 pre-existing warning.
+12. Ran `npm run build` — success.
+13. Ran `npm test` — 190 pass (+3 over T-006 baseline of 187), 0 fail.
+14. Ran `vitest run --environment jsdom cosineSimilarity.test.js` — 10/10 pass (3 new tests).
+
+##### Findings
+- `zahnpasta` correctly maps to `CustomToothpaste` (the previous `IconDental` mapping was outdated; the test assertion was updated accordingly).
+- Entries where the label text also appears in the tags (mango, kiwi, blueberries, e-liquid) still satisfy the ≥5-unique-terms constraint because the `createExactMatchMap` just overwrites with the same icon value.
+- SVG design improvements to `cottonSwabs.svg` and `interdentalSticks.svg` are an appropriate cosmetic fix within this task's scope.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## T-007 — Food & Produce: 19 custom SVG icons
+
+**verdict:** PASS
+
+### Findings
+
+None.
+
+### Verification
+
+#### Steps performed
+
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` before starting review.
+2. Checked tabler/lucide availability: `IconBaguette` present in `@tabler/icons-react`; `IconChocolate`, `IconFries`, `IconTomato` absent — correctly implemented as custom SVGs per plan fallback requirement.
+3. Ran `git diff HEAD` and `git status` to enumerate all changes:
+   - 18 new SVG files under `frontend/src/assets/icons/custom/` (BellPepper, BreadRoll, Butter, Chips, Chocolate, Cream, Cucumber, Fries, FrozenBerries, FrozenVegetables, Jam, Onion, PastaSauce, Potato, Quark, Rice, Tomato, Yogurt).
+   - `customIcons.js`: 18 new imports and `normalizeCustomIcon()` exports.
+   - `iconRegistry.js`: `IconBaguette` added to tabler import block; 18 new `Custom*` entries in `ICON_REGISTRY`.
+   - `iconDatabase.js`: 19 DB redirects (e.g., tomato → `CustomTomato`, baguette → `IconBaguette`, chocolate → `CustomChocolate`) with enriched tags (≥5 per entry).
+   - `iconRegistry.test.js`: new `resolveIconName` test for all 19 icons, `formatIconName` assertions, render tests at size=22 and size=32 for all 18 custom icons.
+   - `cosineSimilarity.test.js`: updated `chocolate`/`schokolade` assertions; new `"routes food and produce exact matches to dedicated icons"` test with 36 key-value checks.
+4. Inspected all 18 SVG files: all use `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root; no `stroke-width` on individual elements; no `width`/`height` attributes. Conventions correct.
+5. Ran `npm run lint` → 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unrelated).
+6. Ran `npm run build` → success, no errors.
+7. Ran `npm test` (full suite, backend) → 106 pass, 0 fail.
+8. Ran `npx vitest run --environment jsdom src/data/iconRegistry.test.js` → 93 pass, 0 fail.
+9. Ran `npx vitest run --environment jsdom src/utils/cosineSimilarity.test.js` → 11 pass, 0 fail.
+
+#### Findings
+
+All acceptance criteria met:
+- All 19 icons resolvable from the registry (18 custom + `IconBaguette` from tabler).
+- All custom icons render at size=22 and size=32 with `currentColor` stroke.
+- SVG files present under `frontend/src/assets/icons/custom/`.
+- `formatIconName` strips `Custom` prefix correctly.
+- DB redirects in place for all 19 entries.
+- Lint, build, and tests pass.
+
+#### Risks
+
+None identified.
+
+---
+
+## T-008 — Drugstore & Household: 20 custom SVG icons
+
+**verdict:** PASS
+
+### Findings
+
+None.
+
+### Verification
+
+#### Steps performed
+
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` before starting review.
+2. Checked tabler availability: `IconMop` absent — correctly implemented as `CustomMop` custom SVG per plan fallback requirement.
+3. Ran `git status` and `git diff HEAD` to enumerate all changes:
+   - 20 new SVG files under `frontend/src/assets/icons/custom/` (AfterSun, BakingPaper, BodyWash, CleaningCloth, Conditioner, Detergent, Diapers, FabricSoftener, Foil, GlassesCleaner, HandSoap, Mop, Mouthwash, PaperTowels, Shampoo, ShavingCream, Sponge, StorageBags, Sunscreen, Toothbrush).
+   - `customIcons.js`: 20 new imports and `normalizeCustomIcon()` exports (alphabetical).
+   - `iconRegistry.js`: 20 new `Custom*` entries in `ICON_REGISTRY` and import block (alphabetical).
+   - `iconDatabase.js`: 20 DB redirects (shampoo → `CustomShampoo`, conditioner → `CustomConditioner`, body wash → `CustomBodyWash`, toothbrush → `CustomToothbrush`, mouthwash → `CustomMouthwash`, shaving cream → `CustomShavingCream`, sunscreen → `CustomSunscreen`, after sun → `CustomAfterSun`, diapers → `CustomDiapers`, glasses cleaner → `CustomGlassesCleaner`, cleaning cloth → `CustomCleaningCloth`, storage bags → `CustomStorageBags`, baking paper → `CustomBakingPaper`, foil → `CustomFoil`, mop → `CustomMop`, sponge → `CustomSponge`, hand soap → `CustomHandSoap`, fabric softener → `CustomFabricSoftener`, detergent → `CustomDetergent`, paper towels → `CustomPaperTowels`) with enriched tags (≥5 per entry).
+   - `iconRegistry.test.js`: new `resolveIconName` test for all 20 icons, `formatIconName` assertions, render tests at size=22 and size=32 for all 20 custom icons.
+   - `cosineSimilarity.test.js`: updated `shampoo` assertion (was `IconFlask`, now `CustomShampoo`); new `"routes drugstore and household exact matches to dedicated icons"` test with 40 key-value checks.
+   - `README.md`: documentation updated to mention drugstore and household dedicated icons.
+4. Inspected all 20 SVG files: all use `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root; no `stroke-width` on individual elements; no `width`/`height` attributes. Conventions correct.
+5. Ran `npm run lint` → 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unrelated).
+6. Ran `npm run build` → success, no errors.
+7. Ran `npx vitest run --environment jsdom src/data/iconRegistry.test.js` → 134 passed, 0 fail.
+8. Ran `npx vitest run --environment jsdom src/utils/cosineSimilarity.test.js` → 12 passed, 0 fail.
+
+#### Findings
+
+All acceptance criteria met:
+- All 20 icons resolvable from the registry (20 custom SVGs; `CustomMop` created as fallback since `IconMop` absent from tabler).
+- All custom icons render at size=22 and size=32 with `currentColor` stroke.
+- SVG files present under `frontend/src/assets/icons/custom/`.
+- `formatIconName` strips `Custom` prefix correctly for all 20 icons.
+- DB redirects in place for all 20 entries with ≥5 tags each.
+- README documentation updated to reflect expanded icon coverage.
+- Lint, build, and tests pass.
+
+#### Risks
+
+None identified.

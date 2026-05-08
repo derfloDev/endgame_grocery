@@ -268,7 +268,9 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 
 ### Icon Assignment
 
-New and edited entries can be assigned icons locally in the browser without sending item text to an external AI service. Exact EN/DE matches resolve immediately from the curated Tabler and Lucide icon catalogue, while broader terms fall back to a local `transformers.js` similarity check that suggests from the same expanded food, household, and health icon set. The picker shows human-readable labels such as `Ice Cream 2` instead of raw registry keys.
+New and edited entries can be assigned icons locally in the browser without sending item text to an external AI service. Exact EN/DE matches resolve immediately from the curated Tabler, Lucide, and custom SVG icon catalogue, including enriched synonym, regional, brand-name, and compound-word matches for grocery, produce, household, clothing, and drugstore items. Dedicated food, produce, drugstore, and household entries such as tomatoes, onions, rice, frozen food, snacks, dairy staples, shampoo, mouthwash, cleaning supplies, and paper goods use specific registry icons instead of generic category fallbacks. Broader terms fall back to a local `transformers.js` similarity check that suggests from the same expanded icon set. The picker shows human-readable labels such as `Ice Cream 2` instead of raw registry keys.
+
+Hand-crafted custom icons live as SVG files in `frontend/src/assets/icons/custom/` and are imported with `*.svg?react` through `vite-plugin-svgr`. Wrap new SVG imports with `normalizeCustomIcon` in `frontend/src/data/customIcons.js`, export them with a `Custom` prefix, and register those exports in `ICON_REGISTRY` so they render with the same `size`, `stroke`/`strokeWidth`, and `color` props as Tabler and Lucide icons.
 
 `VITE_ICON_SIMILARITY_THRESHOLD` controls how strict that semantic fallback is. Lower values suggest icons more aggressively, while higher values require a closer match before the worker returns an automatic suggestion.
 
