@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.12.0](https://github.com/derfloDev/endgame_grocery/compare/v0.11.0...v0.12.0) (2026-05-08)
+
+
+### Features
+
+* **icons:** add custom grocery and hygiene icons ([c8e9aeb](https://github.com/derfloDev/endgame_grocery/commit/c8e9aeb95f068b0ed566f605a13d42904b52424b))
+* **icons:** add custom Kornflakes icon choices ([b4a3943](https://github.com/derfloDev/endgame_grocery/commit/b4a394381f73d44bb5f6fdc69db3111dc61dbaf9))
+* **icons:** add dedicated drugstore and household icons ([16efead](https://github.com/derfloDev/endgame_grocery/commit/16efead0a76c8152f0792f1ad52a53c317b6f247))
+* **icons:** add dedicated food and produce icons ([9e7b46f](https://github.com/derfloDev/endgame_grocery/commit/9e7b46f3a98b1700120b7f6a79011dfbadd01f3b))
+* **icons:** add expanded grocery icon set ([c73bae9](https://github.com/derfloDev/endgame_grocery/commit/c73bae9351d0e1d1f6144205af142a763e27b107))
+* **icons:** add missing grocery icon choices ([8b617a5](https://github.com/derfloDev/endgame_grocery/commit/8b617a58cbed001a4c6ad24e3d070b9dd5842f60))
+* **icons:** enrich icon suggestions ([fc7d12c](https://github.com/derfloDev/endgame_grocery/commit/fc7d12c17982e6af5fee132c0618ef0dd6f61a91))
+
+
+### Bug Fixes
+
+* **deps:** add missing peer dependencies intl-messageformat and @testing-library/dom ([c354a8c](https://github.com/derfloDev/endgame_grocery/commit/c354a8c1a579978ef16587aa40fd51cb10d69a87))
+
 ## [0.11.0](https://github.com/derfloDev/endgame_grocery/compare/v0.10.0...v0.11.0) (2026-05-06)
 
 
