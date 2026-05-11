@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
-import { createEntry, deleteEntry, fetchEntries, updateEntry } from "../api/entries";
+import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
 import { writeCachedResource } from "../api/offlineStore";
 import { fetchLists, renameList } from "../api/lists";
 import { fetchListMembers, revokeListMember, shareListWithMember } from "../api/sharing";
 import AddItemSheet from "../components/AddItemSheet";
-import EntryRow from "../components/EntryRow";
+import EntryTile from "../components/EntryTile";
 import ListOptionsSheet from "../components/ListOptionsSheet";
 import RecentlyUsedSection from "../components/RecentlyUsedSection";
 import RenameListSheet from "../components/RenameListSheet";
@@ -365,21 +365,6 @@ export default function ListDetailPage() {
     }
   }
 
-  async function handleDeleteEntry(entryId) {
-    try {
-      setEntryError("");
-      const entryToArchive = entries.find((entry) => entry.id === entryId);
-      await deleteEntry(id, entryId, token);
-      await updateEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
-
-      if (entryToArchive) {
-        setRecentlyUsed((currentItems) => upsertRecentlyUsedItems(currentItems, entryToArchive));
-      }
-    } catch (submitError) {
-      setEntryError(submitError.message);
-    }
-  }
-
   async function handleAddFromHistory(text, icon) {
     const historyItem = recentlyUsed.find((item) => item.text === text);
     setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
@@ -547,15 +532,16 @@ export default function ListDetailPage() {
               {openEntries.length === 0 ? (
                 <EmptyState body={t("detail.noOpenItems")} title={t("detail.allClearTitle")} />
               ) : (
-                openEntries.map((entry) => (
-                  <EntryRow
-                    key={entry.id}
-                    entry={entry}
-                    onDelete={() => void handleDeleteEntry(entry.id)}
-                    onEdit={() => setEditingEntry(entry)}
-                    onToggle={() => void toggleStatus(entry)}
-                  />
-                ))
+                <div className="entry-tile-grid">
+                  {openEntries.map((entry) => (
+                    <EntryTile
+                      key={entry.id}
+                      entry={entry}
+                      onEdit={() => setEditingEntry(entry)}
+                      onToggle={() => void toggleStatus(entry)}
+                    />
+                  ))}
+                </div>
               )}
             </section>
 

@@ -198,6 +198,25 @@ describe("ListDetailPage optimistic updates", () => {
       { tempId: expect.stringMatching(/^temp-entry-/) }
     );
   });
+
+  it("renders open entries in the tile grid", async () => {
+    mockListDetailData({
+      entries: [
+        {
+          id: "entry-1",
+          text: "Milk",
+          status: "open",
+          icon: "IconMilk",
+          created_at: "2026-04-21T00:00:00Z"
+        }
+      ]
+    });
+
+    renderListDetailPage();
+
+    expect(await screen.findByTestId("entry-tile-entry-1")).toBeTruthy();
+    expect(getOpenItemsSection().querySelector(".entry-tile-grid")).toBeTruthy();
+  });
 });
 
 describe("ListDetailPage layout styles", () => {
@@ -220,5 +239,20 @@ describe("ListDetailPage layout styles", () => {
     expect(pageSource).toMatch(
       /<div className="list-card-chips">[\s\S]*\{visibleMemberBadges\.length > 0 \? \([\s\S]*<div className="detail-member-badges">/s
     );
+  });
+
+  it("defines the entry tile and recently used grid columns", () => {
+    expect(cssSource).toMatch(
+      /\.entry-tile-grid\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(3,\s*1fr\);/s
+    );
+    expect(cssSource).toMatch(
+      /\.recently-used-grid\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(2,\s*1fr\);/s
+    );
+  });
+
+  it("removes row delete wiring from the detail page", () => {
+    expect(pageSource).toContain("EntryTile");
+    expect(pageSource).not.toContain("handleDeleteEntry");
+    expect(pageSource).not.toContain("deleteEntry");
   });
 });

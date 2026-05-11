@@ -185,3 +185,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-005 — implement — 2026-05-11T15:38:39Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Replaced open entry rows with 3-column tiles using long-press edit, and converted recently used items to a 2-column chip grid |
+| Files Changed | `frontend/src/hooks/useLongPress.js`, `frontend/src/hooks/useLongPress.test.jsx`, `frontend/src/components/EntryTile.jsx`, `frontend/src/components/entry-tile.test.jsx`, `frontend/src/components/EntryRow.jsx`, `frontend/src/components/entry-row.test.jsx`, `frontend/src/components/RecentlyUsedSection.jsx`, `frontend/src/components/RecentlyUsedSection.test.jsx`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.test.jsx`, `frontend/src/app.test.jsx`, `frontend/src/index.css`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- useLongPress.test.jsx entry-tile.test.jsx RecentlyUsedSection.test.jsx ListDetailPage.test.jsx app.test.jsx` PASS; `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `feat(entries): show grocery entries as tiles` |
+| Next Role | review |
+
+---
+
+### T-005 — review — 2026-05-11T18:33:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed tile grid implementation; EntryRow deleted, EntryTile and useLongPress added, RecentlyUsedSection converted to 2-col grid, handleDeleteEntry removed, 283/283 tests pass, lint and build clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — commit_task — 2026-05-11T16:34:04Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-005 done and committed the reviewed tile grid changes |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run test --workspace frontend -- useLongPress.test.jsx entry-tile.test.jsx RecentlyUsedSection.test.jsx ListDetailPage.test.jsx app.test.jsx`; `npm run lint`; `npm run build`; `npm test` |
+| Commit | `feat(entries): show grocery entries as tiles` |
+| Next Role | none |
+
+---

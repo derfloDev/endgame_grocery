@@ -126,6 +126,56 @@ No issues found.
 
 ---
 
+## Task: T-005
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-11
+
+#### Findings
+
+No issues found.
+
+- **nit** — `recently-used-chip` CSS omits `user-select: none; -webkit-user-select: none;` (present in the plan spec). The chip is a `<button>` element; browsers do not select button text on tap by default, so the omission is harmless. Not a required fix.
+- **nit** — `useLongPress.js` adds a `useEffect` cleanup (`clearTimeout(timerRef.current)` on unmount) and clears any running timer at the top of `start()` that the plan pseudo-code didn't include. Both are defensive improvements over the spec. Not a required fix.
+
+#### Verification
+
+##### Steps
+
+1. `git diff --name-status HEAD` — confirmed: `EntryRow.jsx` deleted (D), `entry-row.test.jsx` deleted (D), `EntryTile.jsx` added (A), `entry-tile.test.jsx` added (A), `useLongPress.js` added (A), `useLongPress.test.jsx` added (A), `RecentlyUsedSection.jsx` modified, `RecentlyUsedSection.test.jsx` modified, `ListDetailPage.jsx` modified, `app.test.jsx` modified, `index.css` modified.
+2. Read `useLongPress.js` — hook matches plan with unmount cleanup and rapid-press guard added.
+3. Read `EntryTile.jsx` — component matches plan exactly; `Icon` import dropped (not needed, correct).
+4. Read `entry-tile.test.jsx` — 7 tests covering all plan-specified scenarios.
+5. Read `useLongPress.test.jsx` — 4 tests covering all plan-specified scenarios.
+6. Read `RecentlyUsedSection.jsx` — `recently-used-grid` / `recently-used-cell` structure matches plan; `aria-label` on dismiss button uses `recent.dismiss` key.
+7. Read `RecentlyUsedSection.test.jsx` — updated to use `.recently-used-grid` and `.recently-used-cell` selectors; dismiss button asserted by `"Dismiss {name}"` aria-label. Added second test for fallback icon.
+8. Verified `ListDetailPage.jsx` imports `EntryTile` (not `EntryRow`); `handleDeleteEntry` and `deleteEntry` import removed; entries wrapped in `<div className="entry-tile-grid">`.
+9. Verified `app.test.jsx` uses `"Mark {name} done"` aria-label — works with `EntryTile` since it uses the same i18n key. No `.entry-row` or swipe-delete references remain.
+10. Verified `index.css`: tile grid rules present; old `.entry-row*` and `.recently-used-list` / `.recently-used-chip-row` rules removed.
+11. English translations: `entry.markDone` → "Mark {name} done", `common.queued` → "Queued", `recent.dismiss` → "Dismiss {name}" — all match test assertions.
+12. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`).
+13. `npx vitest run --environment jsdom useLongPress.test.jsx entry-tile.test.jsx RecentlyUsedSection.test.jsx` — 13/13 PASS.
+14. Full suite `npx vitest run --environment jsdom` — 283/283 tests PASS (24 test files), no regressions.
+15. `npx vite build` — PASS.
+
+##### Findings
+
+- `useLongPress`: timer cleanup on unmount prevents leaked timers; `longPressedRef` and `defaultPrevented` pattern correctly suppresses the synthetic toggle click after a long-press. ✓
+- `EntryTile`: long-press → `onEdit` fires and `onToggle` is blocked; short tap → `onToggle` fires. ✓
+- `handleDeleteEntry` fully removed from `ListDetailPage`; `deleteEntry` import also removed. ✓
+- `RecentlyUsedSection` grid structure matches plan; dismiss badge is absolutely-positioned inside the cell. ✓
+- Old `EntryRow.jsx` and `entry-row.test.jsx` deleted; no orphan CSS rules remain. ✓
+- All 11 plan-specified tests present and passing. ✓
+
+##### Risks
+
+- None. `EntryRow` was the only consumer of `handleDeleteEntry`; its removal is self-contained. SSE-triggered `handleEntryChange` still calls `loadEntries` to reconcile server state.
+
+---
+
 ## Task: T-003
 
 ### Review Round 1
