@@ -243,19 +243,21 @@ export default function ListDetailPage() {
       return false;
     }
 
+    const nextDetails = normalizeEntryDetails(details);
+    const temporaryEntry = {
+      id: createTemporaryId("entry"),
+      text: trimmed,
+      icon: icon ?? null,
+      details: nextDetails,
+      status: "open",
+      created_at: new Date().toISOString(),
+      is_pending_sync: true
+    };
+
+    await updateEntries((currentEntries) => sortEntries([...currentEntries, temporaryEntry]));
+
     try {
       setEntryError("");
-      const nextDetails = normalizeEntryDetails(details);
-
-      const temporaryEntry = {
-        id: createTemporaryId("entry"),
-        text: trimmed,
-        icon: icon ?? null,
-        details: nextDetails,
-        status: "open",
-        created_at: new Date().toISOString(),
-        is_pending_sync: true
-      };
       const result = await createEntry(
         id,
         token,
@@ -264,19 +266,38 @@ export default function ListDetailPage() {
       );
 
       await updateEntries((currentEntries) =>
-        sortEntries([...currentEntries, result?.queued ? temporaryEntry : result.entry])
+        sortEntries(
+          currentEntries.map((currentEntry) =>
+            currentEntry.id === temporaryEntry.id ? (result?.queued ? temporaryEntry : result.entry) : currentEntry
+          )
+        )
       );
       return true;
     } catch (submitError) {
+      await updateEntries((currentEntries) =>
+        currentEntries.filter((currentEntry) => currentEntry.id !== temporaryEntry.id)
+      );
       setEntryError(submitError.message);
       return false;
     }
   }
 
   async function toggleStatus(entry) {
+    const nextStatus = entry.status === "open" ? "done" : "open";
+    const optimisticEntry = { ...entry, status: nextStatus, is_pending_sync: true };
+
+    await updateEntries((currentEntries) =>
+      sortEntries(
+        currentEntries.map((currentEntry) => (currentEntry.id === entry.id ? optimisticEntry : currentEntry))
+      )
+    );
+
+    if (nextStatus === "done") {
+      setRecentlyUsed((currentItems) => upsertRecentlyUsedItems(currentItems, entry));
+    }
+
     try {
       setEntryError("");
-      const nextStatus = entry.status === "open" ? "done" : "open";
       const result = await updateEntry(id, entry.id, token, { status: nextStatus });
 
       await updateEntries((currentEntries) =>
@@ -292,12 +313,20 @@ export default function ListDetailPage() {
         )
       );
 
-      if (nextStatus === "done") {
+      if (nextStatus === "done" && !result?.queued) {
         setRecentlyUsed((currentItems) =>
-          upsertRecentlyUsedItems(currentItems, result?.queued ? entry : result?.entry ?? entry)
+          upsertRecentlyUsedItems(currentItems, result?.entry ?? entry)
         );
       }
     } catch (submitError) {
+      await updateEntries((currentEntries) =>
+        sortEntries(currentEntries.map((currentEntry) => (currentEntry.id === entry.id ? entry : currentEntry)))
+      );
+
+      if (nextStatus === "done") {
+        setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== entry.text));
+      }
+
       setEntryError(submitError.message);
     }
   }

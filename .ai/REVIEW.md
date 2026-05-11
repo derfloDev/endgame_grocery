@@ -84,6 +84,48 @@ No issues found.
 
 ---
 
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-11
+
+#### Findings
+
+No issues found.
+
+- **nit** — `toggleStatus` settle-on-queued spreads `{ is_pending_sync: true, status: nextStatus }` where the plan specified only `{ is_pending_sync: true }`. The extra `status: nextStatus` is a safe improvement that keeps state consistent when the API queues the request. Not a required fix.
+
+#### Verification
+
+##### Steps
+
+1. Read `frontend/src/pages/ListDetailPage.jsx` — `toggleStatus` and `addEntryByText` reviewed in full against plan.
+2. Read `frontend/src/pages/ListDetailPage.test.jsx` — all 3 new optimistic-update tests reviewed.
+3. Verified English translation keys: `entry.markDone` → "Mark {name} done", `common.queued` → "Queued", `recent.sectionLabel` → "Recently Used" — all match test assertions.
+4. Confirmed `handleDeleteEntry` is still present — correct; T-005 removes it, not T-004.
+5. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-004).
+6. `npx vitest run --environment jsdom ListDetailPage.test.jsx --reporter=verbose` — 6/6 tests PASS, including all 3 new optimistic-update tests.
+7. Full test suite `npx vitest run --environment jsdom` — 275/275 tests PASS (272 prior + 3 new), no regressions.
+8. `npx vite build` — PASS.
+
+##### Findings
+
+- `toggleStatus`: optimistic state update fires before `await updateEntry`; revert in `catch` restores original entry and removes from recentlyUsed on error. ✓
+- `addEntryByText`: temporary entry inserted before `await createEntry`; replaced with server entry on success, removed on error. ✓
+- Both functions use `updateEntries` (which writes to the offline cache via `writeCachedResource`) ensuring offline-queue consistency. ✓
+- Test 1 — toggle removes entry from open list before API resolves. ✓
+- Test 2 — revert restores entry and shows error banner when API rejects. ✓
+- Test 3 — history reactivation shows temp entry with "Queued" chip immediately. ✓
+
+##### Risks
+
+- None. Optimistic pattern is self-contained in `toggleStatus` and `addEntryByText`; SSE events and `loadEntries` will reconcile server state on reconnect as before.
+
+---
+
 ## Task: T-003
 
 ### Review Round 1

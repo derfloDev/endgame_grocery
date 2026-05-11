@@ -147,3 +147,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — implement — 2026-05-11T15:19:59Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Made entry toggles and history reactivation update local list state optimistically before API calls settle |
+| Files Changed | `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.test.jsx`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- ListDetailPage.test.jsx` PASS; `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `feat(entries): make list updates optimistic` |
+| Next Role | review |
+
+---
+
+### T-004 — review — 2026-05-11T17:25:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed optimistic toggle and reactivate implementation; all 3 new tests pass, 275/275 total, optimistic/revert logic matches plan, lint and build clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — commit_task — 2026-05-11T15:25:52Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-004 done and committed the reviewed optimistic list update changes |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run test --workspace frontend -- ListDetailPage.test.jsx`; `npm run lint`; `npm run build`; `npm test` |
+| Commit | `feat(entries): make list updates optimistic` |
+| Next Role | none |
+
+---
