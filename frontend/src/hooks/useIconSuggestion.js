@@ -23,6 +23,20 @@ function getExactOrPrefixIcon(normalizedText) {
     }
   }
 
+  let bestSubstringIcon = null;
+  let bestSubstringLength = 0;
+
+  for (const [term, icon] of Object.entries(EXACT_MATCH_MAP)) {
+    if (term.length >= 4 && normalizedText.includes(term) && term.length > bestSubstringLength) {
+      bestSubstringIcon = icon;
+      bestSubstringLength = term.length;
+    }
+  }
+
+  if (bestSubstringIcon) {
+    return bestSubstringIcon;
+  }
+
   return null;
 }
 

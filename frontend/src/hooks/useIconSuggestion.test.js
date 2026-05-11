@@ -48,6 +48,24 @@ describe("useIconSuggestion", () => {
     expect(requestIconMatch).not.toHaveBeenCalled();
   });
 
+  it("returns the bell-pepper icon for compound input containing paprika without calling the worker", () => {
+    render(createElement(HookHarness, { text: "Spritzpaprika" }));
+
+    expect(screen.getByTestId("icon-name").textContent).toBe("CustomBellPepper");
+    expect(screen.getByTestId("top-matches").textContent).toBe("[]");
+    expect(screen.getByTestId("loading").textContent).toBe("false");
+    expect(requestIconMatch).not.toHaveBeenCalled();
+  });
+
+  it("returns the carrot icon for compound input containing moehren without calling the worker", () => {
+    render(createElement(HookHarness, { text: "Minimöhren" }));
+
+    expect(screen.getByTestId("icon-name").textContent).toBe("IconCarrot");
+    expect(screen.getByTestId("top-matches").textContent).toBe("[]");
+    expect(screen.getByTestId("loading").textContent).toBe("false");
+    expect(requestIconMatch).not.toHaveBeenCalled();
+  });
+
   it("returns null and not loading for empty input", () => {
     render(createElement(HookHarness, { text: "   " }));
 
