@@ -223,3 +223,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-006 — implement — 2026-05-11T16:50:16Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Switched bottom-sheet sizing to dynamic viewport units for the icon browser and restored the recently-used grid to its reviewed 2-column layout |
+| Files Changed | `frontend/src/index.css`, `frontend/src/components/AddItemSheet.test.jsx`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- AddItemSheet.test.jsx ListDetailPage.test.jsx` PASS; `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `fix(ui): keep icon browser visible on mobile` |
+| Next Role | review |
+
+---
+
+### T-006 — review — 2026-05-11T18:58:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed dvh bottom-sheet fix; max-height rules correct, inner flex-chain enables scrollable icon grid, new CSS assertion test passes, 284/284 tests pass, lint clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — commit_task — 2026-05-11T17:03:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-006 done and committed the reviewed mobile icon browser sizing fix |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run test --workspace frontend -- AddItemSheet.test.jsx ListDetailPage.test.jsx`; `npm run lint`; `npm run build`; `npm test` |
+| Commit | `fix(ui): keep icon browser visible on mobile` |
+| Next Role | none |
+
+---

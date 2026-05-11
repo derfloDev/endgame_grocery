@@ -176,6 +176,47 @@ No issues found.
 
 ---
 
+## Task: T-006
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-11
+
+#### Findings
+
+No issues found.
+
+- **nit** — Implementation goes beyond the two plan-specified `max-height` rules: `.bottom-sheet--browser-open` also gains `display: flex; flex-direction: column; overflow: hidden;` and a flex-chain down through `.add-item-form`, `.add-item-disclosure`, `.add-item-icon-browser`, `.add-item-icon-browser-inner`, and `.add-item-icon-browser-grid`. This is necessary to make the icon grid actually scrollable within the constrained viewport height, satisfying the acceptance criterion about scrollability. Test assertions cover the complete set of rules. Not a required fix.
+
+#### Verification
+
+##### Steps
+
+1. `git diff --name-status HEAD` — confirmed only `frontend/src/index.css` and `frontend/src/components/AddItemSheet.test.jsx` modified. No JS changes. ✓
+2. Read `index.css` lines 525–548: `.bottom-sheet` uses `max-height: min(80dvh, 44rem)` (was `80vh`); `.bottom-sheet--browser-open` uses `max-height: min(92dvh, 44rem)`. ✓
+3. Confirmed no remaining `80vh` reference: searched `index.css` for `vh` — none found in `bottom-sheet` rules.
+4. Reviewed additional flex-column chain rules at lines 852–868 and 1076–1101: they create a scrollable flex column inside the constrained sheet so the icon grid overflows-y correctly on small viewports.
+5. Read `AddItemSheet.test.jsx`: new test `"uses dynamic viewport height for the icon browser sheet"` (line 332–334) asserts `min(80dvh, 44rem)` and `min(92dvh, 44rem)` and the absence of legacy `min(80vh, 44rem)`. All 14 AddItemSheet tests pass.
+6. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`).
+7. `npx vitest run --environment jsdom AddItemSheet.test.jsx` — 14/14 PASS.
+8. Full suite `npx vitest run --environment jsdom` — 284/284 tests PASS, no regressions.
+
+##### Findings
+
+- `dvh` (dynamic viewport height) replaces `vh` in `.bottom-sheet` — shrinks automatically when iOS/Android software keyboard appears. ✓
+- `.bottom-sheet--browser-open` uses `min(92dvh, 44rem)` giving more room for the icon browser when open. ✓
+- Inner flex-chain rules ensure the icon grid is scrollable when the sheet is height-constrained. ✓
+- No JS changes, no test-file changes beyond the new CSS assertion. ✓
+- `dvh` supported in Chrome 108+, Safari 15.4+, Firefox 101+ — covers all current mobile targets. ✓
+
+##### Risks
+
+- None. `dvh` has broad browser support; fallback to `vh` is not needed. The flex-chain rules only apply under `.bottom-sheet--browser-open` and do not affect the default sheet layout.
+
+---
+
 ## Task: T-003
 
 ### Review Round 1

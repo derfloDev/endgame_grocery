@@ -328,6 +328,12 @@ describe("AddItemSheet", () => {
     expect(cssSource).toMatch(/\.fab\s*\{[^}]*right:\s*max\(calc\(50%\s*-\s*195px\),\s*16px\);/s);
   });
 
+  it("uses dynamic viewport height for the icon browser sheet", () => {
+    expect(cssSource).toMatch(/\.bottom-sheet\s*\{[^}]*max-height:\s*min\(80dvh,\s*44rem\);/s);
+    expect(cssSource).toMatch(/\.bottom-sheet--browser-open\s*\{[^}]*max-height:\s*min\(92dvh,\s*44rem\);/s);
+    expect(cssSource).not.toMatch(/max-height:\s*min\(80vh,\s*44rem\);/);
+  });
+
   it("scrolls the add-item input into view when it receives focus", async () => {
     const scrollIntoView = vi.fn();
     const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;

@@ -528,7 +528,7 @@ p {
   left: 50%;
   z-index: 201;
   width: 100%;
-  max-height: min(80vh, 44rem);
+  max-height: min(80dvh, 44rem);
   max-width: 430px;
   padding: var(--space-5) var(--space-4) var(--space-5);
   overflow-x: hidden;
@@ -542,6 +542,7 @@ p {
 }
 
 .bottom-sheet--browser-open {
+  max-height: min(92dvh, 44rem);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1142,7 +1143,7 @@ p {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: space-evenly;
   gap: 6px;
   border: 1px solid rgba(139, 43, 226, 0.18);
   border-radius: var(--radius-md);
@@ -1323,7 +1324,7 @@ p {
 
 .recently-used-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
@@ -1338,7 +1339,7 @@ p {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: start;
+  justify-content: space-evenly;
   gap: 6px;
   min-height: 92px;
   border: 1px solid rgba(0, 229, 255, 0.18);
