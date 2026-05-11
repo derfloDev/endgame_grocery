@@ -300,11 +300,60 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-008 — plan — 2026-05-11T17:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned removal of the obsolete swipe-to-delete E2E test (`swipeEntryLeft` helper + test block) that broke CI after `EntryRow` was replaced by `EntryTile` in T-005 |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
 ### Cycle closed — unversioned — 2026-05-11T17:21:20Z
 
 | Field | Value |
 |-------|-------|
 | Summary | All tasks done; cycle closed |
 | Version | unversioned |
+
+---
+
+### T-008 — review — 2026-05-11T20:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed removal of obsolete swipe-to-delete E2E test; swipeEntryLeft helper and swipe test block fully removed, remaining helpers intact, 106/106 tests pass, lint and build clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-008 — implement — 2026-05-11T17:51:48Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed the obsolete swipe-to-delete E2E helper and test that referenced the retired entry-row UI |
+| Files Changed | `e2e/lists.spec.js`, `.ai/TASKS.md` |
+| Validation | `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `test(e2e): remove obsolete swipe-to-delete scenario` |
+| Next Role | review |
+
+---
+
+### T-008 — commit_task — 2026-05-11T17:57:07Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-008 done and committed the reviewed obsolete swipe-to-delete E2E removal |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run lint`; `npm run build`; `npm test` |
+| Commit | `test(e2e): remove obsolete swipe-to-delete scenario` |
+| Next Role | none |
 
 ---

@@ -717,3 +717,37 @@ npm test
 ```
 
 All three must pass before marking a task `ready_for_review`.
+
+---
+
+## T-008 — Remove obsolete swipe-to-delete E2E test
+
+### Goal
+The E2E test `deletes an item from a shopping list via swipe` references `.entry-row`
+and swipe-to-delete behaviour that were intentionally removed in T-005. The test fails
+on every CI run. Remove it and the `swipeEntryLeft` helper that only it uses.
+
+### Background
+`EntryRow.jsx` was replaced by `EntryTile.jsx` in T-005. Swipe-to-delete was a
+deliberate product decision to drop (ROADMAP Priority 5: "Remove swipe-to-delete").
+The E2E test was not cleaned up at that time, causing the current CI failure.
+
+### Files to change
+| File | Change |
+|------|--------|
+| `e2e/lists.spec.js` | Remove `swipeEntryLeft` helper (lines 60–106) and the test block `deletes an item from a shopping list via swipe` (lines 142–155) |
+
+### Implementation detail
+- Delete the entire `swipeEntryLeft` async function (lines 60–106).
+- Delete the entire `test("deletes an item from a shopping list via swipe", ...)` block (lines 142–155).
+- Keep `openItemsSection` and `recentlyUsedSection` helpers — they are used by the remaining tests.
+- No other files require changes.
+
+### Validation
+```
+npm run lint
+npm run build
+npm test
+```
+All three must pass. The E2E suite itself runs in CI only; local validation via
+`npm test` (unit tests) is sufficient to confirm no regressions in the unit layer.

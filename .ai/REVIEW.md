@@ -293,3 +293,44 @@ No issues found.
 ##### Risks
 
 - None. CSS-only selector split; no layout regressions detected in the test suite.
+
+---
+
+## Task: T-008
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-11
+
+#### Findings
+
+No issues found.
+
+#### Verification
+
+##### Steps
+
+1. Read `.ai/TASKS.md` — T-008 moved to `in_review`.
+2. Read `.ai/PLAN.md` — plan specifies deletion of `swipeEntryLeft` helper (original lines 60–106) and the `deletes an item from a shopping list via swipe` test block (original lines 142–155); `openItemsSection` and `recentlyUsedSection` helpers to be retained.
+3. Read `e2e/lists.spec.js` in full — confirmed current state of file.
+4. Ran `git diff e2e/lists.spec.js` — confirmed diff:
+   - `swipeEntryLeft` async function (47 lines) fully removed. ✓
+   - `deletes an item from a shopping list via swipe` test block (15 lines) fully removed. ✓
+   - `openItemsSection` and `recentlyUsedSection` helper functions retained. ✓
+   - No other hunks; only `e2e/lists.spec.js` changed.
+5. `npm run lint` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-008; 0 errors).
+6. `npm run build` — PASS (pre-existing chunk-size and ONNX eval warnings only).
+7. `npm test` — 106/106 tests PASS (frontend + backend), no regressions.
+
+##### Findings
+
+- `swipeEntryLeft` helper and swipe-delete test block are fully removed with no collateral damage. ✓
+- `openItemsSection` and `recentlyUsedSection` helpers are intact; the three remaining E2E tests are unaffected. ✓
+- No other files were touched; the change is exactly scoped to what the plan required. ✓
+- Lint clean relative to this change; build and full unit-test suite pass. ✓
+
+##### Risks
+
+- None. Removing a dead test and its private helper carries zero risk to runtime behaviour.
