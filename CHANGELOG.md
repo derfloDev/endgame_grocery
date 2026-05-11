@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.13.0](https://github.com/derfloDev/endgame_grocery/compare/v0.12.0...v0.13.0) (2026-05-11)
+
+
+### Features
+
+* **entries:** make list updates optimistic ([b2b31be](https://github.com/derfloDev/endgame_grocery/commit/b2b31bef0ea3a884ea7456b5d20441b2f719d26a))
+* **entries:** show grocery entries as tiles ([68ca9e5](https://github.com/derfloDev/endgame_grocery/commit/68ca9e5ff719c48d39792a6d45c769a5e7a1b4d0))
+* **icons:** match compound grocery terms synchronously ([b8ba710](https://github.com/derfloDev/endgame_grocery/commit/b8ba710ad33b58c62bd5bebf95dba5d6bc4afbef))
+* **icons:** refresh cucumber icon ([07863fe](https://github.com/derfloDev/endgame_grocery/commit/07863fe2276e92dbd738c850b167b5b5bea8b21e))
+* **ui:** flatten entry sections ([35345b1](https://github.com/derfloDev/endgame_grocery/commit/35345b1e6d3baa47e29610f267c491f06992487f))
+* **ui:** recently used grid with 3 cols ([b3cf31b](https://github.com/derfloDev/endgame_grocery/commit/b3cf31b89eb8f91c02f59217ebccdbb7e895562d))
+
+
+### Bug Fixes
+
+* **ui:** keep icon browser visible on mobile ([67681fb](https://github.com/derfloDev/endgame_grocery/commit/67681fb7b96984f8396bdb1e39d9c6581dc937fd))
+* **ui:** make icon browser toggle link-style ([8017489](https://github.com/derfloDev/endgame_grocery/commit/80174890ee8020a47d53dfde2b114a8b7ae0ef30))
+
 ## [0.12.0](https://github.com/derfloDev/endgame_grocery/compare/v0.11.0...v0.12.0) (2026-05-08)
 
 
