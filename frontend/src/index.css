@@ -1223,12 +1223,15 @@ p {
 }
 
 .list-card,
-.entry-section,
 .sharing-panel {
   border: 1px solid rgba(139, 43, 226, 0.25);
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
   padding: 1.25rem;
+}
+
+.entry-section {
+  padding: var(--space-2) 0;
 }
 
 .entry-card,

@@ -81,3 +81,42 @@ No issues found.
 ##### Risks
 
 - None. Pure SVG asset replacement; no logic paths affected.
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-11
+
+#### Findings
+
+No issues found.
+
+#### Verification
+
+##### Steps
+
+1. Read `frontend/src/index.css` around the changed block (lines 1225–1235).
+2. Confirmed the combined selector was split correctly: `.list-card, .sharing-panel` retains all card styles (border, border-radius, background, padding); `.entry-section` now contains only `padding: var(--space-2) 0;`.
+3. Verified `detail-content` still applies `padding: 0 16px` — items are not flush with screen edges.
+4. Checked `RecentlyUsedSection.jsx`: applies `className="entry-section recently-used-section"` on the root element — flat treatment inherited automatically from `.entry-section`.
+5. Confirmed no stray `border`, `border-radius`, or `background` declarations remain on `.entry-section`.
+6. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-003).
+7. `npx vitest run --environment jsdom` — 272/272 tests PASS, no regressions.
+
+##### Findings
+
+- `.list-card` and `.sharing-panel` card appearance unchanged. ✓
+- `.entry-section` has no border, no border-radius, no background; only vertical padding `var(--space-2) 0`. ✓
+- Sections retain vertical separation via `padding` and the pre-existing `.entry-section + .entry-section` rule (line 1292). ✓
+- `.recently-used-section` inherits flat treatment via dual class on the JSX element. ✓
+- `.detail-content` side padding (16px) prevents items being flush with screen edge. ✓
+- No JS, test, or documentation file changes were needed or made. ✓
+
+##### Risks
+
+- None. CSS-only selector split; no layout regressions detected in the test suite.

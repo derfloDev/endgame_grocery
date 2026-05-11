@@ -109,3 +109,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — implement — 2026-05-11T14:44:09Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed card framing from entry sections while preserving list-card and sharing-panel card styling |
+| Files Changed | `frontend/src/index.css`, `.ai/TASKS.md` |
+| Validation | `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); initial `npm test` hit two transient `app.test.jsx` timeouts, then `npm run test --workspace frontend -- app.test.jsx` PASS and rerun `npm test` PASS |
+| Commit | `feat(ui): flatten entry sections` |
+| Next Role | review |
+
+---
+
+### T-003 — review — 2026-05-11T14:47:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed CSS selector split for entry-section flattening; all acceptance criteria met, list-card/sharing-panel unchanged, 272 tests pass, lint clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — commit_task — 2026-05-11T14:55:54Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-003 done and committed the reviewed entry-section flattening change |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run lint`; `npm run build`; `npm run test --workspace frontend -- app.test.jsx`; `npm test` |
+| Commit | `feat(ui): flatten entry sections` |
+| Next Role | none |
+
+---
