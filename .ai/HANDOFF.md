@@ -71,3 +71,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — implement — 2026-05-11T14:20:18Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Replaced the cucumber SVG with a stroke-only diagonal cucumber icon including stem and texture strokes |
+| Files Changed | `frontend/src/assets/icons/custom/cucumber.svg`, `.ai/TASKS.md` |
+| Validation | `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `feat(icons): refresh cucumber icon` |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-05-11T14:26:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed replacement cucumber SVG; all acceptance criteria met, correct SVG attributes, 5 paths, no hardcoded colours, 272 tests pass, lint and build clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — commit_task — 2026-05-11T14:27:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and committed the reviewed cucumber SVG replacement |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run lint`; `npm run build`; `npm test` |
+| Commit | `feat(icons): refresh cucumber icon` |
+| Next Role | none |
+
+---
