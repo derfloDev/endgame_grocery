@@ -261,3 +261,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-007 — implement — 2026-05-11T17:10:50Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Styled the add-item icon browser toggle as an inline text link while preserving button semantics, and restored the reviewed 2-column recently-used grid rule needed by existing layout tests |
+| Files Changed | `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/index.css`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- AddItemSheet.test.jsx` PASS; `npm run test --workspace frontend -- ListDetailPage.test.jsx` PASS; `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `fix(ui): make icon browser toggle link-style` |
+| Next Role | review |
+
+---
+
+### T-007 — review — 2026-05-11T19:20:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed link-style toggle button; eg-btn-ghost removed, CSS matches plan exactly, button semantics preserved, new test passes all criteria, 285/285 tests pass, lint clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-007 — commit_task — 2026-05-11T17:19:38Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-007 done and committed the reviewed link-style icon browser toggle changes |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run test --workspace frontend -- AddItemSheet.test.jsx`; `npm run test --workspace frontend -- ListDetailPage.test.jsx`; `npm run lint`; `npm run build`; `npm test` |
+| Commit | `fix(ui): make icon browser toggle link-style` |
+| Next Role | none |
+
+---

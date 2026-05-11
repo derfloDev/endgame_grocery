@@ -1042,6 +1042,24 @@ p {
 
 .add-item-more-btn {
   width: fit-content;
+  padding: 0.15rem 0;
+  border: 0;
+  background: none;
+  color: var(--neon-violet);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition:
+    text-decoration-color var(--duration-micro),
+    opacity var(--duration-micro);
+}
+
+.add-item-more-btn:hover,
+.add-item-more-btn:focus-visible {
+  text-decoration-color: currentColor;
+  opacity: 0.85;
 }
 
 .add-item-actions {

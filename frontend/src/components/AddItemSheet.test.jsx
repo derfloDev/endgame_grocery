@@ -97,6 +97,28 @@ describe("AddItemSheet", () => {
     expect(onAdd).toHaveBeenCalledWith("Milch", "IconMilk", "");
   }, 10000);
 
+  it("styles the icon browser toggle as an inline text link", () => {
+    render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
+
+    const toggleButton = screen.getByRole("button", { name: "Mehr anzeigen" });
+    const toggleRule = cssSource.match(/\.add-item-more-btn\s*\{[^}]*\}/s)?.[0] ?? "";
+    const toggleInteractionRule =
+      cssSource.match(/\.add-item-more-btn:hover,\s*\.add-item-more-btn:focus-visible\s*\{[^}]*\}/s)?.[0] ??
+      "";
+
+    expect(toggleButton.className).toBe("add-item-more-btn");
+    expect(toggleButton.type).toBe("button");
+    expect(toggleRule).toMatch(/width:\s*fit-content;/);
+    expect(toggleRule).toMatch(/padding:\s*0\.15rem 0;/);
+    expect(toggleRule).toMatch(/border:\s*0;/);
+    expect(toggleRule).toMatch(/background:\s*none;/);
+    expect(toggleRule).toMatch(/font-size:\s*0\.9rem;/);
+    expect(toggleRule).toMatch(/text-decoration:\s*underline;/);
+    expect(toggleRule).toMatch(/text-decoration-color:\s*transparent;/);
+    expect(toggleInteractionRule).toMatch(/text-decoration-color:\s*currentColor;/);
+    expect(toggleInteractionRule).toMatch(/opacity:\s*0\.85;/);
+  });
+
   it("expands the inline icon browser, filters icons, and submits the manually selected icon", async () => {
     const onAdd = vi.fn();
     const { container } = render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);

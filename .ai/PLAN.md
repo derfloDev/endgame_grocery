@@ -536,7 +536,7 @@ Each grid cell holds the chip button and an absolutely-positioned dismiss badge.
 /* Replace .recently-used-list */
 .recently-used-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 

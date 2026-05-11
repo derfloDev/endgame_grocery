@@ -217,6 +217,46 @@ No issues found.
 
 ---
 
+## Task: T-007
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-11
+
+#### Findings
+
+No issues found.
+
+#### Verification
+
+##### Steps
+
+1. `git diff --name-status HEAD` — confirmed: `AddItemSheet.jsx`, `AddItemSheet.test.jsx`, `index.css` modified. No other files changed.
+2. Read `AddItemSheet.jsx` line 233: `className="add-item-more-btn"` — `eg-btn-ghost` removed. ✓
+3. Confirmed `type="button"` still present on the toggle button. ✓
+4. Confirmed the close button at line 287 retains `className="eg-btn-ghost"` — only the toggle was changed. ✓
+5. Read `index.css` lines 1043–1063: full link-style rule set matches plan exactly — `border: 0`, `background: none`, `text-decoration: underline`, `text-decoration-color: transparent`, hover/focus-visible reveals underline. ✓
+6. Height estimate: `padding: 0.15rem 0` (0.30rem) + `font-size: 0.9rem × line-height ~1.4` (≈1.26rem) ≈ 1.56rem — well under 1.8rem acceptance limit. ✓
+7. Read `AddItemSheet.test.jsx` lines 100–120: new test `"styles the icon browser toggle as an inline text link"` asserts className is exactly `"add-item-more-btn"` (no ghost class), `type="button"`, and all key CSS properties. ✓
+8. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning).
+9. `npx vitest run --environment jsdom AddItemSheet.test.jsx` — 15/15 PASS including new link-style test.
+10. Full suite `npx vitest run --environment jsdom` — 285/285 tests PASS, no regressions.
+
+##### Findings
+
+- `eg-btn-ghost` removed from toggle button; only `add-item-more-btn` class remains. ✓
+- All link-style CSS properties present: no border, no background, underline hidden at rest, shown on hover/focus-visible. ✓
+- Button element unchanged; `type="button"` preserved; keyboard accessible via `:focus-visible`. ✓
+- New test explicitly asserts every acceptance criterion via CSS source inspection. ✓
+
+##### Risks
+
+- None. CSS-only change to a single class; `eg-btn-ghost` on the close button is unaffected.
+
+---
+
 ## Task: T-003
 
 ### Review Round 1
