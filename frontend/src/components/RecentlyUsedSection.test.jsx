@@ -26,6 +26,8 @@ describe("RecentlyUsedSection", () => {
     const section = screen.getByRole("region", { name: "Recently Used" });
     expect(within(section).getByText("RECENTLY USED")).toBeTruthy();
     expect(within(section).getByText("2")).toBeTruthy();
+    expect(section.querySelector(".recently-used-grid")).toBeTruthy();
+    expect(section.querySelectorAll(".recently-used-cell")).toHaveLength(2);
 
     await userEvent.click(within(section).getByRole("button", { name: "Tomatoes" }));
     expect(onAdd).toHaveBeenCalledWith("Tomatoes", "IconSalad");

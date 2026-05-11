@@ -230,7 +230,7 @@ export default function AddItemSheet({
 
         <div className={`add-item-disclosure${showIconBrowser ? " add-item-disclosure--open" : ""}`}>
           <button
-            className="eg-btn-ghost add-item-more-btn"
+            className="add-item-more-btn"
             type="button"
             onClick={() => setShowIconBrowser((currentValue) => !currentValue)}
           >

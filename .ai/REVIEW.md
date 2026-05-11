@@ -2,43 +2,44 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
+---
+
 ## Task: T-001
 
 ### Review Round 1
 
-Status: **complete**
+Status: **PASS**
 
-Reviewed: 2026-05-06
+Reviewed: 2026-05-11
 
 #### Findings
-- No issues found.
+
+No issues found.
 
 #### Verification
+
 ##### Steps
-1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
-2. Inspected `git diff HEAD` for `frontend/src/data/iconRegistry.js` and `frontend/src/data/iconRegistry.test.js`.
-3. Verified tabler package exports: `IconPaperBag` and `IconCannabis` exist in `@tabler/icons-react`; `IconBean`, `IconBeef`, `IconGrape` do not — lucide fallbacks correctly used.
-4. Confirmed alphabetical ordering of imports and registry entries.
-5. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
-6. Ran `npm run build` — success.
-7. Ran `npm test` — 106 pass, 0 fail.
-8. Ran targeted `vitest run src/data/iconRegistry.test.js` — 6 tests pass including new coverage for all six added icons.
+
+1. Read `.ai/TASKS.md` — T-001 moved to `in_review`.
+2. Read `.ai/PLAN.md` — implementation requirements confirmed: substring-match third pass in `getExactOrPrefixIcon`, minimum length guard of 4, longest-match wins, 2 new tests asserting no worker call.
+3. Read `frontend/src/hooks/useIconSuggestion.js` — implementation reviewed against plan.
+4. Read `frontend/src/hooks/useIconSuggestion.test.js` — new tests reviewed against acceptance criteria.
+5. Verified `EXACT_MATCH_MAP` key construction in `iconDatabase.js`: `toLookupKey` = `trim().toLowerCase()`, so "möhren" → key "möhren" (IconCarrot) and "paprika" → key "paprika" (CustomBellPepper). Compound-word assertions are grounded in real data.
+6. `npm run lint` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-001).
+7. `npm run build` — PASS (pre-existing bundle/eval warnings only).
+8. `npx vitest run --environment jsdom useIconSuggestion` — 7/7 tests PASS including both new compound-word tests.
+9. Full test suite `npx vitest run --environment jsdom` — 272/272 tests PASS, 23 test files, no regressions.
 
 ##### Findings
-- All six icons are present in `ICON_REGISTRY` and `ICON_REGISTRY_KEYS`.
-- Lucide fallbacks for `IconBean`, `IconBeef`, `IconGrape` are correctly aliased and wrapped with `fromLucide()`.
-- `IconCannabis` and `IconPaperBag` are imported directly from tabler and registered as-is.
-- `BicepsFlexed` is imported from lucide and wrapped with `fromLucide()`.
-- Alphabetical ordering is maintained throughout imports and registry.
+
+- Implementation matches the plan exactly: substring-match loop added after exact and prefix passes, `term.length >= 4` guard present, longest-match selection via `term.length > bestSubstringLength`.
+- Both acceptance-criteria cases pass: `useIconSuggestion("Spritzpaprika")` → `CustomBellPepper` (sync, no worker), `useIconSuggestion("Minimöhren")` → `IconCarrot` (sync, no worker).
+- Existing tests unaffected.
+- Lint and build clean relative to this change.
 
 ##### Risks
-- None.
 
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
+- None. The substring scan iterates `EXACT_MATCH_MAP` (frozen object); cost is proportional to the number of entries and runs only when exact-match and prefix checks both miss — negligible for interactive input.
 
 ---
 
@@ -46,85 +47,40 @@ Reviewed: 2026-05-06
 
 ### Review Round 1
 
-Status: **complete**
+Status: **PASS**
 
-Reviewed: 2026-05-07
-
-#### Findings
-- No issues found.
-
-#### Verification
-##### Steps
-1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
-2. Inspected working-tree diff for `frontend/src/data/customIcons.js` (new), `frontend/src/data/iconRegistry.js`, and `frontend/src/data/iconRegistry.test.js`.
-3. Verified `fromCustomSVG` factory signature and default props match plan spec exactly.
-4. Verified `CustomKornflakesBowl` (bowl + 4 flake paths) and `CustomKornflakesBox` (body + angled top + label lines) SVG element sets.
-5. Verified alphabetical registry insertion: `CustomKornflakesBox` before `CustomKornflakesBowl` ✓
-6. Verified `formatIconName` strips `Custom` prefix (6 chars) with inline comment documenting the rule.
-7. Confirmed test additions: registry presence, `formatIconName` output, and DOM render tests for size=22 and size=32 at `currentColor` stroke.
-8. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
-9. Ran `npm run build` — success.
-10. Ran `npm test` — 141 pass, 0 fail.
-11. Ran targeted `vitest run --environment jsdom src/data/iconRegistry.test.js` — 11/11 pass (all four size×icon render tests pass under jsdom).
-
-##### Findings
-- `fromCustomSVG` factory matches plan spec: `color = "currentColor"`, `strokeWidth: stroke ?? strokeWidth ?? 1.5`, `strokeLinecap/strokeLinejoin: "round"`, `fill: "none"`.
-- Both Kornflakes icons export as named constants with `displayName` set.
-- `formatIconName("CustomKornflakesBowl")` → `"Kornflakes Bowl"` ✓; `formatIconName("CustomKornflakesBox")` → `"Kornflakes Box"` ✓.
-- Render tests confirm correct `width`, `height`, `viewBox`, `stroke`, and `fill` at both size=22 and size=32.
-- Note: the targeted vitest run must use `--environment jsdom` (or run via `npm test`) since `@testing-library/react` requires a DOM. This is expected given the existing project test setup.
-
-##### Risks
-- None.
-
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-003
-
-### Review Round 1
-
-Status: **complete**
-
-Reviewed: 2026-05-07
+Reviewed: 2026-05-11
 
 #### Findings
-- No issues found.
+
+No issues found.
+
+- **nit** — `cucumber.svg` sets `stroke-width="1.5"` explicitly on the root element, while `bellPepper.svg` and `tomato.svg` omit this attribute (inheriting the SVG default of 1 when rendered standalone). The plan explicitly requires `stroke-width="1.5"`, so the implementation is correct per spec. Pre-existing inconsistency in the reference icons; not a required fix.
 
 #### Verification
+
 ##### Steps
-1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
-2. Inspected working-tree diffs for `frontend/src/data/customIcons.js`, `frontend/vite.config.js`, `frontend/src/vite-config.test.js`, `README.md`, `frontend/package.json`, and the two new SVG files under `frontend/src/assets/icons/custom/`.
-3. Confirmed `vite-plugin-svgr@^5.2.0` added to `frontend/package.json` devDependencies and `svgr()` registered as the second plugin in `vite.config.js` (between `react()` and `VitePWA`).
-4. Confirmed SVG file conventions match plan requirements: `viewBox="0 0 24 24"`, no `width`/`height` on root, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root; no `stroke-width` on elements (controlled by wrapper).
-5. Verified `normalizeCustomIcon(SvgComponent, displayName)` factory: accepts `(size, stroke, strokeWidth, color, ...rest)`, passes `width`, `height`, `stroke`, `strokeWidth` through to SVG component; `color` defaults to `"currentColor"`, `strokeWidth` falls back to 1.5. Exported for future custom icon use.
-6. Confirmed `iconRegistry.js` unchanged — T-002 imports/entries remain valid since exports keep the same names.
-7. Confirmed `iconRegistry.test.js` unchanged — all 11 tests (including four DOM render tests) still pass against the svgr-backed implementation.
-8. Verified new `vite-config.test.js` test asserts `vite-plugin-svgr` import and `svgr()` call in config source.
-9. Confirmed README updated with SVG workflow documentation (file location, import convention, `normalizeCustomIcon` usage, `Custom` prefix, registry contract).
-10. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
-11. Ran `npm run build` — success, no SVG import warnings.
-12. Ran `npm test` — 142 pass (141 pre-existing + 1 new vite-config test), 0 fail.
-13. Ran `vitest run --environment jsdom iconRegistry.test.js` — 11/11 pass including all four size×icon render tests.
+
+1. Read `frontend/src/assets/icons/custom/cucumber.svg` — SVG reviewed in full.
+2. Read `bellPepper.svg` and `tomato.svg` — compared root SVG attributes and path count for visual weight.
+3. Verified `customIcons.js` already imports and exports `CustomCucumber` from `cucumber.svg?react` — no registry changes needed.
+4. Verified `iconDatabase.js` already registers `CustomCucumber` with tags "gurke", "gurken", etc. — no database changes needed.
+5. Confirmed no `fill` attributes on any `<path>` — only `fill="none"` on root element.
+6. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-002).
+7. `npx vite build` — PASS (pre-existing ONNX eval and chunk-size warnings only).
+8. `npx vitest run --environment jsdom` — 272/272 tests PASS, no regressions.
 
 ##### Findings
-- `stroke-linecap` and `stroke-linejoin` are correctly encoded in the SVG root (rather than the wrapper), so they remain in the component's default output and can be overridden at call-site via `...rest`.
-- `normalizeCustomIcon` is exported, enabling future custom icons to follow the same pattern without duplicating logic.
-- Build output size unchanged (SVG content is equivalent to the T-002 JS-embedded paths).
+
+- All required SVG attributes present: `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-width="1.5"`, `stroke-linecap="round"`, `stroke-linejoin="round"`. ✓
+- No hardcoded colours on root or any path. ✓
+- Five paths: 1 diagonal closed body shape, 1 short stem nub at the narrow (top-right) end, 3 short diagonal texture strokes evenly spaced across the body. Satisfies "diagonal body, stem nub, 2–3 texture lines". ✓
+- Icon is already registered as `CustomCucumber` — no JS, registry, or test-file changes were needed or made. ✓
+- Lint and build clean relative to this change.
 
 ##### Risks
-- None.
 
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
+- None. Pure SVG asset replacement; no logic paths affected.
 
 ---
 
@@ -132,83 +88,41 @@ Reviewed: 2026-05-07
 
 ### Review Round 1
 
-Status: **complete**
+Status: **PASS**
 
-Reviewed: 2026-05-07
-
-#### Findings
-- No issues found.
-
-#### Verification
-##### Steps
-1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
-2. Inspected working-tree diffs for `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, and all six new SVG files.
-3. Confirmed all six SVG files follow T-003 conventions: `viewBox="0 0 24 24"`, no `width`/`height` on root, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root, no `stroke-width` on elements.
-4. Verified design briefs: garlic (bulb + clove lines + stem), hummus (bowl arc + mound + depression), dentalFloss (box body + floss strand), toothpaste (tube body + cap + crimped end), cottonPads (stacked ellipses + texture marks), pasta (wavy noodle lines + fork silhouette).
-5. Confirmed alphabetical import order in `customIcons.js`: CottonPads, DentalFloss, Garlic, Hummus, KornflakesBowl, KornflakesBox, Pasta, Toothpaste.
-6. Confirmed alphabetical registry insertion: new entries (CottonPads, DentalFloss, Garlic, Hummus, Pasta, Toothpaste) placed correctly relative to the existing Kornflakes entries.
-7. Verified test additions: `resolveIconName` presence test for all six; `formatIconName` assertions (e.g. "Dental Floss", "Cotton Pads", "Garlic"); DOM render tests at size=22 and size=32 for all six.
-8. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
-9. Ran `npm run build` — success, no SVG import warnings.
-10. Ran `npm test` — 155 pass (+13 over T-003 baseline of 142), 0 fail.
-11. Ran `vitest run --environment jsdom iconRegistry.test.js` — 24/24 pass (12 new render tests, all six icons at size=22 and size=32).
-
-##### Findings
-- All six SVG files strictly follow the T-003 convention for interoperability with `normalizeCustomIcon`.
-- The KornflakesBox/KornflakesBowl ordering in the registry (Box before Bowl) is a pre-existing artifact from T-002 and is not a T-004 concern.
-- `formatIconName` correctly splits multi-word names: "Cotton Pads", "Dental Floss", "Toothpaste" (single word), etc.
-
-##### Risks
-- None.
-
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-006
-
-### Review Round 1
-
-Status: **complete**
-
-Reviewed: 2026-05-07
+Reviewed: 2026-05-11
 
 #### Findings
 
-1. **nit** — `customIcons.js` lines 17–18 & 57–58; `iconRegistry.js` import block lines 18–19 and registry lines 212–213: `CustomPants` / `PantsSvg` is placed after `CustomPasta` / `PastaSvg` in all three locations. Alphabetically "Pants" (Pa-n) precedes "Pasta" (Pa-s). Not required — does not affect functionality or tests.
+No issues found.
+
+- **nit** — `toggleStatus` settle-on-queued spreads `{ is_pending_sync: true, status: nextStatus }` where the plan specified only `{ is_pending_sync: true }`. The extra `status: nextStatus` is a safe improvement that keeps state consistent when the API queues the request. Not a required fix.
 
 #### Verification
+
 ##### Steps
-1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
-2. Verified tabler/lucide availability for all seven Group A candidates: `IconSock` ✓ tabler, `IconShoe` ✓ tabler, `IconFlame` ✓ tabler; `IconPants`, `IconPineapple`, `IconCan` absent from tabler; `Watermelon` absent from lucide — all four correctly replaced with custom SVG fallbacks.
-3. Confirmed 15 new SVG files created (11 planned + 4 fallbacks: can, pants, pineapple, watermelon). All follow T-003 conventions: `viewBox="0 0 24 24"`, no `width`/`height` on root, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root, no `stroke-width` on elements.
-4. Confirmed `customIcons.js` imports and exports extended with all 15 new custom icons (Blueberries, Can, CottonSwabs, CreamJar, CreamTube, ELiquid, InterdentalSticks, Kiwi, Mango, Pants, Peach, Pineapple, Plum, Watermelon, WetWipes).
-5. Confirmed `iconRegistry.js` import block and `ICON_REGISTRY` extended with all new entries; `IconSock`, `IconShoe`, `IconFlame` registered directly from tabler.
-6. Confirmed test additions: `resolveIconName` presence tests for all new tabler-backed keys (IconFlame, IconShoe, IconSock) and all custom keys; `formatIconName` assertions for all new icons; DOM render tests at size=22 and size=32 for all 15 new custom icons.
-7. Noted `CustomELiquid` → `"E Liquid"` is correct (the `([A-Z]+)([A-Z][a-z])` regex splits "EL" → "E L" → "E Liquid").
-8. Identified `CustomPants`/`PantsSvg` placed after `CustomPasta`/`PastaSvg` in all three locations — nit, not a required fix.
-9. Ran `npm run lint` — 0 errors, 1 pre-existing warning (unrelated).
-10. Ran `npm run build` — success, no SVG import warnings.
-11. Ran `npm test` — 187 pass (+32 over T-004 baseline of 155), 0 fail.
-12. Ran `vitest run --environment jsdom iconRegistry.test.js` — 56/56 pass (32 new render tests, all 15 custom icons at size=22 and size=32 plus 3 tabler presence checks).
+
+1. Read `frontend/src/pages/ListDetailPage.jsx` — `toggleStatus` and `addEntryByText` reviewed in full against plan.
+2. Read `frontend/src/pages/ListDetailPage.test.jsx` — all 3 new optimistic-update tests reviewed.
+3. Verified English translation keys: `entry.markDone` → "Mark {name} done", `common.queued` → "Queued", `recent.sectionLabel` → "Recently Used" — all match test assertions.
+4. Confirmed `handleDeleteEntry` is still present — correct; T-005 removes it, not T-004.
+5. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-004).
+6. `npx vitest run --environment jsdom ListDetailPage.test.jsx --reporter=verbose` — 6/6 tests PASS, including all 3 new optimistic-update tests.
+7. Full test suite `npx vitest run --environment jsdom` — 275/275 tests PASS (272 prior + 3 new), no regressions.
+8. `npx vite build` — PASS.
 
 ##### Findings
-- `IconPants`, `IconPineapple`, `IconCan`, and `Watermelon` are absent from the installed tabler/lucide packages; custom SVG fallbacks correctly applied and registered under `CustomPants`, `CustomPineapple`, `CustomCan`, `CustomWatermelon`.
-- All SVG files strictly follow the T-003 convention for interoperability with `normalizeCustomIcon`.
-- `CustomPants`/`PantsSvg` is ordered after `CustomPasta`/`PastaSvg` — alphabetically reversed. Non-blocking nit.
+
+- `toggleStatus`: optimistic state update fires before `await updateEntry`; revert in `catch` restores original entry and removes from recentlyUsed on error. ✓
+- `addEntryByText`: temporary entry inserted before `await createEntry`; replaced with server entry on success, removed on error. ✓
+- Both functions use `updateEntries` (which writes to the offline cache via `writeCachedResource`) ensuring offline-queue consistency. ✓
+- Test 1 — toggle removes entry from open list before API resolves. ✓
+- Test 2 — revert restores entry and shows error banner when API rejects. ✓
+- Test 3 — history reactivation shows temp entry with "Queued" chip immediately. ✓
 
 ##### Risks
-- None.
 
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS_WITH_NOTES`
+- None. Optimistic pattern is self-contained in `toggleStatus` and `addEntryByText`; SSE events and `loadEntries` will reconcile server state on reconnect as before.
 
 ---
 
@@ -216,129 +130,207 @@ Reviewed: 2026-05-07
 
 ### Review Round 1
 
-Status: **complete**
+Status: **PASS**
 
-Reviewed: 2026-05-07
+Reviewed: 2026-05-11
 
 #### Findings
-- No issues found.
+
+No issues found.
+
+- **nit** — `recently-used-chip` CSS omits `user-select: none; -webkit-user-select: none;` (present in the plan spec). The chip is a `<button>` element; browsers do not select button text on tap by default, so the omission is harmless. Not a required fix.
+- **nit** — `useLongPress.js` adds a `useEffect` cleanup (`clearTimeout(timerRef.current)` on unmount) and clears any running timer at the top of `start()` that the plan pseudo-code didn't include. Both are defensive improvements over the spec. Not a required fix.
 
 #### Verification
+
 ##### Steps
-1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
-2. Read full `iconDatabase.js` — verified all three redirections, all new entries, and enrichment quality.
-3. Verified three redirections: `garlic` → `CustomGarlic` (was IconPepper); `pasta` → `CustomPasta` (was IconToolsKitchen2); `grapes` → `IconGrape` (was IconCherry).
-4. Verified DB entries for all T-002–T-004 custom icons: `CustomKornflakesBowl`, `CustomKornflakesBox`, `CustomHummus`, `CustomDentalFloss`, `CustomToothpaste`, `CustomCottonPads` (garlic and pasta covered by redirections).
-5. Verified DB entries for all T-006 icons: `IconSock`, `CustomPants`, `IconShoe`, `CustomPineapple`, `CustomWatermelon`, `IconFlame`, `CustomCan`, `CustomCottonSwabs`, `CustomWetWipes`, `CustomInterdentalSticks`, `CustomCreamTube`, `CustomCreamJar`, `CustomMango`, `CustomKiwi`, `CustomPeach`, `CustomPlum`, `CustomBlueberries`, `CustomELiquid`, plus existing `IconShirt` and `IconBattery` entries.
-6. Spot-checked ≥5 unique searchable terms for borderline entries (mango, kiwi, blueberries, plum, peach — all exactly 5 due to duplicate label/tag) — all pass.
-7. Confirmed plan-specified enrichments: dairy, produce, bakery, meat/fish, beverages, household, condiments, pantry, drugstore categories all enriched with German regional variants, plural/singular pairs, brand synonyms, and compound-word forms.
-8. Reviewed `cottonSwabs.svg` and `interdentalSticks.svg` diffs — both are visual design improvements; SVG conventions (viewBox, fill=none, stroke=currentColor, round caps/joins, no stroke-width) preserved ✓.
-9. Verified `cosineSimilarity.test.js` changes: updated `zahnpasta → CustomToothpaste` (correct); new ≥5-terms automated test; new redirections test (16 spot checks); new T-006 exact-match test (20 spot checks).
-10. Verified README paragraph updated to mention custom SVG icons, enriched synonyms, and expanded catalogue scope.
-11. Ran `npm run lint` — 0 errors, 1 pre-existing warning.
-12. Ran `npm run build` — success.
-13. Ran `npm test` — 190 pass (+3 over T-006 baseline of 187), 0 fail.
-14. Ran `vitest run --environment jsdom cosineSimilarity.test.js` — 10/10 pass (3 new tests).
+
+1. `git diff --name-status HEAD` — confirmed: `EntryRow.jsx` deleted (D), `entry-row.test.jsx` deleted (D), `EntryTile.jsx` added (A), `entry-tile.test.jsx` added (A), `useLongPress.js` added (A), `useLongPress.test.jsx` added (A), `RecentlyUsedSection.jsx` modified, `RecentlyUsedSection.test.jsx` modified, `ListDetailPage.jsx` modified, `app.test.jsx` modified, `index.css` modified.
+2. Read `useLongPress.js` — hook matches plan with unmount cleanup and rapid-press guard added.
+3. Read `EntryTile.jsx` — component matches plan exactly; `Icon` import dropped (not needed, correct).
+4. Read `entry-tile.test.jsx` — 7 tests covering all plan-specified scenarios.
+5. Read `useLongPress.test.jsx` — 4 tests covering all plan-specified scenarios.
+6. Read `RecentlyUsedSection.jsx` — `recently-used-grid` / `recently-used-cell` structure matches plan; `aria-label` on dismiss button uses `recent.dismiss` key.
+7. Read `RecentlyUsedSection.test.jsx` — updated to use `.recently-used-grid` and `.recently-used-cell` selectors; dismiss button asserted by `"Dismiss {name}"` aria-label. Added second test for fallback icon.
+8. Verified `ListDetailPage.jsx` imports `EntryTile` (not `EntryRow`); `handleDeleteEntry` and `deleteEntry` import removed; entries wrapped in `<div className="entry-tile-grid">`.
+9. Verified `app.test.jsx` uses `"Mark {name} done"` aria-label — works with `EntryTile` since it uses the same i18n key. No `.entry-row` or swipe-delete references remain.
+10. Verified `index.css`: tile grid rules present; old `.entry-row*` and `.recently-used-list` / `.recently-used-chip-row` rules removed.
+11. English translations: `entry.markDone` → "Mark {name} done", `common.queued` → "Queued", `recent.dismiss` → "Dismiss {name}" — all match test assertions.
+12. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`).
+13. `npx vitest run --environment jsdom useLongPress.test.jsx entry-tile.test.jsx RecentlyUsedSection.test.jsx` — 13/13 PASS.
+14. Full suite `npx vitest run --environment jsdom` — 283/283 tests PASS (24 test files), no regressions.
+15. `npx vite build` — PASS.
 
 ##### Findings
-- `zahnpasta` correctly maps to `CustomToothpaste` (the previous `IconDental` mapping was outdated; the test assertion was updated accordingly).
-- Entries where the label text also appears in the tags (mango, kiwi, blueberries, e-liquid) still satisfy the ≥5-unique-terms constraint because the `createExactMatchMap` just overwrites with the same icon value.
-- SVG design improvements to `cottonSwabs.svg` and `interdentalSticks.svg` are an appropriate cosmetic fix within this task's scope.
+
+- `useLongPress`: timer cleanup on unmount prevents leaked timers; `longPressedRef` and `defaultPrevented` pattern correctly suppresses the synthetic toggle click after a long-press. ✓
+- `EntryTile`: long-press → `onEdit` fires and `onToggle` is blocked; short tap → `onToggle` fires. ✓
+- `handleDeleteEntry` fully removed from `ListDetailPage`; `deleteEntry` import also removed. ✓
+- `RecentlyUsedSection` grid structure matches plan; dismiss badge is absolutely-positioned inside the cell. ✓
+- Old `EntryRow.jsx` and `entry-row.test.jsx` deleted; no orphan CSS rules remain. ✓
+- All 11 plan-specified tests present and passing. ✓
 
 ##### Risks
-- None.
 
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
+- None. `EntryRow` was the only consumer of `handleDeleteEntry`; its removal is self-contained. SSE-triggered `handleEntryChange` still calls `loadEntries` to reconcile server state.
 
 ---
 
-## T-007 — Food & Produce: 19 custom SVG icons
+## Task: T-006
 
-**verdict:** PASS
+### Review Round 1
 
-### Findings
+Status: **PASS**
 
-None.
-
-### Verification
-
-#### Steps performed
-
-1. Read `.ai/PLAN.md` and `.ai/TASKS.md` before starting review.
-2. Checked tabler/lucide availability: `IconBaguette` present in `@tabler/icons-react`; `IconChocolate`, `IconFries`, `IconTomato` absent — correctly implemented as custom SVGs per plan fallback requirement.
-3. Ran `git diff HEAD` and `git status` to enumerate all changes:
-   - 18 new SVG files under `frontend/src/assets/icons/custom/` (BellPepper, BreadRoll, Butter, Chips, Chocolate, Cream, Cucumber, Fries, FrozenBerries, FrozenVegetables, Jam, Onion, PastaSauce, Potato, Quark, Rice, Tomato, Yogurt).
-   - `customIcons.js`: 18 new imports and `normalizeCustomIcon()` exports.
-   - `iconRegistry.js`: `IconBaguette` added to tabler import block; 18 new `Custom*` entries in `ICON_REGISTRY`.
-   - `iconDatabase.js`: 19 DB redirects (e.g., tomato → `CustomTomato`, baguette → `IconBaguette`, chocolate → `CustomChocolate`) with enriched tags (≥5 per entry).
-   - `iconRegistry.test.js`: new `resolveIconName` test for all 19 icons, `formatIconName` assertions, render tests at size=22 and size=32 for all 18 custom icons.
-   - `cosineSimilarity.test.js`: updated `chocolate`/`schokolade` assertions; new `"routes food and produce exact matches to dedicated icons"` test with 36 key-value checks.
-4. Inspected all 18 SVG files: all use `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root; no `stroke-width` on individual elements; no `width`/`height` attributes. Conventions correct.
-5. Ran `npm run lint` → 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unrelated).
-6. Ran `npm run build` → success, no errors.
-7. Ran `npm test` (full suite, backend) → 106 pass, 0 fail.
-8. Ran `npx vitest run --environment jsdom src/data/iconRegistry.test.js` → 93 pass, 0 fail.
-9. Ran `npx vitest run --environment jsdom src/utils/cosineSimilarity.test.js` → 11 pass, 0 fail.
+Reviewed: 2026-05-11
 
 #### Findings
 
-All acceptance criteria met:
-- All 19 icons resolvable from the registry (18 custom + `IconBaguette` from tabler).
-- All custom icons render at size=22 and size=32 with `currentColor` stroke.
-- SVG files present under `frontend/src/assets/icons/custom/`.
-- `formatIconName` strips `Custom` prefix correctly.
-- DB redirects in place for all 19 entries.
-- Lint, build, and tests pass.
+No issues found.
 
-#### Risks
+- **nit** — Implementation goes beyond the two plan-specified `max-height` rules: `.bottom-sheet--browser-open` also gains `display: flex; flex-direction: column; overflow: hidden;` and a flex-chain down through `.add-item-form`, `.add-item-disclosure`, `.add-item-icon-browser`, `.add-item-icon-browser-inner`, and `.add-item-icon-browser-grid`. This is necessary to make the icon grid actually scrollable within the constrained viewport height, satisfying the acceptance criterion about scrollability. Test assertions cover the complete set of rules. Not a required fix.
 
-None identified.
+#### Verification
+
+##### Steps
+
+1. `git diff --name-status HEAD` — confirmed only `frontend/src/index.css` and `frontend/src/components/AddItemSheet.test.jsx` modified. No JS changes. ✓
+2. Read `index.css` lines 525–548: `.bottom-sheet` uses `max-height: min(80dvh, 44rem)` (was `80vh`); `.bottom-sheet--browser-open` uses `max-height: min(92dvh, 44rem)`. ✓
+3. Confirmed no remaining `80vh` reference: searched `index.css` for `vh` — none found in `bottom-sheet` rules.
+4. Reviewed additional flex-column chain rules at lines 852–868 and 1076–1101: they create a scrollable flex column inside the constrained sheet so the icon grid overflows-y correctly on small viewports.
+5. Read `AddItemSheet.test.jsx`: new test `"uses dynamic viewport height for the icon browser sheet"` (line 332–334) asserts `min(80dvh, 44rem)` and `min(92dvh, 44rem)` and the absence of legacy `min(80vh, 44rem)`. All 14 AddItemSheet tests pass.
+6. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`).
+7. `npx vitest run --environment jsdom AddItemSheet.test.jsx` — 14/14 PASS.
+8. Full suite `npx vitest run --environment jsdom` — 284/284 tests PASS, no regressions.
+
+##### Findings
+
+- `dvh` (dynamic viewport height) replaces `vh` in `.bottom-sheet` — shrinks automatically when iOS/Android software keyboard appears. ✓
+- `.bottom-sheet--browser-open` uses `min(92dvh, 44rem)` giving more room for the icon browser when open. ✓
+- Inner flex-chain rules ensure the icon grid is scrollable when the sheet is height-constrained. ✓
+- No JS changes, no test-file changes beyond the new CSS assertion. ✓
+- `dvh` supported in Chrome 108+, Safari 15.4+, Firefox 101+ — covers all current mobile targets. ✓
+
+##### Risks
+
+- None. `dvh` has broad browser support; fallback to `vh` is not needed. The flex-chain rules only apply under `.bottom-sheet--browser-open` and do not affect the default sheet layout.
 
 ---
 
-## T-008 — Drugstore & Household: 20 custom SVG icons
+## Task: T-007
 
-**verdict:** PASS
+### Review Round 1
 
-### Findings
+Status: **PASS**
 
-None.
-
-### Verification
-
-#### Steps performed
-
-1. Read `.ai/PLAN.md` and `.ai/TASKS.md` before starting review.
-2. Checked tabler availability: `IconMop` absent — correctly implemented as `CustomMop` custom SVG per plan fallback requirement.
-3. Ran `git status` and `git diff HEAD` to enumerate all changes:
-   - 20 new SVG files under `frontend/src/assets/icons/custom/` (AfterSun, BakingPaper, BodyWash, CleaningCloth, Conditioner, Detergent, Diapers, FabricSoftener, Foil, GlassesCleaner, HandSoap, Mop, Mouthwash, PaperTowels, Shampoo, ShavingCream, Sponge, StorageBags, Sunscreen, Toothbrush).
-   - `customIcons.js`: 20 new imports and `normalizeCustomIcon()` exports (alphabetical).
-   - `iconRegistry.js`: 20 new `Custom*` entries in `ICON_REGISTRY` and import block (alphabetical).
-   - `iconDatabase.js`: 20 DB redirects (shampoo → `CustomShampoo`, conditioner → `CustomConditioner`, body wash → `CustomBodyWash`, toothbrush → `CustomToothbrush`, mouthwash → `CustomMouthwash`, shaving cream → `CustomShavingCream`, sunscreen → `CustomSunscreen`, after sun → `CustomAfterSun`, diapers → `CustomDiapers`, glasses cleaner → `CustomGlassesCleaner`, cleaning cloth → `CustomCleaningCloth`, storage bags → `CustomStorageBags`, baking paper → `CustomBakingPaper`, foil → `CustomFoil`, mop → `CustomMop`, sponge → `CustomSponge`, hand soap → `CustomHandSoap`, fabric softener → `CustomFabricSoftener`, detergent → `CustomDetergent`, paper towels → `CustomPaperTowels`) with enriched tags (≥5 per entry).
-   - `iconRegistry.test.js`: new `resolveIconName` test for all 20 icons, `formatIconName` assertions, render tests at size=22 and size=32 for all 20 custom icons.
-   - `cosineSimilarity.test.js`: updated `shampoo` assertion (was `IconFlask`, now `CustomShampoo`); new `"routes drugstore and household exact matches to dedicated icons"` test with 40 key-value checks.
-   - `README.md`: documentation updated to mention drugstore and household dedicated icons.
-4. Inspected all 20 SVG files: all use `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"` on root; no `stroke-width` on individual elements; no `width`/`height` attributes. Conventions correct.
-5. Ran `npm run lint` → 0 errors, 1 pre-existing warning in `AuthContext.jsx` (unrelated).
-6. Ran `npm run build` → success, no errors.
-7. Ran `npx vitest run --environment jsdom src/data/iconRegistry.test.js` → 134 passed, 0 fail.
-8. Ran `npx vitest run --environment jsdom src/utils/cosineSimilarity.test.js` → 12 passed, 0 fail.
+Reviewed: 2026-05-11
 
 #### Findings
 
-All acceptance criteria met:
-- All 20 icons resolvable from the registry (20 custom SVGs; `CustomMop` created as fallback since `IconMop` absent from tabler).
-- All custom icons render at size=22 and size=32 with `currentColor` stroke.
-- SVG files present under `frontend/src/assets/icons/custom/`.
-- `formatIconName` strips `Custom` prefix correctly for all 20 icons.
-- DB redirects in place for all 20 entries with ≥5 tags each.
-- README documentation updated to reflect expanded icon coverage.
-- Lint, build, and tests pass.
+No issues found.
 
-#### Risks
+#### Verification
 
-None identified.
+##### Steps
+
+1. `git diff --name-status HEAD` — confirmed: `AddItemSheet.jsx`, `AddItemSheet.test.jsx`, `index.css` modified. No other files changed.
+2. Read `AddItemSheet.jsx` line 233: `className="add-item-more-btn"` — `eg-btn-ghost` removed. ✓
+3. Confirmed `type="button"` still present on the toggle button. ✓
+4. Confirmed the close button at line 287 retains `className="eg-btn-ghost"` — only the toggle was changed. ✓
+5. Read `index.css` lines 1043–1063: full link-style rule set matches plan exactly — `border: 0`, `background: none`, `text-decoration: underline`, `text-decoration-color: transparent`, hover/focus-visible reveals underline. ✓
+6. Height estimate: `padding: 0.15rem 0` (0.30rem) + `font-size: 0.9rem × line-height ~1.4` (≈1.26rem) ≈ 1.56rem — well under 1.8rem acceptance limit. ✓
+7. Read `AddItemSheet.test.jsx` lines 100–120: new test `"styles the icon browser toggle as an inline text link"` asserts className is exactly `"add-item-more-btn"` (no ghost class), `type="button"`, and all key CSS properties. ✓
+8. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning).
+9. `npx vitest run --environment jsdom AddItemSheet.test.jsx` — 15/15 PASS including new link-style test.
+10. Full suite `npx vitest run --environment jsdom` — 285/285 tests PASS, no regressions.
+
+##### Findings
+
+- `eg-btn-ghost` removed from toggle button; only `add-item-more-btn` class remains. ✓
+- All link-style CSS properties present: no border, no background, underline hidden at rest, shown on hover/focus-visible. ✓
+- Button element unchanged; `type="button"` preserved; keyboard accessible via `:focus-visible`. ✓
+- New test explicitly asserts every acceptance criterion via CSS source inspection. ✓
+
+##### Risks
+
+- None. CSS-only change to a single class; `eg-btn-ghost` on the close button is unaffected.
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-11
+
+#### Findings
+
+No issues found.
+
+#### Verification
+
+##### Steps
+
+1. Read `frontend/src/index.css` around the changed block (lines 1225–1235).
+2. Confirmed the combined selector was split correctly: `.list-card, .sharing-panel` retains all card styles (border, border-radius, background, padding); `.entry-section` now contains only `padding: var(--space-2) 0;`.
+3. Verified `detail-content` still applies `padding: 0 16px` — items are not flush with screen edges.
+4. Checked `RecentlyUsedSection.jsx`: applies `className="entry-section recently-used-section"` on the root element — flat treatment inherited automatically from `.entry-section`.
+5. Confirmed no stray `border`, `border-radius`, or `background` declarations remain on `.entry-section`.
+6. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-003).
+7. `npx vitest run --environment jsdom` — 272/272 tests PASS, no regressions.
+
+##### Findings
+
+- `.list-card` and `.sharing-panel` card appearance unchanged. ✓
+- `.entry-section` has no border, no border-radius, no background; only vertical padding `var(--space-2) 0`. ✓
+- Sections retain vertical separation via `padding` and the pre-existing `.entry-section + .entry-section` rule (line 1292). ✓
+- `.recently-used-section` inherits flat treatment via dual class on the JSX element. ✓
+- `.detail-content` side padding (16px) prevents items being flush with screen edge. ✓
+- No JS, test, or documentation file changes were needed or made. ✓
+
+##### Risks
+
+- None. CSS-only selector split; no layout regressions detected in the test suite.
+
+---
+
+## Task: T-008
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-11
+
+#### Findings
+
+No issues found.
+
+#### Verification
+
+##### Steps
+
+1. Read `.ai/TASKS.md` — T-008 moved to `in_review`.
+2. Read `.ai/PLAN.md` — plan specifies deletion of `swipeEntryLeft` helper (original lines 60–106) and the `deletes an item from a shopping list via swipe` test block (original lines 142–155); `openItemsSection` and `recentlyUsedSection` helpers to be retained.
+3. Read `e2e/lists.spec.js` in full — confirmed current state of file.
+4. Ran `git diff e2e/lists.spec.js` — confirmed diff:
+   - `swipeEntryLeft` async function (47 lines) fully removed. ✓
+   - `deletes an item from a shopping list via swipe` test block (15 lines) fully removed. ✓
+   - `openItemsSection` and `recentlyUsedSection` helper functions retained. ✓
+   - No other hunks; only `e2e/lists.spec.js` changed.
+5. `npm run lint` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-008; 0 errors).
+6. `npm run build` — PASS (pre-existing chunk-size and ONNX eval warnings only).
+7. `npm test` — 106/106 tests PASS (frontend + backend), no regressions.
+
+##### Findings
+
+- `swipeEntryLeft` helper and swipe-delete test block are fully removed with no collateral damage. ✓
+- `openItemsSection` and `recentlyUsedSection` helpers are intact; the three remaining E2E tests are unaffected. ✓
+- No other files were touched; the change is exactly scoped to what the plan required. ✓
+- Lint clean relative to this change; build and full unit-test suite pass. ✓
+
+##### Risks
+
+- None. Removing a dead test and its private helper carries zero risk to runtime behaviour.

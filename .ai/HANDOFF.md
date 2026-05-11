@@ -23,377 +23,337 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
-### T-001/T-002 — plan — 2026-05-06T00:00:00Z
+### T-001…T-007 — plan — 2026-05-11T00:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Planned icon registry extension (6 new tabler/lucide icons) and custom SVG icon infrastructure with two Kornflakes example icons |
+| Summary | Planned 7 UI-improvement tasks: compound-word icon matching, cucumber SVG, section flattening, optimistic UI, tile-grid layout, mobile icon-browser fix, link-style toggle button |
 | Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-05-06T15:17:57Z
+### T-001 — implement — 2026-05-11T13:57:55Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Added six selectable grocery and household icons to the frontend icon registry, using lucide fallbacks where tabler exports are unavailable. |
-| Files Changed | `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `.ai/TASKS.md` |
-| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval warning; `npm test` PASS |
-| Commit | `feat(icons): add missing grocery icon choices` |
+| Summary | Added synchronous compound-word icon matching for known grocery terms and covered paprika/moehren cases with hook tests |
+| Files Changed | `frontend/src/hooks/useIconSuggestion.js`, `frontend/src/hooks/useIconSuggestion.test.js`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- useIconSuggestion.test.js` PASS; `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing bundle/eval warnings); `npm test` PASS |
+| Commit | `feat(icons): match compound grocery terms synchronously` |
 | Next Role | review |
 
 ---
 
-### T-001 — review — 2026-05-06T15:21:00Z
+### T-001 — review — 2026-05-11T14:01:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed icon registry additions; all six icons correctly imported and registered; lucide fallbacks properly applied for tabler-absent icons; all validations pass. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Summary | Reviewed compound-word substring matching implementation; all acceptance criteria met, 272 tests pass, lint and build clean |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-05-06T15:22:49Z
+### T-001 — commit_task — 2026-05-11T14:02:53Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Committed reviewed T-001 icon registry changes. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `ROADMAP.md`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js` |
-| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
-| Commit | `feat(icons): add missing grocery icon choices` |
-| Next Role | implement |
+| Summary | Marked T-001 done and committed the reviewed compound-word icon matching changes |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run test --workspace frontend -- useIconSuggestion.test.js`; `npm run lint`; `npm run build`; `npm test` |
+| Commit | `feat(icons): match compound grocery terms synchronously` |
+| Next Role | none |
 
 ---
 
-### T-002 — implement — 2026-05-07T04:32:10Z
+### T-002 — implement — 2026-05-11T14:20:18Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Added custom SVG icon infrastructure and registered two selectable Kornflakes icons with Custom-prefix display formatting. |
-| Files Changed | `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `.ai/TASKS.md` |
-| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval warning; `npm test` PASS |
-| Commit | `feat(icons): add custom Kornflakes icon choices` |
+| Summary | Replaced the cucumber SVG with a stroke-only diagonal cucumber icon including stem and texture strokes |
+| Files Changed | `frontend/src/assets/icons/custom/cucumber.svg`, `.ai/TASKS.md` |
+| Validation | `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `feat(icons): refresh cucumber icon` |
 | Next Role | review |
 
 ---
 
-### T-002 — review — 2026-05-07T06:43:00Z
+### T-002 — review — 2026-05-11T14:26:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed custom icon infrastructure and Kornflakes icons; factory, registry entries, formatIconName update, and render tests all correct; all validations pass. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Summary | Reviewed replacement cucumber SVG; all acceptance criteria met, correct SVG attributes, 5 paths, no hardcoded colours, 272 tests pass, lint and build clean |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-002 — implement — 2026-05-07T05:01:58Z
+### T-002 — commit_task — 2026-05-11T14:27:37Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Committed reviewed T-002 custom icon infrastructure and Kornflakes icon changes. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js` |
-| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
-| Commit | `feat(icons): add custom Kornflakes icon choices` |
+| Summary | Marked T-002 done and committed the reviewed cucumber SVG replacement |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run lint`; `npm run build`; `npm test` |
+| Commit | `feat(icons): refresh cucumber icon` |
 | Next Role | none |
 
 ---
 
-### T-003 — plan — 2026-05-07T00:00:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Rework-plan: refactor custom icon system to use filesystem SVG files via vite-plugin-svgr, replacing JS-embedded paths from T-002 |
-| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
-| Next Role | implement |
-
----
-
-### T-003 — implement — 2026-05-07T06:24:57Z
+### T-003 — implement — 2026-05-11T14:44:09Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Refactored custom icons to filesystem SVG assets imported through vite-plugin-svgr and normalized through the existing registry contract. |
-| Files Changed | `README.md`, `frontend/package.json`, `package-lock.json`, `frontend/vite.config.js`, `frontend/src/assets/icons/custom/kornflakesBowl.svg`, `frontend/src/assets/icons/custom/kornflakesBox.svg`, `frontend/src/data/customIcons.js`, `frontend/src/vite-config.test.js`, `.ai/TASKS.md` |
-| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run test --workspace frontend -- vite-config.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval warning; `npm test` PASS |
-| Commit | `refactor(icons): load custom icons from SVG files` |
+| Summary | Removed card framing from entry sections while preserving list-card and sharing-panel card styling |
+| Files Changed | `frontend/src/index.css`, `.ai/TASKS.md` |
+| Validation | `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); initial `npm test` hit two transient `app.test.jsx` timeouts, then `npm run test --workspace frontend -- app.test.jsx` PASS and rerun `npm test` PASS |
+| Commit | `feat(ui): flatten entry sections` |
 | Next Role | review |
 
 ---
 
-### T-003 — review — 2026-05-07T08:40:00Z
+### T-003 — review — 2026-05-11T14:47:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed svgr refactor; SVG files, normalizeCustomIcon wrapper, vite config, and README all match plan spec; all validations pass with 142 tests. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Summary | Reviewed CSS selector split for entry-section flattening; all acceptance criteria met, list-card/sharing-panel unchanged, 272 tests pass, lint clean |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-003 — implement — 2026-05-07T06:53:00Z
+### T-003 — commit_task — 2026-05-11T14:55:54Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Committed reviewed T-003 svgr custom icon refactor. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `ROADMAP.md`, `frontend/package.json`, `package-lock.json`, `frontend/vite.config.js`, `frontend/src/assets/icons/custom/kornflakesBowl.svg`, `frontend/src/assets/icons/custom/kornflakesBox.svg`, `frontend/src/data/customIcons.js`, `frontend/src/vite-config.test.js` |
-| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
-| Commit | `refactor(icons): load custom icons from SVG files` |
+| Summary | Marked T-003 done and committed the reviewed entry-section flattening change |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run lint`; `npm run build`; `npm run test --workspace frontend -- app.test.jsx`; `npm test` |
+| Commit | `feat(ui): flatten entry sections` |
 | Next Role | none |
 
 ---
 
-### T-004 — plan — 2026-05-07T00:00:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Planned six new custom SVG icons (Garlic, Hummus, DentalFloss, Toothpaste, CottonPads, Pasta) following the T-003 filesystem-SVG pattern |
-| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
-| Next Role | implement |
-
----
-
-### T-004 — implement — 2026-05-07T09:28:36Z
+### T-004 — implement — 2026-05-11T15:19:59Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Added six filesystem SVG custom icons for grocery and hygiene categories, exported them through the custom icon normalizer, registered them in the icon browser, and covered registry/display/render behavior in tests. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `ROADMAP.md`, `frontend/src/assets/icons/custom/cottonPads.svg`, `frontend/src/assets/icons/custom/dentalFloss.svg`, `frontend/src/assets/icons/custom/garlic.svg`, `frontend/src/assets/icons/custom/hummus.svg`, `frontend/src/assets/icons/custom/pasta.svg`, `frontend/src/assets/icons/custom/toothpaste.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js` |
-| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval warning; `npm test` PASS |
-| Commit | `feat(icons): add custom grocery and hygiene icons` |
+| Summary | Made entry toggles and history reactivation update local list state optimistically before API calls settle |
+| Files Changed | `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.test.jsx`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- ListDetailPage.test.jsx` PASS; `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `feat(entries): make list updates optimistic` |
 | Next Role | review |
 
 ---
 
-### T-004 — review — 2026-05-07T12:21:00Z
+### T-004 — review — 2026-05-11T17:25:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed six new custom SVG icons (garlic, hummus, dentalFloss, toothpaste, cottonPads, pasta); all SVG files follow T-003 conventions; imports, registry entries, and tests are complete and correct; all validations pass. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Summary | Reviewed optimistic toggle and reactivate implementation; all 3 new tests pass, 275/275 total, optimistic/revert logic matches plan, lint and build clean |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-004 — implement — 2026-05-07T10:34:12Z
+### T-004 — commit_task — 2026-05-11T15:25:52Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Committed reviewed T-004 custom grocery and hygiene SVG icons. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `ROADMAP.md`, `frontend/src/assets/icons/custom/cottonPads.svg`, `frontend/src/assets/icons/custom/dentalFloss.svg`, `frontend/src/assets/icons/custom/garlic.svg`, `frontend/src/assets/icons/custom/hummus.svg`, `frontend/src/assets/icons/custom/pasta.svg`, `frontend/src/assets/icons/custom/toothpaste.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js` |
-| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
-| Commit | `feat(icons): add custom grocery and hygiene icons` |
+| Summary | Marked T-004 done and committed the reviewed optimistic list update changes |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run test --workspace frontend -- ListDetailPage.test.jsx`; `npm run lint`; `npm run build`; `npm test` |
+| Commit | `feat(entries): make list updates optimistic` |
 | Next Role | none |
 
 ---
 
-### T-005/T-006 — plan — 2026-05-07T00:00:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Planned iconDatabase.js enrichment (T-005) and expanded icon set with 7 tabler/lucide candidates + 11 custom SVGs + DB entries (T-006) |
-| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
-| Next Role | implement |
-
----
-
-### T-007/T-008 — plan — 2026-05-07T00:00:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Planned 19 Food & Produce custom SVG icons (T-007) and 19 Drugstore & Household custom SVG icons (T-008), each with DB redirects from generic icons and enriched tags |
-| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
-| Next Role | implement |
-
----
-
-### T-006 — implement — 2026-05-07T11:04:53Z
+### T-005 — implement — 2026-05-11T15:38:39Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Added the expanded registry-only icon set with three available Tabler icons, custom SVG fallbacks for missing package icons, and eleven planned custom SVG icons. No iconDatabase.js entries were changed. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `ROADMAP.md`, `frontend/src/assets/icons/custom/blueberries.svg`, `frontend/src/assets/icons/custom/can.svg`, `frontend/src/assets/icons/custom/cottonSwabs.svg`, `frontend/src/assets/icons/custom/creamJar.svg`, `frontend/src/assets/icons/custom/creamTube.svg`, `frontend/src/assets/icons/custom/eLiquid.svg`, `frontend/src/assets/icons/custom/interdentalSticks.svg`, `frontend/src/assets/icons/custom/kiwi.svg`, `frontend/src/assets/icons/custom/mango.svg`, `frontend/src/assets/icons/custom/pants.svg`, `frontend/src/assets/icons/custom/peach.svg`, `frontend/src/assets/icons/custom/pineapple.svg`, `frontend/src/assets/icons/custom/plum.svg`, `frontend/src/assets/icons/custom/watermelon.svg`, `frontend/src/assets/icons/custom/wetWipes.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js` |
-| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval warning; `npm test` PASS |
-| Package Icon Check | Tabler exports found: `IconSock`, `IconShoe`, `IconFlame`; absent and implemented as custom fallbacks: `IconPants` -> `CustomPants`, `IconPineapple` -> `CustomPineapple`, `IconCan` -> `CustomCan`, Lucide `Watermelon` -> `CustomWatermelon` |
-| Commit | `feat(icons): add expanded grocery icon set` |
+| Summary | Replaced open entry rows with 3-column tiles using long-press edit, and converted recently used items to a 2-column chip grid |
+| Files Changed | `frontend/src/hooks/useLongPress.js`, `frontend/src/hooks/useLongPress.test.jsx`, `frontend/src/components/EntryTile.jsx`, `frontend/src/components/entry-tile.test.jsx`, `frontend/src/components/EntryRow.jsx`, `frontend/src/components/entry-row.test.jsx`, `frontend/src/components/RecentlyUsedSection.jsx`, `frontend/src/components/RecentlyUsedSection.test.jsx`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.test.jsx`, `frontend/src/app.test.jsx`, `frontend/src/index.css`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- useLongPress.test.jsx entry-tile.test.jsx RecentlyUsedSection.test.jsx ListDetailPage.test.jsx app.test.jsx` PASS; `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `feat(entries): show grocery entries as tiles` |
 | Next Role | review |
 
 ---
 
-### T-006 — review — 2026-05-07T13:14:00Z
+### T-005 — review — 2026-05-11T18:33:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed expanded icon set; 3 tabler icons confirmed and 4 custom SVG fallbacks correctly substituted; all 15 new SVG files follow T-003 conventions; all validations pass with 187 tests. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
-| Verdict | PASS_WITH_NOTES |
-| Blocking Findings | none |
-| Next Role | implement |
-
----
-
-### T-006 — implement — 2026-05-07T11:14:14Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Committed reviewed T-006 expanded registry-only icon set. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `ROADMAP.md`, `frontend/src/assets/icons/custom/blueberries.svg`, `frontend/src/assets/icons/custom/can.svg`, `frontend/src/assets/icons/custom/cottonSwabs.svg`, `frontend/src/assets/icons/custom/creamJar.svg`, `frontend/src/assets/icons/custom/creamTube.svg`, `frontend/src/assets/icons/custom/eLiquid.svg`, `frontend/src/assets/icons/custom/interdentalSticks.svg`, `frontend/src/assets/icons/custom/kiwi.svg`, `frontend/src/assets/icons/custom/mango.svg`, `frontend/src/assets/icons/custom/pants.svg`, `frontend/src/assets/icons/custom/peach.svg`, `frontend/src/assets/icons/custom/pineapple.svg`, `frontend/src/assets/icons/custom/plum.svg`, `frontend/src/assets/icons/custom/watermelon.svg`, `frontend/src/assets/icons/custom/wetWipes.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js` |
-| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
-| Commit | `feat(icons): add expanded grocery icon set` |
-| Next Role | none |
-
----
-
-### T-005 — implement — 2026-05-07T11:31:25Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Enriched the curated icon suggestion database with redirects, all custom and expanded icon entries, and broader bilingual synonym coverage; normalized two pre-existing staged SVG edits back to the custom icon contract so validation passes. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/assets/icons/custom/cottonSwabs.svg`, `frontend/src/assets/icons/custom/interdentalSticks.svg`, `frontend/src/data/iconDatabase.js`, `frontend/src/utils/cosineSimilarity.test.js` |
-| Validation | `npm run test --workspace frontend -- cosineSimilarity.test.js` PASS; `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval warning; `npm test` PASS |
-| Commit | `feat(icons): enrich icon suggestions` |
-| Next Role | review |
-
----
-
-### T-005 — review — 2026-05-07T14:06:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Reviewed comprehensive iconDatabase.js enrichment; all three redirections correct, all T-002–T-006 icon entries present, ≥5 terms verified by automated test, SVG design fixes preserve conventions, all 190 tests pass. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md` |
+| Summary | Reviewed tile grid implementation; EntryRow deleted, EntryTile and useLongPress added, RecentlyUsedSection converted to 2-col grid, handleDeleteEntry removed, 283/283 tests pass, lint and build clean |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-005 — implement — 2026-05-07T12:13:10Z
+### T-005 — commit_task — 2026-05-11T16:34:04Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Committed reviewed T-005 icon suggestion enrichment. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/assets/icons/custom/cottonSwabs.svg`, `frontend/src/assets/icons/custom/interdentalSticks.svg`, `frontend/src/data/iconDatabase.js`, `frontend/src/utils/cosineSimilarity.test.js` |
-| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
-| Commit | `feat(icons): enrich icon suggestions` |
+| Summary | Marked T-005 done and committed the reviewed tile grid changes |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run test --workspace frontend -- useLongPress.test.jsx entry-tile.test.jsx RecentlyUsedSection.test.jsx ListDetailPage.test.jsx app.test.jsx`; `npm run lint`; `npm run build`; `npm test` |
+| Commit | `feat(entries): show grocery entries as tiles` |
 | Next Role | none |
 
 ---
 
-### T-007 — implement — 2026-05-07T13:23:41Z
+### T-006 — implement — 2026-05-11T16:50:16Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Added dedicated food and produce icon coverage with 18 new custom SVG icons, Tabler `IconBaguette`, registry entries, exact-match DB redirects, and documentation for dedicated produce suggestions. |
-| Files Changed | `README.md`, `.ai/HANDOFF.md`, `.ai/TASKS.md`, `frontend/src/assets/icons/custom/bellPepper.svg`, `frontend/src/assets/icons/custom/breadRoll.svg`, `frontend/src/assets/icons/custom/butter.svg`, `frontend/src/assets/icons/custom/chips.svg`, `frontend/src/assets/icons/custom/chocolate.svg`, `frontend/src/assets/icons/custom/cream.svg`, `frontend/src/assets/icons/custom/cucumber.svg`, `frontend/src/assets/icons/custom/fries.svg`, `frontend/src/assets/icons/custom/frozenBerries.svg`, `frontend/src/assets/icons/custom/frozenVegetables.svg`, `frontend/src/assets/icons/custom/jam.svg`, `frontend/src/assets/icons/custom/onion.svg`, `frontend/src/assets/icons/custom/pastaSauce.svg`, `frontend/src/assets/icons/custom/potato.svg`, `frontend/src/assets/icons/custom/quark.svg`, `frontend/src/assets/icons/custom/rice.svg`, `frontend/src/assets/icons/custom/tomato.svg`, `frontend/src/assets/icons/custom/yogurt.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconDatabase.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `frontend/src/utils/cosineSimilarity.test.js` |
-| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run test --workspace frontend -- cosineSimilarity.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval and chunk-size warnings; `npm test` PASS |
-| Package Icon Check | Tabler exports found: `IconBaguette`; absent and implemented as custom fallbacks: `IconChocolate` -> `CustomChocolate`, `IconFries` -> `CustomFries`, `IconTomato` -> `CustomTomato` |
-| Commit | `feat(icons): add dedicated food and produce icons` |
+| Summary | Switched bottom-sheet sizing to dynamic viewport units for the icon browser and restored the recently-used grid to its reviewed 2-column layout |
+| Files Changed | `frontend/src/index.css`, `frontend/src/components/AddItemSheet.test.jsx`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- AddItemSheet.test.jsx ListDetailPage.test.jsx` PASS; `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `fix(ui): keep icon browser visible on mobile` |
 | Next Role | review |
 
 ---
 
-### T-007 — review — 2026-05-06T13:40:00Z
+### T-006 — review — 2026-05-11T18:58:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed T-007 Food & Produce icon set: verified all 18 custom SVGs follow conventions, IconBaguette sourced from tabler, DB redirects correct, all validations pass. |
-| Files Changed | .ai/REVIEW.md, .ai/TASKS.md |
+| Summary | Reviewed dvh bottom-sheet fix; max-height rules correct, inner flex-chain enables scrollable icon grid, new CSS assertion test passes, 284/284 tests pass, lint clean |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-007 — implement — 2026-05-07T13:53:04Z
+### T-006 — commit_task — 2026-05-11T17:03:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Committed reviewed T-007 dedicated food and produce icon changes. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `ROADMAP.md`, `frontend/src/assets/icons/custom/bellPepper.svg`, `frontend/src/assets/icons/custom/breadRoll.svg`, `frontend/src/assets/icons/custom/butter.svg`, `frontend/src/assets/icons/custom/chips.svg`, `frontend/src/assets/icons/custom/chocolate.svg`, `frontend/src/assets/icons/custom/cream.svg`, `frontend/src/assets/icons/custom/cucumber.svg`, `frontend/src/assets/icons/custom/fries.svg`, `frontend/src/assets/icons/custom/frozenBerries.svg`, `frontend/src/assets/icons/custom/frozenVegetables.svg`, `frontend/src/assets/icons/custom/jam.svg`, `frontend/src/assets/icons/custom/onion.svg`, `frontend/src/assets/icons/custom/pastaSauce.svg`, `frontend/src/assets/icons/custom/potato.svg`, `frontend/src/assets/icons/custom/quark.svg`, `frontend/src/assets/icons/custom/rice.svg`, `frontend/src/assets/icons/custom/tomato.svg`, `frontend/src/assets/icons/custom/yogurt.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconDatabase.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `frontend/src/utils/cosineSimilarity.test.js` |
-| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
-| Commit | `feat(icons): add dedicated food and produce icons` |
+| Summary | Marked T-006 done and committed the reviewed mobile icon browser sizing fix |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run test --workspace frontend -- AddItemSheet.test.jsx ListDetailPage.test.jsx`; `npm run lint`; `npm run build`; `npm test` |
+| Commit | `fix(ui): keep icon browser visible on mobile` |
 | Next Role | none |
 
 ---
 
-### T-008 — implement — 2026-05-07T14:11:30Z
+### T-007 — implement — 2026-05-11T17:10:50Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Added dedicated drugstore and household icon coverage with 20 custom SVG icons including the missing Tabler mop fallback, registry entries, exact-match DB redirects, and documentation for dedicated household suggestions. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/assets/icons/custom/afterSun.svg`, `frontend/src/assets/icons/custom/bakingPaper.svg`, `frontend/src/assets/icons/custom/bodyWash.svg`, `frontend/src/assets/icons/custom/cleaningCloth.svg`, `frontend/src/assets/icons/custom/conditioner.svg`, `frontend/src/assets/icons/custom/detergent.svg`, `frontend/src/assets/icons/custom/diapers.svg`, `frontend/src/assets/icons/custom/fabricSoftener.svg`, `frontend/src/assets/icons/custom/foil.svg`, `frontend/src/assets/icons/custom/glassesCleaner.svg`, `frontend/src/assets/icons/custom/handSoap.svg`, `frontend/src/assets/icons/custom/mop.svg`, `frontend/src/assets/icons/custom/mouthwash.svg`, `frontend/src/assets/icons/custom/paperTowels.svg`, `frontend/src/assets/icons/custom/shampoo.svg`, `frontend/src/assets/icons/custom/shavingCream.svg`, `frontend/src/assets/icons/custom/sponge.svg`, `frontend/src/assets/icons/custom/storageBags.svg`, `frontend/src/assets/icons/custom/sunscreen.svg`, `frontend/src/assets/icons/custom/toothbrush.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconDatabase.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `frontend/src/utils/cosineSimilarity.test.js` |
-| Validation | `npm run test --workspace frontend -- iconRegistry.test.js` PASS; `npm run test --workspace frontend -- cosineSimilarity.test.js` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.jsx`; `npm run build` PASS with existing `onnxruntime-web` eval and chunk-size warnings; `npm test` PASS |
-| Package Icon Check | Tabler export absent and implemented as custom fallback: `IconMop` -> `CustomMop` |
-| Commit | `feat(icons): add dedicated drugstore and household icons` |
+| Summary | Styled the add-item icon browser toggle as an inline text link while preserving button semantics, and restored the reviewed 2-column recently-used grid rule needed by existing layout tests |
+| Files Changed | `frontend/src/components/AddItemSheet.jsx`, `frontend/src/components/AddItemSheet.test.jsx`, `frontend/src/index.css`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- AddItemSheet.test.jsx` PASS; `npm run test --workspace frontend -- ListDetailPage.test.jsx` PASS; `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `fix(ui): make icon browser toggle link-style` |
 | Next Role | review |
 
-### T-008 — review — 2026-05-07T15:45:00Z
+---
+
+### T-007 — review — 2026-05-11T19:20:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed T-008 Drugstore & Household icon set: verified all 20 custom SVGs follow conventions (IconMop absent from tabler, CustomMop created as fallback), DB redirects correct for all 20 entries, README updated, all validations pass. |
-| Files Changed | .ai/REVIEW.md, .ai/TASKS.md |
+| Summary | Reviewed link-style toggle button; eg-btn-ghost removed, CSS matches plan exactly, button semantics preserved, new test passes all criteria, 285/285 tests pass, lint clean |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-008 — implement — 2026-05-07T15:47:31Z
+### T-007 — commit_task — 2026-05-11T17:19:38Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Committed reviewed T-008 dedicated drugstore and household icon changes. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `README.md`, `frontend/src/assets/icons/custom/afterSun.svg`, `frontend/src/assets/icons/custom/bakingPaper.svg`, `frontend/src/assets/icons/custom/bodyWash.svg`, `frontend/src/assets/icons/custom/cleaningCloth.svg`, `frontend/src/assets/icons/custom/conditioner.svg`, `frontend/src/assets/icons/custom/detergent.svg`, `frontend/src/assets/icons/custom/diapers.svg`, `frontend/src/assets/icons/custom/fabricSoftener.svg`, `frontend/src/assets/icons/custom/foil.svg`, `frontend/src/assets/icons/custom/glassesCleaner.svg`, `frontend/src/assets/icons/custom/handSoap.svg`, `frontend/src/assets/icons/custom/mop.svg`, `frontend/src/assets/icons/custom/mouthwash.svg`, `frontend/src/assets/icons/custom/paperTowels.svg`, `frontend/src/assets/icons/custom/shampoo.svg`, `frontend/src/assets/icons/custom/shavingCream.svg`, `frontend/src/assets/icons/custom/sponge.svg`, `frontend/src/assets/icons/custom/storageBags.svg`, `frontend/src/assets/icons/custom/sunscreen.svg`, `frontend/src/assets/icons/custom/toothbrush.svg`, `frontend/src/data/customIcons.js`, `frontend/src/data/iconDatabase.js`, `frontend/src/data/iconRegistry.js`, `frontend/src/data/iconRegistry.test.js`, `frontend/src/utils/cosineSimilarity.test.js` |
-| Validation | reused reviewed validation: `npm run lint` PASS; `npm run build` PASS; `npm test` PASS |
-| Commit | `feat(icons): add dedicated drugstore and household icons` |
+| Summary | Marked T-007 done and committed the reviewed link-style icon browser toggle changes |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run test --workspace frontend -- AddItemSheet.test.jsx`; `npm run test --workspace frontend -- ListDetailPage.test.jsx`; `npm run lint`; `npm run build`; `npm test` |
+| Commit | `fix(ui): make icon browser toggle link-style` |
 | Next Role | none |
 
-### Cycle closed — unversioned — 2026-05-08T05:34:45Z
+---
+
+### T-008 — plan — 2026-05-11T17:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned removal of the obsolete swipe-to-delete E2E test (`swipeEntryLeft` helper + test block) that broke CI after `EntryRow` was replaced by `EntryTile` in T-005 |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### Cycle closed — unversioned — 2026-05-11T17:21:20Z
 
 | Field | Value |
 |-------|-------|
 | Summary | All tasks done; cycle closed |
 | Version | unversioned |
+
+---
+
+### T-008 — review — 2026-05-11T20:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed removal of obsolete swipe-to-delete E2E test; swipeEntryLeft helper and swipe test block fully removed, remaining helpers intact, 106/106 tests pass, lint and build clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-008 — implement — 2026-05-11T17:51:48Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed the obsolete swipe-to-delete E2E helper and test that referenced the retired entry-row UI |
+| Files Changed | `e2e/lists.spec.js`, `.ai/TASKS.md` |
+| Validation | `npm run lint` PASS (existing Fast Refresh warning in `frontend/src/context/AuthContext.jsx`); `npm run build` PASS (existing ONNX eval and chunk-size warnings); `npm test` PASS |
+| Commit | `test(e2e): remove obsolete swipe-to-delete scenario` |
+| Next Role | review |
+
+---
+
+### T-008 — commit_task — 2026-05-11T17:57:07Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-008 done and committed the reviewed obsolete swipe-to-delete E2E removal |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reused review-approved validation: `npm run lint`; `npm run build`; `npm test` |
+| Commit | `test(e2e): remove obsolete swipe-to-delete scenario` |
+| Next Role | none |
 
 ---

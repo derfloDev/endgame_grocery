@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -879,7 +879,7 @@ describe("authentication shell", () => {
     });
   }, 10000);
 
-  it("adds completed and deleted items to recently used and keeps newest history first", async () => {
+  it("adds completed items to recently used and keeps newest history first", async () => {
     seedAuthSession("user-1");
     fetch
       .mockResolvedValueOnce({
@@ -936,7 +936,16 @@ describe("authentication shell", () => {
         })
       })
       .mockResolvedValueOnce({
-        status: 204
+        ok: true,
+        json: async () => ({
+          entry: {
+            id: "entry-2",
+            text: "Cheese",
+            status: "done",
+            icon: "IconCheese",
+            created_at: "2026-04-21T00:01:00Z"
+          }
+        })
       });
 
     renderApp(["/lists/list-1"]);
@@ -958,16 +967,14 @@ describe("authentication shell", () => {
       .map((button) => button.getAttribute("aria-label"));
     expect(chipLabelsAfterDone.indexOf("Milk")).toBeLessThan(chipLabelsAfterDone.indexOf("Bread"));
 
-    const cheeseRow = screen.getByTestId("entry-row-entry-2");
-    fireEvent.touchStart(cheeseRow, { touches: [{ clientX: 120 }] });
-    fireEvent.touchMove(cheeseRow, { touches: [{ clientX: 20 }] });
-    fireEvent.touchEnd(cheeseRow);
+    await userEvent.click(screen.getByRole("button", { name: "Mark Cheese done" }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/lists/list-1/entries/entry-2",
         expect.objectContaining({
-          method: "DELETE"
+          body: JSON.stringify({ status: "done" }),
+          method: "PATCH"
         })
       );
     });
@@ -1259,7 +1266,15 @@ describe("authentication shell", () => {
     });
     expect(await screen.findByText("500 g")).toBeTruthy();
 
-    await userEvent.click(screen.getByRole("button", { name: "Edit X" }));
+    const xTile = screen.getByRole("button", { name: "Mark X done" });
+    fireEvent.mouseDown(xTile);
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 550);
+      });
+    });
+    fireEvent.mouseUp(xTile);
+    fireEvent.click(xTile);
 
     const editDialog = await screen.findByRole("dialog", { name: "Edit Item" });
     const editDetailsInput = within(editDialog).getByLabelText("Details (optional)");

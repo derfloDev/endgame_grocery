@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
-import { createEntry, deleteEntry, fetchEntries, updateEntry } from "../api/entries";
+import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
 import { writeCachedResource } from "../api/offlineStore";
 import { fetchLists, renameList } from "../api/lists";
 import { fetchListMembers, revokeListMember, shareListWithMember } from "../api/sharing";
 import AddItemSheet from "../components/AddItemSheet";
-import EntryRow from "../components/EntryRow";
+import EntryTile from "../components/EntryTile";
 import ListOptionsSheet from "../components/ListOptionsSheet";
 import RecentlyUsedSection from "../components/RecentlyUsedSection";
 import RenameListSheet from "../components/RenameListSheet";
@@ -243,19 +243,21 @@ export default function ListDetailPage() {
       return false;
     }
 
+    const nextDetails = normalizeEntryDetails(details);
+    const temporaryEntry = {
+      id: createTemporaryId("entry"),
+      text: trimmed,
+      icon: icon ?? null,
+      details: nextDetails,
+      status: "open",
+      created_at: new Date().toISOString(),
+      is_pending_sync: true
+    };
+
+    await updateEntries((currentEntries) => sortEntries([...currentEntries, temporaryEntry]));
+
     try {
       setEntryError("");
-      const nextDetails = normalizeEntryDetails(details);
-
-      const temporaryEntry = {
-        id: createTemporaryId("entry"),
-        text: trimmed,
-        icon: icon ?? null,
-        details: nextDetails,
-        status: "open",
-        created_at: new Date().toISOString(),
-        is_pending_sync: true
-      };
       const result = await createEntry(
         id,
         token,
@@ -264,19 +266,38 @@ export default function ListDetailPage() {
       );
 
       await updateEntries((currentEntries) =>
-        sortEntries([...currentEntries, result?.queued ? temporaryEntry : result.entry])
+        sortEntries(
+          currentEntries.map((currentEntry) =>
+            currentEntry.id === temporaryEntry.id ? (result?.queued ? temporaryEntry : result.entry) : currentEntry
+          )
+        )
       );
       return true;
     } catch (submitError) {
+      await updateEntries((currentEntries) =>
+        currentEntries.filter((currentEntry) => currentEntry.id !== temporaryEntry.id)
+      );
       setEntryError(submitError.message);
       return false;
     }
   }
 
   async function toggleStatus(entry) {
+    const nextStatus = entry.status === "open" ? "done" : "open";
+    const optimisticEntry = { ...entry, status: nextStatus, is_pending_sync: true };
+
+    await updateEntries((currentEntries) =>
+      sortEntries(
+        currentEntries.map((currentEntry) => (currentEntry.id === entry.id ? optimisticEntry : currentEntry))
+      )
+    );
+
+    if (nextStatus === "done") {
+      setRecentlyUsed((currentItems) => upsertRecentlyUsedItems(currentItems, entry));
+    }
+
     try {
       setEntryError("");
-      const nextStatus = entry.status === "open" ? "done" : "open";
       const result = await updateEntry(id, entry.id, token, { status: nextStatus });
 
       await updateEntries((currentEntries) =>
@@ -292,12 +313,20 @@ export default function ListDetailPage() {
         )
       );
 
-      if (nextStatus === "done") {
+      if (nextStatus === "done" && !result?.queued) {
         setRecentlyUsed((currentItems) =>
-          upsertRecentlyUsedItems(currentItems, result?.queued ? entry : result?.entry ?? entry)
+          upsertRecentlyUsedItems(currentItems, result?.entry ?? entry)
         );
       }
     } catch (submitError) {
+      await updateEntries((currentEntries) =>
+        sortEntries(currentEntries.map((currentEntry) => (currentEntry.id === entry.id ? entry : currentEntry)))
+      );
+
+      if (nextStatus === "done") {
+        setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== entry.text));
+      }
+
       setEntryError(submitError.message);
     }
   }
@@ -333,21 +362,6 @@ export default function ListDetailPage() {
     } catch (submitError) {
       setEntryError(submitError.message);
       return false;
-    }
-  }
-
-  async function handleDeleteEntry(entryId) {
-    try {
-      setEntryError("");
-      const entryToArchive = entries.find((entry) => entry.id === entryId);
-      await deleteEntry(id, entryId, token);
-      await updateEntries((currentEntries) => currentEntries.filter((entry) => entry.id !== entryId));
-
-      if (entryToArchive) {
-        setRecentlyUsed((currentItems) => upsertRecentlyUsedItems(currentItems, entryToArchive));
-      }
-    } catch (submitError) {
-      setEntryError(submitError.message);
     }
   }
 
@@ -518,15 +532,16 @@ export default function ListDetailPage() {
               {openEntries.length === 0 ? (
                 <EmptyState body={t("detail.noOpenItems")} title={t("detail.allClearTitle")} />
               ) : (
-                openEntries.map((entry) => (
-                  <EntryRow
-                    key={entry.id}
-                    entry={entry}
-                    onDelete={() => void handleDeleteEntry(entry.id)}
-                    onEdit={() => setEditingEntry(entry)}
-                    onToggle={() => void toggleStatus(entry)}
-                  />
-                ))
+                <div className="entry-tile-grid">
+                  {openEntries.map((entry) => (
+                    <EntryTile
+                      key={entry.id}
+                      entry={entry}
+                      onEdit={() => setEditingEntry(entry)}
+                      onToggle={() => void toggleStatus(entry)}
+                    />
+                  ))}
+                </div>
               )}
             </section>
 

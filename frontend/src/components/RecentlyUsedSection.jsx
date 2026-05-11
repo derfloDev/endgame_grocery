@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
+import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 import { Icon } from "./ui";
 
 export default function RecentlyUsedSection({ items, onAdd, onDismiss }) {
@@ -16,13 +16,13 @@ export default function RecentlyUsedSection({ items, onAdd, onDismiss }) {
         <span className="eg-chip-purple">{items.length}</span>
       </div>
 
-      <div className="recently-used-list">
+      <div className="recently-used-grid">
         {items.map((item) => {
           const resolvedIconName = resolveIconName(item.icon) ?? FALLBACK_ICON_NAME;
-          const ItemIcon = ICON_REGISTRY[resolvedIconName];
+          const ItemIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
 
           return (
-            <div key={item.text} className="recently-used-chip-row">
+            <div key={item.text} className="recently-used-cell">
               <button
                 aria-label={item.text}
                 className="recently-used-chip"
@@ -33,7 +33,7 @@ export default function RecentlyUsedSection({ items, onAdd, onDismiss }) {
                   aria-hidden="true"
                   className="recently-used-chip-icon"
                   data-icon-name={resolvedIconName}
-                  size={18}
+                  size={20}
                   stroke={1.6}
                 />
                 <span className="recently-used-chip-text">{item.text}</span>
@@ -45,7 +45,7 @@ export default function RecentlyUsedSection({ items, onAdd, onDismiss }) {
                 type="button"
                 onClick={() => onDismiss?.(item.text)}
               >
-                <Icon color="var(--text-secondary)" name="x" size={16} />
+                <Icon color="var(--text-secondary)" name="x" size={14} />
               </button>
             </div>
           );

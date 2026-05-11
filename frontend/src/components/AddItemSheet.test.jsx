@@ -97,6 +97,28 @@ describe("AddItemSheet", () => {
     expect(onAdd).toHaveBeenCalledWith("Milch", "IconMilk", "");
   }, 10000);
 
+  it("styles the icon browser toggle as an inline text link", () => {
+    render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
+
+    const toggleButton = screen.getByRole("button", { name: "Mehr anzeigen" });
+    const toggleRule = cssSource.match(/\.add-item-more-btn\s*\{[^}]*\}/s)?.[0] ?? "";
+    const toggleInteractionRule =
+      cssSource.match(/\.add-item-more-btn:hover,\s*\.add-item-more-btn:focus-visible\s*\{[^}]*\}/s)?.[0] ??
+      "";
+
+    expect(toggleButton.className).toBe("add-item-more-btn");
+    expect(toggleButton.type).toBe("button");
+    expect(toggleRule).toMatch(/width:\s*fit-content;/);
+    expect(toggleRule).toMatch(/padding:\s*0\.15rem 0;/);
+    expect(toggleRule).toMatch(/border:\s*0;/);
+    expect(toggleRule).toMatch(/background:\s*none;/);
+    expect(toggleRule).toMatch(/font-size:\s*0\.9rem;/);
+    expect(toggleRule).toMatch(/text-decoration:\s*underline;/);
+    expect(toggleRule).toMatch(/text-decoration-color:\s*transparent;/);
+    expect(toggleInteractionRule).toMatch(/text-decoration-color:\s*currentColor;/);
+    expect(toggleInteractionRule).toMatch(/opacity:\s*0\.85;/);
+  });
+
   it("expands the inline icon browser, filters icons, and submits the manually selected icon", async () => {
     const onAdd = vi.fn();
     const { container } = render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
@@ -326,6 +348,12 @@ describe("AddItemSheet", () => {
   it("keeps the FAB inset on narrow screens and prevents icon-browser collapse overflow from reaching the viewport", () => {
     expect(cssSource).toMatch(/html\s*\{[^}]*overflow-x:\s*hidden;/s);
     expect(cssSource).toMatch(/\.fab\s*\{[^}]*right:\s*max\(calc\(50%\s*-\s*195px\),\s*16px\);/s);
+  });
+
+  it("uses dynamic viewport height for the icon browser sheet", () => {
+    expect(cssSource).toMatch(/\.bottom-sheet\s*\{[^}]*max-height:\s*min\(80dvh,\s*44rem\);/s);
+    expect(cssSource).toMatch(/\.bottom-sheet--browser-open\s*\{[^}]*max-height:\s*min\(92dvh,\s*44rem\);/s);
+    expect(cssSource).not.toMatch(/max-height:\s*min\(80vh,\s*44rem\);/);
   });
 
   it("scrolls the add-item input into view when it receives focus", async () => {

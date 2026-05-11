@@ -57,54 +57,6 @@ async function createEntryByApi(request, token, listId, text) {
   return (await response.json()).entry;
 }
 
-async function swipeEntryLeft(page, entryText) {
-  const row = page.locator(".entry-row").filter({ hasText: entryText });
-  await expect(row).toBeVisible();
-
-  const box = await row.boundingBox();
-  expect(box).toBeTruthy();
-
-  const startX = box.x + box.width - 20;
-  const endX = box.x + box.width - 115;
-  const y = box.y + box.height / 2;
-
-  await page.evaluate(
-    ({ text, sx, ex, yPos }) => {
-      const element = [...document.querySelectorAll(".entry-row")].find((node) => node.textContent?.includes(text));
-
-      if (!element) {
-        throw new Error(`Entry row not found for ${text}`);
-      }
-
-      const touchData = (x) =>
-        new Touch({
-          identifier: 1,
-          target: element,
-          clientX: x,
-          clientY: yPos,
-          pageX: x,
-          pageY: yPos,
-          screenX: x,
-          screenY: yPos
-        });
-
-      const buildEvent = (type, touches, changedTouches) =>
-        new TouchEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          touches,
-          targetTouches: touches,
-          changedTouches
-        });
-
-      element.dispatchEvent(buildEvent("touchstart", [touchData(sx)], [touchData(sx)]));
-      element.dispatchEvent(buildEvent("touchmove", [touchData(ex)], [touchData(ex)]));
-      element.dispatchEvent(buildEvent("touchend", [], [touchData(ex)]));
-    },
-    { text: entryText, sx: startX, ex: endX, yPos: y }
-  );
-}
-
 test.describe("shopping lists", () => {
   test("creates a new shopping list", async ({ page, request }) => {
     await setupLoggedInUser(page, request);
@@ -137,21 +89,6 @@ test.describe("shopping lists", () => {
     await page.getByRole("button", { name: "Add Item" }).click();
 
     await expect(page.getByText(itemText)).toBeVisible();
-  });
-
-  test("deletes an item from a shopping list via swipe", async ({ page, request }) => {
-    const { token } = await setupLoggedInUser(page, request);
-    const list = await createListByApi(request, token, "Quantum Realm Groceries");
-    const itemText = `Pym Particles ${Date.now()}`;
-
-    await createEntryByApi(request, token, list.id, itemText);
-    await page.goto(`/lists/${list.id}`);
-
-    await expect(page.getByText(itemText)).toBeVisible();
-
-    await swipeEntryLeft(page, itemText);
-
-    await expect(openItemsSection(page).getByText(itemText)).not.toBeVisible();
   });
 
   test("marks an item as done in a shopping list", async ({ page, request }) => {

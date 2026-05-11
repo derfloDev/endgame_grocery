@@ -1,788 +1,753 @@
-# Plan
+# PLAN — ui-improvements cycle
 
-Status: **ready_for_implement**
-
-Goal: Extend the icon registry with additional tabler/lucide icons and introduce a custom SVG icon system with two Kornflakes example icons.
-
-## Scope
-
-- T-001: Add six missing tabler/lucide icons to `ICON_REGISTRY` ✅ done
-- T-002: Initial custom icon infrastructure (JS-embedded paths) ✅ done — superseded by T-003
-- T-003: Refactor custom icon system to use filesystem SVG files via `vite-plugin-svgr` ✅ done
-- T-004: Add six new custom SVG icons (Garlic, Hummus, DentalFloss, Toothpaste, CottonPads, Pasta) ✅ done
-- T-006: Expanded icon set — seven tabler/lucide candidates + eleven custom SVGs (registry only, no DB entries) ✅ done
-- T-005: Comprehensive `iconDatabase.js` enrichment — covers all icons from T-001–T-006 ✅ done
-- T-007: Food & Produce custom icons — 19 dedicated SVGs replacing generic icons, with DB redirects
-- T-008: Drugstore & Household custom icons — 19 dedicated SVGs replacing generic icons, with DB redirects
-
-## Acceptance Criteria
-
-- T-001–T-006: ✅ done
-- T-005: ✅ done
-- T-007: All 19 Food & Produce custom icons appear in the icon browser; each renders at `size=22` and `size=32` with `currentColor` stroke; existing DB entries for each label point to the new custom icon; `npm run lint`, `npm run build`, and `npm test` pass.
-- T-008: All 19 Drugstore & Household custom icons appear in the icon browser; each renders at `size=22` and `size=32` with `currentColor` stroke; existing DB entries for each label point to the new custom icon; `npm run lint`, `npm run build`, and `npm test` pass.
+Generated: 2026-05-11
+Source: ROADMAP.md (7 priorities)
+Recommended implementation order: T-003 → T-007 → T-006 → T-002 → T-001 → T-004 → T-005
 
 ---
 
-## T-001 — Add missing tabler/lucide icons ✅ done
-
-_(see HANDOFF.md for implementation details)_
-
----
-
-## T-002 — Custom icon infrastructure (JS-embedded) ✅ done — superseded by T-003
-
-_(see HANDOFF.md for implementation details)_
-
----
-
-## T-003 — Refactor custom icons to filesystem SVG files
-
-### Context
-
-T-002 shipped custom icons with SVG paths embedded in JS. T-003 replaces that approach: each custom icon is a proper `.svg` file on disk, imported as a React component via `vite-plugin-svgr`.
-
-### Files to create / change
-
-| File | Action |
-|---|---|
-| `frontend/package.json` | **Extend** — add `vite-plugin-svgr` to devDependencies |
-| `frontend/vite.config.js` | **Extend** — register `svgr()` plugin |
-| `frontend/src/assets/icons/custom/kornflakesBowl.svg` | **Create** — bowl with cereal flakes SVG |
-| `frontend/src/assets/icons/custom/kornflakesBox.svg` | **Create** — cereal-box silhouette SVG |
-| `frontend/src/data/customIcons.js` | **Rewrite** — replace `fromCustomSVG()` factory with `normalizeCustomIcon()` wrapper; import SVG files via `?react` |
-| `frontend/src/data/iconRegistry.js` | **No change required** — imports/registry entries from T-002 remain valid |
-| `frontend/src/data/iconRegistry.test.js` | **Update** — adjust any tests that relied on the old JS-path factory behaviour |
-
-### Implementation steps
-
-#### Step 1 — Install and configure `vite-plugin-svgr`
-
-```bash
-npm install --save-dev vite-plugin-svgr --workspace frontend
-```
-
-In `frontend/vite.config.js`, add the plugin:
-
-```js
-import svgr from "vite-plugin-svgr";
-
-export default defineConfig({
-  plugins: [
-    react(),
-    svgr(),          // enables *.svg?react imports
-    VitePWA({...}),
-  ],
-  // ...rest unchanged
-});
-```
-
-#### Step 2 — Create SVG files
-
-Location: `frontend/src/assets/icons/custom/`
-
-Both files must follow these conventions so the normalizer can control appearance:
-- `viewBox="0 0 24 24"`, no `width`/`height` attributes on the `<svg>` root
-- `fill="none"` on the root `<svg>`
-- `stroke="currentColor"` on all stroked paths/shapes
-- `stroke-width` omitted on elements (controlled by the wrapper at render time)
-- `stroke-linecap="round"` and `stroke-linejoin="round"` on the root or each element
-
-**`kornflakesBowl.svg`** — a wide shallow bowl with 3–4 small flake shapes floating inside:
-- Bowl: a wide U-shaped arc or ellipse segment near the bottom of the canvas
-- Flakes: 3–4 small irregular quadrilaterals or curved diamond shapes above the bowl centre
-- All on 24×24 grid
-
-**`kornflakesBox.svg`** — a cereal-box silhouette:
-- Box body: a tall rounded rectangle occupying most of the canvas height
-- Angled/folded top: two lines forming a closed trapezoid flap on top of the box
-- Label area: one or two short horizontal lines in the lower third of the box front
-- All on 24×24 grid
-
-#### Step 3 — Rewrite `customIcons.js`
-
-Replace the old `fromCustomSVG()` factory (which accepted JS `elements` arrays) with `normalizeCustomIcon()`, which wraps a vite-plugin-svgr React component:
-
-```js
-import { createElement } from "react";
-import KornflakesBowlSvg from "../assets/icons/custom/kornflakesBowl.svg?react";
-import KornflakesBoxSvg  from "../assets/icons/custom/kornflakesBox.svg?react";
-
-/**
- * Wraps a vite-plugin-svgr component so it accepts the same props as
- * tabler/lucide icons: size, stroke, strokeWidth, color.
- */
-function normalizeCustomIcon(SvgComponent, displayName) {
-  function CustomIcon({ size = 24, stroke, strokeWidth, color = "currentColor", ...rest }) {
-    return createElement(SvgComponent, {
-      width: size,
-      height: size,
-      stroke: color,
-      strokeWidth: stroke ?? strokeWidth ?? 1.5,
-      ...rest,
-    });
-  }
-  CustomIcon.displayName = displayName;
-  return CustomIcon;
-}
-
-export const CustomKornflakesBowl = normalizeCustomIcon(KornflakesBowlSvg, "CustomKornflakesBowl");
-export const CustomKornflakesBox  = normalizeCustomIcon(KornflakesBoxSvg,  "CustomKornflakesBox");
-```
-
-#### Step 4 — Update tests
-
-In `frontend/src/data/iconRegistry.test.js`:
-- Remove any test that directly tested the old `fromCustomSVG()` factory signature.
-- Verify that `ICON_REGISTRY.CustomKornflakesBowl` and `ICON_REGISTRY.CustomKornflakesBox` still resolve correctly via `resolveIconName()`.
-- Verify `formatIconName("CustomKornflakesBowl")` returns `"Kornflakes Bowl"` (the `Custom`-prefix strip from T-002 remains valid).
-
-#### Step 5 — Validate
-
-```bash
-npm run lint
-npm run build
-npm test
-```
-
-Confirm: no new lint errors; build does not warn about unresolved SVG imports; all registry tests pass.
-
----
-
----
-
-## T-004 — Add six new custom SVG icons (grocery & hygiene batch)
-
-### Context
-
-T-003 established the pattern: SVG file on disk → `?react` import → `normalizeCustomIcon()` wrapper → `ICON_REGISTRY` entry. T-004 adds six more icons following the same pattern exactly.
-
-### SVG file conventions (same as T-003)
-
-- `viewBox="0 0 24 24"`, no `width`/`height` on the `<svg>` root
-- `fill="none"` on the root `<svg>`
-- `stroke="currentColor"` on all stroked elements
-- `stroke-width` omitted on individual elements (set by the normalizer at render time)
-- `stroke-linecap="round"` and `stroke-linejoin="round"` on root or each element
-
-### Files to create / change
-
-| File | Action |
-|---|---|
-| `frontend/src/assets/icons/custom/garlic.svg` | **Create** |
-| `frontend/src/assets/icons/custom/hummus.svg` | **Create** |
-| `frontend/src/assets/icons/custom/dentalFloss.svg` | **Create** |
-| `frontend/src/assets/icons/custom/toothpaste.svg` | **Create** |
-| `frontend/src/assets/icons/custom/cottonPads.svg` | **Create** |
-| `frontend/src/assets/icons/custom/pasta.svg` | **Create** |
-| `frontend/src/data/customIcons.js` | **Extend** — add six imports and exports |
-| `frontend/src/data/iconRegistry.js` | **Extend** — add six registry entries |
-| `frontend/src/data/iconRegistry.test.js` | **Extend** — add resolveIconName + formatIconName assertions for all six |
-
-### SVG design briefs
-
-**`garlic.svg`** — garlic bulb:
-- Round bulb base with a slightly pointed top
-- 2–3 vertical curved lines across the bulb suggesting clove segments
-- Short stem/root lines at the top
-
-**`hummus.svg`** — bowl of hummus:
-- Wide shallow bowl (same arc style as `kornflakesBowl.svg`)
-- Smooth rounded mound of filling inside the bowl
-- Small oval depression in the centre of the mound (the olive-oil pool)
-
-**`dentalFloss.svg`** — dental floss dispenser:
-- Small rectangular box body (the dispenser)
-- Rounded corners on the box
-- A short curved strand of floss exiting from the top-centre of the box
-
-**`toothpaste.svg`** — toothpaste tube:
-- Elongated rounded tube body (horizontal or slightly diagonal)
-- Flat, rolled/crimped closed end at one side
-- Small cap shape at the other end
-- Optional: a short curved ribbon of paste emerging from the cap
-
-**`cottonPads.svg`** — stack of cotton pads:
-- Two or three flat ellipses stacked with slight vertical offset to show depth
-- Edges slightly irregular/soft (short tick marks or bumped curves) to suggest cotton texture
-
-**`pasta.svg`** — pasta / noodles:
-- Three wavy parallel horizontal lines (spaghetti strands) in the centre of the canvas
-- A simple fork silhouette to the right with 3 tines, partially behind the strands
-
-### Implementation steps
-
-1. **Create the six SVG files** following the design briefs and conventions above.
-
-2. **Extend `customIcons.js`** — add imports and exports (alphabetical within each block):
-
-   ```js
-   import CottonPadsSvg  from "../assets/icons/custom/cottonPads.svg?react";
-   import DentalFlossSvg from "../assets/icons/custom/dentalFloss.svg?react";
-   import GarlicSvg      from "../assets/icons/custom/garlic.svg?react";
-   import HummusSvg      from "../assets/icons/custom/hummus.svg?react";
-   import PastaSvg       from "../assets/icons/custom/pasta.svg?react";
-   import ToothpasteSvg  from "../assets/icons/custom/toothpaste.svg?react";
-
-   export const CustomCottonPads  = normalizeCustomIcon(CottonPadsSvg,  "CustomCottonPads");
-   export const CustomDentalFloss = normalizeCustomIcon(DentalFlossSvg, "CustomDentalFloss");
-   export const CustomGarlic      = normalizeCustomIcon(GarlicSvg,      "CustomGarlic");
-   export const CustomHummus      = normalizeCustomIcon(HummusSvg,      "CustomHummus");
-   export const CustomPasta       = normalizeCustomIcon(PastaSvg,       "CustomPasta");
-   export const CustomToothpaste  = normalizeCustomIcon(ToothpasteSvg,  "CustomToothpaste");
-   ```
-
-3. **Extend `iconRegistry.js`** — add imports and registry entries (alphabetical):
-
-   ```js
-   import {
-     CustomCottonPads,
-     CustomDentalFloss,
-     CustomGarlic,
-     CustomHummus,
-     CustomKornflakesBox,
-     CustomKornflakesBowl,
-     CustomPasta,
-     CustomToothpaste,
-   } from "./customIcons.js";
-
-   // In ICON_REGISTRY (alphabetical):
-   CustomCottonPads,
-   CustomDentalFloss,
-   CustomGarlic,
-   CustomHummus,
-   CustomPasta,
-   CustomToothpaste,
-   ```
-
-4. **Extend `iconRegistry.test.js`** — for each new key assert:
-   - `resolveIconName("CustomGarlic")` === `"CustomGarlic"` (and same for the other five)
-   - `formatIconName("CustomDentalFloss")` === `"Dental Floss"` (strip `Custom`, split camelCase)
-
-5. **Validate:**
-   ```bash
-   npm run lint
-   npm run build
-   npm test
-   ```
-
----
-
-## T-006 — Expanded icon set: clothing, fruit, hygiene & misc
-
-### Context
-
-New product categories (clothing, exotic fruits, hygiene accessories, misc) need icon coverage. Seven items may already exist in tabler/lucide; eleven require custom SVG files.
-
-### Files to create / change
-
-| File | Action |
-|---|---|
-| `frontend/src/assets/icons/custom/cottonSwabs.svg` | **Create** |
-| `frontend/src/assets/icons/custom/wetWipes.svg` | **Create** |
-| `frontend/src/assets/icons/custom/interdentalSticks.svg` | **Create** |
-| `frontend/src/assets/icons/custom/creamTube.svg` | **Create** |
-| `frontend/src/assets/icons/custom/creamJar.svg` | **Create** |
-| `frontend/src/assets/icons/custom/mango.svg` | **Create** |
-| `frontend/src/assets/icons/custom/kiwi.svg` | **Create** |
-| `frontend/src/assets/icons/custom/peach.svg` | **Create** |
-| `frontend/src/assets/icons/custom/plum.svg` | **Create** |
-| `frontend/src/assets/icons/custom/blueberries.svg` | **Create** |
-| `frontend/src/assets/icons/custom/eLiquid.svg` | **Create** |
-| `frontend/src/data/customIcons.js` | **Extend** — 11 new imports + exports |
-| `frontend/src/data/iconRegistry.js` | **Extend** — Group A tabler/lucide + Group B custom icons |
-| `frontend/src/data/iconRegistry.test.js` | **Extend** — assertions for all new registry keys |
-
-> ⚠️ No `iconDatabase.js` changes in T-006. All DB entries are written in T-005 (which runs after T-006).
-
-### Implementation steps
-
-#### Step 1 — Group A: tabler/lucide icons
-
-For each candidate, verify the export exists in the installed version of the library. If absent, create a custom SVG fallback instead and document the substitution in the HANDOFF entry.
-
-| Item | Primary candidate | Fallback |
-|---|---|---|
-| Socken | tabler `IconSock` | custom SVG |
-| Hose | tabler `IconPants` | custom SVG |
-| Schuhe | tabler `IconShoe` | custom SVG |
-| Ananas | tabler `IconPineapple` | custom SVG |
-| Wassermelone | lucide `Watermelon` (via `fromLucide()`) | custom SVG |
-| Feuerzeug | tabler `IconFlame` | custom SVG |
-| Konservendose | tabler `IconCan` | custom SVG |
-
-Add confirmed tabler icons to the tabler import block in `iconRegistry.js` (alphabetical). Wrap confirmed lucide icons with `fromLucide()`.
-
-#### Step 2 — Group B: custom SVG files
-
-All files follow the T-003 conventions:
-- `viewBox="0 0 24 24"`, no `width`/`height` on `<svg>` root
-- `fill="none"` on root `<svg>`
-- `stroke="currentColor"` on all stroked elements
-- `stroke-width` omitted (set by normalizer)
-- `stroke-linecap="round"` and `stroke-linejoin="round"` on root or each element
-
-**Design briefs:**
-
-`cottonSwabs.svg` — Wattestäbchen:
-- Two parallel thin sticks, each with a small oval cotton tip at both ends
-- Sticks arranged side by side or slightly crossed
-
-`wetWipes.svg` — Feuchtes Klopapier:
-- Rectangular package with rounded corners
-- A single wipe/tissue sheet partially pulled out from a slot on top
-- One or two gentle wave lines on the exposed sheet to suggest moisture
-
-`interdentalSticks.svg` — Interdental Sticks:
-- A slim elongated stick
-- Small tapered cylindrical brush head at one end (a few short strokes radiating outward)
-- Two stylised tooth outlines with the brush positioned between them
-
-`creamTube.svg` — Creme Tube:
-- Elongated tube body (portrait orientation)
-- Flat crimped/sealed bottom end
-- Small round screw cap at the top
-- Optional short curl of cream emerging from the cap
-
-`creamJar.svg` — Creme Tiegel:
-- Short wide cylinder (the jar body)
-- Flat lid shown slightly lifted or separated above the jar
-- Optional thin shine line on the jar side
-
-`mango.svg` — Mango:
-- Teardrop / kidney-bean outline for the fruit body
-- Short stem at the narrow top end
-- One small leaf off the stem
-
-`kiwi.svg` — Kiwi:
-- Oval outline for the whole fruit
-- Cross-section detail inside: central circle with radiating segments and small seed marks
-
-`peach.svg` — Pfirsich:
-- Round fruit outline with a subtle vertical cleft line
-- Short stem plus one small leaf at the top
-
-`plum.svg` — Pflaume:
-- Oval fruit outline, slightly wider in the middle
-- Shallow cleft indent at the top
-- Short stem
-
-`blueberries.svg` — Blaubeeren:
-- Three small circles clustered together representing berries
-- Small five-point star crown mark on top of each berry
-- Thin connecting stems
-
-`eLiquid.svg` — E-Liquid / Vape:
-- Small bottle with a narrow dropper/nozzle top (resembling a unicorn-bottle shape)
-- Two or three small wavy/curling vapor wisps rising from the nozzle tip
-
-#### Step 3 — Extend `customIcons.js`
-
-Add imports and exports for all eleven new custom icons (alphabetical):
-
-```js
-import BlueberriesSvg      from "../assets/icons/custom/blueberries.svg?react";
-import CottonSwabsSvg      from "../assets/icons/custom/cottonSwabs.svg?react";
-import CreamJarSvg         from "../assets/icons/custom/creamJar.svg?react";
-import CreamTubeSvg        from "../assets/icons/custom/creamTube.svg?react";
-import ELiquidSvg          from "../assets/icons/custom/eLiquid.svg?react";
-import InterdentalSticksSvg from "../assets/icons/custom/interdentalSticks.svg?react";
-import KiwiSvg             from "../assets/icons/custom/kiwi.svg?react";
-import MangoSvg            from "../assets/icons/custom/mango.svg?react";
-import PeachSvg            from "../assets/icons/custom/peach.svg?react";
-import PlumSvg             from "../assets/icons/custom/plum.svg?react";
-import WetWipesSvg         from "../assets/icons/custom/wetWipes.svg?react";
-
-export const CustomBlueberries       = normalizeCustomIcon(BlueberriesSvg,       "CustomBlueberries");
-export const CustomCottonSwabs       = normalizeCustomIcon(CottonSwabsSvg,       "CustomCottonSwabs");
-export const CustomCreamJar          = normalizeCustomIcon(CreamJarSvg,          "CustomCreamJar");
-export const CustomCreamTube         = normalizeCustomIcon(CreamTubeSvg,         "CustomCreamTube");
-export const CustomELiquid           = normalizeCustomIcon(ELiquidSvg,           "CustomELiquid");
-export const CustomInterdentalSticks = normalizeCustomIcon(InterdentalSticksSvg, "CustomInterdentalSticks");
-export const CustomKiwi              = normalizeCustomIcon(KiwiSvg,              "CustomKiwi");
-export const CustomMango             = normalizeCustomIcon(MangoSvg,             "CustomMango");
-export const CustomPeach             = normalizeCustomIcon(PeachSvg,             "CustomPeach");
-export const CustomPlum              = normalizeCustomIcon(PlumSvg,              "CustomPlum");
-export const CustomWetWipes          = normalizeCustomIcon(WetWipesSvg,          "CustomWetWipes");
-```
-
-#### Step 4 — Update tests
-
-In `iconRegistry.test.js`, add `resolveIconName` + `formatIconName` assertions for every new registry key added in Group A and Group B.
-
-#### Step 5 — Validate
-
-```bash
-npm run lint
-npm run build
-npm test
-```
-
----
-
-## T-005 — Comprehensive iconDatabase.js enrichment
-
-### Context
-
-T-005 is the single authoritative DB task and runs **after T-006**. It covers: all custom icons from T-002–T-004, all icons added in T-006 (Groups A, B, C), redirections of garlic/pasta/grapes, and synonym enrichment across every existing category.
-
-### Prerequisite
-
-T-006 must be `done` before T-005 begins (T-005 references registry keys created in T-006).
+## T-001 — Icon suggestion: compound-word matching
+
+### Goal
+`useIconSuggestion` must resolve German compound words (e.g. "Spritzpaprika",
+"Minimöhren") to the correct icon synchronously by detecting that the input
+_contains_ a known tag term.
 
 ### Files to change
+| File | Change |
+|------|--------|
+| `frontend/src/hooks/useIconSuggestion.js` | Extend `getExactOrPrefixIcon` with substring check |
+| `frontend/src/hooks/useIconSuggestion.test.js` | Add 2 compound-word test cases |
 
-| File | Action |
-|---|---|
-| `frontend/src/data/iconDatabase.js` | **Rewrite** — redirect entries, add new entries, enrich all existing tags |
+### Implementation detail
 
-### Implementation steps
-
-#### Step 1 — Redirect three existing entries
+In `getExactOrPrefixIcon`, after the existing exact-match and prefix checks, add a
+third pass that finds the **longest** known term contained within the input.
+A minimum length guard of **4 characters** prevents short keys like `"ei"` from
+matching unrelated words.
 
 ```js
-// garlic: IconPepper → CustomGarlic
-{ label: "garlic", icon: "CustomGarlic", tags: ["knoblauch", "knoblauchzehe", "knoblauchknolle", "garlic clove", "garlic bulb"] }
-
-// pasta: IconToolsKitchen2 → CustomPasta
-{ label: "pasta", icon: "CustomPasta", tags: ["nudeln", "spaghetti", "penne", "fusilli", "rigatoni", "tagliatelle", "linguine", "farfalle", "noodles"] }
-
-// grapes: IconCherry → IconGrape
-{ label: "grapes", icon: "IconGrape", tags: ["trauben", "weintrauben", "grape", "raisins", "rosinen", "traube"] }
+// 3. Substring match — input contains a known term (≥ 4 chars), pick longest
+let bestSubstringIcon = null;
+let bestSubstringLength = 0;
+for (const [term, icon] of Object.entries(EXACT_MATCH_MAP)) {
+  if (term.length >= 4 && normalizedText.includes(term) && term.length > bestSubstringLength) {
+    bestSubstringIcon = icon;
+    bestSubstringLength = term.length;
+  }
+}
+if (bestSubstringIcon) {
+  return bestSubstringIcon;
+}
 ```
 
-#### Step 2 — Add DB entries for custom icons from T-002–T-004
+The return value and call signature of `useIconSuggestion` are unchanged.
 
-| Registry key | Label | German tags | English tags |
-|---|---|---|---|
-| `CustomKornflakesBowl` | cornflakes bowl | kornflakes, müsli, cerealien, frühstücksflocken, getreideflocken | cereal bowl, breakfast cereal |
-| `CustomKornflakesBox` | cornflakes box | cornflakes packung, müsli packung, cerealien packung | cereal box, cereal package |
-| `CustomGarlic` | garlic | _(covered by redirect above)_ | |
-| `CustomHummus` | hummus | hummus, kichererbsenpaste, hummus dip, aufstrich | chickpea dip, hummus paste |
-| `CustomDentalFloss` | dental floss | zahnseide, zahnfaden, interdental | floss, dental floss |
-| `CustomToothpaste` | toothpaste | zahncreme, zahnpasta, zahnputzmittel, elmex, blend-a-med | toothpaste, tooth cream |
-| `CustomCottonPads` | cotton pads | wattepads, abschminkpads, kosmetikpads, reinigungspads | cotton pads, makeup remover pads |
-| `CustomPasta` | pasta | _(covered by redirect above)_ | |
+### Tests to add (in `useIconSuggestion.test.js`)
+```
+it("returns the bell-pepper icon for compound input containing 'paprika'")
+  → useIconSuggestion("Spritzpaprika") === "CustomBellPepper", loading false, no worker call
 
-#### Step 3 — Add DB entries for T-006 icons (Groups A, B, C)
+it("returns the carrot icon for compound input containing 'möhren'")
+  → useIconSuggestion("Minimöhren") === "IconCarrot", loading false, no worker call
+```
+Both tests must assert `requestIconMatch` was **not** called (synchronous path).
 
-| Registry key | Label | German tags | English tags |
-|---|---|---|---|
-| `IconSock` / fallback | sock | socken, strümpfe, kniestrümpfe, söckchen | socks, stockings |
-| `IconPants` / fallback | pants | hose, jeans, jogginghose, shorts, leggings, chinos | trousers, pants, jeans, shorts |
-| `IconShoe` / fallback | shoe | schuhe, sneaker, turnschuhe, stiefel, sandalen, pumps | shoes, sneakers, boots, sandals |
-| `IconPineapple` / fallback | pineapple | ananas, ananasscheibe | pineapple |
-| `Watermelon` / fallback | watermelon | wassermelone, melone, wassermelonenscheibe | watermelon |
-| `IconFlame` / fallback | lighter | feuerzeug, anzünder, gasfeuerzeug, sturmfeuerzeug | lighter, fire starter |
-| `IconCan` / fallback | canned food | konservendose, dose, dosengemüse, dosensuppe, thunfischdose, sardinen, konserve | tin can, canned food, canned goods |
-| `CustomCottonSwabs` | cotton swabs | wattestäbchen, q-tips, ohrenstäbchen | cotton swabs, q-tips, ear swabs |
-| `CustomWetWipes` | wet wipes | feuchtes klopapier, feuchttücher, nasspapier, feuchtes toilettenpapier | wet wipes, moist toilet paper |
-| `CustomInterdentalSticks` | interdental sticks | interdentalbürste, zahnzwischenraumbürste, interdental, zahnreinigung | interdental brush, interdental sticks |
-| `CustomCreamTube` | cream tube | creme tube, hautcreme, gesichtscreme, körpercreme, lotion, salbe | cream tube, lotion, face cream |
-| `CustomCreamJar` | cream jar | cremetiegel, cremendose, tiegel, gesichtspflege, feuchtigkeitscreme, nachtcreme | cream jar, moisturizer, face cream pot |
-| `CustomMango` | mango | mango, mangos, tropenfrucht | mango, mangoes |
-| `CustomKiwi` | kiwi | kiwi, kiwis, kiwifrucht | kiwi, kiwifruit |
-| `CustomPeach` | peach | pfirsich, pfirsiche, nektarine | peach, nectarine |
-| `CustomPlum` | plum | pflaume, pflaumen, zwetschge, zwetschgen | plum, plums |
-| `CustomBlueberries` | blueberries | blaubeeren, heidelbeeren, blaubeere | blueberries, blueberry |
-| `CustomELiquid` | e-liquid | e-liquid, liquid, vape liquid, dampfliquid, e-zigarette liquid | e-liquid, vape juice, e-cigarette liquid |
-| `IconShirt` (existing) | t-shirt clothing | t-shirt, shirt, oberteil, top, unterhemd, poloshirt | t-shirt, shirt, top |
-| `IconBattery` (existing) | coin cell | knopfzelle, knopfzellen, uhrbatterie, cr2032 | coin cell, button battery, watch battery |
+---
 
-#### Step 4 — Enrich all existing entries
+## T-002 — Replace cucumber SVG
 
-For **every** existing entry in `ICON_DB`, expand `tags` to at minimum **5 tags total** (label + tags combined). Guiding principles:
+### Goal
+Replace `cucumber.svg` with a cleaner, clearly recognisable cucumber icon using
+the project's established stroke style.
 
-- **German regional variants**: Austrian/Swiss German (e.g., Paradeiser, Erdäpfel, Rüebli, Obers)
-- **Plural / singular pairs**: ensure both forms are present
-- **Brand-name synonyms**: "Tempo" → toilet paper; "Nutella" → spread/jam; "Elmex" → toothpaste
-- **Compound word variants**: "Vollmilch", "Halbfettmilch", "Laktosefrei" → milk
-- **Related product names** mapping to the same icon: "Latte", "Cappuccino", "Espresso" → coffee
-- **Umlaut alternates written out**: ä→ae, ö→oe, ü→ue
-- **English synonyms** for common English-typed inputs
+### Files to change
+| File | Change |
+|------|--------|
+| `frontend/src/assets/icons/custom/cucumber.svg` | Full replacement |
 
-Minimum enrichment guidance per category:
+### Implementation detail
+SVG requirements:
+- `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`,
+  `stroke-width="1.5"`, `stroke-linecap="round"`, `stroke-linejoin="round"`
+- No hardcoded colours, no `fill` on any path.
+- Visually: a diagonal elongated oval body (the cucumber), a small stem nub at
+  the narrow end, and 2–3 short diagonal stroke lines across the body to suggest
+  texture/bumps.
+- Consistent visual weight with `bellPepper.svg` and `tomato.svg`.
 
-_Dairy_: milk → "laktosefrei", "h-milch", "frischmilch", "uht", "obers"; yogurt → "skyr", "kefir", "naturjoghurt", "fruchtjoghurt"; cheese → "frischkäse", "parmesan", "feta", "brie", "schnittkäse"
+No JS, registry, or test-file changes required — the icon is already registered
+as `CustomCucumber` and referenced in `iconDatabase.js`.
 
-_Produce_: tomato → "paradeiser", "cocktailtomaten", "rispentomaten", "kirschtomaten"; potato → "erdäpfel", "süßkartoffel", "yams", "kartoffelbrei"; onion → "schalotte", "frühlingszwiebel", "lauch", "porree"; carrot → "rüebli", "baby karotten"; mushroom → "steinpilz", "pfifferlinge", "austernpilze", "shiitake"
+---
 
-_Bakery_: bread → "vollkornbrot", "weißbrot", "toastbrot", "ciabatta", "laugenbrot"; cake → "torte", "geburtstagskuchen", "käsekuchen", "cheesecake"
+## T-003 — Flatten entry sections (no card framing)
 
-_Meat & Fish_: chicken → "geflügel", "filet", "schnitzel", "hähnchenfilet"; beef → "hackfleisch", "steak", "rinderhack", "gulasch"; fish → "thunfisch", "seelachs", "forelle", "kabeljau", "tilapia"
+### Goal
+Remove the card appearance (border, border-radius, background, side padding) from
+`.entry-section` so both "Offene Einträge" and "Zuletzt verwendet" render as plain
+headings + item lists with no visible frame.
 
-_Beverages_: coffee → "latte", "cappuccino", "espresso", "americano", "filterkaffee"; tea → "grüner tee", "schwarztee", "kräutertee", "kamille", "pfefferminze"; beer → "pils", "weizen", "weißbier", "lager", "radler"; juice → "direktsaft", "nektar", "smoothie", "multivitamin"
+### Files to change
+| File | Change |
+|------|--------|
+| `frontend/src/index.css` | Split combined selector; strip card styles from `.entry-section` |
 
-_Household_: toilet paper → "tempo", "klopapier", "wc-papier", "toilettenpapier"; detergent → "colorwaschmittel", "vollwaschmittel", "waschmittel pods"; cleaner → "badreiniger", "küchenreiniger", "wc-reiniger"
+### Implementation detail
 
-_Condiments_: olive oil → "rapsöl", "sonnenblumenöl", "kokosöl", "bratöl"; ketchup → "tomatensauce", "tomatenmark"; honey → "blütenhonig", "waldhonig", "akazienhonig"
+Current combined rule (around line 1225):
+```css
+.list-card,
+.entry-section,
+.sharing-panel {
+  border: 1px solid rgba(139, 43, 226, 0.25);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  padding: 1.25rem;
+}
+```
 
-_Pantry_: soup → "brühe", "gemüsebrühe", "hühnerbrühe", "instantsuppe", "dosensuppe"
+Replace with two rules:
+```css
+/* Card components keep their full appearance */
+.list-card,
+.sharing-panel {
+  border: 1px solid rgba(139, 43, 226, 0.25);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  padding: 1.25rem;
+}
 
-_Drugstore_: toothpaste → "zahncreme", "elmex", "blend-a-med", "zahnputzmittel"; medicine → "ibuprofen", "aspirin", "paracetamol", "schmerztabletten"
+/* Entry sections: flat content blocks, no card frame */
+.entry-section {
+  padding: var(--space-2) 0;   /* vertical rhythm only; zero side padding */
+}
+```
 
-#### Step 5 — Validate
+`border`, `border-radius`, and `background` are simply absent from `.entry-section`.
+The `.recently-used-section` class already extends `.entry-section` and inherits
+this treatment automatically.
 
-```bash
+Verify that the parent `.detail-content` already provides side padding so items
+are not flush with the screen edge. No JS or test-file changes required.
+
+---
+
+## T-004 — Optimistic UI: instant toggle and reactivate
+
+### Goal
+`toggleStatus` and `addEntryByText` must update local state **before** the API
+call resolves so the UI responds immediately regardless of network speed.
+
+### Files to change
+| File | Change |
+|------|--------|
+| `frontend/src/pages/ListDetailPage.jsx` | Refactor `toggleStatus` and `addEntryByText` |
+| `frontend/src/pages/ListDetailPage.test.jsx` | Add optimistic-UI test cases |
+
+### Implementation detail — `toggleStatus`
+
+Rewrite to apply the optimistic state update first, then fire the API call.
+Revert only on non-network errors (network errors are handled by the offline queue
+which returns `{ queued: true }` without throwing).
+
+```js
+async function toggleStatus(entry) {
+  const nextStatus = entry.status === "open" ? "done" : "open";
+
+  // 1. Optimistic update — immediate UI change
+  const optimisticEntry = { ...entry, status: nextStatus, is_pending_sync: true };
+  await updateEntries((currentEntries) =>
+    sortEntries(
+      currentEntries.map((e) => (e.id === entry.id ? optimisticEntry : e))
+    )
+  );
+  if (nextStatus === "done") {
+    setRecentlyUsed((current) => upsertRecentlyUsedItems(current, entry));
+  }
+
+  try {
+    setEntryError("");
+    const result = await updateEntry(id, entry.id, token, { status: nextStatus });
+
+    // 2. Settle with real server data (or confirm queued state)
+    await updateEntries((currentEntries) =>
+      sortEntries(
+        currentEntries.map((e) =>
+          e.id === entry.id
+            ? { ...e, ...(result?.queued ? { is_pending_sync: true } : result.entry) }
+            : e
+        )
+      )
+    );
+    if (nextStatus === "done" && !result?.queued) {
+      setRecentlyUsed((current) =>
+        upsertRecentlyUsedItems(current, result?.entry ?? entry)
+      );
+    }
+  } catch (submitError) {
+    // 3. Revert on server-side (non-network) error
+    await updateEntries((currentEntries) =>
+      sortEntries(currentEntries.map((e) => (e.id === entry.id ? entry : e)))
+    );
+    if (nextStatus === "done") {
+      setRecentlyUsed((current) =>
+        current.filter((item) => item.text !== entry.text)
+      );
+    }
+    setEntryError(submitError.message);
+  }
+}
+```
+
+### Implementation detail — `addEntryByText`
+
+Move the temporary entry creation and UI insertion **before** `await createEntry`.
+On API success, replace the temp entry with the real one. On failure, remove it.
+
+```js
+async function addEntryByText(text, icon, details = "") {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  const nextDetails = normalizeEntryDetails(details);
+  const temporaryEntry = {
+    id: createTemporaryId("entry"),
+    text: trimmed,
+    icon: icon ?? null,
+    details: nextDetails,
+    status: "open",
+    created_at: new Date().toISOString(),
+    is_pending_sync: true
+  };
+
+  // 1. Optimistic insert — appears immediately
+  await updateEntries((currentEntries) =>
+    sortEntries([...currentEntries, temporaryEntry])
+  );
+
+  try {
+    setEntryError("");
+    const result = await createEntry(
+      id,
+      token,
+      { text: trimmed, icon: icon ?? null, details },
+      { tempId: temporaryEntry.id }
+    );
+
+    // 2. Replace temp with settled entry
+    await updateEntries((currentEntries) =>
+      sortEntries(
+        currentEntries.map((e) =>
+          e.id === temporaryEntry.id
+            ? (result?.queued ? temporaryEntry : result.entry)
+            : e
+        )
+      )
+    );
+    return true;
+  } catch (submitError) {
+    // 3. Revert on error
+    await updateEntries((currentEntries) =>
+      currentEntries.filter((e) => e.id !== temporaryEntry.id)
+    );
+    setEntryError(submitError.message);
+    return false;
+  }
+}
+```
+
+`handleAddFromHistory` already removes the item from recently-used before calling
+`addEntryByText`, so no changes are needed there — the optimistic insert in
+`addEntryByText` covers the "immediate open-entries appearance" requirement.
+
+### Tests to add (`ListDetailPage.test.jsx`)
+
+Add render-based tests (mock `fetchLists`, `fetchEntries`, `fetchRecentlyUsed`,
+`updateEntry`, `createEntry` from their respective API modules):
+
+```
+it("removes a toggled entry from the open list in the same render cycle")
+  → mock updateEntry to never resolve → click toggle button
+  → entry must be gone from the list before updateEntry resolves
+
+it("reverts a toggled entry when the API returns a non-network error")
+  → mock updateEntry to reject with new Error("Server error")
+  → entry reappears, error banner shown
+
+it("adds a temp entry to open entries immediately when reactivating from history")
+  → mock createEntry to never resolve → click recently-used chip
+  → temp entry (is_pending_sync) appears in open entries immediately
+```
+
+---
+
+## T-005 — Tile grid for open entries and recently-used section
+
+### Goal
+Replace the full-width row layout with space-efficient grid layouts:
+- Open entries → 3-column tile grid; tap to toggle done; long-press to edit
+- Recently used → 2-column chip grid with overlay dismiss badge
+
+### Files to change
+| File | Change |
+|------|--------|
+| `frontend/src/hooks/useLongPress.js` | New hook (extracted from tile component) |
+| `frontend/src/hooks/useLongPress.test.js` | New unit tests for the hook |
+| `frontend/src/components/EntryTile.jsx` | New component replacing `EntryRow` |
+| `frontend/src/components/EntryRow.jsx` | Delete (replaced by `EntryTile.jsx`) |
+| `frontend/src/components/entry-tile.test.jsx` | New test file (replaces `entry-row.test.jsx`) |
+| `frontend/src/components/entry-row.test.jsx` | Delete |
+| `frontend/src/components/RecentlyUsedSection.jsx` | Restructure to 2-column grid |
+| `frontend/src/components/RecentlyUsedSection.test.jsx` | Update selectors |
+| `frontend/src/pages/ListDetailPage.jsx` | Use `EntryTile`, remove `handleDeleteEntry` |
+| `frontend/src/pages/ListDetailPage.test.jsx` | Update to match new structure |
+| `frontend/src/index.css` | Add tile grid CSS; update recently-used grid CSS |
+
+### Implementation detail — `useLongPress.js`
+
+```js
+import { useRef, useState } from "react";
+
+export function useLongPress(onLongPress, ms = 500) {
+  const timerRef = useRef(null);
+  const longPressedRef = useRef(false);
+  const [pressing, setPressing] = useState(false);
+
+  function start() {
+    longPressedRef.current = false;
+    setPressing(true);
+    timerRef.current = setTimeout(() => {
+      longPressedRef.current = true;
+      setPressing(false);
+      onLongPress();
+    }, ms);
+  }
+
+  function cancel() {
+    setPressing(false);
+    clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }
+
+  function handleClick(e) {
+    // Suppress the synthetic click that follows touchend when a long-press fired
+    if (longPressedRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      longPressedRef.current = false;
+    }
+  }
+
+  return {
+    pressing,
+    longPressHandlers: {
+      onMouseDown: start,
+      onMouseUp: cancel,
+      onMouseLeave: cancel,
+      onTouchStart: start,
+      onTouchEnd: cancel,
+      onTouchCancel: cancel,
+      onClick: handleClick
+    }
+  };
+}
+```
+
+### Implementation detail — `EntryTile.jsx`
+
+```jsx
+import { useTranslation } from "react-i18next";
+import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName }
+  from "../data/iconRegistry";
+import { useLongPress } from "../hooks/useLongPress";
+import { Icon } from "./ui";
+
+export default function EntryTile({ entry, onToggle, onEdit }) {
+  const { t } = useTranslation();
+  const resolvedIconName = resolveIconName(entry.icon);
+  const EntryIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
+  const { pressing, longPressHandlers } = useLongPress(() => onEdit?.(), 500);
+
+  return (
+    <button
+      aria-label={
+        entry.status === "done"
+          ? t("entry.markOpen", { name: entry.text })
+          : t("entry.markDone", { name: entry.text })
+      }
+      className={[
+        "entry-tile",
+        entry.status === "done" ? "entry-tile--done" : "",
+        pressing ? "entry-tile--pressing" : "",
+        entry.is_pending_sync ? "entry-tile--pending" : ""
+      ].filter(Boolean).join(" ")}
+      data-testid={`entry-tile-${entry.id}`}
+      type="button"
+      {...longPressHandlers}
+      onClick={(e) => {
+        longPressHandlers.onClick(e);
+        if (!e.defaultPrevented) onToggle?.();
+      }}
+    >
+      <EntryIcon
+        aria-hidden="true"
+        className="entry-tile-icon"
+        data-icon-name={resolvedIconName ?? FALLBACK_ICON_NAME}
+        data-testid={`entry-tile-icon-${entry.id}`}
+        size={24}
+        stroke={1.5}
+      />
+      <p className="entry-tile-text">{entry.text}</p>
+      {entry.details ? <p className="entry-tile-details">{entry.details}</p> : null}
+      {entry.is_pending_sync
+        ? <span className="eg-chip-queued entry-tile-chip">{t("common.queued")}</span>
+        : null}
+    </button>
+  );
+}
+```
+
+**onClick / longPress interaction:** `longPressHandlers.onClick` calls
+`e.preventDefault()` when a long-press just fired, setting `defaultPrevented`.
+The outer `onClick` checks this before calling `onToggle` so only one action fires.
+
+### Implementation detail — CSS for `EntryTile`
+
+Add to `index.css`:
+```css
+.entry-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.entry-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 1px solid rgba(139, 43, 226, 0.18);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  transition: opacity 0.15s ease, transform 0.15s ease,
+              border-color var(--duration-micro);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.entry-tile:hover {
+  border-color: rgba(0, 229, 255, 0.3);
+}
+
+.entry-tile--pressing {
+  opacity: 0.55;
+  transform: scale(0.94);
+}
+
+.entry-tile--done {
+  opacity: 0.4;
+  border-color: rgba(0, 229, 176, 0.2);
+}
+
+.entry-tile-icon {
+  flex-shrink: 0;
+}
+
+.entry-tile-text {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+
+.entry-tile-details {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+
+.entry-tile-chip {
+  font-size: 0.65rem;
+}
+```
+
+### Implementation detail — `RecentlyUsedSection.jsx` (2-column grid)
+
+Replace the current `recently-used-list` / `recently-used-chip-row` structure.
+Each grid cell holds the chip button and an absolutely-positioned dismiss badge.
+
+```jsx
+<div className="recently-used-grid">
+  {items.map((item) => {
+    const resolvedIconName = resolveIconName(item.icon) ?? FALLBACK_ICON_NAME;
+    const ItemIcon = ICON_REGISTRY[resolvedIconName];
+    return (
+      <div key={item.text} className="recently-used-cell">
+        <button
+          aria-label={item.text}
+          className="recently-used-chip"
+          type="button"
+          onClick={() => onAdd?.(item.text, item.icon ?? null)}
+        >
+          <ItemIcon
+            aria-hidden="true"
+            className="recently-used-chip-icon"
+            data-icon-name={resolvedIconName}
+            size={20}
+            stroke={1.6}
+          />
+          <span className="recently-used-chip-text">{item.text}</span>
+        </button>
+        <button
+          aria-label={t("recent.dismiss", { name: item.text })}
+          className="recently-used-chip-dismiss"
+          type="button"
+          onClick={() => onDismiss?.(item.text)}
+        >
+          <Icon color="var(--text-secondary)" name="x" size={14} />
+        </button>
+      </div>
+    );
+  })}
+</div>
+```
+
+### CSS for `RecentlyUsedSection` (replace / update existing rules)
+
+```css
+/* Replace .recently-used-list */
+.recently-used-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.recently-used-cell {
+  position: relative;
+}
+
+/* Update .recently-used-chip to column/tile layout */
+.recently-used-chip {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  border-radius: var(--radius-md);   /* was 999px */
+  background: rgba(0, 229, 255, 0.08);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 10px 8px;
+  text-align: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.recently-used-chip-text {
+  font-size: 0.8rem;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+
+/* Dismiss button as overlay badge (top-right corner) */
+.recently-used-chip-dismiss {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+/* Remove old row-based rules */
+/* Delete: .recently-used-list, .recently-used-chip-row */
+```
+
+### `ListDetailPage.jsx` changes
+
+1. Replace `import EntryRow` → `import EntryTile from "../components/EntryTile"`.
+2. Wrap the `openEntries.map(...)` in `<div className="entry-tile-grid">`.
+3. Replace `<EntryRow ... onDelete onEdit onToggle>` with
+   `<EntryTile ... onToggle onEdit>` (no `onDelete`).
+4. Remove `handleDeleteEntry` function entirely.
+
+### Tests
+
+**`useLongPress.test.js`** (new):
+```
+it("does not call onLongPress on a short tap (< 500 ms)")
+it("calls onLongPress after 500 ms hold")
+it("sets pressing=true while held and pressing=false after release")
+it("does not call onLongPress if pointer leaves before threshold")
+```
+
+**`entry-tile.test.jsx`** (replaces `entry-row.test.jsx`):
+```
+it("renders the persisted icon")
+it("renders the fallback cart icon when no icon is set")
+it("renders a details line when details are present")
+it("omits the details line when details are absent")
+it("calls onToggle on a short tap")
+it("calls onEdit after a 500 ms hold and does NOT call onToggle")
+it("adds entry-tile--pressing class while held")
+```
+
+**`RecentlyUsedSection.test.jsx`**: existing tests rely on aria-label
+`t("recent.dismiss", { name })` — keep those assertions; update any selector that
+referenced `.recently-used-chip-row` to use `.recently-used-cell`.
+
+---
+
+## T-006 — Mobile fix: icon browser visible on small screens
+
+### Goal
+Fix the bottom sheet exceeding the visible viewport when the virtual keyboard is
+shown on mobile.
+
+### Files to change
+| File | Change |
+|------|--------|
+| `frontend/src/index.css` | Replace `vh` with `dvh`; add explicit `--browser-open` override |
+
+### Implementation detail
+
+```css
+/* was: max-height: min(80vh, 44rem) */
+.bottom-sheet {
+  max-height: min(80dvh, 44rem);
+}
+
+/* New rule — more height for the icon browser */
+.bottom-sheet--browser-open {
+  max-height: min(92dvh, 44rem);
+}
+```
+
+`dvh` (dynamic viewport height) shrinks automatically when the iOS/Android
+software keyboard appears. Supported in Chrome 108+, Safari 15.4+, Firefox 101+.
+
+No JS changes required.
+
+---
+
+## T-007 — Shrink "Mehr anzeigen" toggle to link style
+
+### Goal
+The icon-browser toggle button must look like an inline text link, not a ghost button.
+
+### Files to change
+| File | Change |
+|------|--------|
+| `frontend/src/components/AddItemSheet.jsx` | Remove `eg-btn-ghost` from the toggle button's `className` |
+| `frontend/src/index.css` | Replace stub `.add-item-more-btn` rule with link-style rules |
+
+### Implementation detail
+
+**`AddItemSheet.jsx`**:
+```jsx
+// Before
+className="eg-btn-ghost add-item-more-btn"
+// After
+className="add-item-more-btn"
+```
+
+**`index.css`** — replace the existing one-liner `.add-item-more-btn { width: fit-content; }`:
+```css
+.add-item-more-btn {
+  width: fit-content;
+  padding: 0.15rem 0;
+  border: 0;
+  background: none;
+  color: var(--neon-violet);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color var(--duration-micro), opacity var(--duration-micro);
+}
+
+.add-item-more-btn:hover,
+.add-item-more-btn:focus-visible {
+  text-decoration-color: currentColor;
+  opacity: 0.85;
+}
+```
+
+The `<button>` element and its type/role remain unchanged. No test-file changes
+required.
+
+---
+
+## Validation checklist (run after every task)
+
+```
 npm run lint
 npm run build
 npm test
 ```
 
+All three must pass before marking a task `ready_for_review`.
+
 ---
 
-## Validation
+## T-008 — Remove obsolete swipe-to-delete E2E test
 
+### Goal
+The E2E test `deletes an item from a shopping list via swipe` references `.entry-row`
+and swipe-to-delete behaviour that were intentionally removed in T-005. The test fails
+on every CI run. Remove it and the `swipeEntryLeft` helper that only it uses.
+
+### Background
+`EntryRow.jsx` was replaced by `EntryTile.jsx` in T-005. Swipe-to-delete was a
+deliberate product decision to drop (ROADMAP Priority 5: "Remove swipe-to-delete").
+The E2E test was not cleaned up at that time, causing the current CI failure.
+
+### Files to change
+| File | Change |
+|------|--------|
+| `e2e/lists.spec.js` | Remove `swipeEntryLeft` helper (lines 60–106) and the test block `deletes an item from a shopping list via swipe` (lines 142–155) |
+
+### Implementation detail
+- Delete the entire `swipeEntryLeft` async function (lines 60–106).
+- Delete the entire `test("deletes an item from a shopping list via swipe", ...)` block (lines 142–155).
+- Keep `openItemsSection` and `recentlyUsedSection` helpers — they are used by the remaining tests.
+- No other files require changes.
+
+### Validation
 ```
 npm run lint
 npm run build
 npm test
 ```
-
----
-
-## T-007 — Food & Produce custom icons (19 icons)
-
-### Context
-
-Many food/produce DB entries point to generic or unrelated icons. T-007 creates dedicated custom SVGs for each item, redirects the existing DB entry to the new icon, and enriches tags.
-
-### Tabler candidates to verify first
-
-| Item | Candidate | Fallback |
-|---|---|---|
-| Chocolate | tabler `IconChocolate` | `CustomChocolate` |
-| Fries | tabler `IconFries` | `CustomFries` |
-| Baguette | tabler `IconBaguette` | `CustomBaguette` |
-| Tomato | tabler `IconTomato` | `CustomTomato` |
-
-If a tabler icon is found: add it to the tabler import block in `iconRegistry.js` and use it as the DB redirect target. If absent: create the custom SVG.
-
-### Files to create / change
-
-| File | Action |
-|---|---|
-| `frontend/src/assets/icons/custom/tomato.svg` | **Create** (if tabler absent) |
-| `frontend/src/assets/icons/custom/cucumber.svg` | **Create** |
-| `frontend/src/assets/icons/custom/bellPepper.svg` | **Create** |
-| `frontend/src/assets/icons/custom/onion.svg` | **Create** |
-| `frontend/src/assets/icons/custom/potato.svg` | **Create** |
-| `frontend/src/assets/icons/custom/breadRoll.svg` | **Create** |
-| `frontend/src/assets/icons/custom/baguette.svg` | **Create** (if tabler absent) |
-| `frontend/src/assets/icons/custom/rice.svg` | **Create** |
-| `frontend/src/assets/icons/custom/jam.svg` | **Create** |
-| `frontend/src/assets/icons/custom/pastaSauce.svg` | **Create** |
-| `frontend/src/assets/icons/custom/chips.svg` | **Create** |
-| `frontend/src/assets/icons/custom/fries.svg` | **Create** (if tabler absent) |
-| `frontend/src/assets/icons/custom/chocolate.svg` | **Create** (if tabler absent) |
-| `frontend/src/assets/icons/custom/frozenVegetables.svg` | **Create** |
-| `frontend/src/assets/icons/custom/frozenBerries.svg` | **Create** |
-| `frontend/src/assets/icons/custom/butter.svg` | **Create** |
-| `frontend/src/assets/icons/custom/cream.svg` | **Create** |
-| `frontend/src/assets/icons/custom/yogurt.svg` | **Create** |
-| `frontend/src/assets/icons/custom/quark.svg` | **Create** |
-| `frontend/src/data/customIcons.js` | **Extend** — imports + exports for all custom icons |
-| `frontend/src/data/iconRegistry.js` | **Extend** — tabler imports (if found) + custom registry entries |
-| `frontend/src/data/iconDatabase.js` | **Extend** — redirect existing DB entries + enrich tags |
-| `frontend/src/data/iconRegistry.test.js` | **Extend** — assertions for all new registry keys |
-
-### SVG conventions (same as T-003/T-004/T-006)
-
-- `viewBox="0 0 24 24"`, no `width`/`height` on `<svg>` root
-- `fill="none"` on root `<svg>`
-- `stroke="currentColor"` on all stroked elements
-- `stroke-width` omitted on elements (set by normalizer)
-- `stroke-linecap="round"` and `stroke-linejoin="round"` on root or each element
-
-### SVG design briefs
-
-`tomato.svg` — round tomato body, small five-point calyx star at top, short stem
-
-`cucumber.svg` — elongated slightly tapered oval, short stem at one end, two or three faint vertical lines suggesting skin texture
-
-`bellPepper.svg` — three-lobed blocky bell pepper outline viewed slightly from above, short stem with two small leaves
-
-`onion.svg` — round bulb with two or three concentric arcs suggesting layers, small dried roots at the bottom, short stem at top
-
-`potato.svg` — irregular lumpy oval outline with two or three small dimple/eye marks on the surface
-
-`breadRoll.svg` — round bun shape with a single curved score line across the top and a hint of a flat base
-
-`baguette.svg` — long thin loaf (landscape orientation), three or four diagonal score lines along the top
-
-`rice.svg` — small rounded bowl viewed slightly from the side, a few small oval grain shapes peeking above the rim
-
-`jam.svg` — wide-mouth glass jar with a screw lid, a small label rectangle on the front, optional bow-tie or fruit silhouette on the label
-
-`pastaSauce.svg` — tall cylindrical glass jar with a metal lid, slightly tapered, a small label on the front
-
-`chips.svg` — a sealed snack bag (wider in the middle, pinched at top and bottom), a single curved chip/crisp shape on the front
-
-`fries.svg` — a folded cardboard fry holder/cup with several vertical fry sticks protruding from the top
-
-`chocolate.svg` — a rectangular chocolate bar with a 3×2 grid of segment lines embossed on the surface
-
-`frozenVegetables.svg` — a rectangular pouch/bag with a small snowflake in the upper area and a simple broccoli or mixed-vegetable silhouette in the lower area
-
-`frozenBerries.svg` — same bag style as frozenVegetables with a small snowflake and a cluster of three small circle-berries
-
-`butter.svg` — a rectangular block/pat of butter with a wrapper partially folded back at one end, showing the block inside
-
-`cream.svg` — a small carton (like a cream carton) with a triangular gable top and a pouring lip at one corner
-
-`yogurt.svg` — a short cylindrical pot with a flat foil lid, the lid slightly peeled back at one corner
-
-`quark.svg` — a wider, shorter tub (like a fromage frais pot) with a flat lid, slightly more squat than the yogurt
-
-### DB redirects and tag enrichment
-
-For each item below, update the existing `iconDatabase.js` entry to point to the new icon and enrich tags:
-
-| Label | Old icon | New icon | Additional tags to add |
-|---|---|---|---|
-| tomato | `IconSalad` | `CustomTomato` / `IconTomato` | paradeiser, cocktailtomaten, rispentomaten, kirschtomaten, cherry tomatoes |
-| cucumber | `IconSalad` | `CustomCucumber` | gurke, gurken, mini gurke, snackgurke, salat |
-| bell pepper | `IconPepper` | `CustomBellPepper` | paprika, paprikaschote, rote paprika, grüne paprika, gelbe paprika |
-| onion | `IconLeaf2` | `CustomOnion` | zwiebel, zwiebeln, schalotte, frühlingszwiebel, rote zwiebel |
-| potato | `IconCarrot` | `CustomPotato` | kartoffel, kartoffeln, erdäpfel, süßkartoffel |
-| bread roll | `IconBread` | `CustomBreadRoll` | brötchen, broetchen, semmel, schrippe, wecken |
-| baguette | `IconBread` | `CustomBaguette` / `IconBaguette` | baguette, franzosenbrot, weißbrot stange |
-| rice | `IconCup` | `CustomRice` | reis, basmatireis, langkornreis, vollkornreis, risotto |
-| jam | `IconCherry` | `CustomJam` | marmelade, konfitüre, konfituere, erdbeermarmelade, fruchtaufstrich |
-| pasta sauce | `IconBottle` | `CustomPastaSauce` | pastasauce, tomatensoße, arrabiata, bolognese, pesto |
-| chips | `IconBurger` | `CustomChips` | kartoffelchips, chips, crisps, pringles |
-| fries | `IconBurger` | `CustomFries` / `IconFries` | pommes, pommes frites, fritten, french fries |
-| chocolate | `IconCandy` | `CustomChocolate` / `IconChocolate` | schokolade, tafelschokolade, milchschokolade, zartbitterschokolade |
-| frozen vegetables | `IconSnowflake` | `CustomFrozenVegetables` | tiefkühlgemüse, tk gemüse, gefrorenes gemüse, erbsen |
-| frozen berries | `IconSnowflake` | `CustomFrozenBerries` | tiefkühlbeeren, tk beeren, gefrorene früchte |
-| cream | `IconBottle` | `CustomCream` | sahne, schlagsahne, obers, kaffeesahne, kokosmilch |
-| yogurt | `IconMilkshake` | `CustomYogurt` | joghurt, naturjoghurt, fruchtjoghurt, skyr |
-| butter | `IconBottle` | `CustomButter` | butter, süßrahmbutter, salzbutter, margarine |
-| quark | `IconCheese` | `CustomQuark` | quark, speisequark, magerquark, frischkäse |
-
-### Implementation steps
-
-1. Verify four tabler candidates; for each found, add to tabler import block. For each absent, create custom SVG.
-2. Create all required custom SVG files (up to 19) following design briefs and conventions.
-3. Extend `customIcons.js` with imports and `normalizeCustomIcon()` exports (alphabetical).
-4. Extend `iconRegistry.js` with new registry entries (alphabetical).
-5. Update `iconDatabase.js`: redirect each existing entry's `icon` field, add the new tags from the table above.
-6. Extend `iconRegistry.test.js` with `resolveIconName` assertions for all new registry keys.
-7. Validate: `npm run lint && npm run build && npm test`.
-
----
-
-## T-008 — Drugstore & Household custom icons (19 icons)
-
-### Context
-
-Drugstore and household DB entries mostly share three generic icons (`IconWash`, `IconDental`, `IconRazor`). T-008 gives each product category its own recognisable custom icon.
-
-### Tabler candidate to verify first
-
-| Item | Candidate | Fallback |
-|---|---|---|
-| Mop | tabler `IconMop` | `CustomMop` |
-
-### Files to create / change
-
-| File | Action |
-|---|---|
-| `frontend/src/assets/icons/custom/shampoo.svg` | **Create** |
-| `frontend/src/assets/icons/custom/conditioner.svg` | **Create** |
-| `frontend/src/assets/icons/custom/bodyWash.svg` | **Create** |
-| `frontend/src/assets/icons/custom/toothbrush.svg` | **Create** |
-| `frontend/src/assets/icons/custom/mouthwash.svg` | **Create** |
-| `frontend/src/assets/icons/custom/shavingCream.svg` | **Create** |
-| `frontend/src/assets/icons/custom/sunscreen.svg` | **Create** |
-| `frontend/src/assets/icons/custom/afterSun.svg` | **Create** |
-| `frontend/src/assets/icons/custom/diapers.svg` | **Create** |
-| `frontend/src/assets/icons/custom/glassesCleaner.svg` | **Create** |
-| `frontend/src/assets/icons/custom/cleaningCloth.svg` | **Create** |
-| `frontend/src/assets/icons/custom/storageBags.svg` | **Create** |
-| `frontend/src/assets/icons/custom/bakingPaper.svg` | **Create** |
-| `frontend/src/assets/icons/custom/foil.svg` | **Create** |
-| `frontend/src/assets/icons/custom/sponge.svg` | **Create** |
-| `frontend/src/assets/icons/custom/handSoap.svg` | **Create** |
-| `frontend/src/assets/icons/custom/fabricSoftener.svg` | **Create** |
-| `frontend/src/assets/icons/custom/detergent.svg` | **Create** |
-| `frontend/src/assets/icons/custom/paperTowels.svg` | **Create** |
-| `frontend/src/data/customIcons.js` | **Extend** |
-| `frontend/src/data/iconRegistry.js` | **Extend** |
-| `frontend/src/data/iconDatabase.js` | **Extend** — redirect existing DB entries + enrich tags |
-| `frontend/src/data/iconRegistry.test.js` | **Extend** |
-
-### SVG design briefs
-
-`shampoo.svg` — tall rounded bottle with a flip-top cap, oval label area in the centre
-
-`conditioner.svg` — tall bottle, slightly wider in proportion than the shampoo bottle, screw cap, oval label
-
-`bodyWash.svg` — pump-dispenser bottle: tall rectangular body with a pump mechanism (vertical tube + horizontal nozzle) at the top
-
-`toothbrush.svg` — toothbrush handle (slight taper), oval bristle head at one end with a few short horizontal lines for bristle rows
-
-`mouthwash.svg` — angular bottle (like a Listerine shape): flat sides, slightly narrowed neck, small screw cap
-
-`shavingCream.svg` — aerosol/pressurized can: cylindrical body, narrow shoulder, small cap on top, a single horizontal line near the bottom suggesting a fill level
-
-`sunscreen.svg` — flat oval tube with a flip cap at the top, a small "SPF" text-block rectangle on the front
-
-`afterSun.svg` — taller, slightly more slender tube than sunscreen, flip cap, optional sun-and-lines motif on label
-
-`diapers.svg` — a single diaper viewed from the front: trapezoidal middle section, two rounded tab fasteners on the sides, elastic leg cuffs suggested by curved lines
-
-`glassesCleaner.svg` — small spray bottle (rectangular body, trigger/nozzle) next to a simple eyeglasses outline
-
-`cleaningCloth.svg` — a folded rectangular cloth with a few faint horizontal texture lines and slightly wavy edges to suggest softness
-
-`storageBags.svg` — a zip-lock bag: rectangular body with open ruffled top pinched into a double-track zip closure
-
-`bakingPaper.svg` — a roll of paper partially unrolled: the cylindrical roll core visible, a flat sheet extending from it with a torn/cut edge
-
-`foil.svg` — same as bakingPaper but with closely spaced parallel diagonal lines across the flat sheet to suggest metallic sheen
-
-`sponge.svg` — a rectangular block with rounded corners; two or three horizontal texture lines across the upper half (the scrubbing side); lower half is plain
-
-`handSoap.svg` — pump soap dispenser: wide rounded bottle body, long pump neck, angled nozzle at top
-
-`fabricSoftener.svg` — a bottle with a distinctively wide rounded body tapering to a narrow neck (Lenor-bottle silhouette), screw cap
-
-`detergent.svg` — a rectangular laundry-powder box: tall box shape, a small dosing flap or scoop suggested on the top/side
-
-`paperTowels.svg` — a large roll of paper towel: cylindrical roll with visible perforations (small dashes) along one vertical line, a single sheet partially unrolled at the bottom
-
-### DB redirects and tag enrichment
-
-| Label | Old icon | New icon | Additional tags to add |
-|---|---|---|---|
-| shampoo | `IconFlask` | `CustomShampoo` | haarshampoo, shampoo, haarpflege, kopfhautpflege |
-| conditioner | `IconFlask2` | `CustomConditioner` | spülung, haarspülung, conditioner, haarpflege |
-| body wash | `IconDroplet` | `CustomBodyWash` | duschgel, shower gel, duschlotion, körperpflege |
-| toothbrush | `IconDental` | `CustomToothbrush` | zahnbürste, electric toothbrush, elektrische zahnbürste |
-| mouthwash | `IconDental` | `CustomMouthwash` | mundspülung, mundwasser, listerine |
-| shaving cream | `IconRazor` | `CustomShavingCream` | rasiercreme, rasierschaum, shaving foam |
-| sunscreen | `IconSun` | `CustomSunscreen` | sonnencreme, sonnenschutz, lsf, spf, sunblock |
-| after sun | `IconSunHigh` | `CustomAfterSun` | aftersun, after sun lotion, after sun pflege |
-| diapers | `IconBabyCarriage` | `CustomDiapers` | windeln, babywindeln, pampers, nappy |
-| glasses cleaner | `IconEyeglass` | `CustomGlassesCleaner` | brillenreiniger, lens cleaner, optik |
-| cleaning cloth | `IconShirt` | `CustomCleaningCloth` | putztuch, microfasertuch, reinigungstuch, wischtuch |
-| storage bags | `IconToolsKitchen3` | `CustomStorageBags` | frischhaltebeutel, zip bag, gefrierbeutel, ziploc |
-| baking paper | `IconToolsKitchen2` | `CustomBakingPaper` | backpapier, pergamentpapier, parchment paper |
-| foil | `IconToolsKitchen` | `CustomFoil` | alufolie, aluminium foil, frischhaltefolie |
-| mop | `IconBucketDroplet` | `CustomMop` / `IconMop` | wischmopp, mopp, bodenwischer, floor mop |
-| sponge | `IconSparkles` | `CustomSponge` | schwamm, spülschwamm, abwaschwamm, cleaning sponge |
-| hand soap | `IconWash` | `CustomHandSoap` | handseife, flüssigseife, seifenspender |
-| fabric softener | `IconWash` | `CustomFabricSoftener` | weichspüler, wäscheweichspüler, softener, lenor |
-| detergent | `IconWashMachine` | `CustomDetergent` | waschmittel, waschpulver, waschmittelkapseln, laundry |
-| paper towels | `IconToiletPaper` | `CustomPaperTowels` | küchenrolle, küchenpapier, haushaltsrolle, paper towel |
-
-### Implementation steps
-
-1. Verify `IconMop` in tabler; if found use it; if absent create `CustomMop` custom SVG.
-2. Create all required custom SVG files (up to 19) following design briefs and conventions.
-3. Extend `customIcons.js` with imports and `normalizeCustomIcon()` exports (alphabetical).
-4. Extend `iconRegistry.js` with new registry entries (alphabetical).
-5. Update `iconDatabase.js`: redirect each existing entry's `icon` field, add the new tags from the table above.
-6. Extend `iconRegistry.test.js` with `resolveIconName` assertions for all new registry keys.
-7. Validate: `npm run lint && npm run build && npm test`.
+All three must pass. The E2E suite itself runs in CI only; local validation via
+`npm test` (unit tests) is sufficient to confirm no regressions in the unit layer.
