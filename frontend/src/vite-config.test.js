@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import viteConfig from "../vite.config";
 
-const viteConfigSource = readFileSync(path.resolve(import.meta.dirname, "../vite.config.js"), "utf8");
+const viteConfigSource = readFileSync(path.resolve(import.meta.dirname, "../vite.config.ts"), "utf8");
 const serviceWorkerSource = readFileSync(
   path.resolve(import.meta.dirname, "./sw/service-worker.js"),
   "utf8"

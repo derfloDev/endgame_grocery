@@ -13,7 +13,7 @@ import { primeIconWorker } from "./workers/iconWorkerClient";
 registerServiceWorker();
 primeIconWorker();
 
-createRoot(document.getElementById("root")).render(
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter
       future={{
