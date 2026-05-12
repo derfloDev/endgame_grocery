@@ -8,6 +8,45 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-002 — implement — 2026-05-12T05:40:34Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-002 shared domain type definitions and closed the task. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, all reviewed T-002 implementation and review files staged via `git add -A` |
+| Validation | Reused reviewed validation from T-002: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, `npm test` PASS |
+| Commit | `chore(typescript): add shared frontend domain types` |
+| Next Role | none |
+
+---
+
+### T-002 — review — 2026-05-12T07:42:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 shared domain types; all 12 required interfaces present and match plan spec exactly; all validation commands pass with zero TS errors. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-12T05:24:41Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the central frontend shared domain type interfaces for the staged TypeScript migration. |
+| Files Changed | `frontend/src/types.ts`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` PASS (existing `AuthContext.jsx` fast-refresh warning only); `npx tsc -p frontend/tsconfig.json --noEmit` PASS; `npm run build` PASS (existing Vite eval/chunk-size warnings only); `npm test` PASS |
+| Commit | `chore(typescript): add shared frontend domain types` |
+| Next Role | review |
+
+---
+
 ### T-001 — implement — 2026-05-12T05:04:58Z
 
 | Field | Value |

@@ -49,3 +49,47 @@ No blockers or major issues found.
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/types.ts` | Plan specified decorative section headers (`// ── Grocery domain ─────...`); actual file uses plain `// Grocery domain` comments. Functionally identical; style preference only. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Read `frontend/src/types.ts` in full.
+2. Cross-checked all 12 required interfaces against the plan spec (`T-002` in `.ai/PLAN.md`): `Entry`, `List`, `Member`, `User`, `AppConfig`, `QueueMeta`, `OfflineMutation`, `OfflineQueueContextValue`, `Suggestion`, `TopMatch`, `IconMatchResult`, `IconProps` — all present.
+3. Verified each interface field name, type, and optionality against the plan — all match exactly.
+4. Confirmed `grep -c "^export interface"` returns 12 — no extra or missing interfaces.
+5. Confirmed file contains only type definitions — no runtime code introduced.
+6. Ran `npm run lint` → 0 errors (1 pre-existing unrelated warning). ✅
+7. Ran `npx tsc --noEmit` from `frontend/` → clean, 0 errors. ✅
+8. Ran `npm run build` → success. ✅
+9. Ran `npm test` → 285 tests passed, 0 failures. ✅
+
+##### Findings
+- All acceptance-criteria commands pass with zero TypeScript errors.
+- `types.ts` is a pure type-declaration file; no functional changes introduced.
+
+##### Risks
+- None. The file adds only type exports; no tree-shaking or runtime impact.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
