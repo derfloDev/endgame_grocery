@@ -8,6 +8,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-010 — implement — 2026-05-12T16:07:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Migrated all frontend test files to TypeScript and typed mocks, browser doubles, deferred helpers, and DOM assertions. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, 24 frontend test files renamed from `.jsx`/`.js` to `.tsx`/`.ts` |
+| Validation | `npx tsc -p frontend/tsconfig.json --noEmit` PASS; old test extension scan PASS; no test `any` or TS suppression scan PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` PASS after sandbox `spawn EPERM` rerun outside sandbox, with existing ONNX eval and chunk-size warnings; `npm test` PASS after sandbox `spawn EPERM` rerun outside sandbox |
+| Commit | `chore(typescript): migrate frontend tests` |
+| Next Role | review |
+
+---
+
 ### T-009 — implement — 2026-05-12T15:22:55Z
 
 | Field | Value |
@@ -381,6 +394,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, all reviewed T-009 implementation and review files staged; unrelated `.claude/settings.local.json` left unstaged |
 | Validation | Reused reviewed validation from T-009: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, focused page Vitest command, `npm test` PASS |
 | Commit | `chore(typescript): migrate frontend pages and entrypoints` |
+| Next Role | none |
+
+---
+
+### T-010 — review — 2026-05-12T18:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-010 test file migration; all 24 old .test.jsx/.test.js files deleted, 24 typed .test.tsx/.test.ts files present, zero any/ts-ignore/ts-expect-error, vi.mocked() pattern used throughout, 285/285 clean on first run. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-010 — implement — 2026-05-12T16:25:59Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-010 frontend test TypeScript migration and closed the task. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, all reviewed T-010 implementation and review files staged; unrelated `.claude/settings.local.json` left unstaged |
+| Validation | Reused reviewed validation from T-010: `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run lint`, `npm run build`, `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend tests` |
 | Next Role | none |
 
 ---

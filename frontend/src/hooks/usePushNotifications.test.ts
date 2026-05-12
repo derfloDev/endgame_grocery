@@ -14,7 +14,21 @@ vi.mock("../api/push", () => ({
   unsubscribePush: vi.fn()
 }));
 
-function HookHarness({ enabled = true, token = "token-1" }) {
+const fetchVapidPublicKeyMock = vi.mocked(fetchVapidPublicKey);
+const subscribePushMock = vi.mocked(subscribePush);
+const unsubscribePushMock = vi.mocked(unsubscribePush);
+
+interface HookHarnessProps {
+  enabled?: boolean;
+  token?: string;
+}
+
+interface TestPushSubscription extends PushSubscriptionJSON {
+  unsubscribe?: () => Promise<boolean>;
+  toJSON: () => PushSubscriptionJSON;
+}
+
+function HookHarness({ enabled = true, token = "token-1" }: HookHarnessProps) {
   const { isReady, isSubscribed, isSupported, subscribe, unsubscribe } = usePushNotifications({
     enabled,
     token
@@ -42,7 +56,7 @@ function HookHarness({ enabled = true, token = "token-1" }) {
             setSubscribeResult(String(await subscribe()));
           } catch (error) {
             setSubscribeResult("");
-            setSubscribeError(error.message);
+            setSubscribeError(error instanceof Error ? error.message : String(error));
           }
         },
         type: "button"
@@ -57,10 +71,10 @@ function HookHarness({ enabled = true, token = "token-1" }) {
   ];
 }
 
-function createDeferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise((nextResolve, nextReject) => {
+function createDeferred<T = unknown>() {
+  let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
+  let reject: (reason?: unknown) => void = () => undefined;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
     resolve = nextResolve;
     reject = nextReject;
   });
@@ -69,13 +83,13 @@ function createDeferred() {
 }
 
 describe("usePushNotifications", () => {
-  let subscribeResult;
-  let unsubscribeResult;
+  let subscribeResult: TestPushSubscription;
+  let unsubscribeResult: boolean;
 
   beforeEach(() => {
-    fetchVapidPublicKey.mockReset();
-    subscribePush.mockReset();
-    unsubscribePush.mockReset();
+    fetchVapidPublicKeyMock.mockReset();
+    subscribePushMock.mockReset();
+    unsubscribePushMock.mockReset();
 
     subscribeResult = {
       endpoint: "https://push.example.com/subscriptions/1",
@@ -83,10 +97,10 @@ describe("usePushNotifications", () => {
         p256dh: "p256dh-key",
         auth: "auth-key"
       },
-      toJSON() {
+      toJSON(): PushSubscriptionJSON {
         return {
-          endpoint: this.endpoint,
-          keys: this.keys
+          endpoint: subscribeResult.endpoint,
+          keys: subscribeResult.keys
         };
       }
     };
@@ -120,7 +134,7 @@ describe("usePushNotifications", () => {
   });
 
   it("loads the VAPID key only when enabled and subscribes the browser endpoint", async () => {
-    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    fetchVapidPublicKeyMock.mockResolvedValue({ publicKey: "dGVzdA" });
 
     render(createElement(HookHarness, { enabled: true }));
 
@@ -145,8 +159,8 @@ describe("usePushNotifications", () => {
   });
 
   it("returns false without requesting permission when the VAPID key is still loading", async () => {
-    const deferredKey = createDeferred();
-    fetchVapidPublicKey.mockReturnValue(deferredKey.promise);
+    const deferredKey = createDeferred<Awaited<ReturnType<typeof fetchVapidPublicKey>>>();
+    fetchVapidPublicKeyMock.mockReturnValue(deferredKey.promise);
 
     render(createElement(HookHarness, { enabled: true }));
 
@@ -156,7 +170,7 @@ describe("usePushNotifications", () => {
       screen.getByText("subscribe").click();
     });
 
-    expect(window.Notification.requestPermission).not.toHaveBeenCalled();
+    expect(window.Notification.requestPermission!).not.toHaveBeenCalled();
     expect(subscribePush).not.toHaveBeenCalled();
 
     deferredKey.resolve({ publicKey: "dGVzdA" });
@@ -166,8 +180,8 @@ describe("usePushNotifications", () => {
   });
 
   it("reports readiness only after the VAPID key finishes loading", async () => {
-    const deferredKey = createDeferred();
-    fetchVapidPublicKey.mockReturnValue(deferredKey.promise);
+    const deferredKey = createDeferred<Awaited<ReturnType<typeof fetchVapidPublicKey>>>();
+    fetchVapidPublicKeyMock.mockReturnValue(deferredKey.promise);
 
     render(createElement(HookHarness, { enabled: true }));
 
@@ -182,7 +196,7 @@ describe("usePushNotifications", () => {
   });
 
   it("becomes ready when the VAPID key loads even while serviceWorker.ready is pending", async () => {
-    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    fetchVapidPublicKeyMock.mockResolvedValue({ publicKey: "dGVzdA" });
     Object.defineProperty(window.navigator, "serviceWorker", {
       configurable: true,
       value: {
@@ -202,7 +216,7 @@ describe("usePushNotifications", () => {
   });
 
   it("subscribes without re-reading serviceWorker.ready once the registration is cached", async () => {
-    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    fetchVapidPublicKeyMock.mockResolvedValue({ publicKey: "dGVzdA" });
     let readyAccessCount = 0;
     const registration = {
       pushManager: {
@@ -244,7 +258,7 @@ describe("usePushNotifications", () => {
   });
 
   it("rejects subscribe with a timeout error when no service worker registration becomes available", async () => {
-    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    fetchVapidPublicKeyMock.mockResolvedValue({ publicKey: "dGVzdA" });
     Object.defineProperty(window.navigator, "serviceWorker", {
       configurable: true,
       value: {
@@ -282,7 +296,7 @@ describe("usePushNotifications", () => {
   });
 
   it("unsubscribes the active endpoint and updates local state", async () => {
-    fetchVapidPublicKey.mockResolvedValue({ publicKey: "dGVzdA" });
+    fetchVapidPublicKeyMock.mockResolvedValue({ publicKey: "dGVzdA" });
 
     subscribeResult = {
       endpoint: "https://push.example.com/subscriptions/1",
@@ -293,10 +307,10 @@ describe("usePushNotifications", () => {
       async unsubscribe() {
         return unsubscribeResult;
       },
-      toJSON() {
+      toJSON(): PushSubscriptionJSON {
         return {
-          endpoint: this.endpoint,
-          keys: this.keys
+          endpoint: subscribeResult.endpoint,
+          keys: subscribeResult.keys
         };
       }
     };

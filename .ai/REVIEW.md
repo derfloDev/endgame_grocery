@@ -482,3 +482,54 @@ No blockers, major issues, or required fixes found.
 
 #### Verdict
 `PASS`
+
+## Task: T-010
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/vite-config.test.ts` L32 | `viteConfig.resolve?.alias as Record<string, string> | undefined` — cast needed because Vite types `alias` as a union of several forms; the cast is necessary and safe given the test just reads string values. | No |
+| 2 | nit | `frontend/src/pages/ListDetailPage.test.tsx` L108 | `{ id: "list-1", ... } as List` cast in mock data to satisfy `List` type; necessary because the mock object has extra fields (`owner_name`, `is_owner`) not in the base `List` type. Acceptable in test context. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 24 old `.test.jsx`/`.test.js` files deleted; 24 new `.test.tsx`/`.test.ts` files present (git shows R-renames for all). ✅
+2. Source scan confirmed zero `any`, `@ts-ignore`, or `@ts-expect-error` usage across all 24 test files. ✅
+3. Spot-checked key files:
+   - `app.test.tsx`: `vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>>()` typed generic; `RenderAppOptions` interface; `ComponentProps<typeof MemoryRouter>` for typed prop extraction; explicit vitest imports throughout. ✅
+   - `ListDetailPage.test.tsx`: `vi.mocked(...)` pattern for all mocked API functions; `TestEntry extends Entry`, `TestSuggestion extends Suggestion` local interfaces; `createDeferred<T = unknown>()` generic utility; domain types imported from `../types`. ✅
+   - `AuthContext.test.tsx`: `vi.mocked(...)` pattern; typed mock return values matching `User` shape. ✅
+   - `useLongPress.test.tsx`: Simple render harness with default props; explicit vitest imports. ✅
+   - `vite-config.test.ts`: Single safe `as` cast for Vite alias type; all vitest imports explicit. ✅
+   - `i18n.test.ts`: JSON imports typed via `resolveJsonModule`; no runtime `any`. ✅
+4. Confirmed `tsconfig.json` includes test files (via `"include": ["src"]` which covers all `src/**/*.test.ts`). ✅
+5. Confirmed explicit vitest imports used throughout (`import { describe, it, expect, vi } from "vitest"`); no global ambient types needed, consistent with plan recommendation. ✅
+6. Ran `npm run lint` → 0 errors, 1 pre-existing warning (`AuthContext.tsx`). ✅
+7. Ran `npx tsc --noEmit` → clean, 0 errors (test files now included in TS type-check). ✅
+8. Ran `npm run build` → success. ✅
+9. Ran `npm test` → **285/285 on first run**, no flakiness. ✅
+
+##### Findings
+- All acceptance-criteria commands pass with zero TypeScript errors.
+- `vi.mocked()` is used consistently instead of manual `as jest.Mock` casts, making typed mock usage idiomatic for Vitest.
+- `vi.fn<Signature>()` generic form used where mock return type needs to be explicit (e.g., the global `fetch` stub in `app.test.tsx`).
+- Test helper interfaces (`TestEntry`, `TestSuggestion`, `RenderAppOptions`, `MockListDetailDataOptions`) are defined locally as needed — clean pattern for test-specific narrowing.
+
+##### Risks
+- None. Test file renames with no functional changes; `tsc --noEmit` now type-checks the full test surface.
+
+#### Open Questions
+- None. `allowJs: true` in `tsconfig.json` can now be removed since all `.js` source and test files have been migrated; this can be done as a follow-up cleanup or noted for the next cycle.
+
+#### Verdict
+`PASS`

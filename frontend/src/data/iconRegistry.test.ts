@@ -365,9 +365,9 @@ describe("custom icons", () => {
   ])("renders %s at the requested size with currentColor stroke", (iconName, size) => {
     const CustomIcon = ICON_REGISTRY[iconName];
 
-    render(createElement(CustomIcon, { "aria-label": iconName, size }));
+    render(createElement(CustomIcon, { "data-testid": iconName, size }));
 
-    const icon = screen.getByLabelText(iconName);
+    const icon = screen.getByTestId(iconName);
 
     expect(icon.tagName.toLowerCase()).toBe("svg");
     expect(icon.getAttribute("width")).toBe(String(size));

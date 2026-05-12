@@ -11,6 +11,7 @@ import { fetchLists } from "../api/lists";
 import { fetchListMembers } from "../api/sharing";
 import { writeCachedResource } from "../api/offlineStore";
 import ListDetailPage from "./ListDetailPage";
+import type { Entry, List, Suggestion } from "../types";
 
 const cssSource = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
 const pageSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage.tsx"), "utf8");
@@ -64,6 +65,14 @@ vi.mock("../hooks/usePushNotifications", () => ({
   })
 }));
 
+const createEntryMock = vi.mocked(createEntry);
+const fetchEntriesMock = vi.mocked(fetchEntries);
+const fetchRecentlyUsedMock = vi.mocked(fetchRecentlyUsed);
+const fetchListsMock = vi.mocked(fetchLists);
+const fetchListMembersMock = vi.mocked(fetchListMembers);
+const updateEntryMock = vi.mocked(updateEntry);
+const writeCachedResourceMock = vi.mocked(writeCachedResource);
+
 function renderListDetailPage() {
   return render(
     <MemoryRouter
@@ -80,24 +89,45 @@ function renderListDetailPage() {
   );
 }
 
-function mockListDetailData({ entries = [], history = [] } = {}) {
-  fetchLists.mockResolvedValue({
-    lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false }]
+interface TestEntry extends Entry {
+  created_at?: string;
+}
+
+interface TestSuggestion extends Suggestion {
+  last_used_at?: string;
+}
+
+interface MockListDetailDataOptions {
+  entries?: TestEntry[];
+  history?: TestSuggestion[];
+}
+
+function mockListDetailData({ entries = [], history = [] }: MockListDetailDataOptions = {}) {
+  fetchListsMock.mockResolvedValue({
+    lists: [
+      { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List
+    ]
   });
-  fetchEntries.mockResolvedValue({ entries });
-  fetchRecentlyUsed.mockResolvedValue({ history });
-  fetchListMembers.mockResolvedValue({ members: [] });
-  writeCachedResource.mockResolvedValue(undefined);
+  fetchEntriesMock.mockResolvedValue({ entries });
+  fetchRecentlyUsedMock.mockResolvedValue({ history });
+  fetchListMembersMock.mockResolvedValue({ members: [] });
+  writeCachedResourceMock.mockResolvedValue(undefined);
 }
 
 function getOpenItemsSection() {
-  return screen.getByText("OPEN ITEMS").closest("section");
+  const section = screen.getByText("OPEN ITEMS").closest("section");
+
+  if (!section) {
+    throw new Error("Expected open items section to exist.");
+  }
+
+  return section;
 }
 
-function createDeferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise((nextResolve, nextReject) => {
+function createDeferred<T = unknown>() {
+  let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
+  let reject: (reason?: unknown) => void = () => undefined;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
     resolve = nextResolve;
     reject = nextReject;
   });
@@ -126,7 +156,7 @@ describe("ListDetailPage optimistic updates", () => {
         }
       ]
     });
-    updateEntry.mockReturnValue(new Promise(() => {}));
+    updateEntryMock.mockReturnValue(new Promise(() => {}));
 
     renderListDetailPage();
 
@@ -140,7 +170,7 @@ describe("ListDetailPage optimistic updates", () => {
   });
 
   it("reverts a toggled entry when updateEntry rejects", async () => {
-    const updateRequest = createDeferred();
+    const updateRequest = createDeferred<Awaited<ReturnType<typeof updateEntry>>>();
     mockListDetailData({
       entries: [
         {
@@ -152,7 +182,7 @@ describe("ListDetailPage optimistic updates", () => {
         }
       ]
     });
-    updateEntry.mockReturnValue(updateRequest.promise);
+    updateEntryMock.mockReturnValue(updateRequest.promise);
 
     renderListDetailPage();
 
@@ -180,7 +210,7 @@ describe("ListDetailPage optimistic updates", () => {
         }
       ]
     });
-    createEntry.mockReturnValue(new Promise(() => {}));
+    createEntryMock.mockReturnValue(new Promise(() => {}));
 
     renderListDetailPage();
 

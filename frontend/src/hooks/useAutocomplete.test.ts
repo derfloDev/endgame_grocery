@@ -8,7 +8,15 @@ vi.mock("../api/suggestions", () => ({
   fetchSuggestions: vi.fn()
 }));
 
-function HookHarness({ listId = "list-1", inputText = "", token = "token-1" }) {
+const fetchSuggestionsMock = vi.mocked(fetchSuggestions);
+
+interface HookHarnessProps {
+  listId?: string;
+  inputText?: string;
+  token?: string;
+}
+
+function HookHarness({ listId = "list-1", inputText = "", token = "token-1" }: HookHarnessProps) {
   const { suggestions, loading } = useAutocomplete(listId, inputText, token);
 
   return [
@@ -20,7 +28,7 @@ function HookHarness({ listId = "list-1", inputText = "", token = "token-1" }) {
 describe("useAutocomplete", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    fetchSuggestions.mockReset();
+    fetchSuggestionsMock.mockReset();
   });
 
   afterEach(() => {
@@ -37,7 +45,7 @@ describe("useAutocomplete", () => {
   });
 
   it("debounces requests so only the latest input in a burst is fetched", async () => {
-    fetchSuggestions.mockResolvedValue({
+    fetchSuggestionsMock.mockResolvedValue({
       suggestions: [{ text: "Tomaten", icon: "IconSalad", useCount: 7 }]
     });
 
@@ -64,7 +72,7 @@ describe("useAutocomplete", () => {
   });
 
   it("filters offline cached suggestions with fuzzy matching before returning them", async () => {
-    fetchSuggestions.mockResolvedValue({
+    fetchSuggestionsMock.mockResolvedValue({
       offline: true,
       suggestions: [
         { text: "Schokolade", icon: "IconCandy", useCount: 8 },
@@ -87,7 +95,7 @@ describe("useAutocomplete", () => {
   });
 
   it("clears suggestions when the input is cleared", async () => {
-    fetchSuggestions.mockResolvedValue({
+    fetchSuggestionsMock.mockResolvedValue({
       suggestions: [{ text: "Tomaten", icon: "IconSalad", useCount: 7 }]
     });
 

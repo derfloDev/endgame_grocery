@@ -9,6 +9,10 @@ vi.mock("../api/auth", () => ({
   registerUser: vi.fn()
 }));
 
+const fetchCurrentUserMock = vi.mocked(fetchCurrentUser);
+const loginUserMock = vi.mocked(loginUser);
+const registerUserMock = vi.mocked(registerUser);
+
 function AuthState() {
   const { token, user } = useAuth();
 
@@ -26,8 +30,8 @@ describe("AuthProvider", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.clearAllMocks();
-    loginUser.mockResolvedValue({ token: "", user: null });
-    registerUser.mockResolvedValue({ message: "ok" });
+    loginUserMock.mockResolvedValue({ token: "" });
+    registerUserMock.mockResolvedValue({ message: "ok" });
   });
 
   afterEach(() => {
@@ -36,7 +40,7 @@ describe("AuthProvider", () => {
 
   it("hydrates the current user when only a persisted token is available", async () => {
     const token = createFakeJwt("user-1");
-    fetchCurrentUser.mockResolvedValue({
+    fetchCurrentUserMock.mockResolvedValue({
       id: "user-1",
       display_name: "Demo User",
       email: "demo@example.com"
@@ -57,7 +61,7 @@ describe("AuthProvider", () => {
     });
     expect(screen.getByTestId("user-name").textContent).toBe("Demo User");
     expect(screen.getByTestId("user-email").textContent).toBe("demo@example.com");
-    expect(JSON.parse(window.localStorage.getItem("endgame_grocery.auth_user"))).toEqual({
+    expect(JSON.parse(window.localStorage.getItem("endgame_grocery.auth_user")!)).toEqual({
       id: "user-1",
       display_name: "Demo User",
       email: "demo@example.com"
@@ -85,12 +89,12 @@ describe("AuthProvider", () => {
     await waitFor(() => {
       expect(screen.getByTestId("user-name").textContent).toBe("Demo User");
     });
-    expect(fetchCurrentUser).not.toHaveBeenCalled();
+    expect(fetchCurrentUserMock).not.toHaveBeenCalled();
   });
 
   it("keeps the jwt session active when profile hydration fails", async () => {
     const token = createFakeJwt("user-1");
-    fetchCurrentUser.mockRejectedValue(new Error("offline"));
+    fetchCurrentUserMock.mockRejectedValue(new Error("offline"));
     window.localStorage.setItem("endgame_grocery.auth_token", token);
 
     render(
@@ -110,7 +114,7 @@ describe("AuthProvider", () => {
   });
 });
 
-function createFakeJwt(sub) {
+function createFakeJwt(sub: string): string {
   const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const payload = btoa(JSON.stringify({ sub }));
 

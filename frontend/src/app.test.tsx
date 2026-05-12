@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18next from "i18next";
 import "./i18n";
@@ -11,7 +12,16 @@ import { AuthProvider } from "./context/AuthContext";
 import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 
-function renderApp(initialEntries = ["/"], { registrationEnabled = true } = {}) {
+const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>>();
+
+interface RenderAppOptions {
+  registrationEnabled?: boolean;
+}
+
+function renderApp(
+  initialEntries: ComponentProps<typeof MemoryRouter>["initialEntries"] = ["/"],
+  { registrationEnabled = true }: RenderAppOptions = {}
+) {
   return render(
     <MemoryRouter
       future={{
@@ -35,7 +45,8 @@ function renderApp(initialEntries = ["/"], { registrationEnabled = true } = {}) 
 
 describe("authentication shell", () => {
   beforeEach(async () => {
-    vi.stubGlobal("fetch", vi.fn());
+    fetch.mockReset();
+    vi.stubGlobal("fetch", fetch);
     stubMatchMedia();
     MockEventSource.instances = [];
     vi.stubGlobal("EventSource", MockEventSource);
@@ -52,7 +63,7 @@ describe("authentication shell", () => {
               return null;
             },
             async subscribe() {
-              return {
+              const subscription = {
                 endpoint: "https://push.example.com/subscriptions/1",
                 keys: {
                   p256dh: "p256dh-key",
@@ -61,13 +72,14 @@ describe("authentication shell", () => {
                 async unsubscribe() {
                   return true;
                 },
-                toJSON() {
+                toJSON(): PushSubscriptionJSON {
                   return {
-                    endpoint: this.endpoint,
-                    keys: this.keys
+                    endpoint: subscription.endpoint,
+                    keys: subscription.keys
                   };
                 }
               };
+              return subscription;
             }
           }
         })
@@ -535,7 +547,7 @@ describe("authentication shell", () => {
   it("shows the loading and error states on the overview", async () => {
     seedAuthSession("user-1");
 
-    let rejectFetch;
+    let rejectFetch: (reason?: unknown) => void = () => undefined;
     fetch.mockReturnValueOnce(
       new Promise((_, reject) => {
         rejectFetch = reject;
@@ -603,7 +615,7 @@ describe("authentication shell", () => {
     expect(screen.getByText("demo@example.com")).toBeTruthy();
     expect(screen.getByText(/^v\d+\.\d+\.\d+$/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "GNU GPL v3.0" })).toBeTruthy();
-    expect(JSON.parse(window.localStorage.getItem("endgame_grocery.auth_user"))).toEqual({
+    expect(JSON.parse(window.localStorage.getItem("endgame_grocery.auth_user")!)).toEqual({
       id: "user-1",
       display_name: "Demo User",
       email: "demo@example.com"
@@ -686,7 +698,7 @@ describe("authentication shell", () => {
     expect(await screen.findByRole("dialog", { name: "Info & Settings" })).toBeTruthy();
     expect(screen.getByText("Demo User")).toBeTruthy();
     expect(screen.getByText("demo@example.com")).toBeTruthy();
-    expect(JSON.parse(window.localStorage.getItem("endgame_grocery.auth_user"))).toEqual({
+    expect(JSON.parse(window.localStorage.getItem("endgame_grocery.auth_user")!)).toEqual({
       id: "user-1",
       display_name: "Demo User",
       email: "demo@example.com"
@@ -1206,7 +1218,7 @@ describe("authentication shell", () => {
       }
 
       if (url === "/api/lists/list-1/entries" && method === "POST") {
-        expect(JSON.parse(init.body)).toMatchObject({ text: "Y", details: "500 g" });
+        expect(JSON.parse(String(init.body))).toMatchObject({ text: "Y", details: "500 g" });
 
         return {
           ok: true,
@@ -1224,7 +1236,7 @@ describe("authentication shell", () => {
       }
 
       if (url === "/api/lists/list-1/entries/entry-1" && method === "PATCH") {
-        expect(JSON.parse(init.body)).toMatchObject({ text: "X", details: "3L" });
+        expect(JSON.parse(String(init.body))).toMatchObject({ text: "X", details: "3L" });
 
         return {
           ok: true,
@@ -1262,7 +1274,7 @@ describe("authentication shell", () => {
       );
 
       expect(addCall).toBeTruthy();
-      expect(JSON.parse(addCall[1].body)).toMatchObject({ text: "Y", details: "500 g" });
+      expect(JSON.parse(String(addCall?.[1]?.body))).toMatchObject({ text: "Y", details: "500 g" });
     });
     expect(await screen.findByText("500 g")).toBeTruthy();
 
@@ -1278,7 +1290,7 @@ describe("authentication shell", () => {
 
     const editDialog = await screen.findByRole("dialog", { name: "Edit Item" });
     const editDetailsInput = within(editDialog).getByLabelText("Details (optional)");
-    expect(editDetailsInput.value).toBe("2L");
+    expect((editDetailsInput as HTMLInputElement).value).toBe("2L");
 
     fireEvent.change(editDetailsInput, { target: { value: "3L" } });
     await userEvent.click(within(editDialog).getByRole("button", { name: "Save Item" }));
@@ -1289,7 +1301,7 @@ describe("authentication shell", () => {
       );
 
       expect(editCall).toBeTruthy();
-      expect(JSON.parse(editCall[1].body)).toMatchObject({ text: "X", details: "3L" });
+      expect(JSON.parse(String(editCall?.[1]?.body))).toMatchObject({ text: "X", details: "3L" });
     });
     await waitFor(() => {
       expect(screen.getByText("3L")).toBeTruthy();
@@ -1471,7 +1483,7 @@ describe("authentication shell", () => {
   it("shows the redesigned list detail loading and error states", async () => {
     seedAuthSession("user-1");
 
-    let rejectFetch;
+    let rejectFetch: (reason?: unknown) => void = () => undefined;
     fetch
       .mockResolvedValueOnce({
         ok: true,
@@ -1575,14 +1587,19 @@ describe("authentication shell", () => {
   });
 });
 
-function createFakeJwt(sub) {
+function createFakeJwt(sub: string): string {
   const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const payload = btoa(JSON.stringify({ sub }));
 
   return `${header}.${payload}.signature`;
 }
 
-function createAuthUser(sub, overrides = {}) {
+interface AuthUserOverrides {
+  display_name?: string;
+  email?: string;
+}
+
+function createAuthUser(sub: string, overrides: AuthUserOverrides = {}) {
   return {
     id: sub,
     display_name: overrides.display_name ?? "Demo User",
@@ -1590,7 +1607,7 @@ function createAuthUser(sub, overrides = {}) {
   };
 }
 
-function seedAuthSession(sub, overrides = {}) {
+function seedAuthSession(sub: string, overrides: AuthUserOverrides = {}): void {
   window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt(sub));
   window.localStorage.setItem(
     "endgame_grocery.auth_user",
@@ -1598,10 +1615,10 @@ function seedAuthSession(sub, overrides = {}) {
   );
 }
 
-function createDeferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise((nextResolve, nextReject) => {
+function createDeferred<T = unknown>() {
+  let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
+  let reject: (reason?: unknown) => void = () => undefined;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
     resolve = nextResolve;
     reject = nextReject;
   });
@@ -1609,17 +1626,17 @@ function createDeferred() {
   return { promise, resolve, reject };
 }
 
-function setNavigatorOnline(value) {
+function setNavigatorOnline(value: boolean): void {
   Object.defineProperty(window.navigator, "onLine", {
     configurable: true,
     value
   });
 }
 
-function stubMatchMedia({ reduced = false } = {}) {
+function stubMatchMedia({ reduced = false }: { reduced?: boolean } = {}): void {
   vi.stubGlobal(
     "matchMedia",
-    vi.fn().mockImplementation((query) => ({
+    vi.fn().mockImplementation((query: string) => ({
       matches: reduced && query === "(prefers-reduced-motion: reduce)",
       media: query,
       onchange: null,
@@ -1636,9 +1653,15 @@ class MockEventSource {
   static CONNECTING = 0;
   static OPEN = 1;
   static CLOSED = 2;
-  static instances = [];
+  static instances: MockEventSource[] = [];
 
-  constructor(url) {
+  url: string;
+  readyState: number;
+  listeners: Map<string, Set<(event: MessageEvent<string>) => void>>;
+  close: ReturnType<typeof vi.fn>;
+  onerror: ((event: Event) => void) | null;
+
+  constructor(url: string) {
     this.url = url;
     this.readyState = MockEventSource.OPEN;
     this.listeners = new Map();
@@ -1649,23 +1672,21 @@ class MockEventSource {
     MockEventSource.instances.push(this);
   }
 
-  addEventListener(type, handler) {
+  addEventListener(type: string, handler: (event: MessageEvent<string>) => void) {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
     }
 
-    this.listeners.get(type).add(handler);
+    this.listeners.get(type)?.add(handler);
   }
 
-  removeEventListener(type, handler) {
+  removeEventListener(type: string, handler: (event: MessageEvent<string>) => void) {
     this.listeners.get(type)?.delete(handler);
   }
 
-  emit(type, data) {
+  emit(type: string, data: Record<string, unknown>) {
     for (const handler of this.listeners.get(type) ?? []) {
-      handler({
-        data: JSON.stringify(data)
-      });
+      handler(new MessageEvent(type, { data: JSON.stringify(data) }));
     }
   }
 }

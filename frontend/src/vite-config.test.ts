@@ -16,7 +16,7 @@ describe("vite worker config", () => {
   });
 
   it("keeps transformers and onnxruntime out of optimizeDeps", () => {
-    expect(viteConfig.optimizeDeps.exclude).toEqual(
+    expect(viteConfig.optimizeDeps?.exclude).toEqual(
       expect.arrayContaining(["@xenova/transformers", "onnxruntime-web"])
     );
   });
@@ -29,11 +29,13 @@ describe("vite worker config", () => {
     // ort-web.min.js (the default browser entry) depends on onnxruntime-common as an
     // external UMD parameter that does not exist in Worker module context, causing the
     // registerBackend crash. ort.min.js bundles everything inline with no external deps.
-    expect(viteConfig.resolve.alias["onnxruntime-web"]).toBe("onnxruntime-web/dist/ort.min.js");
+    const aliases = viteConfig.resolve?.alias as Record<string, string> | undefined;
+
+    expect(aliases?.["onnxruntime-web"]).toBe("onnxruntime-web/dist/ort.min.js");
   });
 
   it("defines the app version from the root package.json", () => {
-    expect(viteConfig.define.__APP_VERSION__).toMatch(/^"\d+\.\d+\.\d+"$/);
+    expect(String(viteConfig.define?.__APP_VERSION__)).toMatch(/^"\d+\.\d+\.\d+"$/);
   });
 
   it("registers svgr for custom SVG React icon imports", () => {

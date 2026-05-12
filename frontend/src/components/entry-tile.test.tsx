@@ -32,7 +32,7 @@ describe("EntryTile", () => {
   });
 
   it("omits the details line when details are absent", () => {
-    render(<EntryTile entry={{ id: "entry-2c", text: "Bread", status: "open", icon: null, details: null }} />);
+    render(<EntryTile entry={{ id: "entry-2c", text: "Bread", status: "open", icon: null }} />);
 
     expect(screen.queryByText("Whole grain")).toBeNull();
   });

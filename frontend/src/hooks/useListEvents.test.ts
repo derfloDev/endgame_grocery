@@ -3,10 +3,13 @@ import { render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useListEvents } from "./useListEvents";
 import { useEventSource } from "../context/EventSourceContext";
+import type { SseEventType, SseHandler } from "../context/EventSourceContext";
 
 vi.mock("../context/EventSourceContext", () => ({
   useEventSource: vi.fn()
 }));
+
+const useEventSourceMock = vi.mocked(useEventSource);
 
 describe("useListEvents", () => {
   afterEach(() => {
@@ -17,7 +20,7 @@ describe("useListEvents", () => {
     const subscriptions = createEventSourceMock();
     const handler = vi.fn();
 
-    useEventSource.mockReturnValue({
+    useEventSourceMock.mockReturnValue({
       addEventListener: subscriptions.addEventListener
     });
 
@@ -37,7 +40,7 @@ describe("useListEvents", () => {
     const subscriptions = createEventSourceMock();
     const handler = vi.fn();
 
-    useEventSource.mockReturnValue({
+    useEventSourceMock.mockReturnValue({
       addEventListener: subscriptions.addEventListener
     });
 
@@ -53,7 +56,7 @@ describe("useListEvents", () => {
     const subscriptions = createEventSourceMock();
     const handler = vi.fn();
 
-    useEventSource.mockReturnValue({
+    useEventSourceMock.mockReturnValue({
       addEventListener: subscriptions.addEventListener
     });
 
@@ -69,7 +72,7 @@ describe("useListEvents", () => {
     const subscriptions = createEventSourceMock();
     const handler = vi.fn();
 
-    useEventSource.mockReturnValue({
+    useEventSourceMock.mockReturnValue({
       addEventListener: subscriptions.addEventListener
     });
 
@@ -90,27 +93,33 @@ describe("useListEvents", () => {
   });
 });
 
-function HookHarness({ eventType, listId, handler }) {
+interface HookHarnessProps {
+  eventType: SseEventType;
+  listId: string | null;
+  handler: SseHandler;
+}
+
+function HookHarness({ eventType, listId, handler }: HookHarnessProps) {
   useListEvents(eventType, listId, handler);
   return null;
 }
 
 function createEventSourceMock() {
-  const handlers = new Map();
+  const handlers = new Map<SseEventType, Set<SseHandler>>();
 
   return {
-    addEventListener(type, handler) {
+    addEventListener(type: SseEventType, handler: SseHandler) {
       if (!handlers.has(type)) {
         handlers.set(type, new Set());
       }
 
-      handlers.get(type).add(handler);
+      handlers.get(type)?.add(handler);
 
       return () => {
         handlers.get(type)?.delete(handler);
       };
     },
-    emit(type, data) {
+    emit(type: SseEventType, data: Record<string, unknown>) {
       for (const handler of handlers.get(type) ?? []) {
         handler(data);
       }

@@ -38,8 +38,8 @@ describe("recentlyUsedState", () => {
       { text: "Tomatoes", icon: "IconSalad", useCount: 7 }
     ];
     const entries = [
-      { id: "entry-1", text: "Tomatoes", status: "open" },
-      { id: "entry-2", text: "Milk", status: "done" }
+      { id: "entry-1", text: "Tomatoes", status: "open" as const },
+      { id: "entry-2", text: "Milk", status: "done" as const }
     ];
 
     expect(filterRecentlyUsedItems(historyItems, entries)).toEqual([

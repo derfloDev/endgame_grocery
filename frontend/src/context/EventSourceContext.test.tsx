@@ -3,10 +3,13 @@ import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventSourceProvider, useEventSource } from "./EventSourceContext";
 import { useAuth } from "./AuthContext";
+import type { SseEventType, SseHandler } from "./EventSourceContext";
 
 vi.mock("./AuthContext", () => ({
   useAuth: vi.fn()
 }));
+
+const useAuthMock = vi.mocked(useAuth);
 
 describe("EventSourceProvider", () => {
   beforeEach(() => {
@@ -19,7 +22,7 @@ describe("EventSourceProvider", () => {
   });
 
   it("opens an EventSource when a token is present", async () => {
-    useAuth.mockReturnValue({ token: "token-123" });
+    useAuthMock.mockReturnValue(createAuthValue("token-123"));
 
     render(
       <EventSourceProvider>
@@ -30,11 +33,11 @@ describe("EventSourceProvider", () => {
     await waitFor(() => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
-    expect(MockEventSource.instances[0].url).toBe("/api/events?token=token-123");
+    expect(MockEventSource.instances[0]?.url).toBe("/api/events?token=token-123");
   });
 
   it("closes the active EventSource when the token is removed", async () => {
-    useAuth.mockReturnValue({ token: "token-123" });
+    useAuthMock.mockReturnValue(createAuthValue("token-123"));
 
     const rendered = render(
       <EventSourceProvider>
@@ -46,8 +49,8 @@ describe("EventSourceProvider", () => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
 
-    const eventSource = MockEventSource.instances[0];
-    useAuth.mockReturnValue({ token: "" });
+    const eventSource = MockEventSource.instances[0]!;
+    useAuthMock.mockReturnValue(createAuthValue(""));
 
     rendered.rerender(
       <EventSourceProvider>
@@ -63,7 +66,7 @@ describe("EventSourceProvider", () => {
   it("delivers incoming events to registered handlers", async () => {
     const handler = vi.fn();
 
-    useAuth.mockReturnValue({ token: "token-123" });
+    useAuthMock.mockReturnValue(createAuthValue("token-123"));
 
     render(
       <EventSourceProvider>
@@ -75,7 +78,7 @@ describe("EventSourceProvider", () => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
 
-    MockEventSource.instances[0].emit("entry:created", {
+    MockEventSource.instances[0]?.emit("entry:created", {
       listId: "list-1",
       entryId: "entry-1"
     });
@@ -91,7 +94,7 @@ describe("EventSourceProvider", () => {
   it("stops calling handlers after listener cleanup", async () => {
     const handler = vi.fn();
 
-    useAuth.mockReturnValue({ token: "token-123" });
+    useAuthMock.mockReturnValue(createAuthValue("token-123"));
 
     const rendered = render(
       <EventSourceProvider>
@@ -104,7 +107,7 @@ describe("EventSourceProvider", () => {
     });
 
     rendered.unmount();
-    MockEventSource.instances[0].emit("entry:created", {
+    MockEventSource.instances[0]?.emit("entry:created", {
       listId: "list-1",
       entryId: "entry-1"
     });
@@ -113,7 +116,12 @@ describe("EventSourceProvider", () => {
   });
 });
 
-function ListenerHarness({ eventType, handler }) {
+interface ListenerHarnessProps {
+  eventType: SseEventType;
+  handler: SseHandler;
+}
+
+function ListenerHarness({ eventType, handler }: ListenerHarnessProps) {
   const { addEventListener } = useEventSource();
 
   useEffect(() => addEventListener(eventType, handler), [addEventListener, eventType, handler]);
@@ -121,13 +129,30 @@ function ListenerHarness({ eventType, handler }) {
   return null;
 }
 
+function createAuthValue(token: string): ReturnType<typeof useAuth> {
+  return {
+    token,
+    user: null,
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+    setAuthToken: vi.fn()
+  };
+}
+
 class MockEventSource {
   static CONNECTING = 0;
   static OPEN = 1;
   static CLOSED = 2;
-  static instances = [];
+  static instances: MockEventSource[] = [];
 
-  constructor(url) {
+  url: string;
+  readyState: number;
+  listeners: Map<SseEventType, Set<(event: MessageEvent<string>) => void>>;
+  close: ReturnType<typeof vi.fn>;
+  onerror: ((event: Event) => void) | null;
+
+  constructor(url: string) {
     this.url = url;
     this.readyState = MockEventSource.OPEN;
     this.listeners = new Map();
@@ -138,23 +163,21 @@ class MockEventSource {
     MockEventSource.instances.push(this);
   }
 
-  addEventListener(type, handler) {
+  addEventListener(type: SseEventType, handler: (event: MessageEvent<string>) => void) {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
     }
 
-    this.listeners.get(type).add(handler);
+    this.listeners.get(type)?.add(handler);
   }
 
-  removeEventListener(type, handler) {
+  removeEventListener(type: SseEventType, handler: (event: MessageEvent<string>) => void) {
     this.listeners.get(type)?.delete(handler);
   }
 
-  emit(type, data) {
+  emit(type: SseEventType, data: Record<string, unknown>) {
     for (const handler of this.listeners.get(type) ?? []) {
-      handler({
-        data: JSON.stringify(data)
-      });
+      handler(new MessageEvent(type, { data: JSON.stringify(data) }));
     }
   }
 }

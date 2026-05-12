@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 class MockWorker {
-  static instances = [];
+  static instances: MockWorker[] = [];
 
-  constructor(url, options) {
+  url: string | URL;
+  options?: WorkerOptions;
+  listeners: Map<string, (event: Event | MessageEvent) => void>;
+  postMessage: ReturnType<typeof vi.fn>;
+
+  constructor(url: string | URL, options?: WorkerOptions) {
     this.url = url;
     this.options = options;
     this.listeners = new Map();
@@ -11,11 +16,11 @@ class MockWorker {
     MockWorker.instances.push(this);
   }
 
-  addEventListener(type, handler) {
+  addEventListener(type: string, handler: (event: Event | MessageEvent) => void) {
     this.listeners.set(type, handler);
   }
 
-  dispatch(type, event = {}) {
+  dispatch(type: string, event: Event | MessageEvent = new Event(type)) {
     const handler = this.listeners.get(type);
 
     if (handler) {
@@ -43,8 +48,8 @@ describe("iconWorkerClient", () => {
     const worker = getIconWorker();
 
     expect(worker).toBeInstanceOf(MockWorker);
-    expect(worker.options).toEqual({ type: "module" });
-    expect(worker.postMessage).toHaveBeenCalledWith({ type: "init" });
+    expect((worker as MockWorker | null)?.options).toEqual({ type: "module" });
+    expect((worker as MockWorker | null)?.postMessage).toHaveBeenCalledWith({ type: "init" });
   });
 
   it("rejects pending matches and recreates the worker after an error", async () => {
@@ -52,13 +57,13 @@ describe("iconWorkerClient", () => {
     const firstWorker = getIconWorker();
     const firstRequest = requestIconMatch("Gemuese");
 
-    expect(firstWorker.postMessage).toHaveBeenCalledWith({
+    expect((firstWorker as MockWorker | null)?.postMessage).toHaveBeenCalledWith({
       type: "match",
       id: 0,
       text: "Gemuese"
     });
 
-    firstWorker.dispatch("error");
+    (firstWorker as MockWorker | null)?.dispatch("error");
 
     await expect(firstRequest).rejects.toThrow("Icon worker failed.");
 
@@ -69,13 +74,13 @@ describe("iconWorkerClient", () => {
 
     const secondRequest = requestIconMatch("Gemuese");
 
-    expect(secondWorker.postMessage).toHaveBeenCalledWith({
+    expect((secondWorker as MockWorker | null)?.postMessage).toHaveBeenCalledWith({
       type: "match",
       id: 1,
       text: "Gemuese"
     });
 
-    secondWorker.dispatch("message", {
+    (secondWorker as MockWorker | null)?.dispatch("message", new MessageEvent("message", {
       data: {
         type: "matchResult",
         id: 1,
@@ -83,7 +88,7 @@ describe("iconWorkerClient", () => {
         score: 0.74,
         topMatches: [{ iconName: "IconCarrot", score: 0.74 }]
       }
-    });
+    }));
 
     await expect(secondRequest).resolves.toEqual({
       iconName: "IconCarrot",

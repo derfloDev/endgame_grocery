@@ -8,6 +8,14 @@ import AddItemSheet from "./AddItemSheet";
 
 const cssSource = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
 
+function requireElement<T extends Element>(element: T | null): T {
+  if (!element) {
+    throw new Error("Expected element to exist.");
+  }
+
+  return element;
+}
+
 vi.mock("../context/AuthContext", () => ({
   useAuth: vi.fn(() => ({
     token: "token-1"
@@ -107,7 +115,7 @@ describe("AddItemSheet", () => {
       "";
 
     expect(toggleButton.className).toBe("add-item-more-btn");
-    expect(toggleButton.type).toBe("button");
+    expect((toggleButton as HTMLButtonElement).type).toBe("button");
     expect(toggleRule).toMatch(/width:\s*fit-content;/);
     expect(toggleRule).toMatch(/padding:\s*0\.15rem 0;/);
     expect(toggleRule).toMatch(/border:\s*0;/);
@@ -136,8 +144,8 @@ describe("AddItemSheet", () => {
     expect(screen.queryByRole("dialog", { name: "Choose Icon" })).toBeNull();
     expect(screen.getByLabelText("Add item")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Add Item" })).toBeTruthy();
-    const iconBrowser = container.querySelector(".add-item-icon-browser");
-    const iconBrowserInner = container.querySelector(".add-item-icon-browser-inner");
+    const iconBrowser = requireElement(container.querySelector<HTMLElement>(".add-item-icon-browser"));
+    const iconBrowserInner = requireElement(container.querySelector<HTMLElement>(".add-item-icon-browser-inner"));
     const iconSearchInput = screen.getByLabelText("Search icons");
     expect(iconBrowser).toBeTruthy();
     expect(iconBrowserInner).toBeTruthy();
@@ -197,15 +205,15 @@ describe("AddItemSheet", () => {
     );
 
     expect(screen.getByRole("dialog", { name: "Edit Item" })).toBeTruthy();
-    expect(screen.getByLabelText("Edit item").value).toBe("Milch");
-    expect(screen.getByLabelText("Details (optional)").value).toBe("2L");
+    expect((screen.getByLabelText("Edit item") as HTMLInputElement).value).toBe("Milch");
+    expect((screen.getByLabelText("Details (optional)") as HTMLInputElement).value).toBe("2L");
     expect(container.querySelector("[data-testid='add-item-icon-preview'] svg")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save Item" })).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Mehr anzeigen" }));
-    expect(screen.getByLabelText("Edit item").value).toBe("Milch");
+    expect((screen.getByLabelText("Edit item") as HTMLInputElement).value).toBe("Milch");
     expect(screen.getByRole("button", { name: "Save Item" })).toBeTruthy();
-    const iconBrowser = container.querySelector(".add-item-icon-browser");
+    const iconBrowser = requireElement(container.querySelector<HTMLElement>(".add-item-icon-browser"));
     const iconSearchInput = screen.getByLabelText("Search icons");
     expect(iconBrowser.className).toContain("add-item-icon-browser--open");
     expect(screen.getByRole("button", { name: "Weniger anzeigen" })).toBeTruthy();
@@ -238,7 +246,7 @@ describe("AddItemSheet", () => {
 
     const submitButton = screen.getByRole("button", { name: "Add Item" });
 
-    expect(submitButton.disabled).toBe(true);
+    expect((submitButton as HTMLButtonElement).disabled).toBe(true);
     expect(cssSource).toMatch(
       /\.button-primary:disabled,\s*\.eg-btn-primary:disabled\s*\{[^}]*cursor:\s*not-allowed;/s
     );
@@ -250,8 +258,8 @@ describe("AddItemSheet", () => {
 
     fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Tom" } });
 
-    const inputWrap = container.querySelector(".eg-input-wrap");
-    const inputAnchor = container.querySelector(".eg-input-anchor");
+    const inputWrap = requireElement(container.querySelector<HTMLElement>(".eg-input-wrap"));
+    const inputAnchor = requireElement(container.querySelector<HTMLElement>(".eg-input-anchor"));
     expect(inputWrap).toBeTruthy();
     expect(inputAnchor).toBeTruthy();
     expect(screen.getByLabelText("Add item").getAttribute("autocomplete")).toBe("off");
@@ -262,8 +270,8 @@ describe("AddItemSheet", () => {
 
     expect(onAdd).toHaveBeenCalledWith("Tomaten", "IconSalad", "");
     expect(screen.getByRole("dialog", { name: "Add Item" })).toBeTruthy();
-    expect(screen.getByLabelText("Add item").value).toBe("");
-    expect(screen.getByLabelText("Details (optional)").value).toBe("");
+    expect((screen.getByLabelText("Add item") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Details (optional)") as HTMLInputElement).value).toBe("");
     expect(screen.queryByRole("listbox", { name: "Autocomplete suggestions" })).toBeNull();
     expect(cssSource).toMatch(
       /\.eg-input-wrap\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*row;[^}]*align-items:\s*center;[^}]*gap:\s*10px;/s
@@ -277,7 +285,7 @@ describe("AddItemSheet", () => {
 
     fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Tom" } });
 
-    const inputAnchor = container.querySelector(".eg-input-anchor");
+    const inputAnchor = requireElement(container.querySelector<HTMLElement>(".eg-input-anchor"));
     expect(within(inputAnchor).getByRole("listbox", { name: "Autocomplete suggestions" })).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Mehr anzeigen" }));
@@ -290,9 +298,9 @@ describe("AddItemSheet", () => {
 
     fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Milch" } });
 
-    const inputWrap = container.querySelector(".eg-input-wrap");
-    const inputAnchor = container.querySelector(".eg-input-anchor");
-    const preview = container.querySelector("[data-testid='add-item-icon-preview']");
+    const inputWrap = requireElement(container.querySelector<HTMLElement>(".eg-input-wrap"));
+    const inputAnchor = requireElement(container.querySelector<HTMLElement>(".eg-input-anchor"));
+    const preview = requireElement(container.querySelector<HTMLElement>("[data-testid='add-item-icon-preview']"));
 
     expect(inputWrap).toBeTruthy();
     expect(inputAnchor).toBeTruthy();
@@ -309,8 +317,8 @@ describe("AddItemSheet", () => {
   it("keeps the icon browser mounted while collapsed and marks it inert until opened", async () => {
     const { container } = render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
 
-    const iconBrowser = container.querySelector(".add-item-icon-browser");
-    const iconBrowserInner = container.querySelector(".add-item-icon-browser-inner");
+    const iconBrowser = requireElement(container.querySelector<HTMLElement>(".add-item-icon-browser"));
+    const iconBrowserInner = requireElement(container.querySelector<HTMLElement>(".add-item-icon-browser-inner"));
     const iconBrowserRule =
       cssSource.match(/\.add-item-icon-browser\s*\{[^}]*\}/s)?.[0] ?? "";
     const iconBrowserInnerRule =
