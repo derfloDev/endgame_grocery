@@ -8,6 +8,45 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-005 — implement — 2026-05-12T09:51:52Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-005 frontend worker TypeScript migration and closed the task. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, all reviewed T-005 implementation and review files staged via `git add -A`; unrelated `.claude/settings.local.json` left unstaged |
+| Validation | Reused reviewed validation from T-005: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, `npm run test --workspace frontend -- src/workers/iconWorkerClient.test.js`, `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend workers` |
+| Next Role | none |
+
+---
+
+### T-005 — review — 2026-05-12T11:52:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 worker migration; both old .js files deleted, @ts-expect-error with reason present at xenova boundary, all plan signatures matched, zero any usage; two minor defensive additions noted (toEmbedding guard, id type guard) but no required fixes; clean run 285/285. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — implement — 2026-05-12T09:26:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Migrated the frontend icon worker and worker client modules to TypeScript with typed worker messages and icon match results. |
+| Files Changed | `frontend/src/workers/iconWorker.ts`, `frontend/src/workers/iconWorkerClient.ts`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` PASS (existing `AuthContext.jsx` fast-refresh warning only); `npx tsc -p frontend/tsconfig.json --noEmit` PASS; `npm run build` PASS (existing Vite eval/chunk-size warnings only); `npm run test --workspace frontend -- src/workers/iconWorkerClient.test.js` PASS after sandbox `spawn EPERM` rerun with approval; `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend workers` |
+| Next Role | review |
+
+---
+
 ### T-004 — implement — 2026-05-12T08:58:27Z
 
 | Field | Value |

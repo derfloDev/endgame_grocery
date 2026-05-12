@@ -1,8 +1,22 @@
-let iconWorker;
-let nextRequestId = 0;
-const pendingRequests = new Map();
+import type { IconMatchResult } from "../types";
 
-function rejectPendingRequests(error) {
+type PendingIconRequest = {
+  resolve: (value: IconMatchResult) => void;
+  reject: (error: Error) => void;
+};
+type IconWorkerResponse = Partial<IconMatchResult> & {
+  type?: "ready" | "matchResult" | "matchError";
+  id?: number;
+  error?: string;
+};
+
+let iconWorker: Worker | null | undefined;
+let nextRequestId = 0;
+const pendingRequests = new Map<number, PendingIconRequest>();
+
+const emptyIconMatchResult: IconMatchResult = { iconName: null, score: 0, topMatches: [] };
+
+function rejectPendingRequests(error: Error): void {
   for (const { reject } of pendingRequests.values()) {
     reject(error);
   }
@@ -10,8 +24,12 @@ function rejectPendingRequests(error) {
   pendingRequests.clear();
 }
 
-function handleWorkerMessage(event) {
+function handleWorkerMessage(event: MessageEvent<IconWorkerResponse>): void {
   const { type, id, iconName = null, score = 0, topMatches = [], error } = event.data ?? {};
+
+  if (typeof id !== "number") {
+    return;
+  }
 
   if (type === "matchResult") {
     const pendingRequest = pendingRequests.get(id);
@@ -37,18 +55,18 @@ function handleWorkerMessage(event) {
   }
 }
 
-function handleWorkerError() {
+function handleWorkerError(): void {
   rejectPendingRequests(new Error("Icon worker failed."));
   // Drop the crashed instance so the next request can bootstrap a fresh worker.
   iconWorker = null;
 }
 
-function createIconWorker() {
+function createIconWorker(): Worker | null {
   if (typeof Worker === "undefined") {
     return null;
   }
 
-  const worker = new Worker(new URL("./iconWorker.js", import.meta.url), {
+  const worker = new Worker(new URL("./iconWorker.ts", import.meta.url), {
     type: "module"
   });
 
@@ -58,7 +76,7 @@ function createIconWorker() {
   return worker;
 }
 
-export function getIconWorker() {
+export function getIconWorker(): Worker | null {
   if (iconWorker == null) {
     iconWorker = createIconWorker();
   }
@@ -66,7 +84,7 @@ export function getIconWorker() {
   return iconWorker;
 }
 
-export function primeIconWorker() {
+export function primeIconWorker(): void {
   const worker = getIconWorker();
 
   if (!worker) {
@@ -76,11 +94,11 @@ export function primeIconWorker() {
   worker.postMessage({ type: "init" });
 }
 
-export function requestIconMatch(text) {
+export function requestIconMatch(text: string): Promise<IconMatchResult> {
   const worker = getIconWorker();
 
   if (!worker) {
-    return Promise.resolve({ iconName: null, score: 0, topMatches: [] });
+    return Promise.resolve(emptyIconMatchResult);
   }
 
   const id = nextRequestId;
