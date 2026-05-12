@@ -1,11 +1,20 @@
 import { useTranslation } from "react-i18next";
 import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
 import { useLongPress } from "../hooks/useLongPress";
+import type { Entry } from "../types";
+import type { ReactElement } from "react";
 
-export default function EntryTile({ entry, onEdit, onToggle }) {
+interface EntryTileProps {
+  entry: Entry;
+  onEdit?: () => void;
+  onToggle?: () => void;
+}
+
+export default function EntryTile({ entry, onEdit, onToggle }: EntryTileProps): ReactElement {
   const { t } = useTranslation();
   const resolvedIconName = resolveIconName(entry.icon);
-  const EntryIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
+  const displayIconName = resolvedIconName ?? FALLBACK_ICON_NAME;
+  const EntryIcon = ICON_REGISTRY[displayIconName] ?? FALLBACK_ICON;
   const { pressing, longPressHandlers } = useLongPress(() => onEdit?.(), 500);
 
   return (
@@ -34,7 +43,7 @@ export default function EntryTile({ entry, onEdit, onToggle }) {
       <EntryIcon
         aria-hidden="true"
         className="entry-tile-icon"
-        data-icon-name={resolvedIconName ?? FALLBACK_ICON_NAME}
+        data-icon-name={displayIconName}
         data-testid={`entry-tile-icon-${entry.id}`}
         size={24}
         stroke={1.5}

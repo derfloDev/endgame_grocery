@@ -1,5 +1,29 @@
 import { useTranslation } from "react-i18next";
+import type { FormEvent, ReactElement } from "react";
+import type { Member } from "../types";
 import { BottomSheet, LoadingState } from "./ui";
+
+interface SharedListMember extends Member {
+  user_id: string;
+  display_name: string;
+  email: string;
+  is_owner?: boolean;
+  is_pending_sync?: boolean;
+}
+
+interface ShareListSheetProps {
+  open: boolean;
+  onClose: () => void;
+  members: SharedListMember[];
+  shareEmail: string;
+  shareError: string;
+  shareNotice: string;
+  isSubmitting: boolean;
+  isSharingLoading: boolean;
+  onEmailChange: (value: string) => void;
+  onShareSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onRevoke: (memberId: string) => Promise<void> | void;
+}
 
 export default function ShareListSheet({
   open,
@@ -13,7 +37,7 @@ export default function ShareListSheet({
   onEmailChange,
   onShareSubmit,
   onRevoke
-}) {
+}: ShareListSheetProps): ReactElement {
   const { t } = useTranslation();
 
   return (

@@ -1,7 +1,22 @@
 import { useTranslation } from "react-i18next";
+import type { ReactElement } from "react";
 import { BottomSheet, Icon } from "./ui";
 
-export default function ListOptionsSheet({ open, onClose, isOwner, onRenameSelect, onShareSelect }) {
+interface ListOptionsSheetProps {
+  open: boolean;
+  onClose: () => void;
+  isOwner: boolean;
+  onRenameSelect?: () => void;
+  onShareSelect?: () => void;
+}
+
+export default function ListOptionsSheet({
+  open,
+  onClose,
+  isOwner,
+  onRenameSelect,
+  onShareSelect
+}: ListOptionsSheetProps): ReactElement | null {
   const { t } = useTranslation();
 
   if (!open || !isOwner) {

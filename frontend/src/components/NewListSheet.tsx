@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
+import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { BottomSheet } from "./ui";
 
-export default function NewListSheet({ open, onAdd, onClose }) {
+interface NewListSheetProps {
+  open: boolean;
+  onAdd?: (name: string) => void;
+  onClose: () => void;
+}
+
+export default function NewListSheet({ open, onAdd, onClose }: NewListSheetProps): ReactElement {
   const { t } = useTranslation();
   const [name, setName] = useState("");
 
@@ -12,7 +19,7 @@ export default function NewListSheet({ open, onAdd, onClose }) {
     }
   }, [open]);
 
-  function handleSubmit(event) {
+  function handleSubmit(event?: FormEvent<HTMLFormElement>): void {
     event?.preventDefault();
 
     const trimmed = name.trim();

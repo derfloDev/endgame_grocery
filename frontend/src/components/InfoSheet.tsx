@@ -1,14 +1,20 @@
 /* global __APP_VERSION__ */
 import { useTranslation } from "react-i18next";
+import type { ReactElement } from "react";
 import { useAuth } from "../context/AuthContext";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { BottomSheet, Icon } from "./ui";
 
-function getAppVersion() {
-  return globalThis.__APP_VERSION__ ?? (typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "0.0.0");
+interface InfoSheetProps {
+  open: boolean;
+  onClose: () => void;
 }
 
-export default function InfoSheet({ open, onClose }) {
+function getAppVersion(): string {
+  return (globalThis as { __APP_VERSION__?: string }).__APP_VERSION__ ?? (typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "0.0.0");
+}
+
+export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactElement {
   const { t } = useTranslation();
   const { logout, user } = useAuth();
   const appVersion = getAppVersion();

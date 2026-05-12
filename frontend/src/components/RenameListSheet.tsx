@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
+import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { BottomSheet } from "./ui";
 
-export default function RenameListSheet({ open, onClose, currentName, onRename }) {
+interface RenameListSheetProps {
+  open: boolean;
+  onClose: () => void;
+  currentName: string;
+  onRename?: (name: string) => Promise<void> | void;
+}
+
+export default function RenameListSheet({ open, onClose, currentName, onRename }: RenameListSheetProps): ReactElement {
   const { t } = useTranslation();
   const [value, setValue] = useState(currentName);
 
@@ -12,7 +20,7 @@ export default function RenameListSheet({ open, onClose, currentName, onRename }
     }
   }, [currentName, open]);
 
-  async function handleSubmit(event) {
+  async function handleSubmit(event?: FormEvent<HTMLFormElement>): Promise<void> {
     event?.preventDefault();
 
     const trimmed = value.trim();

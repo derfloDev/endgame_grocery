@@ -1,7 +1,12 @@
 import { Navigate, useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
 import { useAuth } from "../context/AuthContext";
 
-export default function ProtectedRoute({ children }) {
+interface ProtectedRouteProps {
+  children: ReactNode;
+}
+
+export default function ProtectedRoute({ children }: ProtectedRouteProps): ReactNode {
   const { token } = useAuth();
   const location = useLocation();
 

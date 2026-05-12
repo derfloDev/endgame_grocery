@@ -8,6 +8,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-008 — implement — 2026-05-12T13:19:02Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Migrated the frontend feature components to TypeScript with explicit props interfaces and shared domain type imports. |
+| Files Changed | `frontend/src/components/AddItemSheet.tsx`, `frontend/src/components/AutocompleteSuggestions.tsx`, `frontend/src/components/EntryTile.tsx`, `frontend/src/components/InfoSheet.tsx`, `frontend/src/components/LanguageSwitcher.tsx`, `frontend/src/components/ListCardHome.tsx`, `frontend/src/components/ListOptionsSheet.tsx`, `frontend/src/components/NewListSheet.tsx`, `frontend/src/components/OfflineBanner.tsx`, `frontend/src/components/ProtectedRoute.tsx`, `frontend/src/components/RecentlyUsedSection.tsx`, `frontend/src/components/RenameListSheet.tsx`, `frontend/src/components/ShareListSheet.tsx`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` PASS (existing `AuthContext.tsx` fast-refresh warning only); `npx tsc -p frontend/tsconfig.json --noEmit` PASS; `npm run build` PASS (existing Vite eval/chunk-size warnings only); `npm run test --workspace frontend -- src/components/AddItemSheet.test.jsx src/components/AutocompleteSuggestions.test.jsx src/components/entry-tile.test.jsx src/components/InfoSheet.test.jsx src/components/LanguageSwitcher.test.jsx src/components/RecentlyUsedSection.test.jsx src/components/ShareListSheet.test.jsx` PASS after sandbox `spawn EPERM` rerun with approval; `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend feature components` |
+| Next Role | review |
+
+---
+
 ### T-007 — implement — 2026-05-12T11:41:28Z
 
 | Field | Value |
@@ -303,6 +316,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, all reviewed T-007 implementation and review files staged; unrelated `.claude/settings.local.json` left unstaged |
 | Validation | Reused reviewed validation from T-007: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, focused UI Vitest command, `npm test` PASS |
 | Commit | `chore(typescript): migrate frontend UI primitives` |
+| Next Role | none |
+
+---
+
+### T-008 — review — 2026-05-12T14:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-008 feature components migration; all 13 old .jsx source files deleted, 13 typed .tsx files present, zero any usage, all props via interface, domain types from src/types.ts; 285/285 clean on first run with no flakiness. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-008 — implement — 2026-05-12T14:36:13Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-008 frontend feature components TypeScript migration and closed the task. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, all reviewed T-008 implementation and review files staged; unrelated `.claude/settings.local.json` left unstaged |
+| Validation | Reused reviewed validation from T-008: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, focused component Vitest command, `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend feature components` |
 | Next Role | none |
 
 ---

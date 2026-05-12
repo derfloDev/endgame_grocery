@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
+import type { ReactElement } from "react";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 
-export default function OfflineBanner() {
+export default function OfflineBanner(): ReactElement | null {
   const { t } = useTranslation();
   const { isOffline, isSyncing, queuedCount, syncError } = useOfflineQueue();
 

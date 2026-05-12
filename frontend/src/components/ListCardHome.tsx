@@ -1,19 +1,34 @@
 import { useState } from "react";
+import type { KeyboardEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
+import type { List } from "../types";
 import { Icon } from "./ui";
 
-export default function ListCardHome({ list, onOpen, onRename, onDelete }) {
+interface HomeList extends List {
+  name: string;
+  owner_name?: string;
+  is_pending_sync?: boolean;
+}
+
+interface ListCardHomeProps {
+  list: HomeList;
+  onOpen?: () => void;
+  onRename?: (name: string) => void;
+  onDelete?: () => void;
+}
+
+export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListCardHomeProps): ReactElement {
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [renamingMode, setRenamingMode] = useState(false);
   const [renameValue, setRenameValue] = useState(list.name);
 
-  function closeMenu() {
+  function closeMenu(): void {
     setMenuOpen(false);
     setRenamingMode(false);
   }
 
-  function submitRename() {
+  function submitRename(): void {
     const trimmed = renameValue.trim();
 
     if (!trimmed) {
@@ -32,7 +47,7 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }) {
         role="button"
         tabIndex={0}
         onClick={onOpen}
-        onKeyDown={(event) => {
+        onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             onOpen?.();

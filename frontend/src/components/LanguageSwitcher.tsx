@@ -1,20 +1,27 @@
 import { useTranslation } from "react-i18next";
+import type { ReactElement } from "react";
 
 const LANGUAGES = [
   { code: "de", label: "DE" },
   { code: "en", label: "EN" }
-];
+] as const;
 
-function normalizeLanguage(language) {
-  const baseLanguage = language?.split("-")[0];
-  return LANGUAGES.some(({ code }) => code === baseLanguage) ? baseLanguage : "en";
+type LanguageCode = (typeof LANGUAGES)[number]["code"];
+
+function isLanguageCode(language: string | undefined): language is LanguageCode {
+  return LANGUAGES.some(({ code }) => code === language);
 }
 
-export default function LanguageSwitcher() {
+function normalizeLanguage(language: string | undefined): LanguageCode {
+  const baseLanguage = language?.split("-")[0];
+  return isLanguageCode(baseLanguage) ? baseLanguage : "en";
+}
+
+export default function LanguageSwitcher(): ReactElement {
   const { i18n, t } = useTranslation();
   const activeLanguage = normalizeLanguage(i18n.resolvedLanguage ?? i18n.language);
 
-  function handleLanguageChange(language) {
+  function handleLanguageChange(language: LanguageCode): void {
     void i18n.changeLanguage(language);
   }
 

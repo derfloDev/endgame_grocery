@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, FocusEvent, FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { formatIconName, ICON_REGISTRY, ICON_REGISTRY_KEYS, resolveIconName } from "../data/iconRegistry";
@@ -7,7 +8,18 @@ import { useIconSuggestion } from "../hooks/useIconSuggestion";
 import AutocompleteSuggestions from "./AutocompleteSuggestions";
 import { BottomSheet } from "./ui";
 
-function normalizeSearchTerm(value) {
+interface AddItemSheetProps {
+  initialDetails?: string;
+  initialIconName?: string | null;
+  initialText?: string;
+  listId?: string;
+  mode?: "add" | "edit";
+  open: boolean;
+  onAdd?: (text: string, iconName: string | null, details: string) => Promise<boolean | void> | boolean | void;
+  onClose: () => void;
+}
+
+function normalizeSearchTerm(value: string): string {
   return value.trim().toLowerCase();
 }
 
@@ -20,7 +32,7 @@ export default function AddItemSheet({
   open,
   onAdd,
   onClose
-}) {
+}: AddItemSheetProps): ReactElement {
   const { t } = useTranslation();
   const { token } = useAuth();
   const [text, setText] = useState(initialText);
@@ -29,8 +41,8 @@ export default function AddItemSheet({
   const [showIconBrowser, setShowIconBrowser] = useState(false);
   const [iconBrowserSearchText, setIconBrowserSearchText] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const inputAnchorRef = useRef(null);
-  const iconSearchRef = useRef(null);
+  const inputAnchorRef = useRef<HTMLDivElement | null>(null);
+  const iconSearchRef = useRef<HTMLInputElement | null>(null);
   const { iconName, topMatches, loading } = useIconSuggestion(text);
   const isEditMode = mode === "edit";
   const { suggestions } = useAutocomplete(listId, isEditMode ? "" : text, token);
@@ -67,8 +79,10 @@ export default function AddItemSheet({
       return;
     }
 
-    function handlePointerOutside(event) {
-      if (inputAnchorRef.current && !inputAnchorRef.current.contains(event.target)) {
+    function handlePointerOutside(event: MouseEvent | TouchEvent): void {
+      const target = event.target;
+
+      if (inputAnchorRef.current && target instanceof Node && !inputAnchorRef.current.contains(target)) {
         setShowSuggestions(false);
       }
     }
@@ -96,14 +110,14 @@ export default function AddItemSheet({
     };
   }, [showIconBrowser]);
 
-  function handleInputChange(event) {
+  function handleInputChange(event: ChangeEvent<HTMLInputElement>): void {
     const value = event.target.value;
 
     setText(value);
     setShowSuggestions(value.trim().length >= 2);
   }
 
-  function handleInputFocus(event) {
+  function handleInputFocus(event: FocusEvent<HTMLInputElement>): void {
     event.target.scrollIntoView?.({
       behavior: "smooth",
       block: "nearest"
@@ -114,7 +128,7 @@ export default function AddItemSheet({
     }
   }
 
-  async function handleQuickAdd(suggestedText, suggestedIconName) {
+  async function handleQuickAdd(suggestedText: string, suggestedIconName: string | null): Promise<void> {
     const trimmed = suggestedText.trim();
 
     if (!trimmed) {
@@ -136,7 +150,7 @@ export default function AddItemSheet({
     setSelectedIconName(null);
   }
 
-  async function handleSubmit(event) {
+  async function handleSubmit(event?: FormEvent<HTMLFormElement>): Promise<void> {
     event?.preventDefault();
 
     const trimmed = text.trim();
