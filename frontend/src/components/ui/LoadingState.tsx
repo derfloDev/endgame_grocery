@@ -1,6 +1,11 @@
 import { useTranslation } from "react-i18next";
+import type { ReactElement } from "react";
 
-export default function LoadingState({ rows = 4 }) {
+interface LoadingStateProps {
+  rows?: number;
+}
+
+export default function LoadingState({ rows = 4 }: LoadingStateProps): ReactElement {
   const { t } = useTranslation();
 
   return (

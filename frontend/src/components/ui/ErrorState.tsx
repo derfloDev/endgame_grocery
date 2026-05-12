@@ -1,7 +1,12 @@
 import { useTranslation } from "react-i18next";
+import type { ReactElement } from "react";
 import Icon from "./Icon";
 
-export default function ErrorState({ onRetry }) {
+interface ErrorStateProps {
+  onRetry: () => void;
+}
+
+export default function ErrorState({ onRetry }: ErrorStateProps): ReactElement {
   const { t } = useTranslation();
 
   return (

@@ -1,6 +1,21 @@
 import { useTranslation } from "react-i18next";
+import type { ReactElement, ReactNode } from "react";
 
-export default function BottomSheet({ open, onClose, title, className = "", children }) {
+interface BottomSheetProps {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  className?: string;
+  children?: ReactNode;
+}
+
+export default function BottomSheet({
+  open,
+  onClose,
+  title,
+  className = "",
+  children
+}: BottomSheetProps): ReactElement | null {
   const { t } = useTranslation();
 
   if (!open) {

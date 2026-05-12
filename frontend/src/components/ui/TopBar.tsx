@@ -1,8 +1,24 @@
 import { isValidElement } from "react";
 import { useTranslation } from "react-i18next";
 import Icon from "./Icon";
+import type { IconName } from "./Icon";
+import type { ReactElement, ReactNode } from "react";
 
-export default function TopBar({ title, subtitle, onBack, actions = [] }) {
+interface TopBarAction {
+  ariaLabel?: string;
+  icon: IconName | string | ReactNode;
+  label?: string;
+  onClick: () => void;
+}
+
+interface TopBarProps {
+  title: string;
+  subtitle?: string;
+  onBack?: () => void;
+  actions?: TopBarAction[];
+}
+
+export default function TopBar({ title, subtitle, onBack, actions = [] }: TopBarProps): ReactElement {
   const { t } = useTranslation();
 
   return (
@@ -24,7 +40,11 @@ export default function TopBar({ title, subtitle, onBack, actions = [] }) {
           type="button"
           onClick={action.onClick}
         >
-          {isValidElement(action.icon) ? action.icon : <Icon name={action.icon} size={20} color="var(--text-secondary)" />}
+          {isValidElement(action.icon) ? (
+            action.icon
+          ) : (
+            <Icon name={String(action.icon)} size={20} color="var(--text-secondary)" />
+          )}
         </button>
       ))}
     </div>

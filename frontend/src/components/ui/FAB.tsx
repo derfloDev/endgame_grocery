@@ -1,7 +1,14 @@
 import { useTranslation } from "react-i18next";
 import Icon from "./Icon";
+import type { IconName } from "./Icon";
+import type { ReactElement } from "react";
 
-export default function FAB({ onClick, icon = "plus" }) {
+interface FABProps {
+  onClick: () => void;
+  icon?: IconName | string;
+}
+
+export default function FAB({ onClick, icon = "plus" }: FABProps): ReactElement {
   const { t } = useTranslation();
 
   return (

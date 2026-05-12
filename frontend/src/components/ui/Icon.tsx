@@ -1,3 +1,5 @@
+import type { CSSProperties, ReactElement, ReactNode } from "react";
+
 const iconPaths = {
   plus: (
     <>
@@ -111,9 +113,25 @@ const iconPaths = {
       <line x1="21" x2="9" y1="12" y2="12" />
     </>
   )
-};
+} satisfies Record<string, ReactNode>;
 
-export default function Icon({ name, size = 20, color = "currentColor", strokeWidth = 1.5 }) {
+export type IconName = keyof typeof iconPaths;
+
+interface IconProps {
+  name: IconName | string;
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}
+
+const iconStyle: CSSProperties = { display: "block", flexShrink: 0 };
+
+export default function Icon({
+  name,
+  size = 20,
+  color = "currentColor",
+  strokeWidth = 1.5
+}: IconProps): ReactElement {
   return (
     <svg
       aria-hidden="true"
@@ -123,11 +141,15 @@ export default function Icon({ name, size = 20, color = "currentColor", strokeWi
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={strokeWidth}
-      style={{ display: "block", flexShrink: 0 }}
+      style={iconStyle}
       viewBox="0 0 24 24"
       width={size}
     >
-      {iconPaths[name] ?? <circle cx="12" cy="12" r="10" />}
+      {isIconName(name) ? iconPaths[name] : <circle cx="12" cy="12" r="10" />}
     </svg>
   );
+}
+
+function isIconName(name: string): name is IconName {
+  return name in iconPaths;
 }

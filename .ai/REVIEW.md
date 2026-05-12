@@ -311,3 +311,55 @@ No blockers, major issues, or required fixes found.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-007
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/components/ui/Icon.tsx` L118 | `IconProps.name` typed as `IconName | string` (plan spec had `string` only). The `IconName` union is derived from `keyof typeof iconPaths` via `satisfies`, giving compile-time autocomplete on known icon names. Strictly better than the plan spec. | No |
+| 2 | nit | `frontend/src/components/ui/index.ts` | `IconName` type is not re-exported from the barrel. `FAB` and `TopBar` import it directly from `"./Icon"`. Callers outside the folder who need `IconName` must also import from `"./Icon"` directly. Acceptable for current usage; could be re-exported as a convenience. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 8 files renamed (git detected as R — renames with content similarity): `BottomSheet`, `EmptyState`, `ErrorState`, `FAB`, `Icon`, `LoadingState`, `TopBar` (`.jsx`→`.tsx`); `index` (`.js`→`.ts`). ✅
+2. Verified zero `any` usage across all 8 files. ✅
+3. Cross-checked all 8 files against plan spec:
+   - `Icon.tsx`: `IconProps { name: IconName|string; size?; color?; strokeWidth? }`; `IconName` type exported; `isIconName` guard; `iconPaths satisfies Record<string, ReactNode>`. ✅
+   - `BottomSheet.tsx`: `{ open: boolean; onClose: () => void; title: string; className?; children? }`; returns `ReactElement | null`. ✅
+   - `EmptyState.tsx`: `{ title: string; body: string; action?; onAction? }`; returns `ReactElement`. ✅
+   - `ErrorState.tsx`: `{ onRetry: () => void }`; returns `ReactElement`. ✅
+   - `FAB.tsx`: `{ onClick: () => void; icon?: IconName | string }`; imports `IconName` from `Icon`. ✅
+   - `LoadingState.tsx`: `{ rows?: number }`; returns `ReactElement`. ✅
+   - `TopBar.tsx`: `TopBarAction` interface; `{ title; subtitle?; onBack?; actions? }`; `isValidElement` distinguishes `ReactNode` icon from string. ✅
+   - `index.ts`: Re-exports all 7 components; no runtime changes. ✅
+4. Ran `npm run lint` → 0 errors, 1 pre-existing warning (`AuthContext.tsx`). ✅
+5. Ran `npx tsc --noEmit` → clean, 0 errors. ✅
+6. Ran `npm run build` → success. ✅
+7. Ran `npm test` → **285/285 on first run**, no flakiness. ✅
+
+##### Findings
+- All acceptance-criteria commands pass with zero TS errors.
+- `satisfies Record<string, ReactNode>` on `iconPaths` and `isIconName` type guard are clean TypeScript idioms that improve type safety beyond the plan spec.
+- `TopBarAction.icon: IconName | string | ReactNode` with `isValidElement` check is a precise, correct union discriminant.
+
+##### Risks
+- None. All changes are type-annotated equivalents of the original JSX/JS.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

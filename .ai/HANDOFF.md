@@ -8,6 +8,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-007 — implement — 2026-05-12T11:41:28Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Migrated the frontend UI primitive components to TypeScript with explicit props interfaces. |
+| Files Changed | `frontend/src/components/ui/BottomSheet.tsx`, `frontend/src/components/ui/EmptyState.tsx`, `frontend/src/components/ui/ErrorState.tsx`, `frontend/src/components/ui/FAB.tsx`, `frontend/src/components/ui/Icon.tsx`, `frontend/src/components/ui/LoadingState.tsx`, `frontend/src/components/ui/TopBar.tsx`, `frontend/src/components/ui/index.ts`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` PASS (existing `AuthContext.tsx` fast-refresh warning only); `npx tsc -p frontend/tsconfig.json --noEmit` PASS; `npm run build` PASS (existing Vite eval/chunk-size warnings only); `npm run test --workspace frontend -- src/components/ui/ui.test.jsx` PASS; `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend UI primitives` |
+| Next Role | review |
+
+---
+
 ### T-006 — implement — 2026-05-12T11:17:17Z
 
 | Field | Value |
@@ -265,5 +278,31 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Summary | Planned full JSX→TSX / JS→TS migration in 10 tasks (toolchain → types → pure modules → API → workers → hooks+contexts → UI primitives → feature components → pages+entry → tests) |
 | Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
 | Next Role | implement |
+
+---
+
+### T-007 — review — 2026-05-12T14:05:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-007 UI primitive components migration; all 8 old .jsx/.js files deleted, 8 typed .tsx/.ts files present, zero any usage, all props via interface; 285/285 clean on first run with no flakiness. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-007 — implement — 2026-05-12T12:31:41Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-007 frontend UI primitives TypeScript migration and closed the task. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, all reviewed T-007 implementation and review files staged; unrelated `.claude/settings.local.json` left unstaged |
+| Validation | Reused reviewed validation from T-007: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, focused UI Vitest command, `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend UI primitives` |
+| Next Role | none |
 
 ---

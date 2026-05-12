@@ -1,6 +1,14 @@
+import type { ReactElement } from "react";
 import Icon from "./Icon";
 
-export default function EmptyState({ title, body, action, onAction }) {
+interface EmptyStateProps {
+  title: string;
+  body: string;
+  action?: string;
+  onAction?: () => void;
+}
+
+export default function EmptyState({ title, body, action, onAction }: EmptyStateProps): ReactElement {
   return (
     <div className="empty-state">
       <Icon name="shoppingCart" size={56} color="var(--text-disabled)" />
