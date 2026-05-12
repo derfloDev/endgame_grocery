@@ -1,35 +1,64 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { fetchCurrentUser, loginUser, registerUser } from "../api/auth";
+import type { User } from "../types";
 
 const STORAGE_KEY = "endgame_grocery.auth_token";
 const USER_STORAGE_KEY = "endgame_grocery.auth_user";
-const AuthContext = createContext(null);
+interface LoginCredentials {
+  email: string;
+  password: string;
+}
 
-function parseJwtSubject(token) {
+interface LoginResult {
+  token: string;
+  user?: User;
+}
+
+interface AuthContextValue {
+  token: string;
+  user: User | null;
+  login: (credentials: LoginCredentials) => Promise<LoginResult>;
+  register: (payload: unknown) => Promise<unknown>;
+  logout: () => void;
+  setAuthToken: (token: string, user?: User | null) => void;
+}
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+function parseJwtSubject(token: string): string | null {
   if (!token) {
     return null;
   }
 
   try {
     const [, payload] = token.split(".");
+    if (!payload) {
+      return null;
+    }
+
     const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/");
     const paddedPayload = normalizedPayload.padEnd(
       normalizedPayload.length + ((4 - (normalizedPayload.length % 4 || 4)) % 4),
       "="
     );
-    const decodedPayload = JSON.parse(atob(paddedPayload));
+    const decodedPayload = JSON.parse(atob(paddedPayload)) as unknown;
 
-    return decodedPayload.sub ?? null;
+    return isRecord(decodedPayload) && typeof decodedPayload.sub === "string" ? decodedPayload.sub : null;
   } catch {
     return null;
   }
 }
 
-export function AuthProvider({ children }) {
+export function AuthProvider({ children }: AuthProviderProps): ReactElement {
   const [token, setToken] = useState(() => window.localStorage.getItem(STORAGE_KEY) ?? "");
   const [user, setUser] = useState(() => getStoredUser(window.localStorage.getItem(STORAGE_KEY) ?? ""));
 
-  const setAuthToken = useCallback((nextToken, nextUser = null) => {
+  const setAuthToken = useCallback((nextToken: string, nextUser: User | null = null): void => {
     setToken(nextToken);
 
     if (!nextToken) {
@@ -74,21 +103,21 @@ export function AuthProvider({ children }) {
     };
   }, [token, user?.display_name, setAuthToken]);
 
-  async function login(credentials) {
+  async function login(credentials: LoginCredentials): Promise<LoginResult> {
     const result = await loginUser(credentials);
     setAuthToken(result.token, result.user ?? null);
     return result;
   }
 
-  async function register(payload) {
-    return registerUser(payload);
+  async function register(payload: unknown): Promise<unknown> {
+    return registerUser(payload as Parameters<typeof registerUser>[0]);
   }
 
-  function logout() {
+  function logout(): void {
     setAuthToken("");
   }
 
-  const value = {
+  const value: AuthContextValue = {
     token,
     user,
     login,
@@ -100,7 +129,7 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
 
   if (!context) {
@@ -110,7 +139,7 @@ export function useAuth() {
   return context;
 }
 
-function getStoredUser(token) {
+function getStoredUser(token: string): User | null {
   const sub = parseJwtSubject(token);
 
   if (!sub) {
@@ -118,25 +147,25 @@ function getStoredUser(token) {
   }
 
   try {
-    const storedUser = JSON.parse(window.localStorage.getItem(USER_STORAGE_KEY) ?? "null");
+    const storedUser = JSON.parse(window.localStorage.getItem(USER_STORAGE_KEY) ?? "null") as unknown;
     return normalizeAuthUser(token, storedUser);
   } catch {
     return { id: sub };
   }
 }
 
-function normalizeAuthUser(token, user) {
+function normalizeAuthUser(token: string, user: unknown): User | null {
   const sub = parseJwtSubject(token);
 
   if (!sub) {
     return null;
   }
 
-  if (!user || typeof user !== "object") {
+  if (!isRecord(user)) {
     return { id: sub };
   }
 
-  if (user.id && user.id !== sub) {
+  if (typeof user.id === "string" && user.id !== sub) {
     return { id: sub };
   }
 
@@ -145,4 +174,8 @@ function normalizeAuthUser(token, user) {
     ...(typeof user.display_name === "string" && user.display_name ? { display_name: user.display_name } : {}),
     ...(typeof user.email === "string" && user.email ? { email: user.email } : {})
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
 }

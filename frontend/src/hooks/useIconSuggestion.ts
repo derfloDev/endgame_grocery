@@ -4,11 +4,17 @@ import { requestIconMatch } from "../workers/iconWorkerClient";
 
 const WORKER_DEBOUNCE_MS = 300;
 
-function normalizeInputText(inputText) {
+interface IconSuggestionResult {
+  iconName: string | null;
+  topMatches: string[];
+  loading: boolean;
+}
+
+function normalizeInputText(inputText: string): string {
   return inputText.trim().toLowerCase();
 }
 
-function getExactOrPrefixIcon(normalizedText) {
+function getExactOrPrefixIcon(normalizedText: string): string | null {
   if (!normalizedText) {
     return null;
   }
@@ -23,7 +29,7 @@ function getExactOrPrefixIcon(normalizedText) {
     }
   }
 
-  let bestSubstringIcon = null;
+  let bestSubstringIcon: string | null = null;
   let bestSubstringLength = 0;
 
   for (const [term, icon] of Object.entries(EXACT_MATCH_MAP)) {
@@ -40,11 +46,11 @@ function getExactOrPrefixIcon(normalizedText) {
   return null;
 }
 
-export function useIconSuggestion(inputText) {
+export function useIconSuggestion(inputText: string): IconSuggestionResult {
   const normalizedText = normalizeInputText(inputText);
   const exactIcon = getExactOrPrefixIcon(normalizedText);
   const requestSequenceRef = useRef(0);
-  const [asyncState, setAsyncState] = useState({
+  const [asyncState, setAsyncState] = useState<IconSuggestionResult>({
     iconName: null,
     topMatches: [],
     loading: false

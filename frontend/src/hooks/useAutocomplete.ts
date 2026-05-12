@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchSuggestions } from "../api/suggestions";
+import type { Suggestion } from "../types";
 
 const AUTOCOMPLETE_DEBOUNCE_MS = 300;
 
-function normalizeText(value) {
+interface AutocompleteResult {
+  suggestions: Suggestion[];
+  loading: boolean;
+}
+
+function normalizeText(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function computeLevenshteinDistance(left, right) {
+function computeLevenshteinDistance(left: string, right: string): number {
   if (!left) {
     return right.length;
   }
@@ -38,7 +44,7 @@ function computeLevenshteinDistance(left, right) {
   return previousRow[right.length];
 }
 
-function fuzzyMatch(query, text) {
+function fuzzyMatch(query: string, text: string): boolean {
   const normalizedQuery = normalizeText(query);
   const normalizedText = normalizeText(text);
 
@@ -55,17 +61,17 @@ function fuzzyMatch(query, text) {
   return computeLevenshteinDistance(normalizedQuery, normalizedText) <= maxDistance;
 }
 
-function filterOfflineSuggestions(query, suggestions) {
+function filterOfflineSuggestions(query: string, suggestions: Suggestion[]): Suggestion[] {
   return [...suggestions]
     .filter((suggestion) => fuzzyMatch(query, suggestion.text))
     .sort((left, right) => (right.useCount ?? 0) - (left.useCount ?? 0))
     .slice(0, 5);
 }
 
-export function useAutocomplete(listId, inputText, token) {
+export function useAutocomplete(listId: string | undefined, inputText: string, token: string): AutocompleteResult {
   const normalizedText = inputText.trim();
   const requestSequenceRef = useRef(0);
-  const [state, setState] = useState({
+  const [state, setState] = useState<AutocompleteResult>({
     suggestions: [],
     loading: false
   });
@@ -94,10 +100,10 @@ export function useAutocomplete(listId, inputText, token) {
             return;
           }
 
-          const suggestions = Array.isArray(result?.suggestions) ? result.suggestions : [];
+          const suggestions = Array.isArray(result.suggestions) ? result.suggestions : [];
 
           setState({
-            suggestions: result?.offline ? filterOfflineSuggestions(normalizedText, suggestions) : suggestions,
+            suggestions: result.offline ? filterOfflineSuggestions(normalizedText, suggestions) : suggestions,
             loading: false
           });
         })

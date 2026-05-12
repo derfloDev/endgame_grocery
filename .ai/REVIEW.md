@@ -255,3 +255,59 @@ No blockers, major issues, or required fixes found.
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/context/AuthContext.tsx` L132 | `useAuth` hook exported from same file as `AuthProvider` component triggers fast-refresh warning (same design as original `.jsx`). Pre-existing pattern; plan does not require restructuring. `EventSourceContext.tsx` suppresses the equivalent warning with `/* eslint-disable react-refresh/only-export-components */` — `AuthContext.tsx` could do the same for consistency. | No |
+| 2 | nit | `frontend/src/context/AuthContext.tsx` L113 | `registerUser(payload as Parameters<typeof registerUser>[0])` is correct but verbose. A direct cast (`payload as RegisterPayload`) would be clearer, though the `Parameters<>` approach is safe and TS-idiomatic. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 12 old `.js`/`.jsx` files deleted; 12 new `.ts`/`.tsx` files created. ✅
+2. Verified zero `any` usage across all 12 files (`grep -rn "any"`). ✅
+3. Cross-checked all 12 files against plan spec:
+   - `useLongPress.ts`: `LongPressHandlers`, `LongPressResult`, `useLongPress(onLongPress: (() => void) | undefined, ms = 500): LongPressResult`. ✅
+   - `useAutocomplete.ts`: `Suggestion` from `../types`; returns `{ suggestions: Suggestion[]; loading: boolean }`. ✅
+   - `useIconSuggestion.ts`: returns `{ iconName: string | null; topMatches: string[]; loading: boolean }`. ✅
+   - `useListEvents.ts`: imports `SseEventType`, `SseHandler` from `EventSourceContext`; re-uses types cleanly. ✅
+   - `useOfflineQueue.ts`: `OfflineQueueContextValue` from `../types`; return type explicit. ✅
+   - `usePushNotifications.ts`: `PushNotificationsResult` interface with `isReady`, `isSubscribed`, `isSupported`, `subscribe`, `unsubscribe`. ✅
+   - `appConfigState.ts`: `AppConfig` from `../types`; `AppConfigContext`, `defaultAppConfig`, `useAppConfig()`. ✅
+   - `AppConfigContext.tsx`: `AppConfigProviderProps`, `StaticAppConfigProviderProps` interfaces; return `ReactElement`. ✅
+   - `offlineQueueContextValue.ts`: `OfflineQueueContextValue | null` context. ✅
+   - `OfflineQueueContext.tsx`: `OfflineQueueProviderProps`; `replaceTemporaryIds` with function overloads; `extractCreatedId(resourceType: string | undefined, data: unknown): string`; uses `satisfies OfflineQueueContextValue`. ✅
+   - `AuthContext.tsx`: `AuthContextValue` with all plan-required fields; `User` from `../types`; `AuthContext: Context<AuthContextValue | null>`. ✅
+   - `EventSourceContext.tsx`: `SseEventType` union, `SseHandler`, `EventSourceContextValue`; `eslint-disable` comment suppresses fast-refresh warning. ✅
+4. Ran `npm run lint` → 1 pre-existing warning (`AuthContext.tsx` fast-refresh, same as original `.jsx`), 0 errors. ✅
+5. Ran `npx tsc --noEmit` → clean, 0 errors. ✅
+6. Ran `npm run build` → success. ✅
+7. Ran `npm test` → **285/285 on first run**, no timeout flakiness. ✅
+
+##### Findings
+- All acceptance-criteria commands pass with zero TS errors.
+- `replaceTemporaryIds` overloads and `satisfies OfflineQueueContextValue` are clean uses of TypeScript features.
+- `SseEventType` and `SseHandler` exported from `EventSourceContext.tsx` and imported by `useListEvents.ts` avoids duplication.
+
+##### Risks
+- None. All changes are type-annotated equivalents of the original JS/JSX.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

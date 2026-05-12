@@ -1,8 +1,27 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useRef } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 
-const EVENT_TYPES = [
+export type SseEventType =
+  | "entry:created"
+  | "entry:updated"
+  | "entry:deleted"
+  | "list:updated"
+  | "list:deleted"
+  | "member:added"
+  | "member:removed";
+export type SseHandler = (data: Record<string, unknown>) => void;
+
+interface EventSourceContextValue {
+  addEventListener: (type: SseEventType, handler: SseHandler) => () => void;
+}
+
+interface EventSourceProviderProps {
+  children: ReactNode;
+}
+
+const EVENT_TYPES: SseEventType[] = [
   "entry:created",
   "entry:updated",
   "entry:deleted",
@@ -11,19 +30,19 @@ const EVENT_TYPES = [
   "member:added",
   "member:removed"
 ];
-const EventSourceContext = createContext(null);
+const EventSourceContext = createContext<EventSourceContextValue | null>(null);
 
-export function EventSourceProvider({ children }) {
+export function EventSourceProvider({ children }: EventSourceProviderProps): ReactElement {
   const { token } = useAuth();
-  const listenersRef = useRef(new Map());
-  const eventSourceRef = useRef(null);
-  const contextValueRef = useRef({
+  const listenersRef = useRef(new Map<SseEventType, Set<SseHandler>>());
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const contextValueRef = useRef<EventSourceContextValue>({
     addEventListener(type, handler) {
       if (!listenersRef.current.has(type)) {
         listenersRef.current.set(type, new Set());
       }
 
-      listenersRef.current.get(type).add(handler);
+      listenersRef.current.get(type)?.add(handler);
 
       return () => {
         const handlers = listenersRef.current.get(type);
@@ -47,8 +66,8 @@ export function EventSourceProvider({ children }) {
     }
 
     const eventSource = new window.EventSource(`/api/events?token=${encodeURIComponent(token)}`);
-    const eventListeners = EVENT_TYPES.map((type) => {
-      const listener = (event) => {
+    const eventListeners: Array<[SseEventType, (event: MessageEvent<string>) => void]> = EVENT_TYPES.map((type) => {
+      const listener = (event: MessageEvent<string>) => {
         const data = parseEventData(event.data);
 
         for (const handler of listenersRef.current.get(type) ?? []) {
@@ -90,7 +109,7 @@ export function EventSourceProvider({ children }) {
   );
 }
 
-export function useEventSource() {
+export function useEventSource(): EventSourceContextValue {
   const context = useContext(EventSourceContext);
 
   if (!context) {
@@ -100,14 +119,19 @@ export function useEventSource() {
   return context;
 }
 
-function parseEventData(rawData) {
+function parseEventData(rawData: string): Record<string, unknown> {
   if (!rawData) {
     return {};
   }
 
   try {
-    return JSON.parse(rawData);
+    const data = JSON.parse(rawData) as unknown;
+    return isRecord(data) ? data : {};
   } catch {
     return {};
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
 }

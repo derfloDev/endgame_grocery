@@ -1,7 +1,8 @@
 import { useContext } from "react";
 import { OfflineQueueContext } from "../context/offlineQueueContextValue";
+import type { OfflineQueueContextValue } from "../types";
 
-export function useOfflineQueue() {
+export function useOfflineQueue(): OfflineQueueContextValue {
   const context = useContext(OfflineQueueContext);
 
   if (!context) {

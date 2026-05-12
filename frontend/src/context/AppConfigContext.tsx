@@ -1,9 +1,21 @@
 import { useEffect, useState } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { fetchAppConfig } from "../api/config";
+import type { AppConfig } from "../types";
 import { AppConfigContext, defaultAppConfig } from "./appConfigState";
 
-export function AppConfigProvider({ children, loadConfig = fetchAppConfig }) {
-  const [appConfig, setAppConfig] = useState(defaultAppConfig);
+interface AppConfigProviderProps {
+  children: ReactNode;
+  loadConfig?: () => Promise<AppConfig>;
+}
+
+interface StaticAppConfigProviderProps {
+  children: ReactNode;
+  registrationEnabled?: boolean;
+}
+
+export function AppConfigProvider({ children, loadConfig = fetchAppConfig }: AppConfigProviderProps): ReactElement {
+  const [appConfig, setAppConfig] = useState<AppConfig>(defaultAppConfig);
 
   useEffect(() => {
     let isActive = true;
@@ -33,7 +45,10 @@ export function AppConfigProvider({ children, loadConfig = fetchAppConfig }) {
   return <AppConfigContext.Provider value={appConfig}>{children}</AppConfigContext.Provider>;
 }
 
-export function StaticAppConfigProvider({ children, registrationEnabled = true }) {
+export function StaticAppConfigProvider({
+  children,
+  registrationEnabled = true
+}: StaticAppConfigProviderProps): ReactElement {
   return (
     <AppConfigContext.Provider value={{ registrationEnabled }}>
       {children}

@@ -1,11 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchVapidPublicKey, subscribePush, unsubscribePush } from "../api/push";
 
-export function usePushNotifications({ enabled = false, token = "" }) {
+interface PushNotificationsOptions {
+  enabled?: boolean;
+  token?: string;
+}
+
+interface PushNotificationsResult {
+  isReady: boolean;
+  isSubscribed: boolean;
+  isSupported: boolean;
+  subscribe: () => Promise<boolean>;
+  unsubscribe: () => Promise<boolean>;
+}
+
+export function usePushNotifications({
+  enabled = false,
+  token = ""
+}: PushNotificationsOptions): PushNotificationsResult {
   // `null` means the initial VAPID-key fetch has not completed yet.
-  const [publicKey, setPublicKey] = useState(null);
-  const [currentSubscription, setCurrentSubscription] = useState(null);
-  const registrationRef = useRef(null);
+  const [publicKey, setPublicKey] = useState<string | null>(null);
+  const [currentSubscription, setCurrentSubscription] = useState<PushSubscription | null>(null);
+  const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
 
   const isSupported = Boolean(
     enabled &&
@@ -22,7 +38,7 @@ export function usePushNotifications({ enabled = false, token = "" }) {
 
     let cancelled = false;
 
-    async function loadPushState() {
+    async function loadPushState(): Promise<void> {
       const keyResult = await fetchVapidPublicKey();
 
       if (cancelled) {
@@ -49,7 +65,7 @@ export function usePushNotifications({ enabled = false, token = "" }) {
     };
   }, [isSupported, publicKey]);
 
-  async function subscribe() {
+  async function subscribe(): Promise<boolean> {
     if (!isSupported) {
       return false;
     }
@@ -68,8 +84,8 @@ export function usePushNotifications({ enabled = false, token = "" }) {
       registrationRef.current ??
       (await Promise.race([
         navigator.serviceWorker.ready,
-        new Promise((_, reject) => {
-          setTimeout(
+        new Promise<ServiceWorkerRegistration>((_, reject) => {
+          window.setTimeout(
             () => reject(new Error("Service worker is not available. Try refreshing the page.")),
             8000
           );
@@ -87,7 +103,7 @@ export function usePushNotifications({ enabled = false, token = "" }) {
     return true;
   }
 
-  async function unsubscribe() {
+  async function unsubscribe(): Promise<boolean> {
     if (!currentSubscription) {
       return false;
     }
@@ -109,10 +125,15 @@ export function usePushNotifications({ enabled = false, token = "" }) {
   };
 }
 
-function decodeBase64Url(value) {
+function decodeBase64Url(value: string): ArrayBuffer {
   const normalizedValue = value.replace(/-/g, "+").replace(/_/g, "/");
   const padding = "=".repeat((4 - (normalizedValue.length % 4 || 4)) % 4);
   const decoded = atob(`${normalizedValue}${padding}`);
+  const bytes = new Uint8Array(new ArrayBuffer(decoded.length));
 
-  return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+  for (let index = 0; index < decoded.length; index += 1) {
+    bytes[index] = decoded.charCodeAt(index);
+  }
+
+  return bytes.buffer;
 }

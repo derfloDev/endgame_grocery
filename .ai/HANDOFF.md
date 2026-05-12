@@ -8,6 +8,45 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-006 — implement — 2026-05-12T11:17:17Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-006 frontend hooks and contexts TypeScript migration and closed the task. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, all reviewed T-006 implementation and review files staged via `git add -A`; unrelated `.claude/settings.local.json` left unstaged |
+| Validation | Reused reviewed validation from T-006: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, focused hook/context Vitest command, `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend hooks and contexts` |
+| Next Role | none |
+
+---
+
+### T-006 — review — 2026-05-12T13:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-006 hooks and contexts migration; all 12 old .js/.jsx files deleted, 12 typed .ts/.tsx files present, zero any, all plan signatures met; 285/285 on first run with no flakiness. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-05-12T10:56:01Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Migrated the frontend hooks and context providers to TypeScript with explicit return shapes and shared domain types. |
+| Files Changed | `frontend/src/hooks/useAutocomplete.ts`, `frontend/src/hooks/useIconSuggestion.ts`, `frontend/src/hooks/useListEvents.ts`, `frontend/src/hooks/useLongPress.ts`, `frontend/src/hooks/useOfflineQueue.ts`, `frontend/src/hooks/usePushNotifications.ts`, `frontend/src/context/AppConfigContext.tsx`, `frontend/src/context/appConfigState.ts`, `frontend/src/context/AuthContext.tsx`, `frontend/src/context/EventSourceContext.tsx`, `frontend/src/context/OfflineQueueContext.tsx`, `frontend/src/context/offlineQueueContextValue.ts`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` PASS (existing `AuthContext.tsx` fast-refresh warning only); `npx tsc -p frontend/tsconfig.json --noEmit` PASS; `npm run build` PASS (existing Vite eval/chunk-size warnings only); `npm run test --workspace frontend -- src/hooks/useAutocomplete.test.js src/hooks/useIconSuggestion.test.js src/hooks/useListEvents.test.js src/hooks/useLongPress.test.jsx src/hooks/usePushNotifications.test.js src/context/AppConfigContext.test.jsx src/context/AuthContext.test.jsx src/context/EventSourceContext.test.jsx` PASS after sandbox `spawn EPERM` rerun with approval; `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend hooks and contexts` |
+| Next Role | review |
+
+---
+
 ### T-005 — implement — 2026-05-12T09:51:52Z
 
 | Field | Value |

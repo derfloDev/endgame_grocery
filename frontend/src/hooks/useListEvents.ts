@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { useEventSource } from "../context/EventSourceContext";
+import type { SseEventType, SseHandler } from "../context/EventSourceContext";
 
 /**
  * Subscribes to a list-scoped SSE event and forwards matching payloads.
  * Pass `null` as `listId` to receive all events of the given type.
  */
-export function useListEvents(eventType, listId, handler) {
+export function useListEvents(eventType: SseEventType, listId: string | null, handler: SseHandler): void {
   const { addEventListener } = useEventSource();
 
   useEffect(() => {

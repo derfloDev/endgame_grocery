@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { OFFLINE_SYNC_COMPLETE_EVENT } from "../api/client";
 import {
   listOfflineMutations,
   OFFLINE_QUEUE_CHANGED_EVENT,
   removeOfflineMutation
 } from "../api/offlineStore";
+import type { OfflineQueueContextValue } from "../types";
 import { OfflineQueueContext } from "./offlineQueueContextValue";
 
-export function OfflineQueueProvider({ children }) {
+interface OfflineQueueProviderProps {
+  children: ReactNode;
+}
+
+type IdMap = Map<string, string>;
+
+export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): ReactElement {
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
   const [queuedCount, setQueuedCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -15,12 +23,12 @@ export function OfflineQueueProvider({ children }) {
   const [syncVersion, setSyncVersion] = useState(0);
 
   useEffect(() => {
-    async function refreshQueuedCount() {
+    async function refreshQueuedCount(): Promise<void> {
       const pendingMutations = await listOfflineMutations();
       setQueuedCount(pendingMutations.length);
     }
 
-    async function drainQueue() {
+    async function drainQueue(): Promise<void> {
       const pendingMutations = await listOfflineMutations();
 
       if (pendingMutations.length === 0) {
@@ -31,7 +39,7 @@ export function OfflineQueueProvider({ children }) {
       setIsSyncing(true);
       setSyncError("");
 
-      const idMap = new Map();
+      const idMap: IdMap = new Map();
 
       try {
         for (const mutation of pendingMutations) {
@@ -48,7 +56,7 @@ export function OfflineQueueProvider({ children }) {
 
           if (!response.ok) {
             const data = await response.json().catch(() => ({}));
-            throw new Error(data.error ?? "Failed to sync queued changes.");
+            throw new Error(getResponseError(data) ?? "Failed to sync queued changes.");
           }
 
           const data = response.status === 204 ? null : await response.json().catch(() => ({}));
@@ -67,7 +75,7 @@ export function OfflineQueueProvider({ children }) {
           window.dispatchEvent(new Event(OFFLINE_SYNC_COMPLETE_EVENT));
         }
       } catch (error) {
-        setSyncError(error.message ?? "Failed to sync queued changes.");
+        setSyncError(error instanceof Error ? error.message : "Failed to sync queued changes.");
       } finally {
         setIsSyncing(false);
         await refreshQueuedCount();
@@ -76,16 +84,16 @@ export function OfflineQueueProvider({ children }) {
 
     void refreshQueuedCount();
 
-    async function handleOnline() {
+    async function handleOnline(): Promise<void> {
       setIsOffline(false);
       await drainQueue();
     }
 
-    function handleOffline() {
+    function handleOffline(): void {
       setIsOffline(true);
     }
 
-    function handleQueueChanged() {
+    function handleQueueChanged(): void {
       void refreshQueuedCount();
     }
 
@@ -112,14 +120,16 @@ export function OfflineQueueProvider({ children }) {
         isSyncing,
         syncError,
         syncVersion
-      }}
+      } satisfies OfflineQueueContextValue}
     >
       {children}
     </OfflineQueueContext.Provider>
   );
 }
 
-function replaceTemporaryIds(value, idMap) {
+function replaceTemporaryIds(value: string, idMap: IdMap): string;
+function replaceTemporaryIds<T>(value: T, idMap: IdMap): T;
+function replaceTemporaryIds(value: unknown, idMap: IdMap): unknown {
   if (!value) {
     return value;
   }
@@ -147,18 +157,40 @@ function replaceTemporaryIds(value, idMap) {
   return value;
 }
 
-function extractCreatedId(resourceType, data) {
+function extractCreatedId(resourceType: string | undefined, data: unknown): string {
   if (!data || !resourceType) {
     return "";
   }
 
   if (resourceType === "list") {
-    return data.list?.id ?? "";
+    return getNestedId(data, "list");
   }
 
   if (resourceType === "entry") {
-    return data.entry?.id ?? "";
+    return getNestedId(data, "entry");
   }
 
   return "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function getNestedId(data: unknown, key: string): string {
+  if (!isRecord(data)) {
+    return "";
+  }
+
+  const nestedValue = data[key];
+
+  if (!isRecord(nestedValue)) {
+    return "";
+  }
+
+  return typeof nestedValue.id === "string" ? nestedValue.id : "";
+}
+
+function getResponseError(data: unknown): string | undefined {
+  return isRecord(data) && typeof data.error === "string" ? data.error : undefined;
 }
