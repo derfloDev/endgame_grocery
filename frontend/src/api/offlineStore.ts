@@ -1,18 +1,25 @@
+import type { OfflineMutation } from "../types";
+
 const DATABASE_NAME = "endgame-grocery-offline";
 const DATABASE_VERSION = 1;
 const CACHE_STORE = "resource_cache";
 const QUEUE_STORE = "offline_queue";
 export const OFFLINE_QUEUE_CHANGED_EVENT = "endgame_grocery.offline_queue_changed";
 
-let databasePromise;
-const memoryCache = new Map();
-const memoryQueue = new Map();
+let databasePromise: Promise<IDBDatabase | null> | undefined;
+const memoryCache = new Map<string, unknown>();
+const memoryQueue = new Map<string, OfflineMutation>();
 
-function supportsIndexedDb() {
+interface CachedResourceEntry {
+  key: string;
+  value: unknown;
+}
+
+function supportsIndexedDb(): boolean {
   return typeof indexedDB !== "undefined";
 }
 
-function openDatabase() {
+function openDatabase(): Promise<IDBDatabase | null> {
   if (!supportsIndexedDb()) {
     return Promise.resolve(null);
   }
@@ -41,20 +48,24 @@ function openDatabase() {
   return databasePromise;
 }
 
-function requestToPromise(request) {
+function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed."));
   });
 }
 
-function createTransactionPromise(storeName, mode, callback) {
+function createTransactionPromise(
+  storeName: string,
+  mode: IDBTransactionMode,
+  callback: (store: IDBObjectStore, resolve: () => void, reject: (reason?: unknown) => void) => void
+): Promise<void> {
   return openDatabase().then((database) => {
     if (!database) {
-      return callback(null);
+      return;
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(storeName, mode);
       const store = transaction.objectStore(storeName);
 
@@ -67,13 +78,13 @@ function createTransactionPromise(storeName, mode, callback) {
   });
 }
 
-function dispatchQueueChanged() {
+function dispatchQueueChanged(): void {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(OFFLINE_QUEUE_CHANGED_EVENT));
   }
 }
 
-export async function readCachedResource(key) {
+export async function readCachedResource(key: string): Promise<unknown> {
   if (!supportsIndexedDb()) {
     return memoryCache.get(key) ?? null;
   }
@@ -86,12 +97,12 @@ export async function readCachedResource(key) {
 
   const transaction = database.transaction(CACHE_STORE, "readonly");
   const store = transaction.objectStore(CACHE_STORE);
-  const entry = await requestToPromise(store.get(key));
+  const entry = await requestToPromise<CachedResourceEntry | undefined>(store.get(key));
 
   return entry?.value ?? null;
 }
 
-export async function writeCachedResource(key, value) {
+export async function writeCachedResource(key: string, value: unknown): Promise<void> {
   if (!supportsIndexedDb()) {
     memoryCache.set(key, value);
     return;
@@ -104,7 +115,7 @@ export async function writeCachedResource(key, value) {
   });
 }
 
-export async function enqueueOfflineMutation(mutation) {
+export async function enqueueOfflineMutation(mutation: OfflineMutation): Promise<void> {
   if (!supportsIndexedDb()) {
     memoryQueue.set(mutation.id, mutation);
     dispatchQueueChanged();
@@ -121,7 +132,7 @@ export async function enqueueOfflineMutation(mutation) {
   });
 }
 
-export async function listOfflineMutations() {
+export async function listOfflineMutations(): Promise<OfflineMutation[]> {
   if (!supportsIndexedDb()) {
     return [...memoryQueue.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
   }
@@ -134,12 +145,12 @@ export async function listOfflineMutations() {
 
   const transaction = database.transaction(QUEUE_STORE, "readonly");
   const store = transaction.objectStore(QUEUE_STORE);
-  const entries = await requestToPromise(store.getAll());
+  const entries = await requestToPromise<OfflineMutation[]>(store.getAll());
 
   return entries.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 
-export async function removeOfflineMutation(id) {
+export async function removeOfflineMutation(id: string): Promise<void> {
   if (!supportsIndexedDb()) {
     memoryQueue.delete(id);
     dispatchQueueChanged();
@@ -156,7 +167,7 @@ export async function removeOfflineMutation(id) {
   });
 }
 
-export async function resetOfflineStateForTests() {
+export async function resetOfflineStateForTests(): Promise<void> {
   memoryCache.clear();
   memoryQueue.clear();
 

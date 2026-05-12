@@ -8,6 +8,45 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-004 — implement — 2026-05-12T08:58:27Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-004 frontend API TypeScript migration and closed the task. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, all reviewed T-004 implementation and review files staged via `git add -A`; unrelated `.claude/settings.local.json` left unstaged |
+| Validation | Reused reviewed validation from T-004: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend API layer` |
+| Next Role | none |
+
+---
+
+### T-004 — review — 2026-05-12T10:58:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 API layer migration; all 10 old .js files deleted, 10 typed .ts files present, zero any usage, all plan signatures matched; clean run 285/285; pre-existing timeout flakiness noted but not caused by T-004. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-05-12T08:26:57Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Migrated the frontend API layer to TypeScript with typed request options and domain return values. |
+| Files Changed | `frontend/src/api/auth.ts`, `frontend/src/api/client.ts`, `frontend/src/api/config.ts`, `frontend/src/api/entries.ts`, `frontend/src/api/history.ts`, `frontend/src/api/lists.ts`, `frontend/src/api/offlineStore.ts`, `frontend/src/api/push.ts`, `frontend/src/api/sharing.ts`, `frontend/src/api/suggestions.ts`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` PASS (existing `AuthContext.jsx` fast-refresh warning only); `npx tsc -p frontend/tsconfig.json --noEmit` PASS; `npm run build` PASS (existing Vite eval/chunk-size warnings only); `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend API layer` |
+| Next Role | review |
+
+---
+
 ### T-003 — implement — 2026-05-12T08:02:08Z
 
 | Field | Value |

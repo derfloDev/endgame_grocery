@@ -1,21 +1,37 @@
 import { enqueueOfflineMutation, readCachedResource, writeCachedResource } from "./offlineStore";
+import type { QueueMeta } from "../types";
 
 export const OFFLINE_SYNC_COMPLETE_EVENT = "endgame_grocery.offline_sync_complete";
 
-export function createCacheKey(resource, suffix = "") {
+export interface SendJsonRequestOptions {
+  token?: string;
+  method?: string;
+  payload?: unknown;
+  headers?: HeadersInit;
+  cacheKey?: string;
+  offlineFallbackMessage?: string;
+  queueable?: boolean;
+  queueMeta?: QueueMeta | null;
+}
+
+interface ErrorResponse {
+  error?: string;
+}
+
+export function createCacheKey(resource: string, suffix = ""): string {
   return suffix ? `${resource}:${suffix}` : resource;
 }
 
-export function isNetworkError(error) {
-  return error instanceof TypeError || error?.message === "Failed to fetch";
+export function isNetworkError(error: unknown): boolean {
+  return error instanceof TypeError || (error instanceof Error && error.message === "Failed to fetch");
 }
 
-export function createTemporaryId(resource) {
+export function createTemporaryId(resource: string): string {
   return `temp-${resource}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export async function sendJsonRequest(
-  url,
+  url: string,
   {
     token = "",
     method = "GET",
@@ -25,8 +41,8 @@ export async function sendJsonRequest(
     offlineFallbackMessage = "Offline data is unavailable.",
     queueable = false,
     queueMeta = null
-  } = {}
-) {
+  }: SendJsonRequestOptions = {}
+): Promise<unknown> {
   try {
     const response = await fetch(url, {
       method,
@@ -42,7 +58,7 @@ export async function sendJsonRequest(
       return null;
     }
 
-    const data = await response.json().catch(() => ({}));
+    const data = (await response.json().catch(() => ({}))) as ErrorResponse;
 
     if (!response.ok) {
       throw new Error(data.error ?? "Request failed.");
@@ -59,7 +75,7 @@ export async function sendJsonRequest(
 
       if (cachedValue) {
         return {
-          ...cachedValue,
+          ...(cachedValue as Record<string, unknown>),
           offline: true
         };
       }

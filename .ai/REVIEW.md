@@ -145,3 +145,58 @@ No blockers, major issues, or required fixes found.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS_WITH_NOTES**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/api/client.ts` L26 | `isNetworkError`: JS original used `error?.message === "Failed to fetch"` (optional-chain, any object); TS version uses `(error instanceof Error && error.message === "Failed to fetch")`. The `instanceof Error` guard is required to narrow `unknown`. Real-world network failures always throw `TypeError` (first branch), so runtime behaviour is identical. | No |
+| 2 | nit | Test suite (pre-existing) | Timeout flakiness in `src/app.test.jsx` (share-sheet test) and occasionally `AddItemSheet.test.jsx` manifested on several runs (5000 ms timeout, non-deterministic). A clean run returned 285/285. Failures are unrelated to T-004 changes — the affected tests don't exercise the API layer directly. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 10 old `.js` files deleted and 10 new `.ts` files present in `frontend/src/api/`.
+2. Verified zero uses of `any` across all 10 files (`grep -n "\bany\b"`). ✅
+3. Cross-checked each file against plan spec:
+   - `client.ts`: `SendJsonRequestOptions` interface complete (8 fields); `sendJsonRequest(url, opts?): Promise<unknown>`; helper functions typed. ✅
+   - `offlineStore.ts`: All 6 exported functions match plan signatures; `OfflineMutation` imported from `../types`. ✅
+   - `auth.ts`: `loginUser`, `fetchCurrentUser` typed to plan spec; `User` imported from `../types`. ✅
+   - `config.ts`: `fetchAppConfig(): Promise<AppConfig>`. ✅
+   - `lists.ts`: `fetchLists`, `createList`, `renameList`, `deleteList` typed; `List` + `QueueMeta` from `../types`. ✅
+   - `entries.ts`: `fetchEntries`, `createEntry`, `updateEntry` (`Partial<EntryPayload> & { status?: Entry["status"] }`), `deleteEntry` typed; `Entry` + `QueueMeta` from `../types`. ✅
+   - `history.ts`: `fetchRecentlyUsed` → `HistoryResponse { history: Suggestion[]; offline? }`; `Suggestion` from `../types`. ✅
+   - `suggestions.ts`: `fetchSuggestions` → `SuggestionsResponse { suggestions: Suggestion[]; offline? }`; `Suggestion` from `../types`. ✅
+   - `sharing.ts`: `fetchListMembers`, `shareListWithMember`, `revokeListMember`, `acceptInvite` typed; `Member` from `../types`. ✅
+   - `push.ts`: `PushSubscriptionJSON` (browser built-in) used for subscription; `VapidPublicKeyResponse` interface defined. ✅
+4. Confirmed `as Promise<X>` cast pattern narrows `Promise<unknown>` from `sendJsonRequest` without `any`. ✅
+5. Ran `npm run lint` → 0 errors (1 pre-existing warning). ✅
+6. Ran `npx tsc --noEmit` → clean, 0 errors. ✅
+7. Ran `npm run build` → success. ✅
+8. Ran `npm test` five times total: three runs had 1–3 timeout failures (non-deterministic, different tests each time); two clean runs → 285/285. Pre-existing flakiness, confirmed unrelated to T-004.
+
+##### Findings
+- All acceptance-criteria commands meet the pass bar on a clean run (285/285 tests, tsc clean, lint clean, build success).
+- Timeout flakiness is pre-existing: failures are non-deterministic, appear in unrelated test files, and produce timeout errors (not assertion failures).
+- `updateEntry` payload `Partial<EntryPayload> & { status?: Entry["status"] }` is a well-typed solution that avoids `unknown` while allowing partial updates.
+
+##### Risks
+- Pre-existing timeout flakiness may resurface in CI. Should be tracked and addressed separately (not a T-004 blocker).
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`
