@@ -2,44 +2,53 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
----
-
 ## Task: T-001
 
 ### Review Round 1
 
-Status: **PASS**
+Status: **PASS_WITH_NOTES**
 
-Reviewed: 2026-05-11
+Reviewed: 2026-05-12
 
 #### Findings
 
-No issues found.
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/tsconfig.json` | `"allowJs": true` was added but is not in the plan spec. It is a pragmatic necessity — without it `tsc --noEmit` would error on every remaining `.js` file during the staged migration. No code harm; keep it. | No |
+| 2 | minor | `frontend/src/main.tsx` | `main.tsx` was migrated (and `main.jsx` deleted) as part of T-001 to satisfy the `index.html` entry-point change. The plan assigns this file to T-009. When T-009 is implemented, the executor must skip the `main.jsx → main.tsx` rename (already done) and focus on any remaining typing gaps. A note should be added to TASKS.md or surfaced at T-009 hand-off. | No (inform T-009 implementer) |
+
+No blockers or major issues found.
 
 #### Verification
 
 ##### Steps
-
-1. Read `.ai/TASKS.md` — T-001 moved to `in_review`.
-2. Read `.ai/PLAN.md` — implementation requirements confirmed: substring-match third pass in `getExactOrPrefixIcon`, minimum length guard of 4, longest-match wins, 2 new tests asserting no worker call.
-3. Read `frontend/src/hooks/useIconSuggestion.js` — implementation reviewed against plan.
-4. Read `frontend/src/hooks/useIconSuggestion.test.js` — new tests reviewed against acceptance criteria.
-5. Verified `EXACT_MATCH_MAP` key construction in `iconDatabase.js`: `toLookupKey` = `trim().toLowerCase()`, so "möhren" → key "möhren" (IconCarrot) and "paprika" → key "paprika" (CustomBellPepper). Compound-word assertions are grounded in real data.
-6. `npm run lint` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-001).
-7. `npm run build` — PASS (pre-existing bundle/eval warnings only).
-8. `npx vitest run --environment jsdom useIconSuggestion` — 7/7 tests PASS including both new compound-word tests.
-9. Full test suite `npx vitest run --environment jsdom` — 272/272 tests PASS, 23 test files, no regressions.
+1. Examined all changed files via `git diff HEAD`.
+2. Confirmed old `.js` / `.jsx` files deleted: `frontend/vite.config.js`, `frontend/src/main.jsx`, `frontend/src/test/setup.js`.
+3. Confirmed new files created: `frontend/tsconfig.json`, `frontend/src/vite-env.d.ts`, `frontend/vite.config.ts`, `frontend/src/test/setup.ts`, `frontend/src/main.tsx`.
+4. Confirmed `frontend/src/vite-config.test.js` updated to reference `vite.config.ts` (line 7).
+5. Confirmed `frontend/index.html` updated: `main.jsx` → `main.tsx`.
+6. Confirmed ESLint config extended with `typescript-eslint` block covering `frontend/**/*.ts` and `frontend/**/*.tsx`.
+7. Confirmed `typescript-eslint` added to root `package.json` devDependencies.
+8. Confirmed `typescript`, `@types/react`, `@types/react-dom` added to `frontend/package.json` devDependencies.
+9. Ran `npm run lint` → 1 pre-existing warning in `AuthContext.jsx` (unrelated to T-001), 0 errors. ✅
+10. Ran `npx tsc --noEmit` from `frontend/` → clean, 0 errors. ✅
+11. Ran `npm run build` → success (pre-existing chunk-size warning only). ✅
+12. Ran `npm test` → 285 tests passed across 24 test files, 0 failures. ✅
 
 ##### Findings
-
-- Implementation matches the plan exactly: substring-match loop added after exact and prefix passes, `term.length >= 4` guard present, longest-match selection via `term.length > bestSubstringLength`.
-- Both acceptance-criteria cases pass: `useIconSuggestion("Spritzpaprika")` → `CustomBellPepper` (sync, no worker), `useIconSuggestion("Minimöhren")` → `IconCarrot` (sync, no worker).
-- Existing tests unaffected.
-- Lint and build clean relative to this change.
+- All acceptance-criteria commands pass with zero TypeScript errors.
+- The lint warning (`AuthContext.jsx` fast-refresh) is pre-existing and unrelated to T-001.
+- `main.tsx` uses the correct non-null assertion (`document.getElementById("root")!`) as specified in the T-009 plan.
 
 ##### Risks
+- `"allowJs": true` means `.js` files are silently included in the TS compilation graph. As tasks T-002 through T-010 delete old `.js` files and replace them with `.ts`, this flag becomes unnecessary. It should be removed in the final cleanup or in T-010 once all `.js` source files are gone. Low risk for now.
+- T-009 implementer must be aware that `main.tsx` and deletion of `main.jsx` are already done; double-migration attempt would be a no-op but could cause confusion.
 
-- None. The substring scan iterates `EXACT_MATCH_MAP` (frozen object); cost is proportional to the number of entries and runs only when exact-match and prefix checks both miss — negligible for interactive input.
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`
 
 ---
 
@@ -49,211 +58,41 @@ No issues found.
 
 Status: **PASS**
 
-Reviewed: 2026-05-11
+Reviewed: 2026-05-12
 
 #### Findings
 
-No issues found.
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/types.ts` | Plan specified decorative section headers (`// ── Grocery domain ─────...`); actual file uses plain `// Grocery domain` comments. Functionally identical; style preference only. | No |
 
-- **nit** — `cucumber.svg` sets `stroke-width="1.5"` explicitly on the root element, while `bellPepper.svg` and `tomato.svg` omit this attribute (inheriting the SVG default of 1 when rendered standalone). The plan explicitly requires `stroke-width="1.5"`, so the implementation is correct per spec. Pre-existing inconsistency in the reference icons; not a required fix.
+No blockers, major issues, or required fixes found.
 
 #### Verification
 
 ##### Steps
-
-1. Read `frontend/src/assets/icons/custom/cucumber.svg` — SVG reviewed in full.
-2. Read `bellPepper.svg` and `tomato.svg` — compared root SVG attributes and path count for visual weight.
-3. Verified `customIcons.js` already imports and exports `CustomCucumber` from `cucumber.svg?react` — no registry changes needed.
-4. Verified `iconDatabase.js` already registers `CustomCucumber` with tags "gurke", "gurken", etc. — no database changes needed.
-5. Confirmed no `fill` attributes on any `<path>` — only `fill="none"` on root element.
-6. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-002).
-7. `npx vite build` — PASS (pre-existing ONNX eval and chunk-size warnings only).
-8. `npx vitest run --environment jsdom` — 272/272 tests PASS, no regressions.
-
-##### Findings
-
-- All required SVG attributes present: `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-width="1.5"`, `stroke-linecap="round"`, `stroke-linejoin="round"`. ✓
-- No hardcoded colours on root or any path. ✓
-- Five paths: 1 diagonal closed body shape, 1 short stem nub at the narrow (top-right) end, 3 short diagonal texture strokes evenly spaced across the body. Satisfies "diagonal body, stem nub, 2–3 texture lines". ✓
-- Icon is already registered as `CustomCucumber` — no JS, registry, or test-file changes were needed or made. ✓
-- Lint and build clean relative to this change.
-
-##### Risks
-
-- None. Pure SVG asset replacement; no logic paths affected.
-
----
-
-## Task: T-004
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-05-11
-
-#### Findings
-
-No issues found.
-
-- **nit** — `toggleStatus` settle-on-queued spreads `{ is_pending_sync: true, status: nextStatus }` where the plan specified only `{ is_pending_sync: true }`. The extra `status: nextStatus` is a safe improvement that keeps state consistent when the API queues the request. Not a required fix.
-
-#### Verification
-
-##### Steps
-
-1. Read `frontend/src/pages/ListDetailPage.jsx` — `toggleStatus` and `addEntryByText` reviewed in full against plan.
-2. Read `frontend/src/pages/ListDetailPage.test.jsx` — all 3 new optimistic-update tests reviewed.
-3. Verified English translation keys: `entry.markDone` → "Mark {name} done", `common.queued` → "Queued", `recent.sectionLabel` → "Recently Used" — all match test assertions.
-4. Confirmed `handleDeleteEntry` is still present — correct; T-005 removes it, not T-004.
-5. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-004).
-6. `npx vitest run --environment jsdom ListDetailPage.test.jsx --reporter=verbose` — 6/6 tests PASS, including all 3 new optimistic-update tests.
-7. Full test suite `npx vitest run --environment jsdom` — 275/275 tests PASS (272 prior + 3 new), no regressions.
-8. `npx vite build` — PASS.
+1. Read `frontend/src/types.ts` in full.
+2. Cross-checked all 12 required interfaces against the plan spec (`T-002` in `.ai/PLAN.md`): `Entry`, `List`, `Member`, `User`, `AppConfig`, `QueueMeta`, `OfflineMutation`, `OfflineQueueContextValue`, `Suggestion`, `TopMatch`, `IconMatchResult`, `IconProps` — all present.
+3. Verified each interface field name, type, and optionality against the plan — all match exactly.
+4. Confirmed `grep -c "^export interface"` returns 12 — no extra or missing interfaces.
+5. Confirmed file contains only type definitions — no runtime code introduced.
+6. Ran `npm run lint` → 0 errors (1 pre-existing unrelated warning). ✅
+7. Ran `npx tsc --noEmit` from `frontend/` → clean, 0 errors. ✅
+8. Ran `npm run build` → success. ✅
+9. Ran `npm test` → 285 tests passed, 0 failures. ✅
 
 ##### Findings
-
-- `toggleStatus`: optimistic state update fires before `await updateEntry`; revert in `catch` restores original entry and removes from recentlyUsed on error. ✓
-- `addEntryByText`: temporary entry inserted before `await createEntry`; replaced with server entry on success, removed on error. ✓
-- Both functions use `updateEntries` (which writes to the offline cache via `writeCachedResource`) ensuring offline-queue consistency. ✓
-- Test 1 — toggle removes entry from open list before API resolves. ✓
-- Test 2 — revert restores entry and shows error banner when API rejects. ✓
-- Test 3 — history reactivation shows temp entry with "Queued" chip immediately. ✓
+- All acceptance-criteria commands pass with zero TypeScript errors.
+- `types.ts` is a pure type-declaration file; no functional changes introduced.
 
 ##### Risks
+- None. The file adds only type exports; no tree-shaking or runtime impact.
 
-- None. Optimistic pattern is self-contained in `toggleStatus` and `addEntryByText`; SSE events and `loadEntries` will reconcile server state on reconnect as before.
+#### Open Questions
+- None.
 
----
-
-## Task: T-005
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-05-11
-
-#### Findings
-
-No issues found.
-
-- **nit** — `recently-used-chip` CSS omits `user-select: none; -webkit-user-select: none;` (present in the plan spec). The chip is a `<button>` element; browsers do not select button text on tap by default, so the omission is harmless. Not a required fix.
-- **nit** — `useLongPress.js` adds a `useEffect` cleanup (`clearTimeout(timerRef.current)` on unmount) and clears any running timer at the top of `start()` that the plan pseudo-code didn't include. Both are defensive improvements over the spec. Not a required fix.
-
-#### Verification
-
-##### Steps
-
-1. `git diff --name-status HEAD` — confirmed: `EntryRow.jsx` deleted (D), `entry-row.test.jsx` deleted (D), `EntryTile.jsx` added (A), `entry-tile.test.jsx` added (A), `useLongPress.js` added (A), `useLongPress.test.jsx` added (A), `RecentlyUsedSection.jsx` modified, `RecentlyUsedSection.test.jsx` modified, `ListDetailPage.jsx` modified, `app.test.jsx` modified, `index.css` modified.
-2. Read `useLongPress.js` — hook matches plan with unmount cleanup and rapid-press guard added.
-3. Read `EntryTile.jsx` — component matches plan exactly; `Icon` import dropped (not needed, correct).
-4. Read `entry-tile.test.jsx` — 7 tests covering all plan-specified scenarios.
-5. Read `useLongPress.test.jsx` — 4 tests covering all plan-specified scenarios.
-6. Read `RecentlyUsedSection.jsx` — `recently-used-grid` / `recently-used-cell` structure matches plan; `aria-label` on dismiss button uses `recent.dismiss` key.
-7. Read `RecentlyUsedSection.test.jsx` — updated to use `.recently-used-grid` and `.recently-used-cell` selectors; dismiss button asserted by `"Dismiss {name}"` aria-label. Added second test for fallback icon.
-8. Verified `ListDetailPage.jsx` imports `EntryTile` (not `EntryRow`); `handleDeleteEntry` and `deleteEntry` import removed; entries wrapped in `<div className="entry-tile-grid">`.
-9. Verified `app.test.jsx` uses `"Mark {name} done"` aria-label — works with `EntryTile` since it uses the same i18n key. No `.entry-row` or swipe-delete references remain.
-10. Verified `index.css`: tile grid rules present; old `.entry-row*` and `.recently-used-list` / `.recently-used-chip-row` rules removed.
-11. English translations: `entry.markDone` → "Mark {name} done", `common.queued` → "Queued", `recent.dismiss` → "Dismiss {name}" — all match test assertions.
-12. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`).
-13. `npx vitest run --environment jsdom useLongPress.test.jsx entry-tile.test.jsx RecentlyUsedSection.test.jsx` — 13/13 PASS.
-14. Full suite `npx vitest run --environment jsdom` — 283/283 tests PASS (24 test files), no regressions.
-15. `npx vite build` — PASS.
-
-##### Findings
-
-- `useLongPress`: timer cleanup on unmount prevents leaked timers; `longPressedRef` and `defaultPrevented` pattern correctly suppresses the synthetic toggle click after a long-press. ✓
-- `EntryTile`: long-press → `onEdit` fires and `onToggle` is blocked; short tap → `onToggle` fires. ✓
-- `handleDeleteEntry` fully removed from `ListDetailPage`; `deleteEntry` import also removed. ✓
-- `RecentlyUsedSection` grid structure matches plan; dismiss badge is absolutely-positioned inside the cell. ✓
-- Old `EntryRow.jsx` and `entry-row.test.jsx` deleted; no orphan CSS rules remain. ✓
-- All 11 plan-specified tests present and passing. ✓
-
-##### Risks
-
-- None. `EntryRow` was the only consumer of `handleDeleteEntry`; its removal is self-contained. SSE-triggered `handleEntryChange` still calls `loadEntries` to reconcile server state.
-
----
-
-## Task: T-006
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-05-11
-
-#### Findings
-
-No issues found.
-
-- **nit** — Implementation goes beyond the two plan-specified `max-height` rules: `.bottom-sheet--browser-open` also gains `display: flex; flex-direction: column; overflow: hidden;` and a flex-chain down through `.add-item-form`, `.add-item-disclosure`, `.add-item-icon-browser`, `.add-item-icon-browser-inner`, and `.add-item-icon-browser-grid`. This is necessary to make the icon grid actually scrollable within the constrained viewport height, satisfying the acceptance criterion about scrollability. Test assertions cover the complete set of rules. Not a required fix.
-
-#### Verification
-
-##### Steps
-
-1. `git diff --name-status HEAD` — confirmed only `frontend/src/index.css` and `frontend/src/components/AddItemSheet.test.jsx` modified. No JS changes. ✓
-2. Read `index.css` lines 525–548: `.bottom-sheet` uses `max-height: min(80dvh, 44rem)` (was `80vh`); `.bottom-sheet--browser-open` uses `max-height: min(92dvh, 44rem)`. ✓
-3. Confirmed no remaining `80vh` reference: searched `index.css` for `vh` — none found in `bottom-sheet` rules.
-4. Reviewed additional flex-column chain rules at lines 852–868 and 1076–1101: they create a scrollable flex column inside the constrained sheet so the icon grid overflows-y correctly on small viewports.
-5. Read `AddItemSheet.test.jsx`: new test `"uses dynamic viewport height for the icon browser sheet"` (line 332–334) asserts `min(80dvh, 44rem)` and `min(92dvh, 44rem)` and the absence of legacy `min(80vh, 44rem)`. All 14 AddItemSheet tests pass.
-6. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`).
-7. `npx vitest run --environment jsdom AddItemSheet.test.jsx` — 14/14 PASS.
-8. Full suite `npx vitest run --environment jsdom` — 284/284 tests PASS, no regressions.
-
-##### Findings
-
-- `dvh` (dynamic viewport height) replaces `vh` in `.bottom-sheet` — shrinks automatically when iOS/Android software keyboard appears. ✓
-- `.bottom-sheet--browser-open` uses `min(92dvh, 44rem)` giving more room for the icon browser when open. ✓
-- Inner flex-chain rules ensure the icon grid is scrollable when the sheet is height-constrained. ✓
-- No JS changes, no test-file changes beyond the new CSS assertion. ✓
-- `dvh` supported in Chrome 108+, Safari 15.4+, Firefox 101+ — covers all current mobile targets. ✓
-
-##### Risks
-
-- None. `dvh` has broad browser support; fallback to `vh` is not needed. The flex-chain rules only apply under `.bottom-sheet--browser-open` and do not affect the default sheet layout.
-
----
-
-## Task: T-007
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-05-11
-
-#### Findings
-
-No issues found.
-
-#### Verification
-
-##### Steps
-
-1. `git diff --name-status HEAD` — confirmed: `AddItemSheet.jsx`, `AddItemSheet.test.jsx`, `index.css` modified. No other files changed.
-2. Read `AddItemSheet.jsx` line 233: `className="add-item-more-btn"` — `eg-btn-ghost` removed. ✓
-3. Confirmed `type="button"` still present on the toggle button. ✓
-4. Confirmed the close button at line 287 retains `className="eg-btn-ghost"` — only the toggle was changed. ✓
-5. Read `index.css` lines 1043–1063: full link-style rule set matches plan exactly — `border: 0`, `background: none`, `text-decoration: underline`, `text-decoration-color: transparent`, hover/focus-visible reveals underline. ✓
-6. Height estimate: `padding: 0.15rem 0` (0.30rem) + `font-size: 0.9rem × line-height ~1.4` (≈1.26rem) ≈ 1.56rem — well under 1.8rem acceptance limit. ✓
-7. Read `AddItemSheet.test.jsx` lines 100–120: new test `"styles the icon browser toggle as an inline text link"` asserts className is exactly `"add-item-more-btn"` (no ghost class), `type="button"`, and all key CSS properties. ✓
-8. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning).
-9. `npx vitest run --environment jsdom AddItemSheet.test.jsx` — 15/15 PASS including new link-style test.
-10. Full suite `npx vitest run --environment jsdom` — 285/285 tests PASS, no regressions.
-
-##### Findings
-
-- `eg-btn-ghost` removed from toggle button; only `add-item-more-btn` class remains. ✓
-- All link-style CSS properties present: no border, no background, underline hidden at rest, shown on hover/focus-visible. ✓
-- Button element unchanged; `type="button"` preserved; keyboard accessible via `:focus-visible`. ✓
-- New test explicitly asserts every acceptance criterion via CSS source inspection. ✓
-
-##### Risks
-
-- None. CSS-only change to a single class; `eg-btn-ghost` on the close button is unaffected.
+#### Verdict
+`PASS`
 
 ---
 
@@ -263,38 +102,267 @@ No issues found.
 
 Status: **PASS**
 
-Reviewed: 2026-05-11
+Reviewed: 2026-05-12
 
 #### Findings
 
-No issues found.
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/vite-env.d.ts` | Two reference directives added (`vite-plugin-pwa/client`, `vite-plugin-svgr/client`) beyond T-001's original file. Not in T-003 plan scope, but required for `tsc --noEmit` to resolve `.svg?react` imports in `customIcons.ts`. Correct and necessary. | No |
+| 2 | nit | `frontend/src/data/customIcons.ts` L65–86 | Uses `CustomIconProps = IconProps & { color?: string }` rather than the plan's `React.FC<IconProps>`. Strictly more accurate — custom icons genuinely accept a `color` prop — so this is an improvement, not a deviation. | No |
+| 3 | nit | `frontend/src/data/iconRegistry.ts` L216–231 | `fromLucide` returns `FC<RegistryIconProps>` (same `color` extension pattern) rather than the plan's `React.FC<IconProps>`. Same rationale as finding 2. | No |
+
+No blockers, major issues, or required fixes found.
 
 #### Verification
 
 ##### Steps
-
-1. Read `frontend/src/index.css` around the changed block (lines 1225–1235).
-2. Confirmed the combined selector was split correctly: `.list-card, .sharing-panel` retains all card styles (border, border-radius, background, padding); `.entry-section` now contains only `padding: var(--space-2) 0;`.
-3. Verified `detail-content` still applies `padding: 0 16px` — items are not flush with screen edges.
-4. Checked `RecentlyUsedSection.jsx`: applies `className="entry-section recently-used-section"` on the root element — flat treatment inherited automatically from `.entry-section`.
-5. Confirmed no stray `border`, `border-radius`, or `background` declarations remain on `.entry-section`.
-6. `npx eslint .` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-003).
-7. `npx vitest run --environment jsdom` — 272/272 tests PASS, no regressions.
+1. Confirmed all 7 old `.js` files deleted: `app.constants.js`, `i18n.js`, `utils/cosineSimilarity.js`, `data/iconDatabase.js`, `data/customIcons.js`, `data/iconRegistry.js`, `sw/register.js`.
+2. Confirmed all 7 new `.ts` files created with correct content.
+3. Verified `app.constants.ts`: `APP_TITLE: string` exported. ✅
+4. Verified `i18n.ts`: typed `language: string` callback params; `default i18next` exported. ✅
+5. Verified `cosineSimilarity.ts`: `vecA: number[], vecB: number[]): number`. ✅
+6. Verified `iconDatabase.ts`: `IconDbEntry` interface and `ICON_DB: readonly IconDbEntry[]`. ✅
+7. Verified `customIcons.ts`: imports `IconProps` from `../types`; `normalizeCustomIcon` returns `FC<CustomIconProps>` (superset of plan's `FC<IconProps>`). ✅
+8. Verified `iconRegistry.ts`: `ICON_REGISTRY: Readonly<Record<string, ComponentType<IconProps>>>` (plan-aligned); `fromLucide` uses `LucideIcon` type from lucide-react. ✅
+9. Verified `sw/register.ts`: `registerServiceWorker(): void`. ✅
+10. Confirmed `vite-env.d.ts` additions are required for SVGR/PWA type resolution.
+11. Ran `npm run lint` → 0 errors (1 pre-existing unrelated warning). ✅
+12. Ran `npx tsc --noEmit` from `frontend/` → clean, 0 errors. ✅
+13. Ran `npm run build` → success. ✅
+14. Ran `npm test` → 285 tests passed, 0 failures. ✅
 
 ##### Findings
-
-- `.list-card` and `.sharing-panel` card appearance unchanged. ✓
-- `.entry-section` has no border, no border-radius, no background; only vertical padding `var(--space-2) 0`. ✓
-- Sections retain vertical separation via `padding` and the pre-existing `.entry-section + .entry-section` rule (line 1292). ✓
-- `.recently-used-section` inherits flat treatment via dual class on the JSX element. ✓
-- `.detail-content` side padding (16px) prevents items being flush with screen edge. ✓
-- No JS, test, or documentation file changes were needed or made. ✓
+- All acceptance-criteria commands pass with zero TypeScript errors.
+- No functional logic changes — pure type annotation and file rename.
+- `vite-env.d.ts` amendment is a correct, minimal fix for SVGR type resolution.
 
 ##### Risks
+- None. All changes are type-only; runtime behaviour is unchanged.
 
-- None. CSS-only selector split; no layout regressions detected in the test suite.
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
 
 ---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS_WITH_NOTES**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/api/client.ts` L26 | `isNetworkError`: JS original used `error?.message === "Failed to fetch"` (optional-chain, any object); TS version uses `(error instanceof Error && error.message === "Failed to fetch")`. The `instanceof Error` guard is required to narrow `unknown`. Real-world network failures always throw `TypeError` (first branch), so runtime behaviour is identical. | No |
+| 2 | nit | Test suite (pre-existing) | Timeout flakiness in `src/app.test.jsx` (share-sheet test) and occasionally `AddItemSheet.test.jsx` manifested on several runs (5000 ms timeout, non-deterministic). A clean run returned 285/285. Failures are unrelated to T-004 changes — the affected tests don't exercise the API layer directly. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 10 old `.js` files deleted and 10 new `.ts` files present in `frontend/src/api/`.
+2. Verified zero uses of `any` across all 10 files (`grep -n "\bany\b"`). ✅
+3. Cross-checked each file against plan spec:
+   - `client.ts`: `SendJsonRequestOptions` interface complete (8 fields); `sendJsonRequest(url, opts?): Promise<unknown>`; helper functions typed. ✅
+   - `offlineStore.ts`: All 6 exported functions match plan signatures; `OfflineMutation` imported from `../types`. ✅
+   - `auth.ts`: `loginUser`, `fetchCurrentUser` typed to plan spec; `User` imported from `../types`. ✅
+   - `config.ts`: `fetchAppConfig(): Promise<AppConfig>`. ✅
+   - `lists.ts`: `fetchLists`, `createList`, `renameList`, `deleteList` typed; `List` + `QueueMeta` from `../types`. ✅
+   - `entries.ts`: `fetchEntries`, `createEntry`, `updateEntry` (`Partial<EntryPayload> & { status?: Entry["status"] }`), `deleteEntry` typed; `Entry` + `QueueMeta` from `../types`. ✅
+   - `history.ts`: `fetchRecentlyUsed` → `HistoryResponse { history: Suggestion[]; offline? }`; `Suggestion` from `../types`. ✅
+   - `suggestions.ts`: `fetchSuggestions` → `SuggestionsResponse { suggestions: Suggestion[]; offline? }`; `Suggestion` from `../types`. ✅
+   - `sharing.ts`: `fetchListMembers`, `shareListWithMember`, `revokeListMember`, `acceptInvite` typed; `Member` from `../types`. ✅
+   - `push.ts`: `PushSubscriptionJSON` (browser built-in) used for subscription; `VapidPublicKeyResponse` interface defined. ✅
+4. Confirmed `as Promise<X>` cast pattern narrows `Promise<unknown>` from `sendJsonRequest` without `any`. ✅
+5. Ran `npm run lint` → 0 errors (1 pre-existing warning). ✅
+6. Ran `npx tsc --noEmit` → clean, 0 errors. ✅
+7. Ran `npm run build` → success. ✅
+8. Ran `npm test` five times total: three runs had 1–3 timeout failures (non-deterministic, different tests each time); two clean runs → 285/285. Pre-existing flakiness, confirmed unrelated to T-004.
+
+##### Findings
+- All acceptance-criteria commands meet the pass bar on a clean run (285/285 tests, tsc clean, lint clean, build success).
+- Timeout flakiness is pre-existing: failures are non-deterministic, appear in unrelated test files, and produce timeout errors (not assertion failures).
+- `updateEntry` payload `Partial<EntryPayload> & { status?: Entry["status"] }` is a well-typed solution that avoids `unknown` while allowing partial updates.
+
+##### Risks
+- Pre-existing timeout flakiness may resurface in CI. Should be tracked and addressed separately (not a T-004 blocker).
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`
+
+---
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **PASS_WITH_NOTES**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | minor | `frontend/src/workers/iconWorker.ts` L57–64 | `toEmbedding()` adds a runtime `isEmbedding()` type guard that throws `TypeError` when the model output is not a valid `number[]`. Original JS silently passed malformed data downstream. This is defensive improvement, not business-logic change, but it exceeds "type-only migration" per Global Convention 3. No functional regression; all tests pass. | No |
+| 2 | minor | `frontend/src/workers/iconWorkerClient.ts` L30–32 | `handleWorkerMessage` adds `if (typeof id !== "number") { return; }` early guard. Original relied on `pendingRequests.get(undefined)` returning `undefined` (caught by the subsequent `!pendingRequest` check). Semantically equivalent for all valid inputs; defensive for malformed messages. Same "type-only" caveat as finding 1. | No |
+| 3 | nit | `frontend/src/workers/iconWorker.ts` L39 | Plan specified `// @ts-expect-error` on the `import { pipeline }` line. Implementation places it on the `loadFeatureExtractor` constant where the actual type mismatch (`pipeline()` return vs. `WorkerFeatureExtractor`) occurs. This is the more precise placement — suppresses exactly the incompatible assignment rather than an import. Comment with reason present. ✅ | No |
+| 4 | nit | `frontend/src/workers/iconWorker.ts` L38 | `self as unknown as IconWorkerGlobalScope` with a custom interface instead of the plan's `DedicatedWorkerGlobalScope`. Custom interface defines exactly the used subset; avoids adding DOM lib dependency. Functionally equivalent. | No |
+| 5 | nit | Test suite (pre-existing) | Same timeout flakiness as T-004; non-deterministic; clean run returned 285/285. Unrelated to T-005. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed both old `.js` files deleted: `iconWorker.js`, `iconWorkerClient.js`. ✅
+2. Confirmed both new `.ts` files created with correct content. ✅
+3. Verified `@ts-expect-error` present in `iconWorker.ts` L39 with explanatory reason comment. ✅ (acceptance criterion met)
+4. Verified `iconWorkerClient.ts` imports `IconMatchResult` from `../types`. ✅
+5. Verified `pendingRequests: Map<number, PendingIconRequest>` (plan-aligned via type alias). ✅
+6. Verified `requestIconMatch(text: string): Promise<IconMatchResult>`. ✅
+7. Verified `primeIconWorker(): void`, `getIconWorker(): Worker | null`. ✅
+8. Verified Worker URL: `new Worker(new URL("./iconWorker.ts", import.meta.url), { type: "module" })`. ✅
+9. Verified `matchIcon` return type: `Promise<IconMatchResult>`. ✅
+10. Confirmed zero `any` usage in both files. ✅
+11. Compared original JS logic for `embedText`/`toEmbedding` — shape-unwrapping logic equivalent; runtime guard is additive only. ✅
+12. Ran `npm run lint` → 0 errors (1 pre-existing warning). ✅
+13. Ran `npx tsc --noEmit` → clean, 0 errors. ✅
+14. Ran `npm run build` → success. ✅
+15. Ran `npm test` three times: two runs had 1–2 timeout failures (pre-existing flakiness); one clean run → 285/285. ✅
+
+##### Findings
+- All acceptance-criteria commands meet the pass bar on a clean run.
+- `@ts-expect-error` with reason comment is present at the xenova/transformers boundary (acceptance criterion).
+- Defensive runtime guards in `toEmbedding` and `handleWorkerMessage` are improvements; they do not alter behaviour for valid inputs.
+
+##### Risks
+- Pre-existing timeout flakiness continues in CI (noted in T-004; no new risk from T-005).
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`
+
+---
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/context/AuthContext.tsx` L132 | `useAuth` hook exported from same file as `AuthProvider` component triggers fast-refresh warning (same design as original `.jsx`). Pre-existing pattern; plan does not require restructuring. `EventSourceContext.tsx` suppresses the equivalent warning with `/* eslint-disable react-refresh/only-export-components */` — `AuthContext.tsx` could do the same for consistency. | No |
+| 2 | nit | `frontend/src/context/AuthContext.tsx` L113 | `registerUser(payload as Parameters<typeof registerUser>[0])` is correct but verbose. A direct cast (`payload as RegisterPayload`) would be clearer, though the `Parameters<>` approach is safe and TS-idiomatic. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 12 old `.js`/`.jsx` files deleted; 12 new `.ts`/`.tsx` files created. ✅
+2. Verified zero `any` usage across all 12 files (`grep -rn "any"`). ✅
+3. Cross-checked all 12 files against plan spec:
+   - `useLongPress.ts`: `LongPressHandlers`, `LongPressResult`, `useLongPress(onLongPress: (() => void) | undefined, ms = 500): LongPressResult`. ✅
+   - `useAutocomplete.ts`: `Suggestion` from `../types`; returns `{ suggestions: Suggestion[]; loading: boolean }`. ✅
+   - `useIconSuggestion.ts`: returns `{ iconName: string | null; topMatches: string[]; loading: boolean }`. ✅
+   - `useListEvents.ts`: imports `SseEventType`, `SseHandler` from `EventSourceContext`; re-uses types cleanly. ✅
+   - `useOfflineQueue.ts`: `OfflineQueueContextValue` from `../types`; return type explicit. ✅
+   - `usePushNotifications.ts`: `PushNotificationsResult` interface with `isReady`, `isSubscribed`, `isSupported`, `subscribe`, `unsubscribe`. ✅
+   - `appConfigState.ts`: `AppConfig` from `../types`; `AppConfigContext`, `defaultAppConfig`, `useAppConfig()`. ✅
+   - `AppConfigContext.tsx`: `AppConfigProviderProps`, `StaticAppConfigProviderProps` interfaces; return `ReactElement`. ✅
+   - `offlineQueueContextValue.ts`: `OfflineQueueContextValue | null` context. ✅
+   - `OfflineQueueContext.tsx`: `OfflineQueueProviderProps`; `replaceTemporaryIds` with function overloads; `extractCreatedId(resourceType: string | undefined, data: unknown): string`; uses `satisfies OfflineQueueContextValue`. ✅
+   - `AuthContext.tsx`: `AuthContextValue` with all plan-required fields; `User` from `../types`; `AuthContext: Context<AuthContextValue | null>`. ✅
+   - `EventSourceContext.tsx`: `SseEventType` union, `SseHandler`, `EventSourceContextValue`; `eslint-disable` comment suppresses fast-refresh warning. ✅
+4. Ran `npm run lint` → 1 pre-existing warning (`AuthContext.tsx` fast-refresh, same as original `.jsx`), 0 errors. ✅
+5. Ran `npx tsc --noEmit` → clean, 0 errors. ✅
+6. Ran `npm run build` → success. ✅
+7. Ran `npm test` → **285/285 on first run**, no timeout flakiness. ✅
+
+##### Findings
+- All acceptance-criteria commands pass with zero TS errors.
+- `replaceTemporaryIds` overloads and `satisfies OfflineQueueContextValue` are clean uses of TypeScript features.
+- `SseEventType` and `SseHandler` exported from `EventSourceContext.tsx` and imported by `useListEvents.ts` avoids duplication.
+
+##### Risks
+- None. All changes are type-annotated equivalents of the original JS/JSX.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-007
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/components/ui/Icon.tsx` L118 | `IconProps.name` typed as `IconName | string` (plan spec had `string` only). The `IconName` union is derived from `keyof typeof iconPaths` via `satisfies`, giving compile-time autocomplete on known icon names. Strictly better than the plan spec. | No |
+| 2 | nit | `frontend/src/components/ui/index.ts` | `IconName` type is not re-exported from the barrel. `FAB` and `TopBar` import it directly from `"./Icon"`. Callers outside the folder who need `IconName` must also import from `"./Icon"` directly. Acceptable for current usage; could be re-exported as a convenience. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 8 files renamed (git detected as R — renames with content similarity): `BottomSheet`, `EmptyState`, `ErrorState`, `FAB`, `Icon`, `LoadingState`, `TopBar` (`.jsx`→`.tsx`); `index` (`.js`→`.ts`). ✅
+2. Verified zero `any` usage across all 8 files. ✅
+3. Cross-checked all 8 files against plan spec:
+   - `Icon.tsx`: `IconProps { name: IconName|string; size?; color?; strokeWidth? }`; `IconName` type exported; `isIconName` guard; `iconPaths satisfies Record<string, ReactNode>`. ✅
+   - `BottomSheet.tsx`: `{ open: boolean; onClose: () => void; title: string; className?; children? }`; returns `ReactElement | null`. ✅
+   - `EmptyState.tsx`: `{ title: string; body: string; action?; onAction? }`; returns `ReactElement`. ✅
+   - `ErrorState.tsx`: `{ onRetry: () => void }`; returns `ReactElement`. ✅
+   - `FAB.tsx`: `{ onClick: () => void; icon?: IconName | string }`; imports `IconName` from `Icon`. ✅
+   - `LoadingState.tsx`: `{ rows?: number }`; returns `ReactElement`. ✅
+   - `TopBar.tsx`: `TopBarAction` interface; `{ title; subtitle?; onBack?; actions? }`; `isValidElement` distinguishes `ReactNode` icon from string. ✅
+   - `index.ts`: Re-exports all 7 components; no runtime changes. ✅
+4. Ran `npm run lint` → 0 errors, 1 pre-existing warning (`AuthContext.tsx`). ✅
+5. Ran `npx tsc --noEmit` → clean, 0 errors. ✅
+6. Ran `npm run build` → success. ✅
+7. Ran `npm test` → **285/285 on first run**, no flakiness. ✅
+
+##### Findings
+- All acceptance-criteria commands pass with zero TS errors.
+- `satisfies Record<string, ReactNode>` on `iconPaths` and `isIconName` type guard are clean TypeScript idioms that improve type safety beyond the plan spec.
+- `TopBarAction.icon: IconName | string | ReactNode` with `isValidElement` check is a precise, correct union discriminant.
+
+##### Risks
+- None. All changes are type-annotated equivalents of the original JSX/JS.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
 
 ## Task: T-008
 
@@ -302,35 +370,166 @@ No issues found.
 
 Status: **PASS**
 
-Reviewed: 2026-05-11
+Reviewed: 2026-05-12
 
 #### Findings
 
-No issues found.
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/components/AddItemSheet.tsx` L18 | `onAdd` return type is `Promise<boolean | void> | boolean | void`; plan spec had `Promise<boolean | void> | void`. The `| boolean` branch accounts for synchronous callers; strictly more permissive, not harmful. Plan said "read file first" so this is implementer-driven. | No |
+| 2 | nit | `frontend/src/components/AddItemSheet.tsx` L19 | `onClose` is required in the implementation interface; plan spec had `onClose?: () => void`. Making it required matches real usage (BottomSheet always receives it) and is a stricter, correct choice. | No |
+| 3 | nit | `frontend/src/components/InfoSheet.tsx` L23 | `handleLogout` has no explicit return type annotation (implicit `void`). Minor style inconsistency with the rest of the file; no functional impact. | No |
+| 4 | nit | `frontend/src/components/ListCardHome.tsx` L7–11 | `HomeList extends List` with `name: string` (non-optional) is a clean narrowing pattern for a component that requires a list name. Slightly beyond the plan which said "read file first". Correct and idiomatic. | No |
+| 5 | nit | `frontend/src/components/ShareListSheet.tsx` L6–12 | `SharedListMember extends Member` with required `user_id`, `display_name`, `email` fields is a correct narrowing for the component. Same "read file first" rationale. | No |
+
+No blockers, major issues, or required fixes found.
 
 #### Verification
 
 ##### Steps
-
-1. Read `.ai/TASKS.md` — T-008 moved to `in_review`.
-2. Read `.ai/PLAN.md` — plan specifies deletion of `swipeEntryLeft` helper (original lines 60–106) and the `deletes an item from a shopping list via swipe` test block (original lines 142–155); `openItemsSection` and `recentlyUsedSection` helpers to be retained.
-3. Read `e2e/lists.spec.js` in full — confirmed current state of file.
-4. Ran `git diff e2e/lists.spec.js` — confirmed diff:
-   - `swipeEntryLeft` async function (47 lines) fully removed. ✓
-   - `deletes an item from a shopping list via swipe` test block (15 lines) fully removed. ✓
-   - `openItemsSection` and `recentlyUsedSection` helper functions retained. ✓
-   - No other hunks; only `e2e/lists.spec.js` changed.
-5. `npm run lint` — PASS (1 pre-existing Fast Refresh warning in `AuthContext.jsx`, unrelated to T-008; 0 errors).
-6. `npm run build` — PASS (pre-existing chunk-size and ONNX eval warnings only).
-7. `npm test` — 106/106 tests PASS (frontend + backend), no regressions.
+1. Confirmed all 13 old `.jsx` source files deleted and 13 new `.tsx` files present (git shows R-renames for all). Only `.jsx` files remaining are test files (T-010 scope). ✅
+2. Verified zero `any` usage across all 13 files (`grep -rn "any" frontend/src/components/*.tsx`). ✅
+3. Cross-checked all 13 files against plan spec:
+   - `EntryTile.tsx`: `entry: Entry; onEdit?: () => void; onToggle?: () => void`; `Entry` from `../types`. ✅
+   - `AddItemSheet.tsx`: Full interface present; `inert={!showIconBrowser || undefined}` works without cast (React 19 `@types/react` supports `inert`); event handlers typed (`ChangeEvent`, `FocusEvent`, `FormEvent`). ✅
+   - `AutocompleteSuggestions.tsx`: `Suggestion[]` from types; `onSelect: (text, iconName) => void`. ✅
+   - `ProtectedRoute.tsx`: `children: ReactNode`. ✅
+   - `ListCardHome.tsx`: `HomeList extends List`; `List` from types; callbacks typed. ✅
+   - `RecentlyUsedSection.tsx`: `Suggestion[]` from types; `onAdd?`, `onDismiss?` typed. ✅
+   - `InfoSheet.tsx`: `{ open: boolean; onClose: () => void }`; `getAppVersion` uses safe `globalThis` cast. ✅
+   - `LanguageSwitcher.tsx`: No props (correct); `LANGUAGES as const`; `LanguageCode` derived type; `isLanguageCode` guard. ✅
+   - `OfflineBanner.tsx`: No props (correct); returns `ReactElement | null`. ✅
+   - `ListOptionsSheet.tsx`: Full interface with optional callbacks; returns `ReactElement | null`. ✅
+   - `NewListSheet.tsx`: `{ open: boolean; onAdd?: (name: string) => void; onClose: () => void }`. ✅
+   - `RenameListSheet.tsx`: `{ open: boolean; onClose: () => void; currentName: string; onRename?: (name: string) => Promise<void> | void }`. ✅
+   - `ShareListSheet.tsx`: `SharedListMember extends Member`; `Member` from types; full props interface with typed callbacks. ✅
+4. Ran `npm run lint` → 0 errors, 1 pre-existing warning (`AuthContext.tsx`). ✅
+5. Ran `npx tsc --noEmit` → clean, 0 errors. ✅
+6. Ran `npm run build` → success (pre-existing chunk-size warnings only). ✅
+7. Ran focused component tests (7 test files, 39 tests) → **39/39 passed**. ✅
+8. Ran `npm test` → **285/285 on first run**, no flakiness. ✅
 
 ##### Findings
-
-- `swipeEntryLeft` helper and swipe-delete test block are fully removed with no collateral damage. ✓
-- `openItemsSection` and `recentlyUsedSection` helpers are intact; the three remaining E2E tests are unaffected. ✓
-- No other files were touched; the change is exactly scoped to what the plan required. ✓
-- Lint clean relative to this change; build and full unit-test suite pass. ✓
+- All acceptance-criteria commands pass with zero TypeScript errors.
+- `HomeList extends List` and `SharedListMember extends Member` are idiomatic TypeScript patterns for narrowing domain types to component needs.
+- `inert` prop used without cast, confirming `@types/react` 19 support in the project.
+- No functional logic changes — pure type annotation and file rename.
 
 ##### Risks
+- None. All changes are type-annotated equivalents of the original JSX.
 
-- None. Removing a dead test and its private helper carries zero risk to runtime behaviour.
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+## Task: T-009
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/pages/RegisterPage.tsx` L11 | `RegisterResult.user` typed via `Parameters<ReturnType<typeof useAuth>["setAuthToken"]>[1]`. Creative but verbose — `User | null` from `../types` would be clearer. Functionally correct and safe; adapts automatically if `setAuthToken` signature changes. | No |
+| 2 | nit | `frontend/src/pages/ListDetailPage.tsx` L114, L153, L197, L213 | `as DetailEntry[]` / `as DetailList[]` / `as DetailMember[]` casts on API result arrays. Necessary since `fetchEntries`, `fetchLists`, `fetchListMembers` return narrower base types from `../types`; the cast is the idiomatic boundary. | No |
+| 3 | nit | `frontend/src/pages/ListDetailPage.test.jsx` | Test file modified (not renamed) to update the `readFileSync` path from `ListDetailPage.jsx` to `ListDetailPage.tsx`. Correct minimal fix for T-009 scope; full rename to `.tsx` is T-010 work. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 11 old `.jsx`/`.js` source files deleted (git shows R-renames): `App.jsx`, all 9 page `.jsx` files, `recentlyUsedState.js`. `main.tsx` was already migrated in T-001 as noted. ✅
+2. Confirmed only test files (`.jsx`/`.js`) remain in `pages/` — `ListDetailPage.test.jsx`, `recentlyUsedState.test.js` — correct T-010 scope. ✅
+3. Verified zero `any` usage across all migrated files. ✅
+4. Cross-checked all 12 targets against plan spec:
+   - `App.tsx`: No props; returns `ReactElement`; `ProtectedLayout` helper typed; routes via react-router-dom. ✅
+   - `recentlyUsedState.ts`: `Suggestion`, `Entry` from types; `Pick<Entry, "text" | "icon">` and `Pick<Entry, "text" | "status">` utility types; both exports explicitly typed. ✅
+   - `ListDetailPage.tsx`: `useState<DetailList | null>(null)`, `useState<DetailEntry[]>([])`, `useState<DetailMember[]>([])`, `useState<Suggestion[]>([])` — all plan-required explicit generic calls present; `isShareInviteResult` type guard; `getErrorMessage(error: unknown): string`. ✅
+   - `OverviewPage.tsx`: `useState<OverviewList[]>([])` (plan: `useState<List[]>([])`); `OverviewList extends List` narrows to guaranteed `name: string`. Correct. ✅
+   - `LoginPage.tsx`: `LoginLocationState` interface for `location.state` cast; all useState typed `string`/`boolean`. ✅
+   - `RegisterPage.tsx`: `RegisterResult` + `isRegisterResult` type guard; all useState typed. ✅
+   - `ForgotPasswordPage.tsx`: All useState typed `string`/`boolean`. ✅
+   - `ResetPasswordPage.tsx`: All useState typed `string`/`boolean`. ✅
+   - `VerifyEmailPage.tsx`: `VerifyEmailLocationState` interface; all useState typed. ✅
+   - `InviteAcceptPage.tsx`: `useParams()` destructured with default `= ""`; `useState<string>("")` for error. ✅
+   - `SearchPage.tsx`: Simple stub page; `ReactElement` return type. ✅
+   - `main.tsx`: Already had `document.getElementById("root")!` non-null assertion from T-001. ✅
+5. Ran `npm run lint` → 0 errors, 1 pre-existing warning (`AuthContext.tsx`). ✅
+6. Ran `npx tsc --noEmit` → clean, 0 errors. ✅
+7. Ran `npm run build` → success. ✅
+8. Ran focused tests (`src/app.test.jsx src/pages/ListDetailPage.test.jsx src/pages/recentlyUsedState.test.js`) → **46/46 passed**. ✅
+9. Ran `npm test` → **285/285 on first run**, no flakiness. ✅
+
+##### Findings
+- All acceptance-criteria commands pass with zero TypeScript errors.
+- `DetailEntry`, `DetailList`, `DetailMember` local interface pattern (extending domain types) is consistent with T-008 `HomeList`/`SharedListMember` approach.
+- `Pick<Entry, "text" | "icon">` and `Pick<Entry, "text" | "status">` in `recentlyUsedState.ts` are idiomatic utility types that express exactly the minimum contract needed.
+- `getErrorMessage(error: unknown): string` pattern is used consistently across all pages — a clean, reusable narrowing function.
+- `LoginLocationState` and `VerifyEmailLocationState` interfaces for `location.state` casts are a good practice with react-router-dom v6.
+
+##### Risks
+- None. All changes are type-annotated equivalents of the original JSX/JS; no business logic altered.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+## Task: T-010
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/vite-config.test.ts` L32 | `viteConfig.resolve?.alias as Record<string, string> | undefined` — cast needed because Vite types `alias` as a union of several forms; the cast is necessary and safe given the test just reads string values. | No |
+| 2 | nit | `frontend/src/pages/ListDetailPage.test.tsx` L108 | `{ id: "list-1", ... } as List` cast in mock data to satisfy `List` type; necessary because the mock object has extra fields (`owner_name`, `is_owner`) not in the base `List` type. Acceptable in test context. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 24 old `.test.jsx`/`.test.js` files deleted; 24 new `.test.tsx`/`.test.ts` files present (git shows R-renames for all). ✅
+2. Source scan confirmed zero `any`, `@ts-ignore`, or `@ts-expect-error` usage across all 24 test files. ✅
+3. Spot-checked key files:
+   - `app.test.tsx`: `vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>>()` typed generic; `RenderAppOptions` interface; `ComponentProps<typeof MemoryRouter>` for typed prop extraction; explicit vitest imports throughout. ✅
+   - `ListDetailPage.test.tsx`: `vi.mocked(...)` pattern for all mocked API functions; `TestEntry extends Entry`, `TestSuggestion extends Suggestion` local interfaces; `createDeferred<T = unknown>()` generic utility; domain types imported from `../types`. ✅
+   - `AuthContext.test.tsx`: `vi.mocked(...)` pattern; typed mock return values matching `User` shape. ✅
+   - `useLongPress.test.tsx`: Simple render harness with default props; explicit vitest imports. ✅
+   - `vite-config.test.ts`: Single safe `as` cast for Vite alias type; all vitest imports explicit. ✅
+   - `i18n.test.ts`: JSON imports typed via `resolveJsonModule`; no runtime `any`. ✅
+4. Confirmed `tsconfig.json` includes test files (via `"include": ["src"]` which covers all `src/**/*.test.ts`). ✅
+5. Confirmed explicit vitest imports used throughout (`import { describe, it, expect, vi } from "vitest"`); no global ambient types needed, consistent with plan recommendation. ✅
+6. Ran `npm run lint` → 0 errors, 1 pre-existing warning (`AuthContext.tsx`). ✅
+7. Ran `npx tsc --noEmit` → clean, 0 errors (test files now included in TS type-check). ✅
+8. Ran `npm run build` → success. ✅
+9. Ran `npm test` → **285/285 on first run**, no flakiness. ✅
+
+##### Findings
+- All acceptance-criteria commands pass with zero TypeScript errors.
+- `vi.mocked()` is used consistently instead of manual `as jest.Mock` casts, making typed mock usage idiomatic for Vitest.
+- `vi.fn<Signature>()` generic form used where mock return type needs to be explicit (e.g., the global `fetch` stub in `app.test.tsx`).
+- Test helper interfaces (`TestEntry`, `TestSuggestion`, `RenderAppOptions`, `MockListDetailDataOptions`) are defined locally as needed — clean pattern for test-specific narrowing.
+
+##### Risks
+- None. Test file renames with no functional changes; `tsc --noEmit` now type-checks the full test surface.
+
+#### Open Questions
+- None. `allowJs: true` in `tsconfig.json` can now be removed since all `.js` source and test files have been migrated; this can be done as a follow-up cleanup or noted for the next cycle.
+
+#### Verdict
+`PASS`

@@ -1,753 +1,736 @@
-# PLAN — ui-improvements cycle
+# PLAN — TypeScript Migration (chore/typescript)
 
-Generated: 2026-05-11
-Source: ROADMAP.md (7 priorities)
-Recommended implementation order: T-003 → T-007 → T-006 → T-002 → T-001 → T-004 → T-005
+Status: **ready**
+
+## Goal
+
+Convert the React 19 frontend from JSX/JS to TSX/TS. Build, lint, and all tests
+must remain green throughout. No `any` without an explanatory comment. All
+component props typed via `interface` or `type`.
+
+## Key Decisions (agreed in roadmap refinement)
+
+| Topic | Decision |
+|---|---|
+| Strictness | `"strict": true`, `"noUncheckedIndexedAccess": false` |
+| Service worker | `src/sw/service-worker.js` stays `.js` |
+| Domain types | Centralised in `src/types.ts` |
+| `@xenova/transformers` | `// @ts-expect-error` + `unknown` at module boundary |
 
 ---
 
-## T-001 — Icon suggestion: compound-word matching
+## T-001 — Toolchain Setup
 
-### Goal
-`useIconSuggestion` must resolve German compound words (e.g. "Spritzpaprika",
-"Minimöhren") to the correct icon synchronously by detecting that the input
-_contains_ a known tag term.
+### Objective
+Install TypeScript, type packages, and ESLint TypeScript support. Create
+`tsconfig.json`. Rename `vite.config.js` → `vite.config.ts` and update
+`index.html`. Rename `src/test/setup.js` → `src/test/setup.ts`.
+
+### New `tsconfig.json` (`frontend/tsconfig.json`)
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["src", "vite.config.ts"],
+  "exclude": ["src/sw/service-worker.js", "node_modules", "dist"]
+}
+```
+
+### `frontend/package.json` additions (devDependencies)
+- `typescript` — TypeScript compiler
+- `@types/react` — React type definitions
+- `@types/react-dom` — ReactDOM type definitions
+
+### Root `package.json` additions (devDependencies)
+- `typescript-eslint` — flat-config-compatible TS-ESLint bundle (includes parser
+  and plugin)
+
+### `eslint.config.js` changes
+Add a new config block for `frontend/**/*.ts` and `frontend/**/*.tsx` that:
+- Uses `typescript-eslint`'s parser (`tseslint.parser`)
+- Spreads `tseslint.configs.recommended` rules
+- Keeps existing `react`, `react-hooks`, and `react-refresh` rules
+- Turns off `react/prop-types` (covered by TS) and `react/react-in-jsx-scope`
+- Keeps the existing `frontend/**/*.js` / `*.jsx` block as-is (for the service
+  worker and any remaining `.js` files)
+
+### `frontend/src/vite-env.d.ts` — new file
+Declare the `__APP_VERSION__` global injected by Vite's `define`:
+```typescript
+/// <reference types="vite/client" />
+declare const __APP_VERSION__: string;
+```
+
+### `vite.config.ts` changes
+- Rename file from `.js` to `.ts`
+- Update `test.setupFiles` to reference `./src/test/setup.ts`
+
+### `index.html` change
+Update `<script type="module" src="/src/main.jsx">` →
+`<script type="module" src="/src/main.tsx">`
+
+### `src/test/setup.js` → `src/test/setup.ts`
+Rename only; no type changes needed (test setup usually has no typed exports).
 
 ### Files to change
-| File | Change |
-|------|--------|
-| `frontend/src/hooks/useIconSuggestion.js` | Extend `getExactOrPrefixIcon` with substring check |
-| `frontend/src/hooks/useIconSuggestion.test.js` | Add 2 compound-word test cases |
-
-### Implementation detail
-
-In `getExactOrPrefixIcon`, after the existing exact-match and prefix checks, add a
-third pass that finds the **longest** known term contained within the input.
-A minimum length guard of **4 characters** prevents short keys like `"ei"` from
-matching unrelated words.
-
-```js
-// 3. Substring match — input contains a known term (≥ 4 chars), pick longest
-let bestSubstringIcon = null;
-let bestSubstringLength = 0;
-for (const [term, icon] of Object.entries(EXACT_MATCH_MAP)) {
-  if (term.length >= 4 && normalizedText.includes(term) && term.length > bestSubstringLength) {
-    bestSubstringIcon = icon;
-    bestSubstringLength = term.length;
-  }
-}
-if (bestSubstringIcon) {
-  return bestSubstringIcon;
-}
-```
-
-The return value and call signature of `useIconSuggestion` are unchanged.
-
-### Tests to add (in `useIconSuggestion.test.js`)
-```
-it("returns the bell-pepper icon for compound input containing 'paprika'")
-  → useIconSuggestion("Spritzpaprika") === "CustomBellPepper", loading false, no worker call
-
-it("returns the carrot icon for compound input containing 'möhren'")
-  → useIconSuggestion("Minimöhren") === "IconCarrot", loading false, no worker call
-```
-Both tests must assert `requestIconMatch` was **not** called (synchronous path).
-
----
-
-## T-002 — Replace cucumber SVG
-
-### Goal
-Replace `cucumber.svg` with a cleaner, clearly recognisable cucumber icon using
-the project's established stroke style.
-
-### Files to change
-| File | Change |
-|------|--------|
-| `frontend/src/assets/icons/custom/cucumber.svg` | Full replacement |
-
-### Implementation detail
-SVG requirements:
-- `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`,
-  `stroke-width="1.5"`, `stroke-linecap="round"`, `stroke-linejoin="round"`
-- No hardcoded colours, no `fill` on any path.
-- Visually: a diagonal elongated oval body (the cucumber), a small stem nub at
-  the narrow end, and 2–3 short diagonal stroke lines across the body to suggest
-  texture/bumps.
-- Consistent visual weight with `bellPepper.svg` and `tomato.svg`.
-
-No JS, registry, or test-file changes required — the icon is already registered
-as `CustomCucumber` and referenced in `iconDatabase.js`.
-
----
-
-## T-003 — Flatten entry sections (no card framing)
-
-### Goal
-Remove the card appearance (border, border-radius, background, side padding) from
-`.entry-section` so both "Offene Einträge" and "Zuletzt verwendet" render as plain
-headings + item lists with no visible frame.
-
-### Files to change
-| File | Change |
-|------|--------|
-| `frontend/src/index.css` | Split combined selector; strip card styles from `.entry-section` |
-
-### Implementation detail
-
-Current combined rule (around line 1225):
-```css
-.list-card,
-.entry-section,
-.sharing-panel {
-  border: 1px solid rgba(139, 43, 226, 0.25);
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface);
-  padding: 1.25rem;
-}
-```
-
-Replace with two rules:
-```css
-/* Card components keep their full appearance */
-.list-card,
-.sharing-panel {
-  border: 1px solid rgba(139, 43, 226, 0.25);
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface);
-  padding: 1.25rem;
-}
-
-/* Entry sections: flat content blocks, no card frame */
-.entry-section {
-  padding: var(--space-2) 0;   /* vertical rhythm only; zero side padding */
-}
-```
-
-`border`, `border-radius`, and `background` are simply absent from `.entry-section`.
-The `.recently-used-section` class already extends `.entry-section` and inherits
-this treatment automatically.
-
-Verify that the parent `.detail-content` already provides side padding so items
-are not flush with the screen edge. No JS or test-file changes required.
-
----
-
-## T-004 — Optimistic UI: instant toggle and reactivate
-
-### Goal
-`toggleStatus` and `addEntryByText` must update local state **before** the API
-call resolves so the UI responds immediately regardless of network speed.
-
-### Files to change
-| File | Change |
-|------|--------|
-| `frontend/src/pages/ListDetailPage.jsx` | Refactor `toggleStatus` and `addEntryByText` |
-| `frontend/src/pages/ListDetailPage.test.jsx` | Add optimistic-UI test cases |
-
-### Implementation detail — `toggleStatus`
-
-Rewrite to apply the optimistic state update first, then fire the API call.
-Revert only on non-network errors (network errors are handled by the offline queue
-which returns `{ queued: true }` without throwing).
-
-```js
-async function toggleStatus(entry) {
-  const nextStatus = entry.status === "open" ? "done" : "open";
-
-  // 1. Optimistic update — immediate UI change
-  const optimisticEntry = { ...entry, status: nextStatus, is_pending_sync: true };
-  await updateEntries((currentEntries) =>
-    sortEntries(
-      currentEntries.map((e) => (e.id === entry.id ? optimisticEntry : e))
-    )
-  );
-  if (nextStatus === "done") {
-    setRecentlyUsed((current) => upsertRecentlyUsedItems(current, entry));
-  }
-
-  try {
-    setEntryError("");
-    const result = await updateEntry(id, entry.id, token, { status: nextStatus });
-
-    // 2. Settle with real server data (or confirm queued state)
-    await updateEntries((currentEntries) =>
-      sortEntries(
-        currentEntries.map((e) =>
-          e.id === entry.id
-            ? { ...e, ...(result?.queued ? { is_pending_sync: true } : result.entry) }
-            : e
-        )
-      )
-    );
-    if (nextStatus === "done" && !result?.queued) {
-      setRecentlyUsed((current) =>
-        upsertRecentlyUsedItems(current, result?.entry ?? entry)
-      );
-    }
-  } catch (submitError) {
-    // 3. Revert on server-side (non-network) error
-    await updateEntries((currentEntries) =>
-      sortEntries(currentEntries.map((e) => (e.id === entry.id ? entry : e)))
-    );
-    if (nextStatus === "done") {
-      setRecentlyUsed((current) =>
-        current.filter((item) => item.text !== entry.text)
-      );
-    }
-    setEntryError(submitError.message);
-  }
-}
-```
-
-### Implementation detail — `addEntryByText`
-
-Move the temporary entry creation and UI insertion **before** `await createEntry`.
-On API success, replace the temp entry with the real one. On failure, remove it.
-
-```js
-async function addEntryByText(text, icon, details = "") {
-  const trimmed = text.trim();
-  if (!trimmed) return false;
-
-  const nextDetails = normalizeEntryDetails(details);
-  const temporaryEntry = {
-    id: createTemporaryId("entry"),
-    text: trimmed,
-    icon: icon ?? null,
-    details: nextDetails,
-    status: "open",
-    created_at: new Date().toISOString(),
-    is_pending_sync: true
-  };
-
-  // 1. Optimistic insert — appears immediately
-  await updateEntries((currentEntries) =>
-    sortEntries([...currentEntries, temporaryEntry])
-  );
-
-  try {
-    setEntryError("");
-    const result = await createEntry(
-      id,
-      token,
-      { text: trimmed, icon: icon ?? null, details },
-      { tempId: temporaryEntry.id }
-    );
-
-    // 2. Replace temp with settled entry
-    await updateEntries((currentEntries) =>
-      sortEntries(
-        currentEntries.map((e) =>
-          e.id === temporaryEntry.id
-            ? (result?.queued ? temporaryEntry : result.entry)
-            : e
-        )
-      )
-    );
-    return true;
-  } catch (submitError) {
-    // 3. Revert on error
-    await updateEntries((currentEntries) =>
-      currentEntries.filter((e) => e.id !== temporaryEntry.id)
-    );
-    setEntryError(submitError.message);
-    return false;
-  }
-}
-```
-
-`handleAddFromHistory` already removes the item from recently-used before calling
-`addEntryByText`, so no changes are needed there — the optimistic insert in
-`addEntryByText` covers the "immediate open-entries appearance" requirement.
-
-### Tests to add (`ListDetailPage.test.jsx`)
-
-Add render-based tests (mock `fetchLists`, `fetchEntries`, `fetchRecentlyUsed`,
-`updateEntry`, `createEntry` from their respective API modules):
-
-```
-it("removes a toggled entry from the open list in the same render cycle")
-  → mock updateEntry to never resolve → click toggle button
-  → entry must be gone from the list before updateEntry resolves
-
-it("reverts a toggled entry when the API returns a non-network error")
-  → mock updateEntry to reject with new Error("Server error")
-  → entry reappears, error banner shown
-
-it("adds a temp entry to open entries immediately when reactivating from history")
-  → mock createEntry to never resolve → click recently-used chip
-  → temp entry (is_pending_sync) appears in open entries immediately
-```
-
----
-
-## T-005 — Tile grid for open entries and recently-used section
-
-### Goal
-Replace the full-width row layout with space-efficient grid layouts:
-- Open entries → 3-column tile grid; tap to toggle done; long-press to edit
-- Recently used → 2-column chip grid with overlay dismiss badge
-
-### Files to change
-| File | Change |
-|------|--------|
-| `frontend/src/hooks/useLongPress.js` | New hook (extracted from tile component) |
-| `frontend/src/hooks/useLongPress.test.js` | New unit tests for the hook |
-| `frontend/src/components/EntryTile.jsx` | New component replacing `EntryRow` |
-| `frontend/src/components/EntryRow.jsx` | Delete (replaced by `EntryTile.jsx`) |
-| `frontend/src/components/entry-tile.test.jsx` | New test file (replaces `entry-row.test.jsx`) |
-| `frontend/src/components/entry-row.test.jsx` | Delete |
-| `frontend/src/components/RecentlyUsedSection.jsx` | Restructure to 2-column grid |
-| `frontend/src/components/RecentlyUsedSection.test.jsx` | Update selectors |
-| `frontend/src/pages/ListDetailPage.jsx` | Use `EntryTile`, remove `handleDeleteEntry` |
-| `frontend/src/pages/ListDetailPage.test.jsx` | Update to match new structure |
-| `frontend/src/index.css` | Add tile grid CSS; update recently-used grid CSS |
-
-### Implementation detail — `useLongPress.js`
-
-```js
-import { useRef, useState } from "react";
-
-export function useLongPress(onLongPress, ms = 500) {
-  const timerRef = useRef(null);
-  const longPressedRef = useRef(false);
-  const [pressing, setPressing] = useState(false);
-
-  function start() {
-    longPressedRef.current = false;
-    setPressing(true);
-    timerRef.current = setTimeout(() => {
-      longPressedRef.current = true;
-      setPressing(false);
-      onLongPress();
-    }, ms);
-  }
-
-  function cancel() {
-    setPressing(false);
-    clearTimeout(timerRef.current);
-    timerRef.current = null;
-  }
-
-  function handleClick(e) {
-    // Suppress the synthetic click that follows touchend when a long-press fired
-    if (longPressedRef.current) {
-      e.preventDefault();
-      e.stopPropagation();
-      longPressedRef.current = false;
-    }
-  }
-
-  return {
-    pressing,
-    longPressHandlers: {
-      onMouseDown: start,
-      onMouseUp: cancel,
-      onMouseLeave: cancel,
-      onTouchStart: start,
-      onTouchEnd: cancel,
-      onTouchCancel: cancel,
-      onClick: handleClick
-    }
-  };
-}
-```
-
-### Implementation detail — `EntryTile.jsx`
-
-```jsx
-import { useTranslation } from "react-i18next";
-import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName }
-  from "../data/iconRegistry";
-import { useLongPress } from "../hooks/useLongPress";
-import { Icon } from "./ui";
-
-export default function EntryTile({ entry, onToggle, onEdit }) {
-  const { t } = useTranslation();
-  const resolvedIconName = resolveIconName(entry.icon);
-  const EntryIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
-  const { pressing, longPressHandlers } = useLongPress(() => onEdit?.(), 500);
-
-  return (
-    <button
-      aria-label={
-        entry.status === "done"
-          ? t("entry.markOpen", { name: entry.text })
-          : t("entry.markDone", { name: entry.text })
-      }
-      className={[
-        "entry-tile",
-        entry.status === "done" ? "entry-tile--done" : "",
-        pressing ? "entry-tile--pressing" : "",
-        entry.is_pending_sync ? "entry-tile--pending" : ""
-      ].filter(Boolean).join(" ")}
-      data-testid={`entry-tile-${entry.id}`}
-      type="button"
-      {...longPressHandlers}
-      onClick={(e) => {
-        longPressHandlers.onClick(e);
-        if (!e.defaultPrevented) onToggle?.();
-      }}
-    >
-      <EntryIcon
-        aria-hidden="true"
-        className="entry-tile-icon"
-        data-icon-name={resolvedIconName ?? FALLBACK_ICON_NAME}
-        data-testid={`entry-tile-icon-${entry.id}`}
-        size={24}
-        stroke={1.5}
-      />
-      <p className="entry-tile-text">{entry.text}</p>
-      {entry.details ? <p className="entry-tile-details">{entry.details}</p> : null}
-      {entry.is_pending_sync
-        ? <span className="eg-chip-queued entry-tile-chip">{t("common.queued")}</span>
-        : null}
-    </button>
-  );
-}
-```
-
-**onClick / longPress interaction:** `longPressHandlers.onClick` calls
-`e.preventDefault()` when a long-press just fired, setting `defaultPrevented`.
-The outer `onClick` checks this before calling `onToggle` so only one action fires.
-
-### Implementation detail — CSS for `EntryTile`
-
-Add to `index.css`:
-```css
-.entry-tile-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.entry-tile {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 8px;
-  border: 1px solid rgba(139, 43, 226, 0.18);
-  border-radius: var(--radius-md);
-  background: var(--bg-raised);
-  color: var(--text-primary);
-  cursor: pointer;
-  font: inherit;
-  text-align: center;
-  transition: opacity 0.15s ease, transform 0.15s ease,
-              border-color var(--duration-micro);
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.entry-tile:hover {
-  border-color: rgba(0, 229, 255, 0.3);
-}
-
-.entry-tile--pressing {
-  opacity: 0.55;
-  transform: scale(0.94);
-}
-
-.entry-tile--done {
-  opacity: 0.4;
-  border-color: rgba(0, 229, 176, 0.2);
-}
-
-.entry-tile-icon {
-  flex-shrink: 0;
-}
-
-.entry-tile-text {
-  margin: 0;
-  font-size: 0.8rem;
-  font-weight: 500;
-  line-height: 1.3;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  word-break: break-word;
-}
-
-.entry-tile-details {
-  margin: 0;
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-  line-height: 1.3;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  word-break: break-word;
-}
-
-.entry-tile-chip {
-  font-size: 0.65rem;
-}
-```
-
-### Implementation detail — `RecentlyUsedSection.jsx` (2-column grid)
-
-Replace the current `recently-used-list` / `recently-used-chip-row` structure.
-Each grid cell holds the chip button and an absolutely-positioned dismiss badge.
-
-```jsx
-<div className="recently-used-grid">
-  {items.map((item) => {
-    const resolvedIconName = resolveIconName(item.icon) ?? FALLBACK_ICON_NAME;
-    const ItemIcon = ICON_REGISTRY[resolvedIconName];
-    return (
-      <div key={item.text} className="recently-used-cell">
-        <button
-          aria-label={item.text}
-          className="recently-used-chip"
-          type="button"
-          onClick={() => onAdd?.(item.text, item.icon ?? null)}
-        >
-          <ItemIcon
-            aria-hidden="true"
-            className="recently-used-chip-icon"
-            data-icon-name={resolvedIconName}
-            size={20}
-            stroke={1.6}
-          />
-          <span className="recently-used-chip-text">{item.text}</span>
-        </button>
-        <button
-          aria-label={t("recent.dismiss", { name: item.text })}
-          className="recently-used-chip-dismiss"
-          type="button"
-          onClick={() => onDismiss?.(item.text)}
-        >
-          <Icon color="var(--text-secondary)" name="x" size={14} />
-        </button>
-      </div>
-    );
-  })}
-</div>
-```
-
-### CSS for `RecentlyUsedSection` (replace / update existing rules)
-
-```css
-/* Replace .recently-used-list */
-.recently-used-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.recently-used-cell {
-  position: relative;
-}
-
-/* Update .recently-used-chip to column/tile layout */
-.recently-used-chip {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid rgba(0, 229, 255, 0.18);
-  border-radius: var(--radius-md);   /* was 999px */
-  background: rgba(0, 229, 255, 0.08);
-  color: var(--text-primary);
-  cursor: pointer;
-  padding: 10px 8px;
-  text-align: center;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.recently-used-chip-text {
-  font-size: 0.8rem;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  word-break: break-word;
-}
-
-/* Dismiss button as overlay badge (top-right corner) */
-.recently-used-chip-dismiss {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 20px;
-  height: 20px;
-  display: inline-grid;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-/* Remove old row-based rules */
-/* Delete: .recently-used-list, .recently-used-chip-row */
-```
-
-### `ListDetailPage.jsx` changes
-
-1. Replace `import EntryRow` → `import EntryTile from "../components/EntryTile"`.
-2. Wrap the `openEntries.map(...)` in `<div className="entry-tile-grid">`.
-3. Replace `<EntryRow ... onDelete onEdit onToggle>` with
-   `<EntryTile ... onToggle onEdit>` (no `onDelete`).
-4. Remove `handleDeleteEntry` function entirely.
-
-### Tests
-
-**`useLongPress.test.js`** (new):
-```
-it("does not call onLongPress on a short tap (< 500 ms)")
-it("calls onLongPress after 500 ms hold")
-it("sets pressing=true while held and pressing=false after release")
-it("does not call onLongPress if pointer leaves before threshold")
-```
-
-**`entry-tile.test.jsx`** (replaces `entry-row.test.jsx`):
-```
-it("renders the persisted icon")
-it("renders the fallback cart icon when no icon is set")
-it("renders a details line when details are present")
-it("omits the details line when details are absent")
-it("calls onToggle on a short tap")
-it("calls onEdit after a 500 ms hold and does NOT call onToggle")
-it("adds entry-tile--pressing class while held")
-```
-
-**`RecentlyUsedSection.test.jsx`**: existing tests rely on aria-label
-`t("recent.dismiss", { name })` — keep those assertions; update any selector that
-referenced `.recently-used-chip-row` to use `.recently-used-cell`.
-
----
-
-## T-006 — Mobile fix: icon browser visible on small screens
-
-### Goal
-Fix the bottom sheet exceeding the visible viewport when the virtual keyboard is
-shown on mobile.
-
-### Files to change
-| File | Change |
-|------|--------|
-| `frontend/src/index.css` | Replace `vh` with `dvh`; add explicit `--browser-open` override |
-
-### Implementation detail
-
-```css
-/* was: max-height: min(80vh, 44rem) */
-.bottom-sheet {
-  max-height: min(80dvh, 44rem);
-}
-
-/* New rule — more height for the icon browser */
-.bottom-sheet--browser-open {
-  max-height: min(92dvh, 44rem);
-}
-```
-
-`dvh` (dynamic viewport height) shrinks automatically when the iOS/Android
-software keyboard appears. Supported in Chrome 108+, Safari 15.4+, Firefox 101+.
-
-No JS changes required.
-
----
-
-## T-007 — Shrink "Mehr anzeigen" toggle to link style
-
-### Goal
-The icon-browser toggle button must look like an inline text link, not a ghost button.
-
-### Files to change
-| File | Change |
-|------|--------|
-| `frontend/src/components/AddItemSheet.jsx` | Remove `eg-btn-ghost` from the toggle button's `className` |
-| `frontend/src/index.css` | Replace stub `.add-item-more-btn` rule with link-style rules |
-
-### Implementation detail
-
-**`AddItemSheet.jsx`**:
-```jsx
-// Before
-className="eg-btn-ghost add-item-more-btn"
-// After
-className="add-item-more-btn"
-```
-
-**`index.css`** — replace the existing one-liner `.add-item-more-btn { width: fit-content; }`:
-```css
-.add-item-more-btn {
-  width: fit-content;
-  padding: 0.15rem 0;
-  border: 0;
-  background: none;
-  color: var(--neon-violet);
-  font: inherit;
-  font-size: 0.9rem;
-  cursor: pointer;
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  transition: text-decoration-color var(--duration-micro), opacity var(--duration-micro);
-}
-
-.add-item-more-btn:hover,
-.add-item-more-btn:focus-visible {
-  text-decoration-color: currentColor;
-  opacity: 0.85;
-}
-```
-
-The `<button>` element and its type/role remain unchanged. No test-file changes
-required.
-
----
-
-## Validation checklist (run after every task)
-
-```
-npm run lint
-npm run build
-npm test
-```
-
-All three must pass before marking a task `ready_for_review`.
-
----
-
-## T-008 — Remove obsolete swipe-to-delete E2E test
-
-### Goal
-The E2E test `deletes an item from a shopping list via swipe` references `.entry-row`
-and swipe-to-delete behaviour that were intentionally removed in T-005. The test fails
-on every CI run. Remove it and the `swipeEntryLeft` helper that only it uses.
-
-### Background
-`EntryRow.jsx` was replaced by `EntryTile.jsx` in T-005. Swipe-to-delete was a
-deliberate product decision to drop (ROADMAP Priority 5: "Remove swipe-to-delete").
-The E2E test was not cleaned up at that time, causing the current CI failure.
-
-### Files to change
-| File | Change |
-|------|--------|
-| `e2e/lists.spec.js` | Remove `swipeEntryLeft` helper (lines 60–106) and the test block `deletes an item from a shopping list via swipe` (lines 142–155) |
-
-### Implementation detail
-- Delete the entire `swipeEntryLeft` async function (lines 60–106).
-- Delete the entire `test("deletes an item from a shopping list via swipe", ...)` block (lines 142–155).
-- Keep `openItemsSection` and `recentlyUsedSection` helpers — they are used by the remaining tests.
-- No other files require changes.
+- `frontend/package.json`
+- `frontend/tsconfig.json` *(new)*
+- `frontend/src/vite-env.d.ts` *(new)*
+- `frontend/vite.config.ts` *(renamed from `.js`)*
+- `frontend/index.html`
+- `frontend/src/test/setup.ts` *(renamed from `.js`)*
+- `package.json` *(root)*
+- `eslint.config.js`
 
 ### Validation
 ```
-npm run lint
+cd frontend && npm install
+npm run build        # must succeed
+npm run lint         # must pass
+npm test             # must pass
+```
+
+---
+
+## T-002 — Shared Domain Types
+
+### Objective
+Create `src/types.ts` with all shared domain interfaces so later tasks can
+import from a single location instead of redeclaring shapes.
+
+### `src/types.ts` content
+
+```typescript
+// ── Grocery domain ───────────────────────────────────────────────────────────
+
+export interface Entry {
+  id: string;
+  text: string;
+  icon?: string | null;
+  details?: string;
+  status: "open" | "done";
+  is_pending_sync?: boolean;
+}
+
+export interface List {
+  id: string;
+  name?: string;
+  is_owner?: boolean;
+}
+
+export interface Member {
+  id: string;
+  email?: string;
+  display_name?: string;
+}
+
+export interface User {
+  id: string;
+  display_name?: string;
+  email?: string;
+}
+
+// ── App config ───────────────────────────────────────────────────────────────
+
+export interface AppConfig {
+  registrationEnabled: boolean;
+}
+
+// ── Offline queue ─────────────────────────────────────────────────────────────
+
+export interface QueueMeta {
+  resourceType?: string;
+  tempId?: string;
+}
+
+export interface OfflineMutation {
+  id: string;
+  url: string;
+  method: string;
+  payload?: unknown;
+  token: string;
+  createdAt: string;
+  queueMeta?: QueueMeta | null;
+}
+
+export interface OfflineQueueContextValue {
+  isOffline: boolean;
+  queuedCount: number;
+  isSyncing: boolean;
+  syncError: string;
+  syncVersion: number;
+}
+
+// ── Autocomplete / suggestions ────────────────────────────────────────────────
+
+export interface Suggestion {
+  text: string;
+  icon?: string | null;
+  useCount?: number;
+}
+
+// ── Icon worker ───────────────────────────────────────────────────────────────
+
+export interface TopMatch {
+  iconName: string;
+  score: number;
+}
+
+export interface IconMatchResult {
+  iconName: string | null;
+  score: number;
+  topMatches: TopMatch[];
+}
+
+// ── Icon registry ─────────────────────────────────────────────────────────────
+
+/** Minimum prop contract shared by every icon component in ICON_REGISTRY. */
+export interface IconProps {
+  size?: number;
+  stroke?: number;
+  strokeWidth?: number;
+  className?: string;
+  "aria-hidden"?: boolean | "true";
+  "data-icon-name"?: string;
+  "data-testid"?: string;
+}
+```
+
+### Files to change
+- `frontend/src/types.ts` *(new)*
+
+### Validation
+```
 npm run build
+npm run lint
+```
+
+---
+
+## T-003 — Pure Modules
+
+### Objective
+Migrate utility, data, and service-worker-registration modules. No React, no
+component imports.
+
+### File-by-file notes
+
+| Old path | New path | Notes |
+|---|---|---|
+| `src/app.constants.js` | `src/app.constants.ts` | Add `export const APP_TITLE: string` |
+| `src/i18n.js` | `src/i18n.ts` | Infer or cast `i18next` return type; `skipLibCheck` covers any gaps |
+| `src/utils/cosineSimilarity.js` | `src/utils/cosineSimilarity.ts` | Type params as `number[]`, return `number` |
+| `src/data/iconDatabase.js` | `src/data/iconDatabase.ts` | Add `IconDbEntry` interface `{ label: string; icon: string; tags?: string[] }`, type `ICON_DB` as `readonly IconDbEntry[]` |
+| `src/data/customIcons.js` | `src/data/customIcons.ts` | Each Custom* component: `React.FC<IconProps>` using `IconProps` from `src/types.ts` |
+| `src/data/iconRegistry.js` | `src/data/iconRegistry.ts` | Type `ICON_REGISTRY` as `Readonly<Record<string, React.ComponentType<IconProps>>>`. Type `fromLucide` wrapper to accept `React.ComponentType<...>` and return `React.FC<IconProps>` |
+| `src/sw/register.js` | `src/sw/register.ts` | Type `registerServiceWorker(): void` |
+
+### Files to change
+- `frontend/src/app.constants.ts`
+- `frontend/src/i18n.ts`
+- `frontend/src/utils/cosineSimilarity.ts`
+- `frontend/src/data/iconDatabase.ts`
+- `frontend/src/data/customIcons.ts`
+- `frontend/src/data/iconRegistry.ts`
+- `frontend/src/sw/register.ts`
+
+### Validation
+```
+npm run build
+npm run lint
 npm test
 ```
-All three must pass. The E2E suite itself runs in CI only; local validation via
-`npm test` (unit tests) is sufficient to confirm no regressions in the unit layer.
+
+---
+
+## T-004 — API Layer
+
+### Objective
+Migrate all files in `src/api/` to TypeScript. Type request options and return
+values. Import shared types from `src/types.ts`.
+
+### File-by-file notes
+
+**`client.ts`**
+- Add `SendJsonRequestOptions` interface (token, method, payload, headers,
+  cacheKey, offlineFallbackMessage, queueable, queueMeta)
+- `sendJsonRequest(url: string, options?: SendJsonRequestOptions): Promise<unknown>`
+- Helper functions typed with explicit return types
+
+**`offlineStore.ts`**
+- Import `OfflineMutation` from `src/types.ts`
+- `enqueueOfflineMutation(mutation: OfflineMutation): Promise<void>`
+- `listOfflineMutations(): Promise<OfflineMutation[]>`
+- `readCachedResource(key: string): Promise<unknown>`
+- `writeCachedResource(key: string, value: unknown): Promise<void>`
+- `removeOfflineMutation(id: string): Promise<void>`
+- `resetOfflineStateForTests(): Promise<void>`
+
+**`auth.ts`**
+- Import `User` from `src/types.ts`
+- `loginUser(credentials: { email: string; password: string }): Promise<{ token: string; user?: User }>`
+- `registerUser(payload: { email: string; password: string; display_name?: string }): Promise<unknown>`
+- `fetchCurrentUser(token: string): Promise<User>`
+
+**`config.ts`**
+- Import `AppConfig` from `src/types.ts`
+- `fetchAppConfig(): Promise<AppConfig>`
+
+**`lists.ts`**
+- Import `List` from `src/types.ts`
+- `fetchLists(token: string): Promise<{ lists: List[] }>`
+- `createList`, `renameList`, `deleteList` — typed accordingly
+
+**`entries.ts`**
+- Import `Entry` from `src/types.ts`
+- `fetchEntries(listId: string, token: string): Promise<{ entries: Entry[] }>`
+- `createEntry`, `updateEntry`, `deleteEntry` — typed accordingly
+
+**`history.ts`**
+- Import `Suggestion` from `src/types.ts`
+- Type return as `{ items: Suggestion[] }` or similar (read file first)
+
+**`suggestions.ts`**
+- Import `Suggestion` from `src/types.ts`
+- Type response shape with `offline?: boolean` and `suggestions: Suggestion[]`
+
+**`sharing.ts`**
+- Import `Member` from `src/types.ts`
+- `fetchListMembers`, `shareListWithMember`, `revokeListMember` — typed
+
+**`push.ts`**
+- Type push subscription and response shapes (read file first)
+
+### Files to change
+- `frontend/src/api/auth.ts`
+- `frontend/src/api/client.ts`
+- `frontend/src/api/config.ts`
+- `frontend/src/api/entries.ts`
+- `frontend/src/api/history.ts`
+- `frontend/src/api/lists.ts`
+- `frontend/src/api/offlineStore.ts`
+- `frontend/src/api/push.ts`
+- `frontend/src/api/sharing.ts`
+- `frontend/src/api/suggestions.ts`
+
+### Validation
+```
+npm run build
+npm run lint
+npm test
+```
+
+---
+
+## T-005 — Workers
+
+### Objective
+Migrate `src/workers/` to TypeScript. Handle `@xenova/transformers` boundary
+with `// @ts-expect-error` (one comment per suppression, with reason).
+
+### File-by-file notes
+
+**`iconWorker.ts`**
+- Add `// @ts-expect-error — @xenova/transformers has no bundled types` before
+  the `import { pipeline }` line
+- Type `matchIcon` return as `Promise<IconMatchResult>` (from `src/types.ts`)
+- `self.addEventListener("message", ...)` — `self` is `DedicatedWorkerGlobalScope`
+  (available via `lib: ["DOM"]`); cast if needed
+
+**`iconWorkerClient.ts`**
+- Import `IconMatchResult` from `src/types.ts`
+- Type `pendingRequests` map:
+  `Map<number, { resolve: (v: IconMatchResult) => void; reject: (e: Error) => void }>`
+- `requestIconMatch(text: string): Promise<IconMatchResult>`
+- `primeIconWorker(): void`, `getIconWorker(): Worker | null`
+- Worker URL reference: `new Worker(new URL("./iconWorker.ts", import.meta.url), { type: "module" })`
+
+### Files to change
+- `frontend/src/workers/iconWorker.ts`
+- `frontend/src/workers/iconWorkerClient.ts`
+
+### Validation
+```
+npm run build
+npm run lint
+npm test
+```
+
+---
+
+## T-006 — Hooks and Contexts
+
+### Objective
+Migrate all hooks to `.ts` and all context files to `.tsx`/`.ts`. Import domain
+types from `src/types.ts`.
+
+### Hooks (`src/hooks/`)
+
+**`useLongPress.ts`**
+```typescript
+interface LongPressHandlers {
+  onMouseDown: () => void;
+  onMouseUp: () => void;
+  onMouseLeave: () => void;
+  onTouchStart: () => void;
+  onTouchEnd: () => void;
+  onTouchCancel: () => void;
+  onClick: (event: React.MouseEvent) => void;
+}
+interface LongPressResult {
+  pressing: boolean;
+  longPressHandlers: LongPressHandlers;
+}
+export function useLongPress(
+  onLongPress: (() => void) | undefined,
+  ms?: number
+): LongPressResult
+```
+
+**`useAutocomplete.ts`**
+- Import `Suggestion` from `src/types.ts`
+- Returns `{ suggestions: Suggestion[]; loading: boolean }`
+
+**`useIconSuggestion.ts`**
+- Returns `{ iconName: string | null; topMatches: string[]; loading: boolean }`
+
+**`useListEvents.ts`**
+- `type SseEventType` literal union (same as in EventSourceContext)
+- `handler: (data: Record<string, unknown>) => void`
+
+**`useOfflineQueue.ts`**
+- Import `OfflineQueueContextValue` from `src/types.ts`
+- Return type: `OfflineQueueContextValue`
+
+**`usePushNotifications.ts`**
+- Type return shape explicitly (read file first)
+
+### Contexts (`src/context/`)
+
+**`appConfigState.ts`**
+- Import `AppConfig` from `src/types.ts`
+- `AppConfigContext: React.Context<AppConfig>`
+- `defaultAppConfig: AppConfig`
+- `useAppConfig(): AppConfig`
+
+**`AppConfigContext.tsx`**
+- `interface AppConfigProviderProps { children: React.ReactNode; loadConfig?: () => Promise<AppConfig> }`
+- `interface StaticAppConfigProviderProps { children: React.ReactNode; registrationEnabled?: boolean }`
+
+**`offlineQueueContextValue.ts`**
+- Import `OfflineQueueContextValue` from `src/types.ts`
+- `OfflineQueueContext: React.Context<OfflineQueueContextValue | null>`
+
+**`OfflineQueueContext.tsx`**
+- `interface OfflineQueueProviderProps { children: React.ReactNode }`
+- `replaceTemporaryIds`: use overloads or `unknown` parameter narrowed with guards
+- `extractCreatedId(resourceType: string | undefined, data: unknown): string`
+
+**`AuthContext.tsx`**
+- Import `User` from `src/types.ts`
+- `interface AuthContextValue { token: string; user: User | null; login: (credentials: { email: string; password: string }) => Promise<{ token: string; user?: User }>; register: (payload: unknown) => Promise<unknown>; logout: () => void; setAuthToken: (token: string, user?: User | null) => void }`
+- `AuthContext: React.Context<AuthContextValue | null>`
+
+**`EventSourceContext.tsx`**
+- `type SseEventType = "entry:created" | "entry:updated" | "entry:deleted" | "list:updated" | "list:deleted" | "member:added" | "member:removed"`
+- `type SseHandler = (data: Record<string, unknown>) => void`
+- `interface EventSourceContextValue { addEventListener: (type: SseEventType, handler: SseHandler) => () => void }`
+
+### Files to change
+- `frontend/src/hooks/useAutocomplete.ts`
+- `frontend/src/hooks/useIconSuggestion.ts`
+- `frontend/src/hooks/useListEvents.ts`
+- `frontend/src/hooks/useLongPress.ts`
+- `frontend/src/hooks/useOfflineQueue.ts`
+- `frontend/src/hooks/usePushNotifications.ts`
+- `frontend/src/context/AppConfigContext.tsx`
+- `frontend/src/context/appConfigState.ts`
+- `frontend/src/context/AuthContext.tsx`
+- `frontend/src/context/EventSourceContext.tsx`
+- `frontend/src/context/OfflineQueueContext.tsx`
+- `frontend/src/context/offlineQueueContextValue.ts`
+
+### Validation
+```
+npm run build
+npm run lint
+npm test
+```
+
+---
+
+## T-007 — UI Primitive Components
+
+### Objective
+Migrate `src/components/ui/` from `.jsx` to `.tsx`. All props via `interface`.
+
+### Key prop interfaces
+
+**`Icon.tsx`**
+- `interface IconProps { name: string; size?: number; color?: string; strokeWidth?: number }`
+  (separate from the `IconProps` in `src/types.ts` which is for registry icons)
+
+**`BottomSheet.tsx`**
+- `interface BottomSheetProps { open: boolean; onClose: () => void; title: string; className?: string; children?: React.ReactNode }`
+
+**`EmptyState.tsx`**, **`ErrorState.tsx`**, **`LoadingState.tsx`**, **`FAB.tsx`**, **`TopBar.tsx`**
+- Read each file first; define minimal prop interfaces covering all used props
+
+**`index.ts`** (was `.js`)
+- Re-export all UI components; no runtime changes needed
+
+### Files to change
+- `frontend/src/components/ui/BottomSheet.tsx`
+- `frontend/src/components/ui/EmptyState.tsx`
+- `frontend/src/components/ui/ErrorState.tsx`
+- `frontend/src/components/ui/FAB.tsx`
+- `frontend/src/components/ui/Icon.tsx`
+- `frontend/src/components/ui/LoadingState.tsx`
+- `frontend/src/components/ui/TopBar.tsx`
+- `frontend/src/components/ui/index.ts`
+
+### Validation
+```
+npm run build
+npm run lint
+npm test
+```
+
+---
+
+## T-008 — Feature Components
+
+### Objective
+Migrate all non-UI feature components in `src/components/` to `.tsx`. Import
+domain types from `src/types.ts`. All callback props typed.
+
+### Key prop interfaces (representative — implementer reads each file)
+
+**`EntryTile.tsx`**
+```typescript
+import { Entry } from "../types";
+interface EntryTileProps {
+  entry: Entry;
+  onEdit?: () => void;
+  onToggle?: () => void;
+}
+```
+
+**`AddItemSheet.tsx`**
+```typescript
+interface AddItemSheetProps {
+  initialDetails?: string;
+  initialIconName?: string | null;
+  initialText?: string;
+  listId?: string;
+  mode?: "add" | "edit";
+  open: boolean;
+  onAdd?: (text: string, iconName: string | null, details: string) => Promise<boolean | void> | void;
+  onClose?: () => void;
+}
+```
+
+**`AutocompleteSuggestions.tsx`**
+```typescript
+import { Suggestion } from "../types";
+interface AutocompleteSuggestionsProps {
+  suggestions: Suggestion[];
+  onSelect: (text: string, iconName: string | null) => void;
+}
+```
+
+**`ProtectedRoute.tsx`**
+```typescript
+interface ProtectedRouteProps { children: React.ReactNode }
+```
+
+**`ListCardHome.tsx`**
+```typescript
+import { List } from "../types";
+// read file to confirm exact prop shape
+```
+
+**`RecentlyUsedSection.tsx`**
+```typescript
+import { Suggestion } from "../types";
+// read file to confirm exact prop shape
+```
+
+All remaining components (`InfoSheet`, `LanguageSwitcher`, `ListOptionsSheet`,
+`NewListSheet`, `OfflineBanner`, `RenameListSheet`, `ShareListSheet`): read each
+file first; define minimal prop interface from actual usage.
+
+### Note on `inert` prop (`AddItemSheet.tsx`)
+React 19 added `inert` to `HTMLAttributes`. Confirm `@types/react` version
+supports it. If TypeScript errors on `inert`, cast:
+```typescript
+{...({ inert: showIconBrowser ? undefined : "" } as React.HTMLAttributes<HTMLDivElement>)}
+```
+
+### Files to change
+- `frontend/src/components/AddItemSheet.tsx`
+- `frontend/src/components/AutocompleteSuggestions.tsx`
+- `frontend/src/components/EntryTile.tsx`
+- `frontend/src/components/InfoSheet.tsx`
+- `frontend/src/components/LanguageSwitcher.tsx`
+- `frontend/src/components/ListCardHome.tsx`
+- `frontend/src/components/ListOptionsSheet.tsx`
+- `frontend/src/components/NewListSheet.tsx`
+- `frontend/src/components/OfflineBanner.tsx`
+- `frontend/src/components/ProtectedRoute.tsx`
+- `frontend/src/components/RecentlyUsedSection.tsx`
+- `frontend/src/components/RenameListSheet.tsx`
+- `frontend/src/components/ShareListSheet.tsx`
+
+### Validation
+```
+npm run build
+npm run lint
+npm test
+```
+
+---
+
+## T-009 — Pages and Entry Points
+
+### Objective
+Migrate all page components to `.tsx`, state helpers to `.ts`, and the two
+entry-point files (`App.tsx`, `main.tsx`). All local state typed explicitly.
+
+### Key notes
+
+**`recentlyUsedState.ts`**
+- Import `Suggestion` from `src/types.ts`
+- Type `filterRecentlyUsedItems` and `upsertRecentlyUsedItems` with `Suggestion[]`
+
+**`ListDetailPage.tsx`** (most complex)
+- Import `List`, `Entry`, `Member` from `src/types.ts`
+- Type every `useState` explicitly:
+  `const [list, setList] = useState<List | null>(null)`
+  `const [entries, setEntries] = useState<Entry[]>([])`
+  `const [members, setMembers] = useState<Member[]>([])`
+- Avoid inferred `null` literals without union types
+
+**`OverviewPage.tsx`**
+- `useState<List[]>([])` for the lists array
+
+**Auth pages** (`LoginPage`, `RegisterPage`, `ForgotPasswordPage`,
+`ResetPasswordPage`, `VerifyEmailPage`)
+- Form state: `string`; error state: `string`
+
+**`App.tsx`**
+- No props; routes typed by react-router-dom
+
+**`main.tsx`**
+- `document.getElementById("root")!` — non-null assertion (element is guaranteed
+  in `index.html`)
+
+**`index.html`** (if not already updated in T-001)
+- Confirm `src="/src/main.tsx"` in the module script tag
+
+### Files to change
+- `frontend/src/pages/ForgotPasswordPage.tsx`
+- `frontend/src/pages/InviteAcceptPage.tsx`
+- `frontend/src/pages/ListDetailPage.tsx`
+- `frontend/src/pages/LoginPage.tsx`
+- `frontend/src/pages/OverviewPage.tsx`
+- `frontend/src/pages/recentlyUsedState.ts`
+- `frontend/src/pages/RegisterPage.tsx`
+- `frontend/src/pages/ResetPasswordPage.tsx`
+- `frontend/src/pages/SearchPage.tsx`
+- `frontend/src/pages/VerifyEmailPage.tsx`
+- `frontend/src/App.tsx`
+- `frontend/src/main.tsx`
+
+### Validation
+```
+npm run build
+npm run lint
+npm test
+```
+
+---
+
+## T-010 — Test Files
+
+### Objective
+Rename all `*.test.jsx` → `*.test.tsx` and `*.test.js` → `*.test.ts`. Fix
+any TS errors in mocks, spies, and render helpers. Ensure Vitest types resolve.
+
+### Notes
+- Vitest ships its own types; no `@types/jest` needed.
+- Add `"types": ["vitest/globals"]` to `tsconfig.json` **or** use explicit
+  imports (`import { describe, it, expect, vi } from "vitest"`). Prefer explicit
+  imports — add to `tsconfig.json` only if the test files rely on implicit globals.
+- `vi.fn()` mocks: type as `ReturnType<typeof vi.fn>` or use the generic form
+  `vi.fn<[ParamTypes], ReturnType>()` where needed.
+- `@testing-library/react` `render` return is already typed; no extra types needed.
+
+### Files to rename/migrate
+
+| Old | New |
+|---|---|
+| `src/app.test.jsx` | `src/app.test.tsx` |
+| `src/i18n.test.js` | `src/i18n.test.ts` |
+| `src/vite-config.test.js` | `src/vite-config.test.ts` |
+| `src/components/AddItemSheet.test.jsx` | `src/components/AddItemSheet.test.tsx` |
+| `src/components/AutocompleteSuggestions.test.jsx` | `src/components/AutocompleteSuggestions.test.tsx` |
+| `src/components/entry-tile.test.jsx` | `src/components/entry-tile.test.tsx` |
+| `src/components/InfoSheet.test.jsx` | `src/components/InfoSheet.test.tsx` |
+| `src/components/LanguageSwitcher.test.jsx` | `src/components/LanguageSwitcher.test.tsx` |
+| `src/components/RecentlyUsedSection.test.jsx` | `src/components/RecentlyUsedSection.test.tsx` |
+| `src/components/ShareListSheet.test.jsx` | `src/components/ShareListSheet.test.tsx` |
+| `src/components/ui/ui.test.jsx` | `src/components/ui/ui.test.tsx` |
+| `src/context/AppConfigContext.test.jsx` | `src/context/AppConfigContext.test.tsx` |
+| `src/context/AuthContext.test.jsx` | `src/context/AuthContext.test.tsx` |
+| `src/context/EventSourceContext.test.jsx` | `src/context/EventSourceContext.test.tsx` |
+| `src/data/iconRegistry.test.js` | `src/data/iconRegistry.test.ts` |
+| `src/hooks/useAutocomplete.test.js` | `src/hooks/useAutocomplete.test.ts` |
+| `src/hooks/useIconSuggestion.test.js` | `src/hooks/useIconSuggestion.test.ts` |
+| `src/hooks/useListEvents.test.js` | `src/hooks/useListEvents.test.ts` |
+| `src/hooks/useLongPress.test.jsx` | `src/hooks/useLongPress.test.tsx` |
+| `src/hooks/usePushNotifications.test.js` | `src/hooks/usePushNotifications.test.ts` |
+| `src/pages/ListDetailPage.test.jsx` | `src/pages/ListDetailPage.test.tsx` |
+| `src/pages/recentlyUsedState.test.js` | `src/pages/recentlyUsedState.test.ts` |
+| `src/utils/cosineSimilarity.test.js` | `src/utils/cosineSimilarity.test.ts` |
+| `src/workers/iconWorkerClient.test.js` | `src/workers/iconWorkerClient.test.ts` |
+
+### Validation
+```
+npm run build
+npm run lint
+npm test        # all tests green
+```
+
+---
+
+## Global Conventions for All Tasks
+
+1. **No `any` without comment**: if `any` is unavoidable, add
+   `// ts-ignore-reason: <explanation>` on the preceding line.
+2. **`unknown` over `any`**: use `unknown` for generic API responses; narrow
+   with type guards or casts only after checking.
+3. **No functional changes**: this is a type-only migration. Do not alter
+   business logic, restructure imports, or rename exports.
+4. **Rename = delete old + create new**: delete the old `.js`/`.jsx` file and
+   create the `.ts`/`.tsx` file so Vite does not pick up duplicates.
+5. **Old `.js`/`.jsx` files must be deleted** — Vite resolves both and will
+   throw a "duplicate module" error if both exist.
+6. **`inert` prop note**: React 19 `@types/react` includes `inert` on
+   `HTMLAttributes`. Confirm installed `@types/react` version ≥ 18.3+ or 19+
+   before migrating `AddItemSheet`.

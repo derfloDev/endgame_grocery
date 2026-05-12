@@ -190,8 +190,11 @@ Run these checks before merging changes:
 - `npm test`
 - `npm run e2e`
 
-Frontend Vitest runs load `frontend/src/test/setup.js` before each suite so component
+Frontend Vitest runs load `frontend/src/test/setup.ts` before each suite so component
 tests start with the i18next runtime initialized and the language reset to English.
+The frontend TypeScript setup allows existing JavaScript modules during the staged
+TSX migration so converted entry points can continue importing files that move in
+later tasks.
 
 ## E2E Tests
 

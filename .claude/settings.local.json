@@ -31,7 +31,8 @@
       "Bash(sed -n '760,920p' /c/develop/endgame_grocery/frontend/src/index.css)",
       "Bash(grep -v 'Icon$')",
       "Read(//mnt/c/develop/**)",
-      "Read(//c/Users/flori/**)"
+      "Read(//c/Users/flori/**)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('devDependencies',{}\\), indent=2\\)\\)\")"
     ]
   }
 }
