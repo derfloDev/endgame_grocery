@@ -1,37 +1,28 @@
 import { useState } from "react";
+import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
-import { resetPassword } from "../api/auth";
+import { forgotPassword } from "../api/auth";
 
-export default function ResetPasswordPage() {
+export default function ForgotPasswordPage(): ReactElement {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token") ?? "";
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(token ? "" : t("auth.resetTokenRequired"));
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [email, setEmail] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const [notice, setNotice] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  async function handleSubmit(event) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-
-    if (!token) {
-      setError(t("auth.resetTokenRequired"));
-      return;
-    }
-
     setError("");
+    setNotice("");
     setIsSubmitting(true);
 
     try {
-      await resetPassword(token, password);
-      navigate("/login", {
-        replace: true,
-        state: { message: t("auth.passwordUpdatedLogin") }
-      });
+      await forgotPassword(email.trim());
+      setNotice(t("auth.resetSuccess"));
     } catch (submitError) {
-      setError(submitError.message);
+      setError(getErrorMessage(submitError));
     } finally {
       setIsSubmitting(false);
     }
@@ -47,27 +38,27 @@ export default function ResetPasswordPage() {
             <div className="auth-brand-sub">{t("app.brandSub")}</div>
           </div>
         </div>
-        <h1>{t("auth.choosePassword")}</h1>
-        <p>{t("auth.choosePasswordBody")}</p>
+        <h1>{t("auth.resetTitle")}</h1>
+        <p>{t("auth.resetBody")}</p>
         <form className="auth-form" onSubmit={handleSubmit}>
+          {notice ? <p className="eg-success-banner">{notice}</p> : null}
           {error ? <p className="eg-error-banner">{error}</p> : null}
           <div className="eg-field">
-            <label htmlFor="reset-password-next">{t("auth.newPassword")}</label>
+            <label htmlFor="forgot-password-email">{t("auth.email")}</label>
             <input
-              id="reset-password-next"
-              autoComplete="new-password"
+              id="forgot-password-email"
+              autoComplete="email"
               className="eg-input"
-              minLength={8}
-              name="password"
+              name="email"
               required
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
           </div>
           <div className="button-row">
             <button className="eg-btn-primary" disabled={isSubmitting} type="submit">
-              {isSubmitting ? t("auth.updating") : t("auth.updatePassword")}
+              {isSubmitting ? t("auth.sending") : t("auth.sendReset")}
             </button>
             <Link className="eg-link" to="/login">
               {t("auth.backToLogin")}
@@ -77,4 +68,8 @@ export default function ResetPasswordPage() {
       </section>
     </main>
   );
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

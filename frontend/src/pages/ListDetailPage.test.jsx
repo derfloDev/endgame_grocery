@@ -13,7 +13,7 @@ import { writeCachedResource } from "../api/offlineStore";
 import ListDetailPage from "./ListDetailPage";
 
 const cssSource = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
-const pageSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage.jsx"), "utf8");
+const pageSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage.tsx"), "utf8");
 
 vi.mock("../api/entries", () => ({
   createEntry: vi.fn(),

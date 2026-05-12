@@ -1,29 +1,35 @@
 import { useEffect, useState } from "react";
+import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { resendVerification, verifyEmail } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 
-export default function VerifyEmailPage() {
+interface VerifyEmailLocationState {
+  email?: string;
+}
+
+export default function VerifyEmailPage(): ReactElement {
   const { t } = useTranslation();
   const { token, setAuthToken } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const locationState = location.state as VerifyEmailLocationState | null;
   const verificationToken = searchParams.get("token");
-  const [email, setEmail] = useState(location.state?.email ?? "");
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [email, setEmail] = useState<string>(locationState?.email ?? "");
+  const [error, setError] = useState<string>("");
+  const [notice, setNotice] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!location.state?.email) {
+    if (!locationState?.email) {
       return;
     }
 
-    setEmail(location.state.email);
-  }, [location.state]);
+    setEmail(locationState.email);
+  }, [locationState]);
 
   useEffect(() => {
     if (!verificationToken) {
@@ -31,13 +37,14 @@ export default function VerifyEmailPage() {
     }
 
     let cancelled = false;
+    const tokenToVerify = verificationToken;
 
-    async function submitVerification() {
+    async function submitVerification(): Promise<void> {
       setError("");
       setNotice("");
 
       try {
-        const result = await verifyEmail(verificationToken);
+        const result = await verifyEmail(tokenToVerify);
 
         if (cancelled) {
           return;
@@ -50,7 +57,7 @@ export default function VerifyEmailPage() {
           return;
         }
 
-        setError(verificationError.message);
+        setError(getErrorMessage(verificationError));
       }
     }
 
@@ -65,7 +72,7 @@ export default function VerifyEmailPage() {
     return <Navigate to="/" replace />;
   }
 
-  async function handleResend() {
+  async function handleResend(): Promise<void> {
     if (!email.trim()) {
       setError(t("auth.emailRequired"));
       setNotice("");
@@ -80,7 +87,7 @@ export default function VerifyEmailPage() {
       await resendVerification(email.trim());
       setNotice(t("auth.verifySuccess"));
     } catch (resendError) {
-      setError(resendError.message);
+      setError(getErrorMessage(resendError));
     } finally {
       setIsSubmitting(false);
     }
@@ -131,4 +138,8 @@ export default function VerifyEmailPage() {
       </section>
     </main>
   );
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

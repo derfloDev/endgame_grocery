@@ -8,6 +8,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-009 — implement — 2026-05-12T15:22:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Migrated frontend pages, App entry shell, and recently-used page state to TypeScript with explicit local state and route/data boundary types. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `frontend/src/App.jsx`, `frontend/src/App.tsx`, `frontend/src/pages/ForgotPasswordPage.jsx`, `frontend/src/pages/ForgotPasswordPage.tsx`, `frontend/src/pages/InviteAcceptPage.jsx`, `frontend/src/pages/InviteAcceptPage.tsx`, `frontend/src/pages/ListDetailPage.jsx`, `frontend/src/pages/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage.test.jsx`, `frontend/src/pages/LoginPage.jsx`, `frontend/src/pages/LoginPage.tsx`, `frontend/src/pages/OverviewPage.jsx`, `frontend/src/pages/OverviewPage.tsx`, `frontend/src/pages/RegisterPage.jsx`, `frontend/src/pages/RegisterPage.tsx`, `frontend/src/pages/ResetPasswordPage.jsx`, `frontend/src/pages/ResetPasswordPage.tsx`, `frontend/src/pages/SearchPage.jsx`, `frontend/src/pages/SearchPage.tsx`, `frontend/src/pages/VerifyEmailPage.jsx`, `frontend/src/pages/VerifyEmailPage.tsx`, `frontend/src/pages/recentlyUsedState.js`, `frontend/src/pages/recentlyUsedState.ts` |
+| Validation | `npx tsc -p frontend/tsconfig.json --noEmit` PASS; `npm run lint` PASS with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` PASS with existing ONNX eval and chunk-size warnings; focused Vitest command PASS after sandbox `spawn EPERM` rerun; old page/App source scan PASS; `npm test` PASS after sandbox `spawn EPERM` rerun outside sandbox |
+| Commit | `chore(typescript): migrate frontend pages and entrypoints` |
+| Next Role | review |
+
+---
+
 ### T-008 — implement — 2026-05-12T13:19:02Z
 
 | Field | Value |
@@ -342,6 +355,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, all reviewed T-008 implementation and review files staged; unrelated `.claude/settings.local.json` left unstaged |
 | Validation | Reused reviewed validation from T-008: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, focused component Vitest command, `npm test` PASS |
 | Commit | `chore(typescript): migrate frontend feature components` |
+| Next Role | none |
+
+---
+
+### T-009 — review — 2026-05-12T17:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-009 pages and entry points migration; all 11 old .jsx/.js source files deleted, 11 typed .tsx/.ts files present plus main.tsx already done in T-001, zero any usage, all useState calls explicitly typed, 285/285 clean on first run. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-009 — implement — 2026-05-12T15:47:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-009 frontend pages and entry points TypeScript migration and closed the task. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, all reviewed T-009 implementation and review files staged; unrelated `.claude/settings.local.json` left unstaged |
+| Validation | Reused reviewed validation from T-009: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, focused page Vitest command, `npm test` PASS |
+| Commit | `chore(typescript): migrate frontend pages and entrypoints` |
 | Next Role | none |
 
 ---

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
@@ -18,32 +19,75 @@ import { useAuth } from "../context/AuthContext";
 import { useListEvents } from "../hooks/useListEvents";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 import { usePushNotifications } from "../hooks/usePushNotifications";
+import type { Entry, List, Member, Suggestion } from "../types";
 import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "./recentlyUsedState";
 
-export default function ListDetailPage() {
+interface DetailEntry extends Omit<Entry, "details"> {
+  details?: string | null;
+  created_at?: string;
+  is_pending_sync?: boolean;
+}
+
+interface DetailList extends List {
+  name?: string;
+  owner_name?: string;
+  is_pending_sync?: boolean;
+}
+
+interface DetailMember extends Member {
+  user_id: string;
+  display_name: string;
+  email: string;
+  is_owner?: boolean;
+  is_pending_sync?: boolean;
+}
+
+interface LoadEntriesOptions {
+  historyItems?: Suggestion[] | null;
+  throwOnError?: boolean;
+}
+
+interface LoadMembersOptions {
+  isOwner?: boolean;
+  throwOnError?: boolean;
+}
+
+interface ShareInviteResult {
+  queued?: boolean;
+  invite?: {
+    invited_email?: string;
+  };
+}
+
+function isShareInviteResult(value: unknown): value is ShareInviteResult {
+  return Boolean(value) && typeof value === "object";
+}
+
+export default function ListDetailPage(): ReactElement {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
+  const listId = id ?? "";
   const { token } = useAuth();
   const { syncVersion } = useOfflineQueue();
-  const [list, setList] = useState(null);
-  const [entries, setEntries] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [recentlyUsed, setRecentlyUsed] = useState([]);
-  const [shareEmail, setShareEmail] = useState("");
-  const [entryError, setEntryError] = useState("");
-  const [shareError, setShareError] = useState("");
-  const [shareNotice, setShareNotice] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isShareSubmitting, setIsShareSubmitting] = useState(false);
-  const [isSharingLoading, setIsSharingLoading] = useState(false);
-  const [showAddItem, setShowAddItem] = useState(false);
-  const [editingEntry, setEditingEntry] = useState(null);
-  const [showOptions, setShowOptions] = useState(false);
-  const [showRename, setShowRename] = useState(false);
-  const [showShare, setShowShare] = useState(false);
-  const isMountedRef = useRef(false);
-  const shouldShowPushToggle = Boolean(list) && (!list.is_owner || members.length > 1);
+  const [list, setList] = useState<DetailList | null>(null);
+  const [entries, setEntries] = useState<DetailEntry[]>([]);
+  const [members, setMembers] = useState<DetailMember[]>([]);
+  const [recentlyUsed, setRecentlyUsed] = useState<Suggestion[]>([]);
+  const [shareEmail, setShareEmail] = useState<string>("");
+  const [entryError, setEntryError] = useState<string>("");
+  const [shareError, setShareError] = useState<string>("");
+  const [shareNotice, setShareNotice] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isShareSubmitting, setIsShareSubmitting] = useState<boolean>(false);
+  const [isSharingLoading, setIsSharingLoading] = useState<boolean>(false);
+  const [showAddItem, setShowAddItem] = useState<boolean>(false);
+  const [editingEntry, setEditingEntry] = useState<DetailEntry | null>(null);
+  const [showOptions, setShowOptions] = useState<boolean>(false);
+  const [showRename, setShowRename] = useState<boolean>(false);
+  const [showShare, setShowShare] = useState<boolean>(false);
+  const isMountedRef = useRef<boolean>(false);
+  const shouldShowPushToggle = list !== null && (!list.is_owner || members.length > 1);
   const {
     isReady: isPushReady,
     isSubscribed,
@@ -64,10 +108,10 @@ export default function ListDetailPage() {
   }, []);
 
   const loadEntries = useCallback(
-    async ({ historyItems = null, throwOnError = false } = {}) => {
+    async ({ historyItems = null, throwOnError = false }: LoadEntriesOptions = {}): Promise<DetailEntry[]> => {
       try {
-        const entriesResult = await fetchEntries(id, token);
-        const nextEntries = entriesResult.entries ?? [];
+        const entriesResult = await fetchEntries(listId, token);
+        const nextEntries = (entriesResult.entries ?? []) as DetailEntry[];
 
         if (isMountedRef.current) {
           setEntries(nextEntries);
@@ -77,7 +121,7 @@ export default function ListDetailPage() {
         return nextEntries;
       } catch (loadError) {
         if (isMountedRef.current) {
-          setEntryError(loadError.message);
+          setEntryError(getErrorMessage(loadError));
         }
 
         if (throwOnError) {
@@ -87,11 +131,11 @@ export default function ListDetailPage() {
         return [];
       }
     },
-    [id, token]
+    [listId, token]
   );
 
   const loadMembers = useCallback(
-    async ({ isOwner = false, throwOnError = false } = {}) => {
+    async ({ isOwner = false, throwOnError = false }: LoadMembersOptions = {}): Promise<DetailMember[]> => {
       if (!isOwner) {
         if (isMountedRef.current) {
           setMembers([]);
@@ -106,8 +150,8 @@ export default function ListDetailPage() {
       }
 
       try {
-        const membersResult = await fetchListMembers(id, token);
-        const nextMembers = membersResult.members ?? [];
+        const membersResult = await fetchListMembers(listId, token);
+        const nextMembers = (membersResult.members ?? []) as DetailMember[];
 
         if (isMountedRef.current) {
           setMembers(nextMembers);
@@ -116,7 +160,7 @@ export default function ListDetailPage() {
         return nextMembers;
       } catch (loadError) {
         if (isMountedRef.current) {
-          setEntryError(loadError.message);
+          setEntryError(getErrorMessage(loadError));
         }
 
         if (throwOnError) {
@@ -130,11 +174,11 @@ export default function ListDetailPage() {
         }
       }
     },
-    [id, token]
+    [listId, token]
   );
 
   useEffect(() => {
-    async function loadListDetail() {
+    async function loadListDetail(): Promise<void> {
       setEntryError("");
       setShareError("");
       setShareNotice("");
@@ -144,13 +188,13 @@ export default function ListDetailPage() {
       try {
         const [listsResult, entriesResult, historyResult] = await Promise.all([
           fetchLists(token),
-          fetchEntries(id, token),
-          fetchRecentlyUsed(id, token).catch((error) => {
+          fetchEntries(listId, token),
+          fetchRecentlyUsed(listId, token).catch((error) => {
             console.error("Failed to load recently used history.", error);
             return { history: [] };
           })
         ]);
-        const activeList = (listsResult.lists ?? []).find((candidate) => candidate.id === id);
+        const activeList = ((listsResult.lists ?? []) as DetailList[]).find((candidate) => candidate.id === listId);
 
         if (!isMountedRef.current) {
           return;
@@ -166,7 +210,7 @@ export default function ListDetailPage() {
         }
 
         setList(activeList);
-        const nextEntries = entriesResult.entries ?? [];
+        const nextEntries = (entriesResult.entries ?? []) as DetailEntry[];
         setEntries(nextEntries);
         setRecentlyUsed(filterRecentlyUsedItems(historyResult?.history ?? [], nextEntries));
 
@@ -183,7 +227,7 @@ export default function ListDetailPage() {
         }
       } catch (loadError) {
         if (isMountedRef.current) {
-          setEntryError(loadError.message);
+          setEntryError(getErrorMessage(loadError));
           setList(null);
           setEntries([]);
           setMembers([]);
@@ -198,7 +242,7 @@ export default function ListDetailPage() {
     }
 
     void loadListDetail();
-  }, [id, loadEntries, loadMembers, syncVersion, t, token]);
+  }, [listId, loadEntries, loadMembers, syncVersion, t, token]);
 
   const handleEntryChange = useCallback(() => {
     void loadEntries();
@@ -208,35 +252,35 @@ export default function ListDetailPage() {
     void loadMembers({ isOwner: list?.is_owner ?? false });
   }, [list?.is_owner, loadMembers]);
 
-  useListEvents("entry:created", id, handleEntryChange);
-  useListEvents("entry:updated", id, handleEntryChange);
-  useListEvents("entry:deleted", id, handleEntryChange);
-  useListEvents("member:added", id, handleMemberChange);
-  useListEvents("member:removed", id, handleMemberChange);
+  useListEvents("entry:created", listId, handleEntryChange);
+  useListEvents("entry:updated", listId, handleEntryChange);
+  useListEvents("entry:deleted", listId, handleEntryChange);
+  useListEvents("member:added", listId, handleMemberChange);
+  useListEvents("member:removed", listId, handleMemberChange);
 
-  async function updateEntries(updater) {
-    let nextEntries = [];
+  async function updateEntries(updater: (currentEntries: DetailEntry[]) => DetailEntry[]): Promise<void> {
+    let nextEntries: DetailEntry[] = [];
 
     setEntries((currentEntries) => {
       nextEntries = updater(currentEntries);
       return nextEntries;
     });
 
-    await writeCachedResource(`entries:${id}`, { entries: nextEntries });
+    await writeCachedResource(`entries:${listId}`, { entries: nextEntries });
   }
 
-  async function updateMembers(updater) {
-    let nextMembers = [];
+  async function updateMembers(updater: (currentMembers: DetailMember[]) => DetailMember[]): Promise<void> {
+    let nextMembers: DetailMember[] = [];
 
     setMembers((currentMembers) => {
       nextMembers = updater(currentMembers);
       return nextMembers;
     });
 
-    await writeCachedResource(`members:${id}`, { members: nextMembers });
+    await writeCachedResource(`members:${listId}`, { members: nextMembers });
   }
 
-  async function addEntryByText(text, icon, details = "") {
+  async function addEntryByText(text: string, icon: string | null, details = ""): Promise<boolean> {
     const trimmed = text.trim();
 
     if (!trimmed) {
@@ -244,7 +288,7 @@ export default function ListDetailPage() {
     }
 
     const nextDetails = normalizeEntryDetails(details);
-    const temporaryEntry = {
+    const temporaryEntry: DetailEntry = {
       id: createTemporaryId("entry"),
       text: trimmed,
       icon: icon ?? null,
@@ -259,7 +303,7 @@ export default function ListDetailPage() {
     try {
       setEntryError("");
       const result = await createEntry(
-        id,
+        listId,
         token,
         { text: trimmed, icon: icon ?? null, details },
         { tempId: temporaryEntry.id }
@@ -268,7 +312,11 @@ export default function ListDetailPage() {
       await updateEntries((currentEntries) =>
         sortEntries(
           currentEntries.map((currentEntry) =>
-            currentEntry.id === temporaryEntry.id ? (result?.queued ? temporaryEntry : result.entry) : currentEntry
+            currentEntry.id === temporaryEntry.id
+              ? result?.queued
+                ? temporaryEntry
+                : (result.entry as DetailEntry)
+              : currentEntry
           )
         )
       );
@@ -277,14 +325,14 @@ export default function ListDetailPage() {
       await updateEntries((currentEntries) =>
         currentEntries.filter((currentEntry) => currentEntry.id !== temporaryEntry.id)
       );
-      setEntryError(submitError.message);
+      setEntryError(getErrorMessage(submitError));
       return false;
     }
   }
 
-  async function toggleStatus(entry) {
-    const nextStatus = entry.status === "open" ? "done" : "open";
-    const optimisticEntry = { ...entry, status: nextStatus, is_pending_sync: true };
+  async function toggleStatus(entry: DetailEntry): Promise<void> {
+    const nextStatus: Entry["status"] = entry.status === "open" ? "done" : "open";
+    const optimisticEntry: DetailEntry = { ...entry, status: nextStatus, is_pending_sync: true };
 
     await updateEntries((currentEntries) =>
       sortEntries(
@@ -298,7 +346,7 @@ export default function ListDetailPage() {
 
     try {
       setEntryError("");
-      const result = await updateEntry(id, entry.id, token, { status: nextStatus });
+      const result = await updateEntry(listId, entry.id, token, { status: nextStatus });
 
       await updateEntries((currentEntries) =>
         sortEntries(
@@ -306,7 +354,7 @@ export default function ListDetailPage() {
             currentEntry.id === entry.id
               ? {
                   ...currentEntry,
-                  ...(result?.queued ? { is_pending_sync: true, status: nextStatus } : result.entry)
+                  ...(result?.queued ? { is_pending_sync: true, status: nextStatus } : (result.entry as DetailEntry))
                 }
               : currentEntry
           )
@@ -327,11 +375,16 @@ export default function ListDetailPage() {
         setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== entry.text));
       }
 
-      setEntryError(submitError.message);
+      setEntryError(getErrorMessage(submitError));
     }
   }
 
-  async function submitEditEntry(entryId, text, iconName, details = "") {
+  async function submitEditEntry(
+    entryId: string,
+    text: string,
+    iconName: string | null,
+    details = ""
+  ): Promise<boolean> {
     const trimmed = text.trim();
 
     if (!trimmed) {
@@ -342,7 +395,7 @@ export default function ListDetailPage() {
       setEntryError("");
       const nextIcon = iconName ?? null;
       const nextDetails = normalizeEntryDetails(details);
-      const result = await updateEntry(id, entryId, token, { text: trimmed, icon: nextIcon, details });
+      const result = await updateEntry(listId, entryId, token, { text: trimmed, icon: nextIcon, details });
 
       await updateEntries((currentEntries) =>
         sortEntries(
@@ -352,7 +405,7 @@ export default function ListDetailPage() {
                   ...currentEntry,
                   ...(result?.queued
                     ? { details: nextDetails, icon: nextIcon, is_pending_sync: true, text: trimmed }
-                    : result.entry)
+                    : (result.entry as DetailEntry))
                 }
               : currentEntry
           )
@@ -360,12 +413,12 @@ export default function ListDetailPage() {
       );
       return true;
     } catch (submitError) {
-      setEntryError(submitError.message);
+      setEntryError(getErrorMessage(submitError));
       return false;
     }
   }
 
-  async function handleAddFromHistory(text, icon) {
+  async function handleAddFromHistory(text: string, icon: string | null): Promise<void> {
     const historyItem = recentlyUsed.find((item) => item.text === text);
     setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
 
@@ -382,18 +435,18 @@ export default function ListDetailPage() {
     }
   }
 
-  function handleDismissFromHistory(text) {
+  function handleDismissFromHistory(text: string): void {
     setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
 
-    void deleteFromHistory(id, text, token).catch((error) => {
+    void deleteFromHistory(listId, text, token).catch((error) => {
       console.error("Failed to delete recently used history item.", error);
     });
   }
 
-  async function handleRename(newName) {
+  async function handleRename(newName: string): Promise<void> {
     try {
       setEntryError("");
-      const result = await renameList(token, id, { name: newName });
+      const result = await renameList(token, listId, { name: newName });
       setList((currentList) =>
         currentList
           ? {
@@ -404,12 +457,12 @@ export default function ListDetailPage() {
           : currentList
       );
     } catch (submitError) {
-      setEntryError(submitError.message);
+      setEntryError(getErrorMessage(submitError));
       throw submitError;
     }
   }
 
-  async function handleShareSubmit(event) {
+  async function handleShareSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
     if (!shareEmail.trim()) {
@@ -420,33 +473,33 @@ export default function ListDetailPage() {
       setIsShareSubmitting(true);
       setShareError("");
       setShareNotice("");
-      const result = await shareListWithMember(id, token, { email: shareEmail });
+      const result = await shareListWithMember(listId, token, { email: shareEmail });
 
-      if (result?.queued) {
+      if (isShareInviteResult(result) && result.queued) {
         setShareNotice(t("share.inviteQueued", { email: shareEmail.trim() }));
-      } else if (result?.invite?.invited_email) {
+      } else if (isShareInviteResult(result) && result.invite?.invited_email) {
         setShareNotice(t("share.inviteSent", { email: result.invite.invited_email }));
       }
 
       setShareEmail("");
     } catch (submitError) {
-      setShareError(submitError.message);
+      setShareError(getErrorMessage(submitError));
     } finally {
       setIsShareSubmitting(false);
     }
   }
 
-  async function handleRevokeMember(memberId) {
+  async function handleRevokeMember(memberId: string): Promise<void> {
     try {
       setShareError("");
-      await revokeListMember(id, memberId, token);
+      await revokeListMember(listId, memberId, token);
       await updateMembers((currentMembers) => currentMembers.filter((member) => member.user_id !== memberId));
     } catch (submitError) {
-      setShareError(submitError.message);
+      setShareError(getErrorMessage(submitError));
     }
   }
 
-  async function handlePushToggle() {
+  async function handlePushToggle(): Promise<void> {
     try {
       setEntryError("");
 
@@ -457,7 +510,7 @@ export default function ListDetailPage() {
 
       await subscribe();
     } catch (pushError) {
-      setEntryError(pushError.message);
+      setEntryError(getErrorMessage(pushError));
     }
   }
 
@@ -536,7 +589,7 @@ export default function ListDetailPage() {
                   {openEntries.map((entry) => (
                     <EntryTile
                       key={entry.id}
-                      entry={entry}
+                      entry={{ ...entry, details: entry.details ?? undefined }}
                       onEdit={() => setEditingEntry(entry)}
                       onToggle={() => void toggleStatus(entry)}
                     />
@@ -556,7 +609,7 @@ export default function ListDetailPage() {
 
       {list ? <FAB onClick={() => setShowAddItem(true)} /> : null}
       <AddItemSheet
-        listId={id}
+        listId={listId}
         open={showAddItem}
         onAdd={(text, icon, details) => addEntryByText(text, icon, details)}
         onClose={() => setShowAddItem(false)}
@@ -565,7 +618,7 @@ export default function ListDetailPage() {
         initialDetails={editingEntry?.details ?? ""}
         initialIconName={editingEntry?.icon ?? null}
         initialText={editingEntry?.text ?? ""}
-        listId={id}
+        listId={listId}
         mode="edit"
         open={Boolean(editingEntry)}
         onAdd={async (text, icon, details) => {
@@ -613,7 +666,7 @@ export default function ListDetailPage() {
   );
 }
 
-function sortEntries(entries) {
+function sortEntries(entries: DetailEntry[]): DetailEntry[] {
   return [...entries].sort((left, right) => {
     if (left.status === right.status) {
       return new Date(left.created_at ?? 0).getTime() - new Date(right.created_at ?? 0).getTime();
@@ -623,16 +676,12 @@ function sortEntries(entries) {
   });
 }
 
-function normalizeEntryDetails(details) {
-  if (typeof details !== "string") {
-    return null;
-  }
-
+function normalizeEntryDetails(details: string): string | null {
   const trimmedDetails = details.trim();
   return trimmedDetails ? trimmedDetails : null;
 }
 
-function getInitials(name) {
+function getInitials(name: unknown): string {
   if (typeof name !== "string") {
     return "?";
   }
@@ -648,4 +697,8 @@ function getInitials(name) {
   }
 
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

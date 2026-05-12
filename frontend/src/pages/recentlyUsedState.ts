@@ -1,4 +1,9 @@
-export function upsertRecentlyUsedItems(currentItems, entry) {
+import type { Entry, Suggestion } from "../types";
+
+type RecentlyUsedEntry = Pick<Entry, "text" | "icon">;
+type OpenEntry = Pick<Entry, "text" | "status">;
+
+export function upsertRecentlyUsedItems(currentItems: Suggestion[], entry: RecentlyUsedEntry): Suggestion[] {
   const text = entry?.text?.trim();
 
   if (!text) {
@@ -15,7 +20,7 @@ export function upsertRecentlyUsedItems(currentItems, entry) {
   return [nextItem, ...currentItems.filter((item) => item.text !== text)].slice(0, 20);
 }
 
-export function filterRecentlyUsedItems(historyItems, entriesOrOpenEntries) {
+export function filterRecentlyUsedItems(historyItems: Suggestion[], entriesOrOpenEntries: OpenEntry[]): Suggestion[] {
   const openTexts = new Set(
     entriesOrOpenEntries.filter((entry) => entry.status === "open").map((entry) => entry.text)
   );

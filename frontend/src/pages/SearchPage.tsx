@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
+import type { ReactElement } from "react";
 
-export default function SearchPage() {
+export default function SearchPage(): ReactElement {
   const { t } = useTranslation();
 
   return (

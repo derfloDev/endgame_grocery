@@ -1,4 +1,5 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import type { ReactElement } from "react";
 import OfflineBanner from "./components/OfflineBanner";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -12,7 +13,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 import { useAppConfig } from "./context/appConfigState";
 import "./index.css";
 
-export default function App() {
+export default function App(): ReactElement {
   const { registrationEnabled } = useAppConfig();
 
   return (
@@ -35,7 +36,7 @@ export default function App() {
   );
 }
 
-function ProtectedLayout() {
+function ProtectedLayout(): ReactElement {
   return (
     <ProtectedRoute>
       <div className="app-shell">

@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
+import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { acceptInvite } from "../api/sharing";
 import { useAuth } from "../context/AuthContext";
 
-export default function InviteAcceptPage() {
+export default function InviteAcceptPage(): ReactElement {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { token } = useAuth();
   const { token: inviteToken = "" } = useParams();
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string>("");
 
   useEffect(() => {
     if (!inviteToken) {
@@ -25,7 +26,7 @@ export default function InviteAcceptPage() {
 
     let cancelled = false;
 
-    async function submitInvite() {
+    async function submitInvite(): Promise<void> {
       setError("");
 
       try {
@@ -41,7 +42,7 @@ export default function InviteAcceptPage() {
           return;
         }
 
-        setError(acceptError.message);
+        setError(getErrorMessage(acceptError));
       }
     }
 
@@ -80,4 +81,8 @@ export default function InviteAcceptPage() {
       </section>
     </main>
   );
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

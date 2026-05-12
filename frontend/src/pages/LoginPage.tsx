@@ -1,29 +1,36 @@
 import { useState } from "react";
+import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 import { useAppConfig } from "../context/appConfigState";
 
-export default function LoginPage() {
+interface LoginLocationState {
+  from?: string;
+  message?: string;
+}
+
+export default function LoginPage(): ReactElement {
   const { t } = useTranslation();
   const { login, token } = useAuth();
   const { registrationEnabled } = useAppConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const redirectTo = searchParams.get("redirect") ?? location.state?.from ?? "/";
-  const successMessage = location.state?.message ?? "";
+  const locationState = location.state as LoginLocationState | null;
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const redirectTo = searchParams.get("redirect") ?? locationState?.from ?? "/";
+  const successMessage = locationState?.message ?? "";
 
   if (token) {
     return <Navigate to={redirectTo} replace />;
   }
 
-  async function handleSubmit(event) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError("");
     setIsSubmitting(true);
@@ -32,7 +39,7 @@ export default function LoginPage() {
       await login({ email, password });
       navigate(redirectTo, { replace: true });
     } catch (submitError) {
-      setError(submitError.message);
+      setError(getErrorMessage(submitError));
     } finally {
       setIsSubmitting(false);
     }
@@ -96,4 +103,8 @@ export default function LoginPage() {
       </section>
     </main>
   );
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

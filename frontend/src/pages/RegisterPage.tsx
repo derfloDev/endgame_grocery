@@ -1,26 +1,37 @@
 import { useState } from "react";
+import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 
-export default function RegisterPage() {
+interface RegisterResult {
+  token?: string;
+  user?: Parameters<ReturnType<typeof useAuth>["setAuthToken"]>[1];
+  listId?: string;
+}
+
+function isRegisterResult(value: unknown): value is RegisterResult {
+  return Boolean(value) && typeof value === "object";
+}
+
+export default function RegisterPage(): ReactElement {
   const { t } = useTranslation();
   const { register, setAuthToken, token } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [displayName, setDisplayName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const inviteToken = searchParams.get("invite") ?? "";
 
   if (token) {
     return <Navigate to="/" replace />;
   }
 
-  async function handleSubmit(event) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError("");
     setIsSubmitting(true);
@@ -33,7 +44,7 @@ export default function RegisterPage() {
         ...(inviteToken ? { invite_token: inviteToken } : {})
       });
 
-      if (result?.token && result?.listId) {
+      if (isRegisterResult(result) && result.token && result.listId) {
         setAuthToken(result.token, result.user ?? null);
         navigate(`/lists/${result.listId}`, { replace: true });
         return;
@@ -41,7 +52,7 @@ export default function RegisterPage() {
 
       navigate("/verify-email", { replace: true, state: { email } });
     } catch (submitError) {
-      setError(submitError.message);
+      setError(getErrorMessage(submitError));
     } finally {
       setIsSubmitting(false);
     }
@@ -117,4 +128,8 @@ export default function RegisterPage() {
       </section>
     </main>
   );
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

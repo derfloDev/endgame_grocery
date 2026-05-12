@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { createTemporaryId } from "../api/client";
@@ -12,20 +13,27 @@ import logo from "../assets/endgame_grocery_logo.png";
 import { useAuth } from "../context/AuthContext";
 import { useListEvents } from "../hooks/useListEvents";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
+import type { List } from "../types";
 
 const LISTS_CACHE_KEY = "lists";
 
-export default function OverviewPage() {
+interface OverviewList extends List {
+  name: string;
+  owner_name?: string;
+  is_pending_sync?: boolean;
+}
+
+export default function OverviewPage(): ReactElement {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { token } = useAuth();
   const { syncVersion } = useOfflineQueue();
-  const [lists, setLists] = useState([]);
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [showInfo, setShowInfo] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const isMountedRef = useRef(false);
+  const [lists, setLists] = useState<OverviewList[]>([]);
+  const [error, setError] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [showInfo, setShowInfo] = useState<boolean>(false);
+  const [showNew, setShowNew] = useState<boolean>(false);
+  const isMountedRef = useRef<boolean>(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -35,7 +43,7 @@ export default function OverviewPage() {
     };
   }, []);
 
-  const loadLists = useCallback(async () => {
+  const loadLists = useCallback(async (): Promise<void> => {
     setError("");
     setIsLoading(true);
 
@@ -43,11 +51,11 @@ export default function OverviewPage() {
       const result = await fetchLists(token);
 
       if (isMountedRef.current) {
-        setLists(result.lists ?? []);
+        setLists((result.lists ?? []) as OverviewList[]);
       }
     } catch (loadError) {
       if (isMountedRef.current) {
-        setError(loadError.message);
+        setError(getErrorMessage(loadError));
       }
     } finally {
       if (isMountedRef.current) {
@@ -67,8 +75,8 @@ export default function OverviewPage() {
   useListEvents("list:updated", null, handleListChange);
   useListEvents("list:deleted", null, handleListChange);
 
-  async function updateLists(updater) {
-    let nextLists = [];
+  async function updateLists(updater: (currentLists: OverviewList[]) => OverviewList[]): Promise<void> {
+    let nextLists: OverviewList[] = [];
 
     setLists((currentLists) => {
       nextLists = updater(currentLists);
@@ -78,7 +86,7 @@ export default function OverviewPage() {
     await writeCachedResource(LISTS_CACHE_KEY, { lists: nextLists });
   }
 
-  async function createListByName(name) {
+  async function createListByName(name: string): Promise<void> {
     if (!name.trim()) {
       return;
     }
@@ -86,7 +94,7 @@ export default function OverviewPage() {
     try {
       setError("");
 
-      const temporaryList = {
+      const temporaryList: OverviewList = {
         id: createTemporaryId("list"),
         name: name.trim(),
         owner_name: "You",
@@ -97,14 +105,14 @@ export default function OverviewPage() {
 
       await updateLists((currentLists) => [
         ...currentLists,
-        result?.queued ? temporaryList : result.list
+        result?.queued ? temporaryList : (result.list as OverviewList)
       ]);
     } catch (submitError) {
-      setError(submitError.message);
+      setError(getErrorMessage(submitError));
     }
   }
 
-  async function submitRename(listId, newName) {
+  async function submitRename(listId: string, newName: string): Promise<void> {
     if (!newName.trim()) {
       return;
     }
@@ -118,17 +126,17 @@ export default function OverviewPage() {
           list.id === listId
             ? {
                 ...list,
-                ...(result?.queued ? { name: newName.trim(), is_pending_sync: true } : result.list)
+                ...(result?.queued ? { name: newName.trim(), is_pending_sync: true } : (result.list as OverviewList))
               }
             : list
         )
       );
     } catch (submitError) {
-      setError(submitError.message);
+      setError(getErrorMessage(submitError));
     }
   }
 
-  async function handleDelete(listId) {
+  async function handleDelete(listId: string): Promise<void> {
     if (!window.confirm(t("list.deleteConfirm"))) {
       return;
     }
@@ -138,7 +146,7 @@ export default function OverviewPage() {
       await deleteList(token, listId);
       await updateLists((currentLists) => currentLists.filter((list) => list.id !== listId));
     } catch (submitError) {
-      setError(submitError.message);
+      setError(getErrorMessage(submitError));
     }
   }
 
@@ -192,4 +200,8 @@ export default function OverviewPage() {
       />
     </div>
   );
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

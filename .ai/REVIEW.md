@@ -423,3 +423,62 @@ No blockers, major issues, or required fixes found.
 
 #### Verdict
 `PASS`
+
+## Task: T-009
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/pages/RegisterPage.tsx` L11 | `RegisterResult.user` typed via `Parameters<ReturnType<typeof useAuth>["setAuthToken"]>[1]`. Creative but verbose — `User | null` from `../types` would be clearer. Functionally correct and safe; adapts automatically if `setAuthToken` signature changes. | No |
+| 2 | nit | `frontend/src/pages/ListDetailPage.tsx` L114, L153, L197, L213 | `as DetailEntry[]` / `as DetailList[]` / `as DetailMember[]` casts on API result arrays. Necessary since `fetchEntries`, `fetchLists`, `fetchListMembers` return narrower base types from `../types`; the cast is the idiomatic boundary. | No |
+| 3 | nit | `frontend/src/pages/ListDetailPage.test.jsx` | Test file modified (not renamed) to update the `readFileSync` path from `ListDetailPage.jsx` to `ListDetailPage.tsx`. Correct minimal fix for T-009 scope; full rename to `.tsx` is T-010 work. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 11 old `.jsx`/`.js` source files deleted (git shows R-renames): `App.jsx`, all 9 page `.jsx` files, `recentlyUsedState.js`. `main.tsx` was already migrated in T-001 as noted. ✅
+2. Confirmed only test files (`.jsx`/`.js`) remain in `pages/` — `ListDetailPage.test.jsx`, `recentlyUsedState.test.js` — correct T-010 scope. ✅
+3. Verified zero `any` usage across all migrated files. ✅
+4. Cross-checked all 12 targets against plan spec:
+   - `App.tsx`: No props; returns `ReactElement`; `ProtectedLayout` helper typed; routes via react-router-dom. ✅
+   - `recentlyUsedState.ts`: `Suggestion`, `Entry` from types; `Pick<Entry, "text" | "icon">` and `Pick<Entry, "text" | "status">` utility types; both exports explicitly typed. ✅
+   - `ListDetailPage.tsx`: `useState<DetailList | null>(null)`, `useState<DetailEntry[]>([])`, `useState<DetailMember[]>([])`, `useState<Suggestion[]>([])` — all plan-required explicit generic calls present; `isShareInviteResult` type guard; `getErrorMessage(error: unknown): string`. ✅
+   - `OverviewPage.tsx`: `useState<OverviewList[]>([])` (plan: `useState<List[]>([])`); `OverviewList extends List` narrows to guaranteed `name: string`. Correct. ✅
+   - `LoginPage.tsx`: `LoginLocationState` interface for `location.state` cast; all useState typed `string`/`boolean`. ✅
+   - `RegisterPage.tsx`: `RegisterResult` + `isRegisterResult` type guard; all useState typed. ✅
+   - `ForgotPasswordPage.tsx`: All useState typed `string`/`boolean`. ✅
+   - `ResetPasswordPage.tsx`: All useState typed `string`/`boolean`. ✅
+   - `VerifyEmailPage.tsx`: `VerifyEmailLocationState` interface; all useState typed. ✅
+   - `InviteAcceptPage.tsx`: `useParams()` destructured with default `= ""`; `useState<string>("")` for error. ✅
+   - `SearchPage.tsx`: Simple stub page; `ReactElement` return type. ✅
+   - `main.tsx`: Already had `document.getElementById("root")!` non-null assertion from T-001. ✅
+5. Ran `npm run lint` → 0 errors, 1 pre-existing warning (`AuthContext.tsx`). ✅
+6. Ran `npx tsc --noEmit` → clean, 0 errors. ✅
+7. Ran `npm run build` → success. ✅
+8. Ran focused tests (`src/app.test.jsx src/pages/ListDetailPage.test.jsx src/pages/recentlyUsedState.test.js`) → **46/46 passed**. ✅
+9. Ran `npm test` → **285/285 on first run**, no flakiness. ✅
+
+##### Findings
+- All acceptance-criteria commands pass with zero TypeScript errors.
+- `DetailEntry`, `DetailList`, `DetailMember` local interface pattern (extending domain types) is consistent with T-008 `HomeList`/`SharedListMember` approach.
+- `Pick<Entry, "text" | "icon">` and `Pick<Entry, "text" | "status">` in `recentlyUsedState.ts` are idiomatic utility types that express exactly the minimum contract needed.
+- `getErrorMessage(error: unknown): string` pattern is used consistently across all pages — a clean, reusable narrowing function.
+- `LoginLocationState` and `VerifyEmailLocationState` interfaces for `location.state` casts are a good practice with react-router-dom v6.
+
+##### Risks
+- None. All changes are type-annotated equivalents of the original JSX/JS; no business logic altered.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
