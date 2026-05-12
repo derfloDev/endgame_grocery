@@ -8,6 +8,45 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-003 — implement — 2026-05-12T08:02:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed the reviewed T-003 pure module TypeScript migration and closed the task. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, all reviewed T-003 implementation and review files staged via `git add -A` |
+| Validation | Reused reviewed validation from T-003: `npm run lint`, `npx tsc -p frontend/tsconfig.json --noEmit`, `npm run build`, `npm test` PASS |
+| Commit | `chore(typescript): migrate pure frontend modules` |
+| Next Role | none |
+
+---
+
+### T-003 — review — 2026-05-12T10:03:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 pure module migration; all 7 old .js files deleted, 7 typed .ts files present; vite-env.d.ts extended with necessary SVGR/PWA references; all validation commands pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-05-12T07:44:44Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Migrated the frontend pure constants, i18n, utility, icon data/registry, custom icon, and service-worker registration modules to TypeScript. |
+| Files Changed | `frontend/src/app.constants.ts`, `frontend/src/i18n.ts`, `frontend/src/utils/cosineSimilarity.ts`, `frontend/src/data/iconDatabase.ts`, `frontend/src/data/customIcons.ts`, `frontend/src/data/iconRegistry.ts`, `frontend/src/sw/register.ts`, `frontend/src/vite-env.d.ts`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` PASS (existing `AuthContext.jsx` fast-refresh warning only); `npx tsc -p frontend/tsconfig.json --noEmit` PASS; `npm run build` PASS (existing Vite eval/chunk-size warnings only); `npm test` PASS |
+| Commit | `chore(typescript): migrate pure frontend modules` |
+| Next Role | review |
+
+---
+
 ### T-002 — implement — 2026-05-12T05:40:34Z
 
 | Field | Value |

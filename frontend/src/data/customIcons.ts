@@ -1,4 +1,5 @@
-import { createElement } from "react";
+import { createElement, type ComponentType, type FC, type SVGProps } from "react";
+import type { IconProps } from "../types";
 import AfterSunSvg from "../assets/icons/custom/afterSun.svg?react";
 import BakingPaperSvg from "../assets/icons/custom/bakingPaper.svg?react";
 import BellPepperSvg from "../assets/icons/custom/bellPepper.svg?react";
@@ -61,8 +62,15 @@ import WatermelonSvg from "../assets/icons/custom/watermelon.svg?react";
 import WetWipesSvg from "../assets/icons/custom/wetWipes.svg?react";
 import YogurtSvg from "../assets/icons/custom/yogurt.svg?react";
 
-export function normalizeCustomIcon(SvgComponent, displayName) {
-  function CustomIcon({ size = 24, stroke, strokeWidth, color = "currentColor", ...rest }) {
+type CustomIconProps = IconProps & {
+  color?: string;
+};
+
+export function normalizeCustomIcon(
+  SvgComponent: ComponentType<SVGProps<SVGSVGElement>>,
+  displayName: string
+): FC<CustomIconProps> {
+  function CustomIcon({ size = 24, stroke, strokeWidth, color = "currentColor", ...rest }: CustomIconProps) {
     return createElement(SvgComponent, {
       width: size,
       height: size,

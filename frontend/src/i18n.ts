@@ -4,7 +4,7 @@ import ICU from "i18next-icu";
 import resourcesToBackend from "i18next-resources-to-backend";
 import { initReactI18next } from "react-i18next";
 
-function applyLangAttribute(language) {
+function applyLangAttribute(language: string): void {
   if (!language || typeof document === "undefined") {
     return;
   }
@@ -16,7 +16,7 @@ i18next
   .use(ICU)
   .use(LanguageDetector)
   .use(
-    resourcesToBackend((language, namespace) => import(`./locales/${language}/${namespace}.json`))
+    resourcesToBackend((language: string, namespace: string) => import(`./locales/${language}/${namespace}.json`))
   )
   .use(initReactI18next)
   .init({

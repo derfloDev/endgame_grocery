@@ -1,4 +1,5 @@
-import { createElement } from "react";
+import { createElement, type ComponentType, type FC } from "react";
+import type { IconProps } from "../types";
 import {
   CustomAfterSun,
   CustomBakingPaper,
@@ -61,7 +62,7 @@ import {
   CustomWatermelon,
   CustomWetWipes,
   CustomYogurt
-} from "./customIcons.js";
+} from "./customIcons";
 import {
   IconApple,
   IconAvocado,
@@ -210,9 +211,14 @@ import {
   Vegan,
   Wine
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-function fromLucide(LucideIcon) {
-  function NormalizedIcon({ stroke, strokeWidth, ...rest }) {
+type RegistryIconProps = IconProps & {
+  color?: string;
+};
+
+function fromLucide(LucideIcon: LucideIcon): FC<RegistryIconProps> {
+  function NormalizedIcon({ stroke, strokeWidth, ...rest }: RegistryIconProps) {
     return createElement(LucideIcon, {
       ...rest,
       strokeWidth: stroke ?? strokeWidth ?? 1.5
@@ -224,7 +230,7 @@ function fromLucide(LucideIcon) {
   return NormalizedIcon;
 }
 
-export const ICON_REGISTRY = Object.freeze({
+export const ICON_REGISTRY: Readonly<Record<string, ComponentType<IconProps>>> = Object.freeze({
   Banana: fromLucide(Banana),
   BicepsFlexed: fromLucide(BicepsFlexed),
   CakeSlice: fromLucide(CakeSlice),
@@ -434,10 +440,10 @@ export const ICON_REGISTRY = Object.freeze({
 
 export const FALLBACK_ICON_NAME = "IconShoppingCart";
 // Future icon renames should add one alias entry here instead of patching each caller.
-export const ICON_ALIASES = Object.freeze({});
+export const ICON_ALIASES: Readonly<Record<string, string>> = Object.freeze({});
 export const ICON_REGISTRY_KEYS = Object.freeze(Object.keys(ICON_REGISTRY));
 
-export function resolveIconName(name) {
+export function resolveIconName(name: string | null | undefined): string | null {
   if (name == null) {
     return null;
   }
@@ -451,7 +457,7 @@ export function resolveIconName(name) {
   return alias && ICON_REGISTRY[alias] ? alias : null;
 }
 
-export function formatIconName(name) {
+export function formatIconName(name: unknown): string {
   if (typeof name !== "string") {
     return "";
   }

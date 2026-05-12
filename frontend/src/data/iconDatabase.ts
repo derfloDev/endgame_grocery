@@ -1,10 +1,16 @@
-function toLookupKey(term) {
+export interface IconDbEntry {
+  label: string;
+  icon: string;
+  tags?: string[];
+}
+
+function toLookupKey(term: string): string {
   return term.trim().toLowerCase();
 }
 
-function createExactMatchMap(entries) {
+function createExactMatchMap(entries: readonly IconDbEntry[]): Readonly<Record<string, string>> {
   return Object.freeze(
-    entries.reduce((map, { label, icon, tags = [] }) => {
+    entries.reduce<Record<string, string>>((map, { label, icon, tags = [] }) => {
       for (const term of [label, ...tags]) {
         const key = toLookupKey(term);
 
@@ -18,7 +24,7 @@ function createExactMatchMap(entries) {
   );
 }
 
-export const ICON_DB = [
+export const ICON_DB: readonly IconDbEntry[] = [
   // Dairy
   { label: "milk", icon: "IconMilk", tags: ["milch", "whole milk", "vollmilch", "halbfettmilch", "laktosefrei", "h-milch", "frischmilch", "uht", "oat milk", "hafermilch"] },
   { label: "cheese", icon: "IconCheese", tags: ["käse", "kaese", "gouda", "cheddar", "mozzarella", "frischkäse", "parmesan", "feta", "brie", "schnittkäse"] },

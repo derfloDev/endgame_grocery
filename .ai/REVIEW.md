@@ -93,3 +93,55 @@ No blockers, major issues, or required fixes found.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/vite-env.d.ts` | Two reference directives added (`vite-plugin-pwa/client`, `vite-plugin-svgr/client`) beyond T-001's original file. Not in T-003 plan scope, but required for `tsc --noEmit` to resolve `.svg?react` imports in `customIcons.ts`. Correct and necessary. | No |
+| 2 | nit | `frontend/src/data/customIcons.ts` L65–86 | Uses `CustomIconProps = IconProps & { color?: string }` rather than the plan's `React.FC<IconProps>`. Strictly more accurate — custom icons genuinely accept a `color` prop — so this is an improvement, not a deviation. | No |
+| 3 | nit | `frontend/src/data/iconRegistry.ts` L216–231 | `fromLucide` returns `FC<RegistryIconProps>` (same `color` extension pattern) rather than the plan's `React.FC<IconProps>`. Same rationale as finding 2. | No |
+
+No blockers, major issues, or required fixes found.
+
+#### Verification
+
+##### Steps
+1. Confirmed all 7 old `.js` files deleted: `app.constants.js`, `i18n.js`, `utils/cosineSimilarity.js`, `data/iconDatabase.js`, `data/customIcons.js`, `data/iconRegistry.js`, `sw/register.js`.
+2. Confirmed all 7 new `.ts` files created with correct content.
+3. Verified `app.constants.ts`: `APP_TITLE: string` exported. ✅
+4. Verified `i18n.ts`: typed `language: string` callback params; `default i18next` exported. ✅
+5. Verified `cosineSimilarity.ts`: `vecA: number[], vecB: number[]): number`. ✅
+6. Verified `iconDatabase.ts`: `IconDbEntry` interface and `ICON_DB: readonly IconDbEntry[]`. ✅
+7. Verified `customIcons.ts`: imports `IconProps` from `../types`; `normalizeCustomIcon` returns `FC<CustomIconProps>` (superset of plan's `FC<IconProps>`). ✅
+8. Verified `iconRegistry.ts`: `ICON_REGISTRY: Readonly<Record<string, ComponentType<IconProps>>>` (plan-aligned); `fromLucide` uses `LucideIcon` type from lucide-react. ✅
+9. Verified `sw/register.ts`: `registerServiceWorker(): void`. ✅
+10. Confirmed `vite-env.d.ts` additions are required for SVGR/PWA type resolution.
+11. Ran `npm run lint` → 0 errors (1 pre-existing unrelated warning). ✅
+12. Ran `npx tsc --noEmit` from `frontend/` → clean, 0 errors. ✅
+13. Ran `npm run build` → success. ✅
+14. Ran `npm test` → 285 tests passed, 0 failures. ✅
+
+##### Findings
+- All acceptance-criteria commands pass with zero TypeScript errors.
+- No functional logic changes — pure type annotation and file rename.
+- `vite-env.d.ts` amendment is a correct, minimal fix for SVGR type resolution.
+
+##### Risks
+- None. All changes are type-only; runtime behaviour is unchanged.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
