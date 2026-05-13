@@ -194,3 +194,44 @@ No findings. All scope items implemented correctly. T-003 guards honoured.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+No findings. All scope items implemented correctly. T-004 risk (auth.module.css double-injection) resolved.
+
+#### Verification
+
+##### Steps
+- Read `frontend/src/index.css` — confirmed 17 non-empty lines, no class selectors, `@import "./styles/auth.module.css"` removed (T-004 risk resolved), all 4 keyframes present (`shimmer`, `slideUp`, `fadeIn`, `spin`). ✓
+- Read `frontend/src/styles/index-cleanup.test.ts` — confirmed new regression-guard test covers ≤40 line limit, no-class-selector rule, import assertions, and keyframe presence assertions. ✓
+- Verified `index.css` only contains: `@import` lines, element/pseudo-class/ID selectors (`:root`, `*`, `html`, `body`, `button`, `input`, `#root`, `h1`, `p`, `@media`), and `@keyframes`. Zero class (`.`) selectors. ✓
+- Confirmed `@import "./styles/auth.module.css"` is absent — T-004 double-injection risk resolved. ✓
+- Confirmed `shared.css` cross-component classes (`entry-section`, `entry-section-header`, `detail-section-label`, `detail-banner`) retained — global keyframes (`shimmer`, `slideUp`, `fadeIn`, `spin`) remain in `index.css` for CSS Module consumers that reference them by name (e.g., `ShareListSheet.module.css animation: spin`). ✓
+- Ran `npm run lint` → 0 errors, 1 pre-existing warning (`AuthContext.tsx` Fast Refresh). ✓
+- Ran `npm run build` → clean build, pre-existing chunk size warning only. ✓
+- Ran `npm test` → 106/106 pass, 0 fail. ✓
+- Ran targeted acceptance tests (`styles/index-cleanup.test.ts styles/shared.test.ts components/AddItemSheet/AddItemSheet.test.tsx pages/ListDetailPage.test.tsx pages/page-components.test.ts app.test.tsx`) → 1 intermittent timeout (`AddItemSheet > supports edit mode with prefilled text and icon state`) under CPU contention. Pre-existing flakiness reported by implementer; does not reproduce in isolated `npm test` run (106/106 pass). Not a T-005 regression. ✓
+
+##### Findings
+- **T-005 scope fully met**: `index.css` trimmed from ~1648 lines to 17 lines; zero class selectors remain; all 4 global keyframes retained; both `@import` lines (`tokens.css`, `shared.css`) present; `auth.module.css` global import removed.
+- `index-cleanup.test.ts` regression guard correctly implemented — locks the ≤40 line boundary and no-class-selector invariant for future cycles.
+- `@keyframes spin` retained in `index.css` for `ShareListSheet.module.css` (`animation: spin`). Valid — global keyframes are accessible from CSS Module contexts. ✓
+
+##### Risks
+- No new risks. The flaky `AddItemSheet` test is pre-existing CPU-contention behaviour unrelated to this task.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

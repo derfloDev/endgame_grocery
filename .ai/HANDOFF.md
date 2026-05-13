@@ -189,3 +189,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | implement |
 
 ---
+
+### T-005 — implement — 2026-05-13T11:35:49Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Reduced `index.css` to global imports, base reset rules, root typography, and shared keyframes, with a regression test guarding the cleanup boundary. |
+| Files Changed | `frontend/src/index.css`, `frontend/src/styles/index-cleanup.test.ts`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` passed with existing `AuthContext.tsx` Fast Refresh warning; `npm run test --workspace frontend -- styles/index-cleanup.test.ts styles/shared.test.ts components/AddItemSheet/AddItemSheet.test.tsx pages/ListDetailPage.test.tsx pages/page-components.test.ts app.test.tsx` passed outside sandbox after an esbuild spawn EPERM in the sandbox; `npm run build` passed with existing Vite eval/chunk-size warnings; first parallel `npm test` run hit a frontend test timeout while sharing CPU with build, then `npm test` passed when rerun by itself. |
+| Commit | `refactor(styles): finish global stylesheet cleanup` |
+| Next Role | review |
+
+---
+
+### T-005 — review — 2026-05-12T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 global stylesheet cleanup; `index.css` correctly trimmed to 17 lines with no class selectors, all 4 keyframes retained, `auth.module.css` double-import resolved; 106/106 tests pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — commit_task — 2026-05-13T12:25:09Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-005 done and committed the reviewed global stylesheet cleanup. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Used reviewer-approved validation from the T-005 implement handoff. |
+| Commit | `refactor(styles): finish global stylesheet cleanup` |
+| Next Role | none |
+
+---
