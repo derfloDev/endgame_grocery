@@ -1,4 +1,6 @@
 @import "./styles/tokens.css";
+@import "./styles/shared.css";
+@import "./styles/auth.module.css";
 
 :root {
   color-scheme: dark;
