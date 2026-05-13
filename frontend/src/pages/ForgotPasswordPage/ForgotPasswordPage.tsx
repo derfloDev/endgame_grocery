@@ -2,8 +2,9 @@ import { useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import logo from "../assets/endgame_grocery_logo.png";
-import { forgotPassword } from "../api/auth";
+import logo from "../../assets/endgame_grocery_logo.png";
+import { forgotPassword } from "../../api/auth";
+import styles from "../../styles/auth.module.css";
 
 export default function ForgotPasswordPage(): ReactElement {
   const { t } = useTranslation();
@@ -29,18 +30,18 @@ export default function ForgotPasswordPage(): ReactElement {
   }
 
   return (
-    <main className="auth-layout">
-      <section className="auth-card">
-        <div className="auth-brand">
-          <img alt={t("app.brandName")} className="auth-logo" src={logo} />
-          <div className="auth-brand-text">
-            <div className="auth-brand-title eg-orbitron eg-gradient-text">{t("app.brandMain")}</div>
-            <div className="auth-brand-sub">{t("app.brandSub")}</div>
+    <main className={styles["auth-layout"]}>
+      <section className={styles["auth-card"]}>
+        <div className={styles["auth-brand"]}>
+          <img alt={t("app.brandName")} className={styles["auth-logo"]} src={logo} />
+          <div>
+            <div className={`eg-orbitron eg-gradient-text ${styles["auth-brand-title"]}`}>{t("app.brandMain")}</div>
+            <div className={styles["auth-brand-sub"]}>{t("app.brandSub")}</div>
           </div>
         </div>
         <h1>{t("auth.resetTitle")}</h1>
         <p>{t("auth.resetBody")}</p>
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className={styles["auth-form"]} onSubmit={handleSubmit}>
           {notice ? <p className="eg-success-banner">{notice}</p> : null}
           {error ? <p className="eg-error-banner">{error}</p> : null}
           <div className="eg-field">

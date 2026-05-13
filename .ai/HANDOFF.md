@@ -150,3 +150,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | implement |
 
 ---
+
+### T-004 — review — 2026-05-12T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 page CSS Module migration; all 9 pages correctly moved, T-003 guards respected (cross-component classes moved to shared.css), new regression-guard test added, clean pass. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-05-13T08:33:19Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Moved app pages into folders, added page-level CSS Modules, wired auth pages to the shared auth module, and moved cross-component detail section styles into `shared.css`. |
+| Files Changed | `frontend/src/App.tsx`, `frontend/src/App.module.css`, `frontend/src/index.css`, `frontend/src/pages/page-components.test.ts`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ForgotPasswordPage/`, `frontend/src/pages/InviteAcceptPage/`, `frontend/src/pages/ListDetailPage/`, `frontend/src/pages/LoginPage/`, `frontend/src/pages/OverviewPage/`, `frontend/src/pages/RegisterPage/`, `frontend/src/pages/ResetPasswordPage/`, `frontend/src/pages/SearchPage/`, `frontend/src/pages/VerifyEmailPage/`, `frontend/src/styles/shared.css`, `frontend/src/styles/shared.test.ts`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` passed with existing `AuthContext.tsx` Fast Refresh warning; targeted frontend page/shared/app tests passed outside sandbox after an esbuild spawn EPERM in the sandbox; `npm run build` passed with existing Vite eval/chunk-size warnings; `npm test` passed. |
+| Commit | `refactor(pages): move app pages to CSS modules` |
+| Next Role | review |
+
+---
+
+### T-004 — commit_task — 2026-05-13T08:54:19Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-004 done and committed the reviewed page CSS Module migration. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Used reviewer-approved validation from the T-004 implement handoff. |
+| Commit | `refactor(pages): move app pages to CSS modules` |
+| Next Role | implement |
+
+---

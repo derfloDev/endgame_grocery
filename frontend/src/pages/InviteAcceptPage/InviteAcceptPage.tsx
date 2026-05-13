@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import logo from "../assets/endgame_grocery_logo.png";
-import { acceptInvite } from "../api/sharing";
-import { useAuth } from "../context/AuthContext";
+import logo from "../../assets/endgame_grocery_logo.png";
+import { acceptInvite } from "../../api/sharing";
+import { useAuth } from "../../context/AuthContext";
+import styles from "../../styles/auth.module.css";
 
 export default function InviteAcceptPage(): ReactElement {
   const { t } = useTranslation();
@@ -54,13 +55,13 @@ export default function InviteAcceptPage(): ReactElement {
   }, [inviteToken, navigate, t, token]);
 
   return (
-    <main className="auth-layout">
-      <section className="auth-card">
-        <div className="auth-brand">
-          <img alt={t("app.brandName")} className="auth-logo" src={logo} />
-          <div className="auth-brand-text">
-            <div className="auth-brand-title eg-orbitron eg-gradient-text">{t("app.brandMain")}</div>
-            <div className="auth-brand-sub">{t("app.brandSub")}</div>
+    <main className={styles["auth-layout"]}>
+      <section className={styles["auth-card"]}>
+        <div className={styles["auth-brand"]}>
+          <img alt={t("app.brandName")} className={styles["auth-logo"]} src={logo} />
+          <div>
+            <div className={`eg-orbitron eg-gradient-text ${styles["auth-brand-title"]}`}>{t("app.brandMain")}</div>
+            <div className={styles["auth-brand-sub"]}>{t("app.brandSub")}</div>
           </div>
         </div>
         <h1>{error ? t("invite.unavailable") : t("invite.joining")}</h1>
@@ -69,7 +70,7 @@ export default function InviteAcceptPage(): ReactElement {
             ? t("invite.unavailableMsg")
             : t("invite.connecting")}
         </p>
-        <div className="auth-form">
+        <div className={styles["auth-form"]}>
           {error ? <p className="eg-error-banner">{error}</p> : null}
           {!error ? <p className="eg-success-banner">{t("invite.opening")}</p> : null}
           <div className="button-row">

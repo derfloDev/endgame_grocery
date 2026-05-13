@@ -149,3 +149,48 @@ No blocker or major findings. The T-002 risk (AddItemSheet using global `bottom-
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+No findings. All scope items implemented correctly. T-003 guards honoured.
+
+#### Verification
+
+##### Steps
+- Read `App.tsx`, `App.module.css`, all 9 page TSX files, all 3 non-auth page CSS modules, `page-components.test.ts`, `ListDetailPage.test.tsx`.
+- Verified all 6 auth pages import `styles` from `"../../styles/auth.module.css"` and use `styles["auth-layout"]`, `styles["auth-card"]`, `styles["auth-form"]`. ✓
+- Verified `App.tsx` imports `styles from "./App.module.css"` and uses `styles["app-shell"]`. ✓
+- Verified `App.module.css` uses `:global(.stack)` for the `.stack` descendant selector. ✓
+- Verified T-003 guards: `entry-section`, `entry-section-header`, `detail-section-label`, `detail-banner` are **NOT** in `ListDetailPage.module.css` — they were instead added to `shared.css` (lines 264–313 of `shared.css`). ✓
+- Verified `ListDetailPage.module.css` contains only truly-private classes: `detail-content`, `detail-meta`, `detail-member-badges`, `entry-tile-grid`. ✓
+- Verified `OverviewPage.module.css` contains all plan-specified classes: `overview-topbar`, `overview-brand`, `overview-brand-title`, `overview-brand-sub`, `overview-actions`, `overview-logo`, `overview-content`, `overview-header`. ✓
+- Verified `SearchPage.module.css` contains `search-page`, `search-page-title`. ✓
+- Verified `page-components.test.ts` includes a dedicated assertion (`keeps cross-component detail and entry section classes shared`) that guards against future regressions of the T-003 finding. ✓
+- All page import paths in `App.tsx` updated to sub-folder form (`./pages/LoginPage/LoginPage` etc.). ✓
+- Ran `npm run lint` → 0 errors, 1 pre-existing warning.
+- Ran `npm run build` → clean, pre-existing chunk size warning only.
+- Ran `npm test` → 106/106 pass, 0 fail.
+
+##### Findings
+- **T-004 scope fully met**: all 9 pages moved to sub-folders; 3 non-auth pages have co-located CSS Modules; 6 auth pages use shared `auth.module.css`; `App.tsx` uses `App.module.css`; all import paths updated.
+- The `page-components.test.ts` cross-component guard test locks in the T-003 finding resolution — any regression would fail CI. Excellent defensive coverage.
+- `SearchPage` is not yet wired into the router in `App.tsx` — this is pre-existing behaviour (it was not in the router before T-004 either). Not a T-004 regression.
+
+##### Risks
+- `auth.module.css` is still imported globally via `@import` in `index.css` AND as a CSS Module by auth pages. This causes the auth styles to be injected twice (once globally, once via the module). T-005 must remove the `@import "./styles/auth.module.css"` line from `index.css` to resolve this duplication.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

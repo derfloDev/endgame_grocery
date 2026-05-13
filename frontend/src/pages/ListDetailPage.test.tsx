@@ -10,11 +10,17 @@ import { fetchRecentlyUsed } from "../api/history";
 import { fetchLists } from "../api/lists";
 import { fetchListMembers } from "../api/sharing";
 import { writeCachedResource } from "../api/offlineStore";
-import ListDetailPage from "./ListDetailPage";
+import ListDetailPage from "./ListDetailPage/ListDetailPage";
 import type { Entry, List, Suggestion } from "../types";
 
-const cssSource = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
-const pageSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage.tsx"), "utf8");
+const cssSource = [
+  "./ListDetailPage/ListDetailPage.module.css",
+  "../styles/shared.css",
+  "../components/RecentlyUsedSection/RecentlyUsedSection.module.css"
+]
+  .map((filePath) => readFileSync(path.resolve(import.meta.dirname, filePath), "utf8"))
+  .join("\n");
+const pageSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage/ListDetailPage.tsx"), "utf8");
 
 vi.mock("../api/entries", () => ({
   createEntry: vi.fn(),
@@ -245,7 +251,7 @@ describe("ListDetailPage optimistic updates", () => {
     renderListDetailPage();
 
     expect(await screen.findByTestId("entry-tile-entry-1")).toBeTruthy();
-    expect(getOpenItemsSection().querySelector(".entry-tile-grid")).toBeTruthy();
+    expect(within(getOpenItemsSection()).getByTestId("entry-tile-grid")).toBeTruthy();
   });
 });
 
@@ -267,7 +273,7 @@ describe("ListDetailPage layout styles", () => {
 
   it("renders member badges inside the owner chip row", () => {
     expect(pageSource).toMatch(
-      /<div className="list-card-chips">[\s\S]*\{visibleMemberBadges\.length > 0 \? \([\s\S]*<div className="detail-member-badges">/s
+      /<div className="list-card-chips">[\s\S]*\{visibleMemberBadges\.length > 0 \? \([\s\S]*<div className=\{styles\["detail-member-badges"\]\}>/s
     );
   });
 

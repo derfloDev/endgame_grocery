@@ -2,18 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { createTemporaryId } from "../api/client";
-import { writeCachedResource } from "../api/offlineStore";
-import { createList, deleteList, fetchLists, renameList } from "../api/lists";
-import InfoSheet from "../components/InfoSheet/InfoSheet";
-import ListCardHome from "../components/ListCardHome/ListCardHome";
-import NewListSheet from "../components/NewListSheet/NewListSheet";
-import { EmptyState, ErrorState, FAB, Icon, LoadingState } from "../components/ui";
-import logo from "../assets/endgame_grocery_logo.png";
-import { useAuth } from "../context/AuthContext";
-import { useListEvents } from "../hooks/useListEvents";
-import { useOfflineQueue } from "../hooks/useOfflineQueue";
-import type { List } from "../types";
+import { createTemporaryId } from "../../api/client";
+import { writeCachedResource } from "../../api/offlineStore";
+import { createList, deleteList, fetchLists, renameList } from "../../api/lists";
+import InfoSheet from "../../components/InfoSheet/InfoSheet";
+import ListCardHome from "../../components/ListCardHome/ListCardHome";
+import NewListSheet from "../../components/NewListSheet/NewListSheet";
+import { EmptyState, ErrorState, FAB, Icon, LoadingState } from "../../components/ui";
+import logo from "../../assets/endgame_grocery_logo.png";
+import { useAuth } from "../../context/AuthContext";
+import { useListEvents } from "../../hooks/useListEvents";
+import { useOfflineQueue } from "../../hooks/useOfflineQueue";
+import type { List } from "../../types";
+import styles from "./OverviewPage.module.css";
 
 const LISTS_CACHE_KEY = "lists";
 
@@ -151,15 +152,15 @@ export default function OverviewPage(): ReactElement {
   }
 
   return (
-    <div className="overview-page">
-      <div className="overview-topbar">
-        <div className="overview-brand">
+    <div>
+      <div className={styles["overview-topbar"]}>
+        <div className={styles["overview-brand"]}>
           <div>
-            <div className="eg-gradient-text eg-orbitron overview-brand-title">{t("app.brandMain")}</div>
-            <div className="overview-brand-sub">{t("app.brandSub")}</div>
+            <div className={`eg-gradient-text eg-orbitron ${styles["overview-brand-title"]}`}>{t("app.brandMain")}</div>
+            <div className={styles["overview-brand-sub"]}>{t("app.brandSub")}</div>
           </div>
-          <div className="overview-actions">
-            <img alt={t("app.brandName")} className="overview-logo" src={logo} />
+          <div className={styles["overview-actions"]}>
+            <img alt={t("app.brandName")} className={styles["overview-logo"]} src={logo} />
             <button aria-label={t("settings.open")} className="eg-icon-btn" type="button" onClick={() => setShowInfo(true)}>
               <Icon name="settings" color="var(--text-secondary)" size={18} />
             </button>
@@ -167,7 +168,7 @@ export default function OverviewPage(): ReactElement {
         </div>
       </div>
 
-      <div className="overview-content">
+      <div className={styles["overview-content"]}>
         {error ? <ErrorState onRetry={() => void loadLists()} /> : null}
         {isLoading ? <LoadingState rows={3} /> : null}
         {!isLoading && !error && lists.length === 0 ? (

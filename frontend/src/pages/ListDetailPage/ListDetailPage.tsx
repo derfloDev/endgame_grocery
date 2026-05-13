@@ -2,25 +2,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { createTemporaryId } from "../api/client";
-import { createEntry, fetchEntries, updateEntry } from "../api/entries";
-import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
-import { writeCachedResource } from "../api/offlineStore";
-import { fetchLists, renameList } from "../api/lists";
-import { fetchListMembers, revokeListMember, shareListWithMember } from "../api/sharing";
-import AddItemSheet from "../components/AddItemSheet/AddItemSheet";
-import EntryTile from "../components/EntryTile/EntryTile";
-import ListOptionsSheet from "../components/ListOptionsSheet/ListOptionsSheet";
-import RecentlyUsedSection from "../components/RecentlyUsedSection/RecentlyUsedSection";
-import RenameListSheet from "../components/RenameListSheet/RenameListSheet";
-import ShareListSheet from "../components/ShareListSheet/ShareListSheet";
-import { EmptyState, FAB, Icon, LoadingState, TopBar } from "../components/ui";
-import { useAuth } from "../context/AuthContext";
-import { useListEvents } from "../hooks/useListEvents";
-import { useOfflineQueue } from "../hooks/useOfflineQueue";
-import { usePushNotifications } from "../hooks/usePushNotifications";
-import type { Entry, List, Member, Suggestion } from "../types";
-import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "./recentlyUsedState";
+import { createTemporaryId } from "../../api/client";
+import { createEntry, fetchEntries, updateEntry } from "../../api/entries";
+import { deleteFromHistory, fetchRecentlyUsed } from "../../api/history";
+import { writeCachedResource } from "../../api/offlineStore";
+import { fetchLists, renameList } from "../../api/lists";
+import { fetchListMembers, revokeListMember, shareListWithMember } from "../../api/sharing";
+import AddItemSheet from "../../components/AddItemSheet/AddItemSheet";
+import EntryTile from "../../components/EntryTile/EntryTile";
+import ListOptionsSheet from "../../components/ListOptionsSheet/ListOptionsSheet";
+import RecentlyUsedSection from "../../components/RecentlyUsedSection/RecentlyUsedSection";
+import RenameListSheet from "../../components/RenameListSheet/RenameListSheet";
+import ShareListSheet from "../../components/ShareListSheet/ShareListSheet";
+import { EmptyState, FAB, Icon, LoadingState, TopBar } from "../../components/ui";
+import { useAuth } from "../../context/AuthContext";
+import { useListEvents } from "../../hooks/useListEvents";
+import { useOfflineQueue } from "../../hooks/useOfflineQueue";
+import { usePushNotifications } from "../../hooks/usePushNotifications";
+import type { Entry, List, Member, Suggestion } from "../../types";
+import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "../recentlyUsedState";
+import styles from "./ListDetailPage.module.css";
 
 interface DetailEntry extends Omit<Entry, "details"> {
   details?: string | null;
@@ -519,7 +520,7 @@ export default function ListDetailPage(): ReactElement {
   const visibleMemberBadges = list?.is_owner ? members.filter((member) => !member.is_owner) : [];
 
   return (
-    <div className="detail-page">
+    <div>
       <TopBar
         actions={
           list?.is_owner
@@ -536,16 +537,16 @@ export default function ListDetailPage(): ReactElement {
         onBack={() => navigate("/")}
       />
 
-      <div className="detail-content">
+      <div className={styles["detail-content"]}>
         {list ? (
-          <div className="detail-meta">
+          <div className={styles["detail-meta"]}>
             <div className="list-card-chips">
               <span className={list.is_owner ? "eg-chip-purple" : "eg-chip-cyan"}>
                 {list.is_owner ? t("common.owner") : `${t("common.shared")} · ${list.owner_name ?? t("common.anotherMember")}`}
               </span>
               {list.is_pending_sync ? <span className="eg-chip-queued">{t("common.queued")}</span> : null}
               {visibleMemberBadges.length > 0 ? (
-                <div className="detail-member-badges">
+                <div className={styles["detail-member-badges"]}>
                   {visibleMemberBadges.map((member) => (
                     <span
                       key={member.user_id}
@@ -585,7 +586,7 @@ export default function ListDetailPage(): ReactElement {
               {openEntries.length === 0 ? (
                 <EmptyState body={t("detail.noOpenItems")} title={t("detail.allClearTitle")} />
               ) : (
-                <div className="entry-tile-grid">
+                <div className={styles["entry-tile-grid"]} data-testid="entry-tile-grid">
                   {openEntries.map((entry) => (
                     <EntryTile
                       key={entry.id}

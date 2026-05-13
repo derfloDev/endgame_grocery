@@ -2,15 +2,16 @@ import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import type { ReactElement } from "react";
 import OfflineBanner from "./components/OfflineBanner/OfflineBanner";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import InviteAcceptPage from "./pages/InviteAcceptPage";
-import ListDetailPage from "./pages/ListDetailPage";
-import LoginPage from "./pages/LoginPage";
-import OverviewPage from "./pages/OverviewPage";
-import RegisterPage from "./pages/RegisterPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import VerifyEmailPage from "./pages/VerifyEmailPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage/ForgotPasswordPage";
+import InviteAcceptPage from "./pages/InviteAcceptPage/InviteAcceptPage";
+import ListDetailPage from "./pages/ListDetailPage/ListDetailPage";
+import LoginPage from "./pages/LoginPage/LoginPage";
+import OverviewPage from "./pages/OverviewPage/OverviewPage";
+import RegisterPage from "./pages/RegisterPage/RegisterPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage/ResetPasswordPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage/VerifyEmailPage";
 import { useAppConfig } from "./context/appConfigState";
+import styles from "./App.module.css";
 import "./index.css";
 
 export default function App(): ReactElement {
@@ -39,7 +40,7 @@ export default function App(): ReactElement {
 function ProtectedLayout(): ReactElement {
   return (
     <ProtectedRoute>
-      <div className="app-shell">
+      <div className={styles["app-shell"]}>
         <OfflineBanner />
         <Outlet />
       </div>

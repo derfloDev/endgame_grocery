@@ -22,6 +22,10 @@ const sharedClasses = [
   "button-secondary",
   "card-title",
   "destructive-button",
+  "detail-banner",
+  "detail-section-label",
+  "detail-section-label-done",
+  "detail-section-label-share",
   "detail-title",
   "eg-btn",
   "eg-btn-danger",
@@ -50,6 +54,9 @@ const sharedClasses = [
   "entry-card",
   "entry-card-done",
   "entry-copy",
+  "entry-section",
+  "entry-section-collapse",
+  "entry-section-header",
   "entry-text",
   "entry-text-done",
   "entry-toggle",
@@ -86,10 +93,10 @@ const authClasses = [
 ];
 
 describe("shared stylesheet foundation", () => {
-  it("imports shared and auth styles from the global entry stylesheet", () => {
+  it("imports shared styles from the global entry stylesheet", () => {
     expect(indexCssSource).toContain('@import "./styles/tokens.css";');
     expect(indexCssSource).toContain('@import "./styles/shared.css";');
-    expect(indexCssSource).toContain('@import "./styles/auth.module.css";');
+    expect(indexCssSource).not.toContain('@import "./styles/auth.module.css";');
   });
 
   it.each(sharedClasses)("keeps .%s in shared.css", (className) => {

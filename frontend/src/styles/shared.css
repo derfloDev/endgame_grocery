@@ -261,6 +261,57 @@
   flex-wrap: wrap;
 }
 
+.detail-banner {
+  margin-bottom: 12px;
+}
+
+.detail-section-label {
+  color: var(--text-secondary);
+  font-family: "Orbitron", sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.detail-section-label-done {
+  color: var(--color-success);
+}
+
+.detail-section-label-share {
+  color: var(--neon-violet);
+}
+
+.entry-section {
+  padding: var(--space-2) 0;
+}
+
+.entry-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 0 var(--space-2);
+}
+
+.entry-section + .entry-section {
+  margin-top: var(--space-4);
+}
+
+.entry-section-collapse {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.entry-section-collapse .eg-chip-success {
+  margin-left: auto;
+}
+
 .entry-card,
 .member-card {
   display: grid;

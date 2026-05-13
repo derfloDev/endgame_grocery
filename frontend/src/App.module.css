@@ -1,0 +1,14 @@
+.app-shell {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  background: var(--bg-base);
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.45);
+}
+
+.app-shell > :global(.stack),
+.app-shell > [aria-label="Search page"] {
+  padding: 1.25rem 1rem 120px;
+}
