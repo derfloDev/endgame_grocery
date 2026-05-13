@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
-import Icon from "./Icon";
+import Icon from "../Icon/Icon";
+import styles from "./EmptyState.module.css";
 
 interface EmptyStateProps {
   title: string;
@@ -10,12 +11,12 @@ interface EmptyStateProps {
 
 export default function EmptyState({ title, body, action, onAction }: EmptyStateProps): ReactElement {
   return (
-    <div className="empty-state">
+    <div className={styles["empty-state"]}>
       <Icon name="shoppingCart" size={56} color="var(--text-disabled)" />
-      <div className="empty-state-title">{title}</div>
-      <div className="empty-state-body">{body}</div>
+      <div className={styles["empty-state-title"]}>{title}</div>
+      <div className={styles["empty-state-body"]}>{body}</div>
       {action ? (
-        <button className="eg-btn-primary empty-state-action" type="button" onClick={onAction}>
+        <button className={`eg-btn-primary ${styles["empty-state-action"]}`} type="button" onClick={onAction}>
           {action}
         </button>
       ) : null}

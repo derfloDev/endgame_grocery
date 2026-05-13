@@ -1,0 +1,28 @@
+.fab {
+  position: fixed;
+  right: max(calc(50% - 195px), 16px);
+  bottom: 92px;
+  z-index: 90;
+  width: 56px;
+  height: 56px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gradient-brand);
+  box-shadow:
+    var(--glow-purple),
+    0 4px 16px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition:
+    transform var(--duration-micro),
+    box-shadow var(--duration-micro);
+}
+
+.fab:hover {
+  transform: scale(1.08);
+  box-shadow:
+    0 0 28px rgba(139, 43, 226, 0.8),
+    0 0 56px rgba(0, 229, 255, 0.28),
+    0 4px 16px rgba(0, 0, 0, 0.5);
+}

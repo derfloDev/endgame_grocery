@@ -48,3 +48,55 @@ No blockers or major findings.
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS_WITH_NOTES**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File | Description | Required Fix |
+|---|----------|------|-------------|--------------|
+| 1 | minor | `frontend/src/components/AddItemSheet.tsx:62` | `AddItemSheet` still uses the legacy global class string `"bottom-sheet--browser-open"` via the `className` prop instead of the new `browserOpen={showIconBrowser}` boolean prop. This is T-003 scope (AddItemSheet migration is T-003), but it means the `browserOpen` prop is implemented yet not wired up. **Risk:** If T-005 runs before T-003 completes the AddItemSheet migration, the icon-browser layout will break because global class `.bottom-sheet--browser-open` will be removed from `index.css`. T-002 has no blocker here, but T-003 must migrate this before T-005 runs. | No (T-003 scope) |
+| 2 | nit | `frontend/src/components/ui/ui.test.tsx:85` | `browserOpen` class test asserts `className.split(" ").length >= 3` as a proxy for confirming the modifier class was applied. Passes in JSDOM since CSS Module hashes aren't resolved, but the assertion doesn't verify the actual modifier class identity. Acceptable pragmatism. | No |
+
+No blocker or major findings.
+
+#### Verification
+
+##### Steps
+- Read all 7 component TSX files and all 6 CSS module files (Icon has no module).
+- Verified all plan-specified module classes are present in each module file.
+- Verified CSS Module keyframes are locally scoped with prefixed names (`bottom-sheet-slide-up`, `bottom-sheet-fade-in`, `loading-shimmer`).
+- Verified `ui/index.ts` exports all 7 components from their sub-folder paths.
+- Grep'd for any remaining flat import paths (`ui/BottomSheet`, `ui/TopBar`, etc.) — none found.
+- Verified consuming feature components (`AddItemSheet`, `InfoSheet`, `ListOptionsSheet`, `NewListSheet`, `RenameListSheet`, `ShareListSheet`, page components) all import from the `./ui` or `../components/ui` barrel — paths unchanged and correct.
+- Ran `npm run lint` → 0 errors, 1 pre-existing warning.
+- Ran `npm run build` → clean, pre-existing chunk size warning only.
+- Ran `npm test` → 106/106 pass, 0 fail.
+
+##### Findings
+- **T-002 scope fully met**: all 7 UI primitives moved into sub-folders with co-located CSS Modules (where applicable); `browserOpen` prop added to `BottomSheet`; `ui/index.ts` updated.
+- **Plan class inventory verified**:
+  - `TopBar`: `topbar`, `topbar-copy`, `topbar-title`, `topbar-subtitle` ✓
+  - `FAB`: `fab` + `:hover` ✓
+  - `BottomSheet`: `bottom-sheet-backdrop`, `bottom-sheet`, `bottom-sheet--browser-open`, `bottom-sheet form`, `bottom-sheet-handle`, `bottom-sheet-title` ✓
+  - `EmptyState`: `empty-state`, `empty-state-title`, `empty-state-body`, `empty-state-action` ✓
+  - `ErrorState`: `error-state`, `error-state-title`, `error-state-body`, `error-state-action` ✓
+  - `LoadingState`: `loading-state`, `loading-state-row` + local `@keyframes loading-shimmer` ✓
+  - `Icon`: no module (no private styles) ✓
+
+##### Risks
+- `AddItemSheet` passes `className="bottom-sheet--browser-open"` (global string) to `BottomSheet` — this relies on the global rule still existing in `index.css`. T-003 must switch this to `browserOpen={showIconBrowser}` before T-005 removes the global class.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`

@@ -1,0 +1,76 @@
+.bottom-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  border: 0;
+  background: rgba(8, 11, 28, 0.7);
+  backdrop-filter: blur(4px);
+  animation: bottom-sheet-fade-in var(--duration-standard) ease;
+}
+
+.bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  z-index: 201;
+  width: 100%;
+  max-height: min(80dvh, 44rem);
+  max-width: 430px;
+  padding: var(--space-5) var(--space-4) var(--space-5);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-top: 1px solid rgba(139, 43, 226, 0.4);
+  border-radius: 28px 28px 0 0;
+  background: rgba(13, 17, 40, 0.98);
+  box-shadow: 0 -8px 40px rgba(139, 43, 226, 0.2);
+  transform: translateX(-50%);
+  animation: bottom-sheet-slide-up 0.3s var(--ease-out);
+}
+
+.bottom-sheet--browser-open {
+  max-height: min(92dvh, 44rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bottom-sheet form {
+  display: grid;
+  gap: 16px;
+}
+
+.bottom-sheet-handle {
+  width: 36px;
+  height: 4px;
+  margin: -8px auto 16px;
+  border-radius: 9999px;
+  background: rgba(139, 43, 226, 0.4);
+}
+
+.bottom-sheet-title {
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  font-family: "Orbitron", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+@keyframes bottom-sheet-slide-up {
+  from {
+    transform: translate(-50%, 100%);
+  }
+
+  to {
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes bottom-sheet-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

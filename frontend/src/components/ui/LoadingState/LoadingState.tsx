@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ReactElement } from "react";
+import styles from "./LoadingState.module.css";
 
 interface LoadingStateProps {
   rows?: number;
@@ -9,11 +10,11 @@ export default function LoadingState({ rows = 4 }: LoadingStateProps): ReactElem
   const { t } = useTranslation();
 
   return (
-    <div aria-label={t("loading.label")} className="loading-state">
+    <div aria-label={t("loading.label")} className={styles["loading-state"]}>
       {Array.from({ length: rows }, (_, index) => (
         <div
           key={index}
-          className="loading-state-row"
+          className={styles["loading-state-row"]}
           style={{ animationDelay: `${index * 0.1}s` }}
         />
       ))}

@@ -72,3 +72,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | implement |
 
 ---
+
+### T-002 — review — 2026-05-12T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 UI primitives CSS Module migration; all 7 components correctly moved to sub-folders with co-located modules, `browserOpen` prop implemented on `BottomSheet`, one minor risk noted (AddItemSheet still uses global class string — T-003 scope). |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-13T05:26:39Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Moved shared UI primitives into component folders, added CSS Modules for private styles, and added the `BottomSheet` `browserOpen` prop. |
+| Files Changed | `frontend/src/components/ui/index.ts`, `frontend/src/components/ui/ui.test.tsx`, `frontend/src/components/ui/BottomSheet/BottomSheet.tsx`, `frontend/src/components/ui/BottomSheet/BottomSheet.module.css`, `frontend/src/components/ui/EmptyState/EmptyState.tsx`, `frontend/src/components/ui/EmptyState/EmptyState.module.css`, `frontend/src/components/ui/ErrorState/ErrorState.tsx`, `frontend/src/components/ui/ErrorState/ErrorState.module.css`, `frontend/src/components/ui/FAB/FAB.tsx`, `frontend/src/components/ui/FAB/FAB.module.css`, `frontend/src/components/ui/Icon/Icon.tsx`, `frontend/src/components/ui/LoadingState/LoadingState.tsx`, `frontend/src/components/ui/LoadingState/LoadingState.module.css`, `frontend/src/components/ui/TopBar/TopBar.tsx`, `frontend/src/components/ui/TopBar/TopBar.module.css`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` passed with existing `AuthContext.tsx` Fast Refresh warning; `npm run test --workspace frontend -- components/ui/ui.test.tsx` passed; `npm run build` passed with existing Vite bundle warnings; `npm test` passed outside sandbox. |
+| Commit | `refactor(ui): move shared primitives to CSS modules` |
+| Next Role | review |
+
+---
+
+### T-002 — commit_task — 2026-05-13T05:47:01Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and committed the reviewed UI primitive CSS Module migration. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Used reviewer-approved validation from the T-002 implement handoff. |
+| Commit | `refactor(ui): move shared primitives to CSS modules` |
+| Next Role | implement |
+
+---

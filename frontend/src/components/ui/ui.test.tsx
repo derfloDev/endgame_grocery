@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -11,6 +13,9 @@ import {
   LoadingState,
   TopBar
 } from ".";
+
+const uiDir = import.meta.dirname;
+const indexSource = readFileSync(path.resolve(uiDir, "index.ts"), "utf8");
 
 describe("shared Endgame UI components", () => {
   afterEach(() => {
@@ -67,13 +72,36 @@ describe("shared Endgame UI components", () => {
     expect(screen.queryByText("Add Item")).toBeNull();
   });
 
-  it("forwards custom class names to the bottom sheet container", () => {
+  it("applies custom and browser-open classes to the bottom sheet container", () => {
     render(
-      <BottomSheet className="bottom-sheet--browser-open" open title="Add Item" onClose={() => {}}>
+      <BottomSheet browserOpen className="custom-sheet" open title="Add Item" onClose={() => {}}>
         <p>Milk</p>
       </BottomSheet>
     );
 
-    expect(screen.getByRole("dialog", { name: "Add Item" }).className).toContain("bottom-sheet--browser-open");
+    const className = screen.getByRole("dialog", { name: "Add Item" }).className;
+
+    expect(className).toContain("custom-sheet");
+    expect(className.split(" ").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("exports UI primitives from their component folders", () => {
+    const componentFiles = [
+      "BottomSheet/BottomSheet.tsx",
+      "EmptyState/EmptyState.tsx",
+      "ErrorState/ErrorState.tsx",
+      "FAB/FAB.tsx",
+      "Icon/Icon.tsx",
+      "LoadingState/LoadingState.tsx",
+      "TopBar/TopBar.tsx"
+    ];
+
+    for (const fileName of componentFiles) {
+      expect(existsSync(path.resolve(uiDir, fileName))).toBe(true);
+    }
+
+    expect(indexSource).toContain('export { default as BottomSheet } from "./BottomSheet/BottomSheet";');
+    expect(indexSource).toContain('export { default as Icon } from "./Icon/Icon";');
+    expect(indexSource).not.toContain('from "./BottomSheet";');
   });
 });
