@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/derfloDev/endgame_grocery/compare/v0.14.0...v0.15.0) (2026-05-13)
+
+
+### Miscellaneous Chores
+
+* **release:** trigger release-please for 0.15.0 ([db09af3](https://github.com/derfloDev/endgame_grocery/commit/db09af30783417a1e7b56822a235e23d9ef4ce12))
+
 ## [0.14.0](https://github.com/derfloDev/endgame_grocery/compare/v0.13.0...v0.14.0) (2026-05-12)
 
 
