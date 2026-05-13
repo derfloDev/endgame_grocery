@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
-import type { Suggestion } from "../types";
+import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../../data/iconRegistry";
+import type { Suggestion } from "../../types";
 import type { ReactElement } from "react";
-import { Icon } from "./ui";
+import { Icon } from "../ui";
+import styles from "./RecentlyUsedSection.module.css";
 
 interface RecentlyUsedSectionProps {
   items: Suggestion[];
@@ -22,38 +23,38 @@ export default function RecentlyUsedSection({
   }
 
   return (
-    <section aria-label={t("recent.sectionLabel")} className="entry-section recently-used-section">
+    <section aria-label={t("recent.sectionLabel")} className={`entry-section ${styles["recently-used-section"]}`}>
       <div className="entry-section-header">
         <span className="detail-section-label">{t("recent.sectionLabel").toUpperCase()}</span>
         <span className="eg-chip-purple">{items.length}</span>
       </div>
 
-      <div className="recently-used-grid">
+      <div className={styles["recently-used-grid"]} data-testid="recently-used-grid">
         {items.map((item) => {
           const resolvedIconName = resolveIconName(item.icon) ?? FALLBACK_ICON_NAME;
           const ItemIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
 
           return (
-            <div key={item.text} className="recently-used-cell">
+            <div key={item.text} className={styles["recently-used-cell"]} data-testid="recently-used-cell">
               <button
                 aria-label={item.text}
-                className="recently-used-chip"
+                className={styles["recently-used-chip"]}
                 type="button"
                 onClick={() => onAdd?.(item.text, item.icon ?? null)}
               >
                 <ItemIcon
                   aria-hidden="true"
-                  className="recently-used-chip-icon"
+                  className={styles["recently-used-chip-icon"]}
                   data-icon-name={resolvedIconName}
                   size={20}
                   stroke={1.6}
                 />
-                <span className="recently-used-chip-text">{item.text}</span>
+                <span className={styles["recently-used-chip-text"]}>{item.text}</span>
               </button>
 
               <button
                 aria-label={t("recent.dismiss", { name: item.text })}
-                className="recently-used-chip-dismiss"
+                className={styles["recently-used-chip-dismiss"]}
                 type="button"
                 onClick={() => onDismiss?.(item.text)}
               >

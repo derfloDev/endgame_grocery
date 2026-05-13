@@ -3,10 +3,10 @@ import path from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import "../index.css";
+import "../../index.css";
 import AutocompleteSuggestions from "./AutocompleteSuggestions";
 
-const cssSource = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
+const cssSource = readFileSync(path.resolve(import.meta.dirname, "./AutocompleteSuggestions.module.css"), "utf8");
 
 describe("AutocompleteSuggestions", () => {
   afterEach(() => {
@@ -51,12 +51,11 @@ describe("AutocompleteSuggestions", () => {
   });
 
   it("renders a suggestion without an icon and keeps the dropdown row full-width with a 44px touch target", () => {
-    const { container } = render(
+    render(
       <AutocompleteSuggestions suggestions={[{ text: "Milch", icon: null }]} onSelect={vi.fn()} />
     );
 
-    expect(screen.getByRole("option", { name: "Milch" })).toBeTruthy();
-    expect(container.querySelector(".autocomplete-chip svg")).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Milch" }).querySelector("svg")).toBeTruthy();
     expect(cssSource).toMatch(/\.autocomplete-chip\s*\{[^}]*min-height:\s*44px;[^}]*width:\s*100%;/s);
   });
 });

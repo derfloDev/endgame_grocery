@@ -100,3 +100,52 @@ No blocker or major findings.
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS_WITH_NOTES**
+
+Reviewed: 2026-05-12
+
+#### Findings
+
+| # | Severity | File | Description | Required Fix |
+|---|----------|------|-------------|--------------|
+| 1 | minor | `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx:26-28` | Uses `"entry-section"`, `"entry-section-header"`, and `"detail-section-label"` as global class strings. Per the plan these are listed as private `ListDetailPage.module.css` classes (T-004 scope). Since `RecentlyUsedSection` also applies these classes to its own root, they are cross-component shared utilities — NOT page-private. **T-004 must NOT move these to `ListDetailPage.module.css`.** They must stay global or be added to `shared.css`. This is a T-004 guard, not a T-003 defect. | No (T-004 guard) |
+| 2 | minor | `frontend/src/components/ShareListSheet/ShareListSheet.tsx:66-67` | Uses `"detail-banner"` as a global class. `detail-banner` is also used in `ListDetailPage.tsx:574` and is planned as a `ListDetailPage` private module class (T-004). If T-004 privatizes it, `ShareListSheet` loses `margin-bottom: 12px` on its feedback area. T-004 must keep `detail-banner` in `shared.css` or as a global. | No (T-004 guard) |
+| 3 | nit | `frontend/src/components/ShareListSheet/ShareListSheet.module.css:6-17` | `.sharing-panel` and `.sharing-panel-form` are defined in the module but not referenced in `ShareListSheet.tsx`. Dead CSS Module classes — no functional impact. | No |
+| 4 | nit | `frontend/src/components/.gitkeep` | Orphaned `.gitkeep` placeholder file in the now-populated components root directory. Harmless. | No |
+
+No blocker or major findings. The T-002 risk (AddItemSheet using global `bottom-sheet--browser-open` string) is **resolved** — `AddItemSheet.tsx:181` correctly passes `browserOpen={showIconBrowser}` to `BottomSheet`. ✓
+
+#### Verification
+
+##### Steps
+- Read all 13 feature component TSX files and all 11 CSS module files (OfflineBanner and ProtectedRoute have no module per plan).
+- Verified all plan-specified module classes are present in each module file.
+- Verified compound selector resolution in `AddItemSheet`: all 5 compound selectors (form, disclosure, icon-browser, icon-browser-inner, icon-browser-grid) replaced by state-driven `--browser-open` modifier classes applied directly in TSX. ✓
+- Verified `BottomSheet` receives `browserOpen={showIconBrowser}` — T-002 risk resolved. ✓
+- Checked `animation: spin` in `ShareListSheet.module.css` — global `@keyframes spin` is retained in `index.css` after T-005 per plan; reference is valid. ✓
+- Verified `add-item-form--browser-open > :not(.add-item-disclosure)` — CSS Modules scopes class names inside `:not()` correctly. ✓
+- Confirmed no old flat-path imports remain for any moved component. All page/App.tsx imports use sub-folder paths. ✓
+- Confirmed `eg-btn` class usage in `InfoSheet.tsx:42` is valid (added to `shared.css` in T-001). ✓
+- Ran `npm run lint` → 0 errors, 1 pre-existing warning.
+- Ran `npm run build` → clean, pre-existing chunk size warning only.
+- Ran `npm test` → 106/106 pass, 0 fail.
+
+##### Findings
+- **T-003 scope fully met**: all 13 feature components in sub-folders; 11 have co-located CSS Modules; AddItemSheet compound selectors resolved; all consumer import paths updated.
+- `entry-tile-grid` stays as a global (layout wrapper in `ListDetailPage`) — correctly absent from `EntryTile.module.css`. ✓
+
+##### Risks
+- **T-004 implementation guard**: `entry-section`, `entry-section-header`, `detail-section-label`, and `detail-banner` are shared between `ListDetailPage.tsx` and feature components (`RecentlyUsedSection`, `ShareListSheet`). The plan erroneously lists these as `ListDetailPage` private module classes. T-004 **must** move them to `shared.css` (or leave them global) rather than privatizing them, or feature component rendering will break when T-005 cleans `index.css`.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`

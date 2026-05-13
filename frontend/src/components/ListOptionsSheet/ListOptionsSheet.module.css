@@ -1,0 +1,61 @@
+.list-options-sheet {
+  display: grid;
+}
+
+.list-option-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: pointer;
+  padding: var(--space-3);
+  text-align: left;
+  transition: background var(--duration-micro);
+}
+
+.list-option-row:hover {
+  background: rgba(139, 43, 226, 0.1);
+}
+
+.list-option-row + .list-option-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.list-option-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+}
+
+.list-option-icon-edit {
+  background: rgba(139, 43, 226, 0.15);
+}
+
+.list-option-icon-share {
+  background: rgba(0, 229, 255, 0.12);
+}
+
+.list-option-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.list-option-label {
+  display: block;
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.list-option-desc {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}

@@ -1,7 +1,7 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import type { ReactElement } from "react";
-import OfflineBanner from "./components/OfflineBanner";
-import ProtectedRoute from "./components/ProtectedRoute";
+import OfflineBanner from "./components/OfflineBanner/OfflineBanner";
+import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import InviteAcceptPage from "./pages/InviteAcceptPage";
 import ListDetailPage from "./pages/ListDetailPage";

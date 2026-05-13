@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
-import { FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../data/iconRegistry";
-import type { Suggestion } from "../types";
+import { FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../../data/iconRegistry";
+import type { Suggestion } from "../../types";
 import type { ReactElement } from "react";
+import styles from "./AutocompleteSuggestions.module.css";
 
 interface AutocompleteSuggestionsProps {
   suggestions: Suggestion[];
@@ -19,7 +20,7 @@ export default function AutocompleteSuggestions({
   }
 
   return (
-    <div className="autocomplete-suggestions" role="listbox" aria-label={t("autocomplete.label")}>
+    <div className={styles["autocomplete-suggestions"]} role="listbox" aria-label={t("autocomplete.label")}>
       {suggestions.map((suggestion, index) => {
         const resolvedIconName = resolveIconName(suggestion.icon) ?? FALLBACK_ICON_NAME;
         const SuggestionIcon = ICON_REGISTRY[resolvedIconName];
@@ -29,7 +30,7 @@ export default function AutocompleteSuggestions({
           <button
             key={key}
             aria-label={suggestion.text}
-            className="autocomplete-chip"
+            className={styles["autocomplete-chip"]}
             role="option"
             type="button"
             onClick={() => onSelect(suggestion.text, suggestion.icon ?? null)}

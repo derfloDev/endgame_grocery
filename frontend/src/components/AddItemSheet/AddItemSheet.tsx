@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FocusEvent, FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "../context/AuthContext";
-import { formatIconName, ICON_REGISTRY, ICON_REGISTRY_KEYS, resolveIconName } from "../data/iconRegistry";
-import { useAutocomplete } from "../hooks/useAutocomplete";
-import { useIconSuggestion } from "../hooks/useIconSuggestion";
-import AutocompleteSuggestions from "./AutocompleteSuggestions";
-import { BottomSheet } from "./ui";
+import { useAuth } from "../../context/AuthContext";
+import { formatIconName, ICON_REGISTRY, ICON_REGISTRY_KEYS, resolveIconName } from "../../data/iconRegistry";
+import { useAutocomplete } from "../../hooks/useAutocomplete";
+import { useIconSuggestion } from "../../hooks/useIconSuggestion";
+import AutocompleteSuggestions from "../AutocompleteSuggestions/AutocompleteSuggestions";
+import { BottomSheet } from "../ui";
+import styles from "./AddItemSheet.module.css";
 
 interface AddItemSheetProps {
   initialDetails?: string;
@@ -59,7 +60,7 @@ export default function AddItemSheet({
   const inputLabel = isEditMode ? t("item.editLabel") : t("item.addLabel");
   const submitLabel = isEditMode ? t("item.saveItem") : t("item.addTitle");
   const iconBrowserToggleLabel = showIconBrowser ? t("item.showLess") : t("item.showMore");
-  const sheetClassName = showIconBrowser ? "bottom-sheet--browser-open" : "";
+  const getClassName = (...classNames: Array<string | false | undefined>) => classNames.filter(Boolean).join(" ");
 
   useEffect(() => {
     setText(initialText);
@@ -177,8 +178,11 @@ export default function AddItemSheet({
   }
 
   return (
-    <BottomSheet className={sheetClassName} open={open} title={sheetTitle} onClose={onClose}>
-      <form className="add-item-form" onSubmit={handleSubmit}>
+    <BottomSheet browserOpen={showIconBrowser} open={open} title={sheetTitle} onClose={onClose}>
+      <form
+        className={getClassName(styles["add-item-form"], showIconBrowser && styles["add-item-form--browser-open"])}
+        onSubmit={handleSubmit}
+      >
         <div className="eg-field">
           <label htmlFor={textInputId}>{inputLabel}</label>
           <div className="eg-input-wrap">
@@ -198,12 +202,15 @@ export default function AddItemSheet({
               ) : null}
             </div>
             {loading ? (
-              <div aria-live="polite" className="add-item-preview add-item-preview-loading">
-                <span aria-label={t("item.loadingIcon")} className="add-item-preview-spinner" />
+              <div
+                aria-live="polite"
+                className={getClassName(styles["add-item-preview"], styles["add-item-preview-loading"])}
+              >
+                <span aria-label={t("item.loadingIcon")} className={styles["add-item-preview-spinner"]} />
               </div>
             ) : PreviewIcon ? (
-              <div aria-live="polite" className="add-item-preview" data-testid="add-item-icon-preview">
-                <PreviewIcon aria-hidden="true" className="add-item-preview-svg" size={28} stroke={1.6} />
+              <div aria-live="polite" className={styles["add-item-preview"]} data-testid="add-item-icon-preview">
+                <PreviewIcon aria-hidden="true" className={styles["add-item-preview-svg"]} size={28} stroke={1.6} />
               </div>
             ) : null}
           </div>
@@ -221,7 +228,7 @@ export default function AddItemSheet({
         </div>
 
         {suggestedIconNames.length > 0 ? (
-          <div className="add-item-icon-picker" role="group" aria-label={t("item.suggestedIcons")}>
+          <div className={styles["add-item-icon-picker"]} role="group" aria-label={t("item.suggestedIcons")}>
             {suggestedIconNames.map((suggestedIconName) => {
               const SuggestedIcon = ICON_REGISTRY[suggestedIconName];
 
@@ -229,9 +236,10 @@ export default function AddItemSheet({
                 <button
                   key={suggestedIconName}
                   aria-label={t("item.chooseSpecificIcon", { name: formatIconName(suggestedIconName) })}
-                  className={`add-item-icon-picker-btn ${
-                    selectedIconName === suggestedIconName ? "add-item-icon-picker-btn--selected" : ""
-                  }`}
+                  className={getClassName(
+                    styles["add-item-icon-picker-btn"],
+                    selectedIconName === suggestedIconName && styles["add-item-icon-picker-btn--selected"]
+                  )}
                   type="button"
                   onClick={() => setSelectedIconName(suggestedIconName)}
                 >
@@ -242,9 +250,15 @@ export default function AddItemSheet({
           </div>
         ) : null}
 
-        <div className={`add-item-disclosure${showIconBrowser ? " add-item-disclosure--open" : ""}`}>
+        <div
+          className={getClassName(
+            styles["add-item-disclosure"],
+            showIconBrowser && styles["add-item-disclosure--open"],
+            showIconBrowser && styles["add-item-disclosure--browser-open"]
+          )}
+        >
           <button
-            className="add-item-more-btn"
+            className={styles["add-item-more-btn"]}
             type="button"
             onClick={() => setShowIconBrowser((currentValue) => !currentValue)}
           >
@@ -253,10 +267,21 @@ export default function AddItemSheet({
 
           <div
             aria-hidden={!showIconBrowser}
-            className={`add-item-icon-browser${showIconBrowser ? " add-item-icon-browser--open" : ""}`}
+            className={getClassName(
+              styles["add-item-icon-browser"],
+              showIconBrowser && styles["add-item-icon-browser--open"],
+              showIconBrowser && styles["add-item-icon-browser--browser-open"]
+            )}
+            data-testid="add-item-icon-browser"
             inert={!showIconBrowser || undefined}
           >
-            <div className="add-item-icon-browser-inner">
+            <div
+              className={getClassName(
+                styles["add-item-icon-browser-inner"],
+                showIconBrowser && styles["add-item-icon-browser-inner--browser-open"]
+              )}
+              data-testid="add-item-icon-browser-inner"
+            >
               <label className="visually-hidden" htmlFor={iconSearchInputId}>
                 {t("item.searchIcons")}
               </label>
@@ -269,7 +294,13 @@ export default function AddItemSheet({
                 onChange={(event) => setIconBrowserSearchText(event.target.value)}
               />
 
-              <div className="add-item-icon-browser-grid">
+              <div
+                className={getClassName(
+                  styles["add-item-icon-browser-grid"],
+                  showIconBrowser && styles["add-item-icon-browser-grid--browser-open"]
+                )}
+                data-testid="add-item-icon-browser-grid"
+              >
                 {visibleIconNames.map((browserIconName) => {
                   const BrowserIcon = ICON_REGISTRY[browserIconName];
 
@@ -277,9 +308,10 @@ export default function AddItemSheet({
                     <button
                       key={browserIconName}
                       aria-label={t("item.browseSpecificIcon", { name: formatIconName(browserIconName) })}
-                      className={`add-item-icon-browser-btn ${
-                        selectedIconName === browserIconName ? "add-item-icon-browser-btn--selected" : ""
-                      }`}
+                      className={getClassName(
+                        styles["add-item-icon-browser-btn"],
+                        selectedIconName === browserIconName && styles["add-item-icon-browser-btn--selected"]
+                      )}
                       type="button"
                       onClick={() => {
                         setSelectedIconName(browserIconName);
@@ -288,7 +320,7 @@ export default function AddItemSheet({
                       }}
                     >
                       <BrowserIcon aria-hidden="true" size={22} stroke={1.6} />
-                      <span className="icon-picker-btn-label">{formatIconName(browserIconName)}</span>
+                      <span className={styles["icon-picker-btn-label"]}>{formatIconName(browserIconName)}</span>
                     </button>
                   );
                 })}
@@ -297,7 +329,7 @@ export default function AddItemSheet({
           </div>
         </div>
 
-        <div className="button-row add-item-actions">
+        <div className={`button-row ${styles["add-item-actions"]}`}>
           <button className="eg-btn-ghost" type="button" onClick={onClose}>
             {t("common.cancel")}
           </button>

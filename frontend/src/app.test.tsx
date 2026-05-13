@@ -1378,7 +1378,7 @@ describe("authentication shell", () => {
     await userEvent.type(screen.getByLabelText("Invite member by email"), "sam@example.com");
     await userEvent.click(screen.getByRole("button", { name: "Send Invite" }));
     expect(screen.getByRole("button", { name: "Send Invite" }).hasAttribute("disabled")).toBe(true);
-    expect(document.querySelector(".share-invite-spinner")).toBeTruthy();
+    expect(screen.getByTestId("share-invite-spinner")).toBeTruthy();
 
     inviteRequest.resolve({
       ok: true,

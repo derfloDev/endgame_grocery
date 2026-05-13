@@ -2,12 +2,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import InfoSheet from "./InfoSheet";
-import type { User } from "../types";
+import type { User } from "../../types";
 
 const mockLogout = vi.fn();
 let mockUser: User | null = null;
 
-vi.mock("../context/AuthContext", () => ({
+vi.mock("../../context/AuthContext", () => ({
   useAuth() {
     return {
       user: mockUser,

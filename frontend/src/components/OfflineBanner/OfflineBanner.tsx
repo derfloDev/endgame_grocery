@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ReactElement } from "react";
-import { useOfflineQueue } from "../hooks/useOfflineQueue";
+import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 
 export default function OfflineBanner(): ReactElement | null {
   const { t } = useTranslation();

@@ -26,8 +26,8 @@ describe("RecentlyUsedSection", () => {
     const section = screen.getByRole("region", { name: "Recently Used" });
     expect(within(section).getByText("RECENTLY USED")).toBeTruthy();
     expect(within(section).getByText("2")).toBeTruthy();
-    expect(section.querySelector(".recently-used-grid")).toBeTruthy();
-    expect(section.querySelectorAll(".recently-used-cell")).toHaveLength(2);
+    expect(screen.getByTestId("recently-used-grid")).toBeTruthy();
+    expect(screen.getAllByTestId("recently-used-cell")).toHaveLength(2);
 
     await userEvent.click(within(section).getByRole("button", { name: "Tomatoes" }));
     expect(onAdd).toHaveBeenCalledWith("Tomatoes", "IconSalad");
@@ -39,12 +39,13 @@ describe("RecentlyUsedSection", () => {
   });
 
   it("renders the fallback icon when an item has no saved icon", () => {
-    const { container } = render(
+    render(
       <RecentlyUsedSection items={[{ text: "Bread", icon: null, useCount: 4 }]} onAdd={vi.fn()} onDismiss={vi.fn()} />
     );
 
     expect(screen.getByRole("button", { name: "Bread" })).toBeTruthy();
-    expect(container.querySelector(".recently-used-chip-icon")).toBeTruthy();
-    expect(container.querySelector(".recently-used-chip-icon")?.getAttribute("data-icon-name")).toBe("IconShoppingCart");
+    const icon = screen.getByRole("button", { name: "Bread" }).querySelector("[data-icon-name]");
+    expect(icon).toBeTruthy();
+    expect(icon?.getAttribute("data-icon-name")).toBe("IconShoppingCart");
   });
 });

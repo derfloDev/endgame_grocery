@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { KeyboardEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import type { List } from "../types";
-import { Icon } from "./ui";
+import type { List } from "../../types";
+import { Icon } from "../ui";
+import styles from "./ListCardHome.module.css";
 
 interface HomeList extends List {
   name: string;
@@ -40,10 +41,10 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListC
   }
 
   return (
-    <article className="eg-card list-card-home">
+    <article className={`eg-card ${styles["list-card-home"]}`}>
       <div className="eg-card-overlay" />
       <div
-        className="list-card-row"
+        className={styles["list-card-row"]}
         role="button"
         tabIndex={0}
         onClick={onOpen}
@@ -54,8 +55,8 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListC
           }
         }}
       >
-        <div className="list-card-info">
-          <div className="eg-orbitron list-card-name">{list.name}</div>
+        <div className={styles["list-card-info"]}>
+          <div className={`eg-orbitron ${styles["list-card-name"]}`}>{list.name}</div>
           <div className="list-card-chips">
             <span className={list.is_owner ? "eg-chip-purple" : "eg-chip-cyan"}>
               {list.is_owner ? t("common.owner") : `${t("common.shared")} · ${list.owner_name}`}
@@ -81,9 +82,9 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListC
       </div>
 
       {menuOpen && !renamingMode ? (
-        <div className="list-card-menu" onClick={(event) => event.stopPropagation()}>
+        <div className={styles["list-card-menu"]} onClick={(event) => event.stopPropagation()}>
           <button
-            className="eg-btn-ghost list-card-menu-btn"
+            className={`eg-btn-ghost ${styles["list-card-menu-btn"]}`}
             type="button"
             onClick={() => {
               setRenamingMode(true);
@@ -93,7 +94,7 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListC
             {t("common.rename")}
           </button>
           <button
-            className="eg-btn-danger list-card-menu-btn"
+            className={`eg-btn-danger ${styles["list-card-menu-btn"]}`}
             type="button"
             onClick={() => {
               closeMenu();
@@ -106,7 +107,7 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListC
       ) : null}
 
       {menuOpen && renamingMode ? (
-        <div className="list-card-menu" onClick={(event) => event.stopPropagation()}>
+        <div className={styles["list-card-menu"]} onClick={(event) => event.stopPropagation()}>
           <label className="visually-hidden" htmlFor={`rename-${list.id}`}>
             {t("list.renameList")}
           </label>
@@ -127,7 +128,7 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListC
               }
             }}
           />
-          <div className="button-row list-card-menu-actions">
+          <div className={`button-row ${styles["list-card-menu-actions"]}`}>
             <button className="eg-btn-ghost" type="button" onClick={closeMenu}>
               {t("common.cancel")}
             </button>

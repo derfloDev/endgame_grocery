@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { BottomSheet } from "./ui";
+import { BottomSheet } from "../ui";
+import styles from "./NewListSheet.module.css";
 
 interface NewListSheetProps {
   open: boolean;
@@ -35,7 +36,7 @@ export default function NewListSheet({ open, onAdd, onClose }: NewListSheetProps
 
   return (
     <BottomSheet open={open} title={t("list.newListTitle")} onClose={onClose}>
-      <form className="new-list-form" onSubmit={handleSubmit}>
+      <form className={styles["new-list-form"]} onSubmit={handleSubmit}>
         <div className="eg-field">
           <label htmlFor="new-list-sheet-name">{t("list.newList")}</label>
           <input

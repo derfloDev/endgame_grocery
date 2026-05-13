@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { BottomSheet } from "./ui";
+import { BottomSheet } from "../ui";
+import styles from "./RenameListSheet.module.css";
 
 interface RenameListSheetProps {
   open: boolean;
@@ -35,7 +36,7 @@ export default function RenameListSheet({ open, onClose, currentName, onRename }
 
   return (
     <BottomSheet open={open} title={t("list.renameList")} onClose={onClose}>
-      <form className="rename-list-form" onSubmit={(event) => void handleSubmit(event)}>
+      <form className={styles["rename-list-form"]} onSubmit={(event) => void handleSubmit(event)}>
         <div className="eg-field">
           <label htmlFor="rename-list-sheet-value">{t("list.renameList")}</label>
           <input

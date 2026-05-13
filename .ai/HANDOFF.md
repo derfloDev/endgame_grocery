@@ -111,3 +111,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | implement |
 
 ---
+
+### T-003 — review — 2026-05-12T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 feature component CSS Module migration; all 13 components correctly moved to sub-folders, AddItemSheet compound selectors fully resolved with `browserOpen` prop wired up, two T-004 implementation guards identified (entry-section/detail-banner must not become ListDetailPage-private). |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-05-13T07:02:38Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Moved feature components into component folders, added CSS Modules for private styles, and replaced AddItemSheet compound selectors with state-driven module classes. |
+| Files Changed | `frontend/src/App.tsx`, `frontend/src/app.test.tsx`, `frontend/src/pages/ListDetailPage.tsx`, `frontend/src/pages/OverviewPage.tsx`, `frontend/src/components/feature-components.test.ts`, `frontend/src/components/AddItemSheet/`, `frontend/src/components/AutocompleteSuggestions/`, `frontend/src/components/EntryTile/`, `frontend/src/components/InfoSheet/`, `frontend/src/components/LanguageSwitcher/`, `frontend/src/components/ListCardHome/`, `frontend/src/components/ListOptionsSheet/`, `frontend/src/components/NewListSheet/`, `frontend/src/components/OfflineBanner/`, `frontend/src/components/ProtectedRoute/`, `frontend/src/components/RecentlyUsedSection/`, `frontend/src/components/RenameListSheet/`, `frontend/src/components/ShareListSheet/`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run lint` passed with existing `AuthContext.tsx` Fast Refresh warning; targeted frontend feature/component tests passed outside sandbox after an esbuild spawn EPERM in the sandbox; `npm run build` passed with existing Vite eval/chunk-size warnings; `npm test` passed. |
+| Commit | `refactor(components): move feature components to CSS modules` |
+| Next Role | review |
+
+---
+
+### T-003 — commit_task — 2026-05-13T07:23:53Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-003 done and committed the reviewed feature component CSS Module migration. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Used reviewer-approved validation from the T-003 implement handoff. |
+| Commit | `refactor(components): move feature components to CSS modules` |
+| Next Role | implement |
+
+---

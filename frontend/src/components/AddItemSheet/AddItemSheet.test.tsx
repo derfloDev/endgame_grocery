@@ -3,10 +3,19 @@ import path from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import "../index.css";
+import "../../index.css";
 import AddItemSheet from "./AddItemSheet";
 
-const cssSource = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
+const cssSource = [
+  "../../index.css",
+  "../../styles/shared.css",
+  "../ui/BottomSheet/BottomSheet.module.css",
+  "../ui/FAB/FAB.module.css",
+  "../AutocompleteSuggestions/AutocompleteSuggestions.module.css",
+  "./AddItemSheet.module.css"
+]
+  .map((filePath) => readFileSync(path.resolve(import.meta.dirname, filePath), "utf8"))
+  .join("\n");
 
 function requireElement<T extends Element>(element: T | null): T {
   if (!element) {
@@ -16,13 +25,13 @@ function requireElement<T extends Element>(element: T | null): T {
   return element;
 }
 
-vi.mock("../context/AuthContext", () => ({
+vi.mock("../../context/AuthContext", () => ({
   useAuth: vi.fn(() => ({
     token: "token-1"
   }))
 }));
 
-vi.mock("../hooks/useAutocomplete", () => ({
+vi.mock("../../hooks/useAutocomplete", () => ({
   useAutocomplete: vi.fn((listId, text) => {
     if (listId === "list-1" && text === "Tom") {
       return {
@@ -41,7 +50,7 @@ vi.mock("../hooks/useAutocomplete", () => ({
   })
 }));
 
-vi.mock("../hooks/useIconSuggestion", () => ({
+vi.mock("../../hooks/useIconSuggestion", () => ({
   useIconSuggestion: vi.fn((text) => {
     if (text === "Milch") {
       return { iconName: "IconMilk", topMatches: [], loading: false };
@@ -114,7 +123,7 @@ describe("AddItemSheet", () => {
       cssSource.match(/\.add-item-more-btn:hover,\s*\.add-item-more-btn:focus-visible\s*\{[^}]*\}/s)?.[0] ??
       "";
 
-    expect(toggleButton.className).toBe("add-item-more-btn");
+    expect(toggleButton.className).toContain("add-item-more-btn");
     expect((toggleButton as HTMLButtonElement).type).toBe("button");
     expect(toggleRule).toMatch(/width:\s*fit-content;/);
     expect(toggleRule).toMatch(/padding:\s*0\.15rem 0;/);
@@ -144,8 +153,8 @@ describe("AddItemSheet", () => {
     expect(screen.queryByRole("dialog", { name: "Choose Icon" })).toBeNull();
     expect(screen.getByLabelText("Add item")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Add Item" })).toBeTruthy();
-    const iconBrowser = requireElement(container.querySelector<HTMLElement>(".add-item-icon-browser"));
-    const iconBrowserInner = requireElement(container.querySelector<HTMLElement>(".add-item-icon-browser-inner"));
+    const iconBrowser = screen.getByTestId("add-item-icon-browser");
+    const iconBrowserInner = screen.getByTestId("add-item-icon-browser-inner");
     const iconSearchInput = screen.getByLabelText("Search icons");
     expect(iconBrowser).toBeTruthy();
     expect(iconBrowserInner).toBeTruthy();
@@ -157,7 +166,7 @@ describe("AddItemSheet", () => {
     });
     expect(screen.getByRole("button", { name: "Weniger anzeigen" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Zurück" })).toBeNull();
-    expect(container.querySelectorAll(".add-item-icon-browser-grid").length).toBe(1);
+    expect(screen.getAllByTestId("add-item-icon-browser-grid")).toHaveLength(1);
 
     fireEvent.change(iconSearchInput, { target: { value: "trash" } });
     expect(screen.queryByRole("button", { name: "Browse Milk" })).toBeNull();
@@ -213,7 +222,7 @@ describe("AddItemSheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Mehr anzeigen" }));
     expect((screen.getByLabelText("Edit item") as HTMLInputElement).value).toBe("Milch");
     expect(screen.getByRole("button", { name: "Save Item" })).toBeTruthy();
-    const iconBrowser = requireElement(container.querySelector<HTMLElement>(".add-item-icon-browser"));
+    const iconBrowser = screen.getByTestId("add-item-icon-browser");
     const iconSearchInput = screen.getByLabelText("Search icons");
     expect(iconBrowser.className).toContain("add-item-icon-browser--open");
     expect(screen.getByRole("button", { name: "Weniger anzeigen" })).toBeTruthy();
@@ -315,10 +324,10 @@ describe("AddItemSheet", () => {
   });
 
   it("keeps the icon browser mounted while collapsed and marks it inert until opened", async () => {
-    const { container } = render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
+    render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
 
-    const iconBrowser = requireElement(container.querySelector<HTMLElement>(".add-item-icon-browser"));
-    const iconBrowserInner = requireElement(container.querySelector<HTMLElement>(".add-item-icon-browser-inner"));
+    const iconBrowser = screen.getByTestId("add-item-icon-browser");
+    const iconBrowserInner = screen.getByTestId("add-item-icon-browser-inner");
     const iconBrowserRule =
       cssSource.match(/\.add-item-icon-browser\s*\{[^}]*\}/s)?.[0] ?? "";
     const iconBrowserInnerRule =
@@ -342,14 +351,12 @@ describe("AddItemSheet", () => {
     expect(iconBrowserInnerRule).toMatch(/min-height:\s*0;/);
     expect(iconBrowserInnerRule).not.toMatch(/border-top:/);
     expect(cssSource).toMatch(/\.add-item-icon-browser--open\s*\{[^}]*grid-template-rows:\s*1fr;[^}]*opacity:\s*1;/s);
+    expect(cssSource).toMatch(/\.add-item-form--browser-open\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/s);
     expect(cssSource).toMatch(
-      /\.bottom-sheet--browser-open\s+\.add-item-form\s*>\s*:not\(\.add-item-disclosure\)\s*\{[^}]*flex-shrink:\s*0;/s
+      /\.add-item-disclosure--browser-open\s*\{[^}]*display:\s*flex;[^}]*flex:\s*1;[^}]*flex-direction:\s*column;[^}]*min-height:\s*0;/s
     );
     expect(cssSource).toMatch(
-      /\.bottom-sheet--browser-open\s+\.add-item-disclosure\s*\{[^}]*display:\s*flex;[^}]*flex:\s*1;[^}]*flex-direction:\s*column;[^}]*min-height:\s*0;/s
-    );
-    expect(cssSource).toMatch(
-      /\.bottom-sheet--browser-open\s+\.add-item-icon-browser-inner\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*gap:\s*16px;[^}]*overflow:\s*clip;[^}]*min-height:\s*0;/s
+      /\.add-item-icon-browser-inner--browser-open\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*gap:\s*16px;[^}]*overflow:\s*clip;[^}]*min-height:\s*0;/s
     );
   });
 

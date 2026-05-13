@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ReactElement } from "react";
+import styles from "./LanguageSwitcher.module.css";
 
 const LANGUAGES = [
   { code: "de", label: "DE" },
@@ -26,7 +27,7 @@ export default function LanguageSwitcher(): ReactElement {
   }
 
   return (
-    <div className="language-switcher" role="group" aria-label={t("settings.languageLabel")}>
+    <div className={styles["language-switcher"]} role="group" aria-label={t("settings.languageLabel")}>
       {LANGUAGES.map(({ code, label }) => {
         const isActive = activeLanguage === code;
 
@@ -34,7 +35,10 @@ export default function LanguageSwitcher(): ReactElement {
           <button
             key={code}
             aria-pressed={isActive}
-            className={`language-switcher-button${isActive ? " language-switcher-button-active" : ""}`}
+            className={[
+              styles["language-switcher-button"],
+              isActive ? styles["language-switcher-button-active"] : ""
+            ].filter(Boolean).join(" ")}
             type="button"
             onClick={() => handleLanguageChange(code)}
           >
