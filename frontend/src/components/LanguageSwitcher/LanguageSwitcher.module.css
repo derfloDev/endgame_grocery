@@ -1,0 +1,32 @@
+.language-switcher {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(13, 17, 40, 0.84);
+}
+
+.language-switcher-button {
+  min-height: 36px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.language-switcher-button-active {
+  background: var(--gradient-brand);
+  color: var(--bg-base);
+  box-shadow: var(--glow-cyan);
+}
+
+.language-switcher-button:focus-visible {
+  outline: 2px solid var(--neon-cyan);
+  outline-offset: 2px;
+}

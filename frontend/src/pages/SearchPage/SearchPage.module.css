@@ -1,0 +1,13 @@
+.search-page {
+  min-height: 100vh;
+  color: var(--text-primary);
+}
+
+.search-page-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: "Orbitron", sans-serif;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}

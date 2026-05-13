@@ -1,52 +1,53 @@
 # ROADMAP
 
-Goal: Migrate the React 19 frontend from JSX/JS to TypeScript (TSX/TS).
+Goal: CSS-Refactoring — Migrate from a single monolithic `index.css` to per-component CSS Modules for all application-specific styles, while retaining design tokens and shared utilities in a centrally-imported stylesheet.
 
-## Priority 1 — TypeScript Migration
+## Priority 1 — CSS Modules migration
 
-Objective: Convert all frontend source files from `.jsx`/`.js` to `.tsx`/`.ts`, introduce
-strict typing, and keep the build and all tests green throughout.
+Objective: every component owns its private styles via a co-located CSS Module; the global stylesheet is reduced to resets, animations, and design tokens only.
 
 ### Scope
 
-- ~80 source files across `api/`, `data/`, `utils/`, `workers/`, `hooks/`, `context/`,
-  `components/ui/`, `components/`, `pages/`, and the entry points (`App.jsx`, `main.jsx`).
-- `vite.config.js` → `vite.config.ts`.
-- Test files (`.test.jsx` / `.test.js`) migrated to `.test.tsx` / `.test.ts`.
-- `src/sw/service-worker.js` **stays as `.js`** (Workbox / VitePWA injectManifest boundary).
-- `src/sw/register.js` → `register.ts`.
+All `.tsx` files under `frontend/src/`:
+- `components/ui/` — TopBar, FAB, BottomSheet, EmptyState, ErrorState, LoadingState, Icon
+- `components/` — AddItemSheet, AutocompleteSuggestions, EntryTile, InfoSheet, LanguageSwitcher, ListCardHome, ListOptionsSheet, NewListSheet, OfflineBanner, RecentlyUsedSection, RenameListSheet, ShareListSheet
+- `pages/` — LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage, InviteAcceptPage, OverviewPage, ListDetailPage, SearchPage
+- `App.tsx`
 
-### Constraints & Decisions
+### Folder structure convention
 
-| Topic | Decision |
-|---|---|
-| TypeScript strictness | `"strict": true` + `"noUncheckedIndexedAccess": false` |
-| Service worker | Remains `.js`; `tsconfig.json` excludes `src/sw/service-worker.js` |
-| Domain types | Central `src/types.ts` for `Entry`, `List`, `User`, `Member`, etc. |
-| `@xenova/transformers` | `// @ts-expect-error` / `unknown` casts at module boundary; no custom declaration file |
-| Props | `interface` or `type` for every component's props; no untyped `any` props |
-| React 19 | Use typed `use()` hook and action props where already present in code |
+`ComponentName/ComponentName.tsx` + `ComponentName/ComponentName.module.css` (original filename kept, not renamed to `index.tsx` — preserves readable stack traces).
 
-### Acceptance Criteria
+### Shared design-system classes (`eg-*`, `button-row`, `stack`, …)
 
-- `npm run build` succeeds with zero TypeScript errors.
-- `npm run lint` passes (with TypeScript-aware ESLint rules active).
-- `npm test` passes without regressions.
-- No `any` type appears without an explicit `// ts-ignore-reason:` comment explaining why.
-- All component props are typed via `interface` or `type`.
-- `src/types.ts` contains the shared domain interfaces (`Entry`, `List`, `User`, `Member`).
+These classes (`eg-btn-primary`, `eg-icon-btn`, `eg-chip-*`, `eg-input`, `eg-field`, `eg-card`, `eg-gradient-text`, `eg-orbitron`, `button-row`, `stack`, `pill`, `visually-hidden`, …) are used across 8–15 components. Two options:
 
-### Migration Order (bottom-up)
+**Option A — Keep as global design-system stylesheet (recommended)**
+- Extract to `styles/shared.css`; import remains global via `index.css`
+- Components continue using bare class strings: `className="eg-btn-primary"`
+- No duplication; consistent with treating `eg-*` as an internal utility-class library
+- Global stylesheet is reduced to only truly global rules + this design-system layer
 
-1. Toolchain: `tsconfig.json`, install `typescript` + `@types/*`, update `vite.config.ts`, ESLint TS plugin.
-2. Shared types: `src/types.ts` (domain interfaces).
-3. Pure utilities and data: `utils/`, `data/`, `src/app.constants.js`, `src/i18n.js`.
-4. API layer: `api/*.js` → `api/*.ts`.
-5. Workers: `workers/*.js` → `workers/*.ts` (with `@ts-expect-error` at `@xenova/transformers` boundary).
-6. Hooks: `hooks/*.js` → `hooks/*.ts`.
-7. Contexts: `context/*.jsx` / `context/*.js` → `.tsx` / `.ts`.
-8. UI primitive components: `components/ui/*.jsx` → `.tsx`.
-9. Feature components: `components/*.jsx` → `.tsx`.
-10. Pages: `pages/*.jsx` → `.tsx`, `pages/*.js` → `.ts`.
-11. Entry points: `App.jsx` → `App.tsx`, `main.jsx` → `main.tsx`, `vite.config.js` → `vite.config.ts`.
-12. Test files: `*.test.jsx` / `*.test.js` → `*.test.tsx` / `*.test.ts`.
+**Option B — Full module migration (shared CSS Module)**
+- Move `eg-*` classes into `styles/DesignSystem.module.css`
+- Every component that uses a shared class must import it: `import ds from '../../styles/DesignSystem.module.css'`
+- Eliminates all global strings; adds boilerplate imports everywhere
+
+### Cross-component compound selectors
+
+`index.css` contains rules like `.bottom-sheet--browser-open .add-item-form { … }` (13 such selectors). Resolution: replace with direct conditional class application in `AddItemSheet.tsx` using existing `showIconBrowser` state — cleaner than `:global()` workarounds.
+
+### Acceptance criteria
+
+- Each component has a co-located `ComponentName.module.css`
+- `index.css` retains only: `:root`, `*`, `html`, `body`, `button/input` resets, `h1/p`, `#root`, `@keyframes`
+- All component-specific class strings are replaced by CSS Module references
+- `npm run build` passes with no errors
+- `npm run lint` passes with no warnings
+- `npm test` passes
+
+### Out of scope
+
+- Design token changes
+- Visual appearance changes
+- Renaming existing CSS class concepts

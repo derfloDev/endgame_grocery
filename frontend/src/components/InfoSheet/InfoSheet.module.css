@@ -1,0 +1,68 @@
+.info-sheet-section {
+  padding: 0 0 1rem;
+}
+
+.info-sheet-logout {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.info-sheet-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.info-sheet-user-name {
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.info-sheet-user-email {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.info-sheet-language {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.info-sheet-label {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.info-sheet-value {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.info-sheet-link {
+  color: var(--neon-cyan);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.info-sheet-link:hover {
+  text-decoration: underline;
+}
+
+.info-sheet-donate {
+  display: flex;
+  justify-content: center;
+  padding-top: 1rem;
+}
+
+.info-sheet-donate img {
+  display: block;
+  height: 40px;
+}
