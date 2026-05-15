@@ -125,8 +125,13 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
                 {t("settings.apiKeyCopy")}
               </button>
             </div>
-            <button className="eg-btn-ghost" type="button" disabled={regenerating} onClick={handleRegenerateApiKey}>
-              <Icon name="plus" size={16} color="currentColor" />
+            <button
+              className={`eg-btn-ghost ${styles["info-sheet-api-key-action"]}`}
+              type="button"
+              disabled={regenerating}
+              onClick={handleRegenerateApiKey}
+            >
+              <Icon name="refreshCw" size={16} color="currentColor" />
               {t("settings.apiKeyRegenerate")}
             </button>
           </>
@@ -136,12 +141,12 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
               {apiKeyLoaded ? t("settings.apiKeyNone") : t("common.loading")}
             </p>
             <button
-              className="eg-btn-secondary"
+              className={`eg-btn-secondary ${styles["info-sheet-api-key-action"]}`}
               type="button"
               disabled={!apiKeyLoaded || regenerating}
               onClick={handleRegenerateApiKey}
             >
-              <Icon name="plus" size={16} color="currentColor" />
+              <Icon name="key" size={16} color="currentColor" />
               {t("settings.apiKeyGenerate")}
             </button>
           </>

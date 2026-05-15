@@ -72,6 +72,22 @@ const iconPaths = {
       <line x1="3" x2="3.01" y1="18" y2="18" />
     </>
   ),
+  key: (
+    <>
+      <circle cx="7.5" cy="15.5" r="3.5" />
+      <path d="M10 13l9-9" />
+      <path d="M15 8l2 2" />
+      <path d="M17 6l2 2" />
+    </>
+  ),
+  refreshCw: (
+    <>
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+      <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="8" />

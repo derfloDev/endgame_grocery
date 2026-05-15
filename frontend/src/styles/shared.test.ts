@@ -106,4 +106,10 @@ describe("shared stylesheet foundation", () => {
   it.each(authClasses)("keeps .%s in auth.module.css", (className) => {
     expect(authCssSource).toMatch(new RegExp(`\\.${className}\\b`));
   });
+
+  it("aligns shared text and icon buttons with inline-flex", () => {
+    expect(sharedCssSource).toMatch(
+      /\.button-primary,\s*\.eg-btn,\s*\.eg-btn-primary,\s*\.button-secondary,\s*\.eg-btn-secondary,\s*\.eg-btn-ghost,\s*\.eg-btn-danger\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*gap:\s*8px;/s
+    );
+  });
 });

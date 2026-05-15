@@ -198,6 +198,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-006 — plan — 2026-05-15T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned styling fix for InfoSheet API-key section: global button flex-alignment in shared.css, correct refresh icon for regenerate button, and layout clean-up. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
 ### T-005 — implement — 2026-05-15T08:17:25Z
 
 | Field | Value |
@@ -220,6 +231,44 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
 | Validation | Review approved with PASS; previous implement validation remained green |
 | Commit | `feat(settings): manage API keys in InfoSheet` |
+| Next Role | none |
+
+---
+
+### T-006 — review — 2026-05-15T10:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed InfoSheet API-key styling fix; all three plan fixes confirmed (global button flex, icon swap, CSS cleanup), 409 frontend + 134 backend tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-05-15T08:34:13Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Cleaned up InfoSheet API-key styling with shared button icon alignment, dedicated key and refresh icons, and full-width API-key actions. |
+| Files Changed | `frontend/src/styles/shared.css`, `frontend/src/styles/shared.test.ts`, `frontend/src/components/ui/Icon/Icon.tsx`, `frontend/src/components/ui/ui.test.tsx`, `frontend/src/components/InfoSheet/InfoSheet.tsx`, `frontend/src/components/InfoSheet/InfoSheet.module.css`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run test --workspace frontend -- InfoSheet.test.tsx shared.test.ts ui.test.tsx` passed after sandbox EPERM rerun; `npm run lint` passed with one existing React fast-refresh warning; `npm run build` passed with existing frontend bundle warnings; `npm test` passed |
+| Commit | `fix(settings): polish API key controls` |
+| Next Role | review |
+
+---
+
+### T-006 — implement — 2026-05-15T08:39:43Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed InfoSheet API-key styling task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
+| Validation | Review approved with PASS; previous implement validation remained green |
+| Commit | `fix(settings): polish API key controls` |
 | Next Role | none |
 
 ---

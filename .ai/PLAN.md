@@ -284,13 +284,70 @@ Neuer Abschnitt zwischen User-Identität und Sprach-Switcher:
 
 ---
 
+---
+
+## T-006 – Frontend: InfoSheet API-Key-Sektion – Styling-Fix
+
+### Problem
+1. **Icon/Text-Alignment**: Buttons mit `<Icon>` + Text (Generate, Regenerate) nutzen `eg-btn-secondary` / `eg-btn-ghost`, die kein `display: inline-flex; align-items: center; gap` haben. Das `+`-Icon und der Label-Text sind dadurch nicht vertikal ausgerichtet.
+2. **Falsches Icon**: Der „Neu generieren"-Button verwendet `<Icon name="plus">` – semantisch falsch (Plus = neu anlegen, nicht aktualisieren/ersetzen).
+3. **Unaufgeräumtes Layout**: Abstand, Hierarchie und Konsistenz der API-Key-Sektion wirken unfertig.
+
+### Fix-Strategie
+
+#### 1. Globale Button-Basis-Fix in `shared.css`
+Alle Button-Klassen erhalten `display: inline-flex; align-items: center; gap: 8px;`:
+```css
+.button-primary,
+.eg-btn,
+.eg-btn-primary,
+.button-secondary,
+.eg-btn-secondary,
+.eg-btn-ghost,
+.eg-btn-danger {
+  /* bestehende Regeln … */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+```
+Das behebt das Alignment-Problem überall, auch beim Logout-Button (die `info-sheet-logout`-Klasse kann dann `display/align-items/gap` entfernen, da redundant).
+
+#### 2. Icon-Tausch in `InfoSheet.tsx`
+- „Schlüssel generieren"-Button: `<Icon name="plus">` → `<Icon name="key">` (oder weglassen – ein Generate-Button braucht kein Icon)
+- „Neu generieren"-Button: `<Icon name="plus">` → passendes Refresh-Icon (z. B. `<Icon name="refreshCw">` o. Ä., je nach vorhandenen Icons)
+
+> **Vor der Implementierung**: Den `Icon`-Katalog prüfen (`frontend/src/components/ui/Icon` o. Ä.), welche Icon-Namen verfügbar sind, und das am besten passende „Refresh"-Icon wählen.
+
+#### 3. CSS-Aufräumen in `InfoSheet.module.css`
+- `.info-sheet-api-key` – Gap zwischen den Elementen auf `var(--space-3)` erhöhen für mehr Luft
+- `.info-sheet-api-key-hint` – konsistente Bottom-Margin ergänzen (`margin-bottom: var(--space-1)`)
+- `.info-sheet-logout` – redundante Flex-Regeln entfernen (nach globalem Fix in shared.css)
+- Die beiden Buttons (Generate / Regenerate) mit `width: 100%` versehen, damit sie die volle Breite einnehmen und konsistent mit dem Logout-Button wirken
+
+### Dateien
+- **Aktualisiert**: `frontend/src/styles/shared.css` – `display: inline-flex; align-items: center; justify-content: center; gap: 8px` in die Button-Basis-Gruppe
+- **Aktualisiert**: `frontend/src/components/InfoSheet/InfoSheet.tsx` – Icon-Namen korrigieren; Buttons auf `width: 100%` setzen (ggf. via CSS-Klasse)
+- **Aktualisiert**: `frontend/src/components/InfoSheet/InfoSheet.module.css` – Gap, Hint-Margin, redundante Logout-Flex-Styles entfernen
+- **Aktualisiert**: `frontend/src/components/InfoSheet/InfoSheet.test.tsx` – ggf. neue Icon-Namen in Snapshot-Tests anpassen (falls vorhanden)
+
+### Keine verhaltensändernden Anpassungen
+Nur visuelle/CSS-Korrekturen. Keine neuen i18n-Keys, keine API-Änderungen, kein Logik-Delta.
+
+### Tests
+- Bestehende Tests müssen weiterhin grün sein (`npm test`, `npm run lint`, `npm run build`).
+- Falls Icon-Namen in Tests referenziert werden, anpassen.
+
+---
+
 ## Implementierungsreihenfolge
 
 ```
-T-001 → T-002 → T-003 → T-004 → T-005
+T-001 → T-002 → T-003 → T-004 → T-005 → T-006
 ```
 
-T-001 bis T-004 sind Backend-Aufgaben; T-005 ist das Frontend. Jede Aufgabe kann in einem einzigen Commit landen.
+T-001 bis T-004 sind Backend-Aufgaben; T-005 und T-006 sind Frontend. T-006 (Styling-Fix) setzt T-005 voraus. Jede Aufgabe kann in einem einzigen Commit landen.
 
 ## Validation
 

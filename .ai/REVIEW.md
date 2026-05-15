@@ -228,3 +228,49 @@ No blocking or major issues found. The implementation exceeds the plan's UX base
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-15
+
+#### Findings
+
+No blocking or major issues found. All three plan fixes applied correctly.
+
+- **nit** · `frontend/src/components/InfoSheet/InfoSheet.tsx` — `info-sheet-api-key-action` class applied only to Regenerate and Generate buttons, not to the Copy button. Copy sits in a two-column grid row alongside the key value, so full-width would break the layout there. Correct omission.
+
+- **nit** · `frontend/src/styles/shared.test.ts` — The new regex spans the entire selector block with `/s` (dotAll). Robust enough; order of properties is hard-coded in the regex matching the implementation order. No issue.
+
+#### Verification
+
+##### Steps
+1. Read `frontend/src/styles/shared.css` diff — exactly `display: inline-flex; align-items: center; justify-content: center; gap: 8px;` added to the combined button-class block (`.button-primary, .eg-btn, .eg-btn-primary, .button-secondary, .eg-btn-secondary, .eg-btn-ghost, .eg-btn-danger`). Matches plan spec precisely. ✅
+2. Read `frontend/src/components/InfoSheet/InfoSheet.module.css` diff — four changes: (a) `.info-sheet-api-key` gap raised to `var(--space-3)` ✅; (b) `.info-sheet-api-key-hint` `margin-bottom: var(--space-1)` added ✅; (c) `.info-sheet-logout` redundant `display/align-items/justify-content/gap` removed ✅; (d) new `.info-sheet-api-key-action { width: 100% }` class ✅.
+3. Read `frontend/src/components/InfoSheet/InfoSheet.tsx` diff — Regenerate button: `plus` → `refreshCw` + `info-sheet-api-key-action` class added ✅; Generate button: `plus` → `key` + `info-sheet-api-key-action` class added ✅.
+4. Read `frontend/src/components/ui/Icon/Icon.tsx` diff — `key` (circle + 3 paths) and `refreshCw` (2 polylines + 2 paths) added to `iconPaths`. Standard Lucide icon paths. ✅
+5. Read `frontend/src/components/ui/ui.test.tsx` diff — new test verifies `key` and `refreshCw` render 2 SVGs with ≥6 path/polyline elements (no fallback circle). ✅
+6. Read `frontend/src/styles/shared.test.ts` diff — new test asserts all button classes include the `inline-flex` flex group via dotAll regex. ✅
+7. Ran `npm run test --workspace frontend` — **409/409 pass** (407 baseline + 2 new: 1 in shared.test, 1 in ui.test).
+8. Ran `npm run lint` — 0 errors (1 pre-existing frontend warning).
+9. Ran `npm run build` — clean.
+10. Ran `npm test` (full) — **134/134 backend pass**, **409/409 frontend pass**.
+
+##### Findings
+- All three plan fixes delivered: global button flex alignment, icon swap (plus→key, plus→refreshCw), CSS cleanup (gap, hint margin, redundant logout flex, full-width action buttons).
+- No behavioral changes: no new i18n keys, no API changes, no logic delta. ✅
+- Existing InfoSheet tests all pass without modification (icon names not asserted by name in those tests).
+
+##### Risks
+- None. CSS-only and icon-path changes; no logic affected.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
