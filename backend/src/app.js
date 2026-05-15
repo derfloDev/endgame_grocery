@@ -2,6 +2,7 @@ import express from "express";
 import { createRequireApiKey, createRequireAuthFn } from "./middleware/auth.js";
 import pinoHttp from "pino-http";
 import authRoutes from "./routes/auth.js";
+import docsRoutes from "./routes/docs.js";
 import createEventsRouter from "./routes/events.js";
 import { getPool } from "./db/client.js";
 import entryRoutes from "./routes/entries.js";
@@ -76,6 +77,7 @@ export function createApp(options = {}) {
     })
   );
   app.use("/api/auth", authRoutes(routerOptions));
+  app.use("/api/docs", docsRoutes(routerOptions));
   app.use("/api/v1", v1Routes(routerOptions));
   app.use("/api/invites", invitesRoutes(routerOptions));
   app.use("/api/push", pushRoutes(routerOptions));

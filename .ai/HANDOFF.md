@@ -147,3 +147,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — review — 2026-05-15T09:20:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed OpenAPI 3.1 spec and Swagger UI routes; all 5 endpoints documented, both acceptance-criteria routes respond correctly, 134/134 tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-05-15T08:00:13Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added OpenAPI 3.1 YAML documentation and Swagger UI routes for the external v1 API. |
+| Files Changed | `backend/src/openapi/v1.yaml`, `backend/src/routes/docs.js`, `backend/src/docs.test.js`, `backend/src/app.js`, `backend/package.json`, `package-lock.json`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/docs.test.js` passed; `npm run lint` passed with one existing React fast-refresh warning; `npm run build` passed with existing frontend bundle warnings; `npm test` passed |
+| Commit | `feat(api): add OpenAPI docs` |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-05-15T08:07:32Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed OpenAPI docs task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
+| Validation | Review approved with PASS; previous implement validation remained green |
+| Commit | `feat(api): add OpenAPI docs` |
+| Next Role | none |
+
+---

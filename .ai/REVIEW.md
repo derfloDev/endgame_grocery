@@ -135,3 +135,47 @@ No blocking or major issues found.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-15
+
+#### Findings
+
+No blocking or major issues found.
+
+- **nit** · `backend/src/routes/docs.js` lines 19–20 — `router.get('/', swaggerUi.setup(spec))` is registered before `router.use('/', swaggerUi.serve)`, reversing the order shown in the plan example. Functionally correct because `router.get('/')` matches only the root path and does not interfere with `router.use('/')` handling static asset sub-paths. Tests pass; no rework required.
+
+- **nit** · `backend/src/routes/docs.js` line 12 — `createDocsRouter()` accepts no parameters but is called as `docsRoutes(routerOptions)` in `app.js`. The extra argument is silently ignored. Harmless; consistent with the factory pattern of other routers.
+
+#### Verification
+
+##### Steps
+1. Read `backend/src/openapi/v1.yaml` — OpenAPI 3.1.0 with correct `info`, `servers: [{ url: /api/v1 }]`, global `security: [{ ApiKeyAuth: [] }]`, `ApiKeyAuth` scheme (`apiKey`, `header`, `X-Api-Key`). All 5 endpoints documented with request bodies, response schemas, and correct 401/403/404 error responses. `Item.status` enum matches HA values (`needs_action`, `completed`). `Error` schema used for all error responses.
+2. Read `backend/src/routes/docs.js` — `GET /openapi.yaml` sets `Content-Type: application/yaml` and sends the file via `res.sendFile`; Swagger UI served via `swaggerUi.setup(spec)` + `swaggerUi.serve`. Both acceptance criteria served.
+3. Read `backend/src/docs.test.js` — 2 tests: `GET /api/docs` checks status 200, content-type `text/html`, body matches `/Swagger UI/i`; `GET /api/docs/openapi.yaml` checks status 200, content-type `application/yaml`, verifies all 4 path keys and 401/403/404 response codes present in YAML.
+4. Confirmed `backend/package.json` diff adds `js-yaml` and `swagger-ui-express` dependencies.
+5. Confirmed `app.js` registers `docsRoutes` at `/api/docs`.
+6. Confirmed `README.md` adds one-liner documenting Swagger UI and raw YAML endpoints.
+7. Ran `node --test src/docs.test.js` in `backend/` — **2/2 pass**.
+8. Ran `npm run lint` — 0 errors.
+9. Ran `npm test` — **134/134 pass** (132 baseline + 2 new).
+
+##### Findings
+- Both acceptance criteria met: `GET /api/docs` → 200 HTML with Swagger UI; `GET /api/docs/openapi.yaml` → 200 `application/yaml`.
+- Spec covers all 5 v1 endpoints with schemas and error responses; content is accurate relative to the implementation.
+
+##### Risks
+- None. The docs router is read-only and additive; no existing routes are affected.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
