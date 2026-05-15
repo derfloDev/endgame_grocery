@@ -22,3 +22,52 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | plan \| implement \| review \| none |
 
 ---
+
+### T-001..T-005 — plan — 2026-05-15T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned Home Assistant integration: API-key management, external REST API v1 (5 endpoints), OpenAPI 3.1 spec with Swagger UI, and frontend API-key UI in InfoSheet. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-001 — implement — 2026-05-15T04:51:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added a nullable unique UUID `api_key` column migration for `users` with migration smoke-test coverage. |
+| Files Changed | `backend/src/db/migrations/1778803200000_add_api_key_to_users.cjs`, `backend/src/db/migrations.test.js`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/db/migrations.test.js` passed; `npm run lint` passed with one existing React fast-refresh warning; `npm run build` passed; `npm test` passed |
+| Commit | `feat(db): add API key column to users` |
+| Next Role | review |
+
+---
+
+### T-001 — review — 2026-05-15T08:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed DB migration adding nullable unique UUID `api_key` column to `users`; all automated checks passed with no blocking findings. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-001 — implement — 2026-05-15T05:30:45Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed API-key migration task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, reviewed task files staged via `git add -A` |
+| Validation | Review approved with PASS; previous implement validation remained green |
+| Commit | `feat(db): add API key column to users` |
+| Next Role | none |
+
+---
