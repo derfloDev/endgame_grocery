@@ -109,3 +109,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-05-15T09:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed external v1 REST API (5 endpoints, HA status mapping, access control); all plan criteria met, 132/132 tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-05-15T07:32:23Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the external `/api/v1` REST API secured by `X-Api-Key`, including list and item endpoints with Home Assistant status mapping. |
+| Files Changed | `backend/src/routes/v1.js`, `backend/src/v1.test.js`, `backend/src/app.js`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/v1.test.js` passed; `npm run lint` passed with one existing React fast-refresh warning; `npm run build` passed with existing frontend bundle warnings; `npm test` passed after rerun; `npm run test --workspace frontend -- app.test.tsx` passed after an earlier concurrent full-suite timeout |
+| Commit | `feat(api): add external grocery REST API` |
+| Next Role | review |
+
+---
+
+### T-003 — implement — 2026-05-15T07:47:05Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed external v1 REST API task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, reviewed task files staged via `git add -A` |
+| Validation | Review approved with PASS; previous implement validation remained green |
+| Commit | `feat(api): add external grocery REST API` |
+| Next Role | none |
+
+---

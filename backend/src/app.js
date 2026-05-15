@@ -1,8 +1,9 @@
 import express from "express";
-import { createRequireAuthFn } from "./middleware/auth.js";
+import { createRequireApiKey, createRequireAuthFn } from "./middleware/auth.js";
 import pinoHttp from "pino-http";
 import authRoutes from "./routes/auth.js";
 import createEventsRouter from "./routes/events.js";
+import { getPool } from "./db/client.js";
 import entryRoutes from "./routes/entries.js";
 import historyRoutes from "./routes/history.js";
 import invitesRoutes from "./routes/invites.js";
@@ -14,6 +15,7 @@ import suggestionRoutes from "./routes/suggestions.js";
 import sharingRoutes from "./routes/sharing.js";
 import { sseManager as defaultSseManager } from "./sseManager.js";
 import testRoutes from "./routes/testRouter.js";
+import v1Routes from "./routes/v1.js";
 import { startPushWorker } from "./workers/pushWorker.js";
 
 export function createApp(options = {}) {
@@ -23,6 +25,7 @@ export function createApp(options = {}) {
     ...getConfig(),
     ...(options.config ?? {})
   };
+  const pool = "pool" in options ? options.pool : getPool();
   const shouldStartWorkers = options.startWorkers ?? !("pool" in options);
   const sseManager = options.sseManager ?? defaultSseManager;
   const requireAuthFn =
@@ -31,9 +34,16 @@ export function createApp(options = {}) {
       jwtLib: options.jwtLib,
       config
     });
+  const requireApiKey =
+    options.requireApiKey ??
+    createRequireApiKey({
+      pool
+    });
   const routerOptions = {
     ...options,
     config,
+    pool,
+    requireApiKey,
     sseManager
   };
 
@@ -66,6 +76,7 @@ export function createApp(options = {}) {
     })
   );
   app.use("/api/auth", authRoutes(routerOptions));
+  app.use("/api/v1", v1Routes(routerOptions));
   app.use("/api/invites", invitesRoutes(routerOptions));
   app.use("/api/push", pushRoutes(routerOptions));
   if (process.env.NODE_ENV !== "production") {

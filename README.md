@@ -258,6 +258,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
 - Authentication supports register, email verification, password reset, and login flows backed by JWT access tokens.
 - Authenticated users can read their current API key with `GET /api/auth/api-key` and generate or replace it with `POST /api/auth/api-key`; both endpoints require the same JWT bearer token as the protected app.
+- External clients can use the Home Assistant oriented `/api/v1` REST API with `X-Api-Key: <key>` instead of a JWT. It exposes `GET /api/v1/lists`, `GET /api/v1/lists/:listId/items`, `POST /api/v1/lists/:listId/items`, `POST /api/v1/lists/:listId/items/:itemId/toggle`, and `DELETE /api/v1/lists/:listId/items/:itemId`; item statuses are returned as `needs_action` or `completed`.
 - When a browser still has a valid JWT but has lost the cached `endgame_grocery.auth_user` entry, the frontend rehydrates `display_name` and `email` from `GET /api/auth/me` so the Info & Settings sheet still shows the signed-in identity after reload.
 - Lists support create, rename, delete, ownership, and shared-access visibility.
 - The overview refetches lists when list rename/delete SSE events arrive, and the list detail page refetches the active list's entries or members when matching entry/member SSE events arrive over `GET /api/events?token=<jwt>`.
