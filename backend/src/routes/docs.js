@@ -16,8 +16,8 @@ export function createDocsRouter() {
     res.setHeader("Content-Type", "application/yaml");
     res.sendFile(openApiPath);
   });
-  router.get("/", swaggerUi.setup(spec));
   router.use("/", swaggerUi.serve);
+  router.get("/", swaggerUi.setup(spec));
 
   return router;
 }

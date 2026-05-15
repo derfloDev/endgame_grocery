@@ -341,10 +341,101 @@ Nur visuelle/CSS-Korrekturen. Keine neuen i18n-Keys, keine API-Änderungen, kein
 
 ---
 
+---
+
+## T-007 – Backend: Swagger UI – Trailing-Slash-Redirect + Middleware-Reihenfolge
+
+### Ursache
+`swagger-ui-express` generiert HTML mit relativen Asset-Pfaden (`./swagger-ui-bundle.js`, `./swagger-ui.css`). Wenn der Browser `/api/docs` (ohne abschließenden `/`) aufruft, löst er diese relativen Pfade relativ zum **Elternverzeichnis** `/api/` auf – nicht zu `/api/docs/`. Ergebnis: Der Browser sucht die Assets unter `/api/swagger-ui.css` statt `/api/docs/swagger-ui.css`.
+
+Zusätzlich ist die Middleware-Reihenfolge in `docs.js` falsch: `swaggerUi.setup` steht vor `swaggerUi.serve`, obwohl `serve` zuerst kommen muss, damit statische Assets korrekt ausgeliefert werden.
+
+### Fix 1 – Redirect in `app.js`
+
+Vor dem `app.use('/api/docs', ...)` eine explizite `app.get`-Route einfügen, die ohne Trailing Slash auf die Version mit Slash weiterleitet:
+
+```js
+// in createApp(), vor dem docs-Router:
+app.get("/api/docs", (_req, res) => res.redirect(301, "/api/docs/"));
+app.use("/api/docs", docsRoutes(routerOptions));
+```
+
+### Fix 2 – Middleware-Reihenfolge in `docs.js`
+
+`swaggerUi.serve` muss **vor** `swaggerUi.setup` registriert sein:
+
+```js
+// Vorher (falsch):
+router.get("/", swaggerUi.setup(spec));
+router.use("/", swaggerUi.serve);
+
+// Nachher (korrekt):
+router.use("/", swaggerUi.serve);
+router.get("/", swaggerUi.setup(spec));
+```
+
+### Dateien
+- **Aktualisiert**: `backend/src/app.js` – `app.get('/api/docs', redirect)` vor `app.use('/api/docs', ...)`
+- **Aktualisiert**: `backend/src/routes/docs.js` – `swaggerUi.serve` vor `swaggerUi.setup`
+- **Aktualisiert**: `backend/src/docs.test.js` – Test dass `GET /api/docs` → 301 auf `/api/docs/`
+
+### Tests
+- `GET /api/docs` → 301, `Location: /api/docs/`
+- `GET /api/docs/` → 200, Content-Type `text/html`
+- `GET /api/docs/openapi.yaml` → 200, Content-Type `application/yaml`
+- Bestehende Tests bleiben grün
+
+---
+
+---
+
+## T-008 – Backend: v1 API – HA-Statusmapping entfernen
+
+### Änderung
+Das ursprüngliche HA-Statusmapping (`open` → `needs_action`, `done` → `completed`) wird entfernt. Die v1 API gibt den DB-Statuswert direkt zurück: `open` oder `done`.
+
+### Dateien
+
+#### `backend/src/routes/v1.js`
+- Funktion `toHaStatus()` **entfernen**
+- Funktion `serializeItem()` vereinfachen – `status` direkt aus dem DB-Row übernehmen:
+  ```js
+  // Vorher:
+  function toHaStatus(dbStatus) {
+    return dbStatus === "done" ? "completed" : "needs_action";
+  }
+  function serializeItem(row) {
+    return { id: row.id, name: row.text, status: toHaStatus(row.status) };
+  }
+
+  // Nachher:
+  function serializeItem(row) {
+    return { id: row.id, name: row.text, status: row.status };
+  }
+  ```
+
+#### `backend/src/v1.test.js`
+- Alle Assertions, die `needs_action` oder `completed` erwarten, auf `open` bzw. `done` ändern.
+
+#### `backend/src/openapi/v1.yaml`
+- Überall wo der Item-Status als Enum definiert ist, von `[needs_action, completed]` auf `[open, done]` ändern.
+- Beschreibungstexte entsprechend anpassen.
+
+#### `ROADMAP.md`
+- Zeile `Entry-Status-Mapping: DB open ↔ HA needs_action; DB done ↔ HA completed` entfernen oder auf „Status wird unverändert zurückgegeben: `open` | `done`" aktualisieren.
+
+### Keine sonstigen Änderungen
+Toggle-Logik in `v1.js` (`open` ↔ `done`) bleibt unverändert – sie arbeitet bereits mit DB-Werten. Frontend und andere Backend-Routen sind nicht betroffen.
+
+---
+
 ## Implementierungsreihenfolge
 
 ```
 T-001 → T-002 → T-003 → T-004 → T-005 → T-006
+                                           ↓
+                                   T-007 (Bugfix T-004)
+                                   T-008 (Rework T-003)
 ```
 
 T-001 bis T-004 sind Backend-Aufgaben; T-005 und T-006 sind Frontend. T-006 (Styling-Fix) setzt T-005 voraus. Jede Aufgabe kann in einem einzigen Commit landen.

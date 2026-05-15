@@ -198,6 +198,28 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-008 — plan — 2026-05-15T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned removal of HA status mapping from v1 API: routes return raw DB values `open`/`done`, tests and OpenAPI spec updated accordingly. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-007 — plan — 2026-05-15T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned fix for Swagger UI blank page: add 301 redirect from `/api/docs` to `/api/docs/` in app.js and correct swaggerUi.serve/setup order in docs.js. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
 ### T-006 — plan — 2026-05-15T00:00:00Z
 
 | Field | Value |
@@ -269,6 +291,44 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
 | Validation | Review approved with PASS; previous implement validation remained green |
 | Commit | `fix(settings): polish API key controls` |
+| Next Role | none |
+
+---
+
+### T-007 — review — 2026-05-15T10:20:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed Swagger UI trailing-slash redirect and middleware-order fix; both plan fixes confirmed correct, 136 backend + 409 frontend tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-007 — implement — 2026-05-15T08:47:19Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Fixed Swagger UI docs routing so `/api/docs` redirects to `/api/docs/`, assets load under the docs path, and middleware order follows `swagger-ui-express` expectations. |
+| Files Changed | `backend/src/app.js`, `backend/src/routes/docs.js`, `backend/src/docs.test.js`, `README.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/docs.test.js` passed; `npm run lint` passed with one existing React fast-refresh warning; `npm run build` passed with existing frontend bundle warnings; `npm test` passed |
+| Commit | `fix(api): redirect Swagger UI docs path` |
+| Next Role | review |
+
+---
+
+### T-007 — implement — 2026-05-15T08:53:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed Swagger UI redirect task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
+| Validation | Review approved with PASS; previous implement validation remained green |
+| Commit | `fix(api): redirect Swagger UI docs path` |
 | Next Role | none |
 
 ---

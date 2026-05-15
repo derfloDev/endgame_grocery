@@ -4,12 +4,32 @@ import request from "supertest";
 import { createApp } from "./app.js";
 
 describe("API docs routes", () => {
-  it("serves the Swagger UI", async () => {
+  it("redirects the Swagger UI path to a trailing slash", async () => {
     const response = await request(createApp({ pool: null })).get("/api/docs");
+
+    assert.equal(response.status, 301);
+    assert.equal(response.headers.location, "/api/docs/");
+  });
+
+  it("serves the Swagger UI at the trailing slash path", async () => {
+    const response = await request(createApp({ pool: null })).get("/api/docs/");
 
     assert.equal(response.status, 200);
     assert.match(response.headers["content-type"], /text\/html/);
     assert.match(response.text, /Swagger UI/i);
+  });
+
+  it("serves Swagger UI browser assets from the docs path", async () => {
+    const app = createApp({ pool: null });
+    const [cssResponse, bundleResponse] = await Promise.all([
+      request(app).get("/api/docs/swagger-ui.css"),
+      request(app).get("/api/docs/swagger-ui-bundle.js")
+    ]);
+
+    assert.equal(cssResponse.status, 200);
+    assert.match(cssResponse.headers["content-type"], /text\/css/);
+    assert.equal(bundleResponse.status, 200);
+    assert.match(bundleResponse.headers["content-type"], /javascript/);
   });
 
   it("serves the OpenAPI YAML spec for the v1 API", async () => {

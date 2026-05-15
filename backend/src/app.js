@@ -77,6 +77,14 @@ export function createApp(options = {}) {
     })
   );
   app.use("/api/auth", authRoutes(routerOptions));
+  app.get("/api/docs", (req, res, next) => {
+    if (req.path === "/api/docs") {
+      res.redirect(301, "/api/docs/");
+      return;
+    }
+
+    next();
+  });
   app.use("/api/docs", docsRoutes(routerOptions));
   app.use("/api/v1", v1Routes(routerOptions));
   app.use("/api/invites", invitesRoutes(routerOptions));

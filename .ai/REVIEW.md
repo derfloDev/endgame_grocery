@@ -274,3 +274,46 @@ No blocking or major issues found. All three plan fixes applied correctly.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-007
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-15
+
+#### Findings
+
+No blocking or major issues found. Both fixes are correct; the implementation is slightly more defensive than the plan's one-liner.
+
+- **nit** · `backend/src/app.js` lines 78–84 — The plan specified a simple `app.get("/api/docs", (_req, res) => res.redirect(301, "/api/docs/"))`. The implementation adds an `if (req.path === "/api/docs") … else next()` guard. This is a sound defensive pattern: if Express's non-strict routing were to match `/api/docs/` with `app.get("/api/docs", ...)`, the guard prevents an infinite 301 redirect loop. The tests confirm the guard works correctly: `GET /api/docs` → 301, `GET /api/docs/` → 200.
+
+- **nit** · `backend/src/routes/docs.js` — Two-line swap (`router.use("/", swaggerUi.serve)` before `router.get("/", swaggerUi.setup(spec))`). Exactly matches plan Fix 2 and is proven correct by the new asset-serving test.
+
+#### Verification
+
+##### Steps
+1. Read `backend/src/app.js` diff — `app.get("/api/docs", ...)` redirect handler inserted immediately before `app.use("/api/docs", docsRoutes(...))`. Guard condition `req.path === "/api/docs"` correctly discriminates with-slash from without-slash requests and prevents infinite redirect. ✅
+2. Read `backend/src/routes/docs.js` diff — `router.use("/", swaggerUi.serve)` moved above `router.get("/", swaggerUi.setup(spec))` as specified by the plan. ✅
+3. Read `backend/src/docs.test.js` diff — test suite expanded from 2 → 4 tests: (a) `GET /api/docs` → 301, `Location: /api/docs/`; (b) `GET /api/docs/` → 200 HTML (replaces old `GET /api/docs` test); (c) `GET /api/docs/swagger-ui.css` + `GET /api/docs/swagger-ui-bundle.js` → 200 with correct content-types; (d) YAML test unchanged. ✅
+4. Read `README.md` diff — one-liner updated to document trailing-slash behavior and the redirect. ✅
+5. Ran `node --test src/docs.test.js` in `backend/` — **4/4 pass**. Server logs confirm: `GET /api/docs` → 301, `GET /api/docs/` → 200, CSS → 200, bundle JS → 200, YAML → 200. ✅
+6. Ran `npm run lint` — 0 errors (1 pre-existing frontend warning).
+7. Ran `npm test` (full suite) — **136/136 backend pass** (134 baseline + 2 new), **409/409 frontend pass** (unchanged).
+
+##### Findings
+- Both acceptance criteria met: `GET /api/docs` → 301 to `/api/docs/`; Swagger UI assets serve correctly under `/api/docs/`.
+- Middleware order fix (`serve` before `setup`) is confirmed working by the new asset test.
+- No regressions to any previously green test.
+
+##### Risks
+- None. Redirect is a server-side 301; browser bookmarks using `/api/docs` will be silently updated to `/api/docs/` by the browser.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
