@@ -26,6 +26,7 @@ export function createAuthRouter({
   mailer = createMailer({ config, logger }),
   generateVerificationToken = randomUUID,
   generatePasswordResetToken = randomUUID,
+  generateApiKey = randomUUID,
   now = () => new Date()
 } = {}) {
   const router = Router();
@@ -456,6 +457,65 @@ export function createAuthRouter({
       }
 
       res.json(serializeAuthUser(user));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/api-key", requireAuth, async (req, res, next) => {
+    if (!pool) {
+      next(new Error("Database connection is not configured."));
+      return;
+    }
+
+    try {
+      const result = await pool.query(
+        `
+          SELECT api_key
+          FROM users
+          WHERE id = $1
+          LIMIT 1
+        `,
+        [req.user.sub]
+      );
+      const user = result.rows[0];
+
+      if (!user) {
+        res.status(404).json({ error: "User not found." });
+        return;
+      }
+
+      res.json({ api_key: user.api_key });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/api-key", requireAuth, async (req, res, next) => {
+    if (!pool) {
+      next(new Error("Database connection is not configured."));
+      return;
+    }
+
+    try {
+      const apiKey = generateApiKey();
+      const result = await pool.query(
+        `
+          UPDATE users
+          SET api_key = $1
+          WHERE id = $2
+          RETURNING api_key
+        `,
+        [apiKey, req.user.sub]
+      );
+      const user = result.rows[0];
+
+      if (!user) {
+        res.status(404).json({ error: "User not found." });
+        return;
+      }
+
+      res.json({ api_key: user.api_key });
     } catch (error) {
       next(error);
     }

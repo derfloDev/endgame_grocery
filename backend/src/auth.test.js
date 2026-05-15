@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
-import { createRequireAuth } from "./middleware/auth.js";
+import { createRequireApiKey, createRequireAuth } from "./middleware/auth.js";
 
 describe("authentication routes", () => {
   it("returns 404 when registration is disabled", async () => {
@@ -442,6 +442,140 @@ describe("authentication routes", () => {
     assert.deepEqual(response.body, {
       error: "User not found."
     });
+  });
+
+  it("returns null when the authenticated user has no API key", async () => {
+    const token = jwt.sign({ sub: "user-1" }, "test-secret", { expiresIn: "7d" });
+    let apiKeyQuery = null;
+    const pool = {
+      async query(text, params) {
+        apiKeyQuery = [normalizeSql(text), params];
+        return { rows: [{ api_key: null }] };
+      }
+    };
+
+    const app = createApp({
+      pool,
+      config: {
+        jwtSecret: "test-secret",
+        jwtExpiresIn: "7d"
+      }
+    });
+
+    const response = await request(app)
+      .get("/api/auth/api-key")
+      .set("Authorization", `Bearer ${token}`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { api_key: null });
+    assert.match(apiKeyQuery[0], /SELECT api_key FROM users/);
+    assert.deepEqual(apiKeyQuery[1], ["user-1"]);
+  });
+
+  it("returns the current API key for the authenticated user", async () => {
+    const token = jwt.sign({ sub: "user-1" }, "test-secret", { expiresIn: "7d" });
+    const pool = {
+      async query() {
+        return { rows: [{ api_key: "11111111-1111-4111-8111-111111111111" }] };
+      }
+    };
+
+    const app = createApp({
+      pool,
+      config: {
+        jwtSecret: "test-secret",
+        jwtExpiresIn: "7d"
+      }
+    });
+
+    const response = await request(app)
+      .get("/api/auth/api-key")
+      .set("Authorization", `Bearer ${token}`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      api_key: "11111111-1111-4111-8111-111111111111"
+    });
+  });
+
+  it("generates an API key for the authenticated user", async () => {
+    const token = jwt.sign({ sub: "user-1" }, "test-secret", { expiresIn: "7d" });
+    let updateQuery = null;
+    const pool = {
+      async query(text, params) {
+        updateQuery = [normalizeSql(text), params];
+        return { rows: [{ api_key: params[0] }] };
+      }
+    };
+
+    const app = createApp({
+      pool,
+      config: {
+        jwtSecret: "test-secret",
+        jwtExpiresIn: "7d"
+      },
+      generateApiKey() {
+        return "22222222-2222-4222-8222-222222222222";
+      }
+    });
+
+    const response = await request(app)
+      .post("/api/auth/api-key")
+      .set("Authorization", `Bearer ${token}`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      api_key: "22222222-2222-4222-8222-222222222222"
+    });
+    assert.match(updateQuery[0], /UPDATE users SET api_key = \$1 WHERE id = \$2 RETURNING api_key/);
+    assert.deepEqual(updateQuery[1], [
+      "22222222-2222-4222-8222-222222222222",
+      "user-1"
+    ]);
+  });
+
+  it("regenerates an API key for the authenticated user", async () => {
+    const token = jwt.sign({ sub: "user-1" }, "test-secret", { expiresIn: "7d" });
+    const generatedKeys = [
+      "33333333-3333-4333-8333-333333333333",
+      "44444444-4444-4444-8444-444444444444"
+    ];
+    const updates = [];
+    const pool = {
+      async query(_text, params) {
+        updates.push(params);
+        return { rows: [{ api_key: params[0] }] };
+      }
+    };
+
+    const app = createApp({
+      pool,
+      config: {
+        jwtSecret: "test-secret",
+        jwtExpiresIn: "7d"
+      },
+      generateApiKey() {
+        return generatedKeys.shift();
+      }
+    });
+
+    const firstResponse = await request(app)
+      .post("/api/auth/api-key")
+      .set("Authorization", `Bearer ${token}`);
+    const secondResponse = await request(app)
+      .post("/api/auth/api-key")
+      .set("Authorization", `Bearer ${token}`);
+
+    assert.equal(firstResponse.status, 200);
+    assert.equal(secondResponse.status, 200);
+    assert.notEqual(firstResponse.body.api_key, secondResponse.body.api_key);
+    assert.deepEqual(secondResponse.body, {
+      api_key: "44444444-4444-4444-8444-444444444444"
+    });
+    assert.deepEqual(updates, [
+      ["33333333-3333-4333-8333-333333333333", "user-1"],
+      ["44444444-4444-4444-8444-444444444444", "user-1"]
+    ]);
   });
 
   it("logs invalid login attempts at warn", async () => {
@@ -917,6 +1051,78 @@ describe("requireAuth middleware", () => {
     let nextCalled = false;
 
     middleware(req, res, () => {
+      nextCalled = true;
+    });
+
+    assert.deepEqual(req.user, { sub: "user-1" });
+    assert.equal(nextCalled, true);
+  });
+});
+
+describe("requireApiKey middleware", () => {
+  it("returns 401 when the API key header is missing", async () => {
+    const middleware = createRequireApiKey({
+      pool: {
+        async query() {
+          throw new Error("API key query should not run");
+        }
+      }
+    });
+
+    const req = { headers: {} };
+    const res = createResponse();
+    let nextCalled = false;
+
+    await middleware(req, res, () => {
+      nextCalled = true;
+    });
+
+    assert.equal(res.statusCode, 401);
+    assert.equal(res.body.error, "API key is required.");
+    assert.equal(nextCalled, false);
+  });
+
+  it("returns 401 when the API key is unknown", async () => {
+    let apiKeyQuery = null;
+    const middleware = createRequireApiKey({
+      pool: {
+        async query(text, params) {
+          apiKeyQuery = [normalizeSql(text), params];
+          return { rows: [] };
+        }
+      }
+    });
+
+    const req = { headers: { "x-api-key": "missing-api-key" } };
+    const res = createResponse();
+    let nextCalled = false;
+
+    await middleware(req, res, () => {
+      nextCalled = true;
+    });
+
+    assert.equal(res.statusCode, 401);
+    assert.equal(res.body.error, "Invalid API key.");
+    assert.match(apiKeyQuery[0], /SELECT id FROM users WHERE api_key = \$1 LIMIT 1/);
+    assert.deepEqual(apiKeyQuery[1], ["missing-api-key"]);
+    assert.equal(nextCalled, false);
+  });
+
+  it("attaches the matching user for a valid API key", async () => {
+    const middleware = createRequireApiKey({
+      pool: {
+        async query(_text, params) {
+          assert.deepEqual(params, ["valid-api-key"]);
+          return { rows: [{ id: "user-1" }] };
+        }
+      }
+    });
+
+    const req = { headers: { "x-api-key": "valid-api-key" } };
+    const res = createResponse();
+    let nextCalled = false;
+
+    await middleware(req, res, () => {
       nextCalled = true;
     });
 

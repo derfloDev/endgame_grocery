@@ -71,3 +71,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-05-15T08:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed JWT-protected API-key management endpoints and `createRequireApiKey` middleware; all plan criteria met, 114/114 tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-15T05:56:52Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added JWT-protected API-key management endpoints and the reusable `createRequireApiKey` middleware with route and middleware tests. |
+| Files Changed | `backend/src/routes/auth.js`, `backend/src/middleware/auth.js`, `backend/src/auth.test.js`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/auth.test.js` passed; `npm run lint` passed with one existing React fast-refresh warning; `npm run build` passed with existing frontend bundle warnings; `npm test` passed |
+| Commit | `feat(auth): add API key management endpoints` |
+| Next Role | review |
+
+---
+
+### T-002 — implement — 2026-05-15T06:11:49Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed API-key management task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, reviewed task files staged via `git add -A` |
+| Validation | Review approved with PASS; previous implement validation remained green |
+| Commit | `feat(auth): add API key management endpoints` |
+| Next Role | none |
+
+---
