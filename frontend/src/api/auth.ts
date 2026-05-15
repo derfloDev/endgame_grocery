@@ -21,6 +21,10 @@ interface MessageResult {
   message?: string;
 }
 
+interface ApiKeyResult {
+  api_key: string | null;
+}
+
 function sendAuthRequest(path: string, payload: unknown): Promise<unknown> {
   return sendJsonRequest(`/api/auth/${path}`, {
     method: "POST",
@@ -38,6 +42,14 @@ export function loginUser(payload: LoginCredentials): Promise<{ token: string; u
 
 export function fetchCurrentUser(token: string): Promise<User> {
   return sendJsonRequest("/api/auth/me", { token }) as Promise<User>;
+}
+
+export function fetchApiKey(token: string): Promise<ApiKeyResult> {
+  return sendJsonRequest("/api/auth/api-key", { token }) as Promise<ApiKeyResult>;
+}
+
+export function regenerateApiKey(token: string): Promise<{ api_key: string }> {
+  return sendJsonRequest("/api/auth/api-key", { token, method: "POST" }) as Promise<{ api_key: string }>;
 }
 
 export function verifyEmail(token: string): Promise<AuthResult> {

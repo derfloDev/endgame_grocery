@@ -185,3 +185,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-005 — review — 2026-05-15T09:40:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed frontend API-key management in InfoSheet; all plan criteria met, UX enhancements (loading state, effect cleanup, aria-live) verified, 407 frontend + 134 backend tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — implement — 2026-05-15T08:17:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added Info & Settings API-key management with fetch-on-open, generate, copy, and regenerate flows plus localized labels. |
+| Files Changed | `frontend/src/api/auth.ts`, `frontend/src/components/InfoSheet/InfoSheet.tsx`, `frontend/src/components/InfoSheet/InfoSheet.module.css`, `frontend/src/components/InfoSheet/InfoSheet.test.tsx`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run test --workspace frontend -- InfoSheet.test.tsx` passed; `npm run lint` passed with one existing React fast-refresh warning; `npm run build` passed with existing frontend bundle warnings; `npm test` passed |
+| Commit | `feat(settings): manage API keys in InfoSheet` |
+| Next Role | review |
+
+---
+
+### T-005 — implement — 2026-05-15T08:26:20Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed InfoSheet API-key management task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
+| Validation | Review approved with PASS; previous implement validation remained green |
+| Commit | `feat(settings): manage API keys in InfoSheet` |
+| Next Role | none |
+
+---

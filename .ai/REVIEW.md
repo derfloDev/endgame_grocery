@@ -179,3 +179,52 @@ No blocking or major issues found.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-15
+
+#### Findings
+
+No blocking or major issues found. The implementation exceeds the plan's UX baseline in several good ways.
+
+- **nit** · `frontend/src/components/InfoSheet/InfoSheet.tsx` line 24 — `apiKeyLoaded` state is an addition beyond the plan's three state variables. It is a positive enhancement that gates the "Generate key" button and shows a loading placeholder until the fetch resolves. No issue.
+
+- **nit** · `InfoSheet.tsx` lines 35–56 — async fetch uses a `cancelled` flag for cleanup on unmount/re-open. This is correct and prevents set-state-after-unmount warnings. Not in the plan spec, good practice.
+
+- **nit** · `InfoSheet.tsx` line 114 — `aria-live="polite"` on the "Copied!" feedback. Accessibility bonus not required by the plan. No issue.
+
+- **nit** · Plan listed "Bestätigungs-Dialog oder direkt" for regeneration; implementation chose "direkt" (no confirmation dialog). This is within the plan's accepted range.
+
+#### Verification
+
+##### Steps
+1. Read `frontend/src/api/auth.ts` — `fetchApiKey(token)` calls `GET /api/auth/api-key`; `regenerateApiKey(token)` calls `POST /api/auth/api-key`. Both typed correctly (`ApiKeyResult`, `{ api_key: string }`). ✅
+2. Read `frontend/src/components/InfoSheet/InfoSheet.tsx` — API-key section rendered between user-identity and language-switcher as planned. Three required state vars present plus `apiKeyLoaded` UX bonus. `fetchApiKey` called on open via `useEffect([open, token])`. Copy calls `navigator.clipboard.writeText`. Regenerate calls `regenerateApiKey`, updates `apiKey` state. Cancel flag prevents stale-closure updates.  ✅
+3. Read `InfoSheet.test.tsx` — 9 tests total (5 pre-existing + 4 new): fetch-on-open, show key + copy/regen buttons, empty state + generate button, clipboard write + "Copied!" feedback, regenerate updates displayed key. All 5 plan-required test scenarios covered. ✅
+4. Read DE/EN locale files — all 7 plan-specified i18n keys present in both locales with correct text values. ✅
+5. Read `InfoSheet.module.css` diff — new CSS classes for `.info-sheet-api-key`, `.info-sheet-api-key-header`, `.info-sheet-api-key-hint`, `.info-sheet-api-key-empty`, `.info-sheet-api-key-row`, `.info-sheet-api-key-value`, `.info-sheet-api-key-status`. Uses design tokens, monospace font for key display. ✅
+6. Ran `npm run test --workspace frontend` — **407/407 pass** (28 test files).
+7. Ran `npm run lint` — 0 errors (1 pre-existing frontend warning).
+8. Ran `npm test` (full suite) — **134/134 backend pass**, **407/407 frontend pass**.
+9. Confirmed README updated with API key management description (via HANDOFF evidence).
+
+##### Findings
+- All plan acceptance criteria met: InfoSheet shows API-key section; key can be generated, displayed (monospace), and copied; regenerating updates the displayed key; all 7 i18n keys present in DE and EN.
+- Section placement (between user-identity and language-switcher) is correct.
+- UX is better than the plan minimum: loading state, proper effect cleanup, and copy feedback timeout.
+
+##### Risks
+- None. Frontend-only change; no backend routes affected.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
