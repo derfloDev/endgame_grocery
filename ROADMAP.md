@@ -21,6 +21,7 @@ Constraints:
 - Auth: `X-Api-Key: <key>` Header – kein JWT, kein Bearer Token.
 - Scope: Listen, die der User besitzt **oder** bei denen er Mitglied ist.
 - Entry-Status: v1 responses return raw DB values, `open` or `done`.
+- Path-IDs: `listId` und `itemId` müssen UUIDs sein; ungültige Werte liefern 404.
 - Toggle-Endpunkt: kein Body erforderlich, Status wird automatisch umgeschaltet.
 
 Endpunkte:

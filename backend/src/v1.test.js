@@ -3,6 +3,13 @@ import assert from "node:assert/strict";
 import request from "supertest";
 import { createApp } from "./app.js";
 
+const LIST_ID = "11111111-1111-4111-8111-111111111111";
+const SECOND_LIST_ID = "22222222-2222-4222-8222-222222222222";
+const FOREIGN_LIST_ID = "33333333-3333-4333-8333-333333333333";
+const ITEM_ID = "44444444-4444-4444-8444-444444444444";
+const SECOND_ITEM_ID = "55555555-5555-4555-8555-555555555555";
+const MISSING_ITEM_ID = "66666666-6666-4666-8666-666666666666";
+
 function createV1App(pool) {
   return createApp({
     pool,
@@ -22,7 +29,7 @@ function createAccessDeniedPool() {
   return {
     async query(sql, params) {
       assert.match(normalizeSql(sql), /FROM lists l LEFT JOIN list_members lm/);
-      assert.deepEqual(params, ["list-foreign", "user-1"]);
+      assert.deepEqual(params, [FOREIGN_LIST_ID, "user-1"]);
       return { rows: [] };
     }
   };
@@ -31,10 +38,10 @@ function createAccessDeniedPool() {
 describe("external v1 API routes", () => {
   const endpointsRequiringApiKey = [
     ["get", "/api/v1/lists"],
-    ["get", "/api/v1/lists/list-1/items"],
-    ["post", "/api/v1/lists/list-1/items"],
-    ["post", "/api/v1/lists/list-1/items/item-1/toggle"],
-    ["delete", "/api/v1/lists/list-1/items/item-1"]
+    ["get", `/api/v1/lists/${LIST_ID}/items`],
+    ["post", `/api/v1/lists/${LIST_ID}/items`],
+    ["post", `/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`],
+    ["delete", `/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`]
   ];
 
   for (const [method, path] of endpointsRequiringApiKey) {
@@ -66,10 +73,10 @@ describe("external v1 API routes", () => {
   });
 
   const listAccessEndpoints = [
-    ["get", "/api/v1/lists/list-foreign/items"],
-    ["post", "/api/v1/lists/list-foreign/items"],
-    ["post", "/api/v1/lists/list-foreign/items/item-1/toggle"],
-    ["delete", "/api/v1/lists/list-foreign/items/item-1"]
+    ["get", `/api/v1/lists/${FOREIGN_LIST_ID}/items`],
+    ["post", `/api/v1/lists/${FOREIGN_LIST_ID}/items`],
+    ["post", `/api/v1/lists/${FOREIGN_LIST_ID}/items/${ITEM_ID}/toggle`],
+    ["delete", `/api/v1/lists/${FOREIGN_LIST_ID}/items/${ITEM_ID}`]
   ];
 
   for (const [method, path] of listAccessEndpoints) {
@@ -91,8 +98,8 @@ describe("external v1 API routes", () => {
         queryArgs = [normalizeSql(sql), params];
         return {
           rows: [
-            { id: "list-1", name: "Weekly groceries" },
-            { id: "list-2", name: "BBQ party" }
+            { id: LIST_ID, name: "Weekly groceries" },
+            { id: SECOND_LIST_ID, name: "BBQ party" }
           ]
         };
       }
@@ -105,8 +112,8 @@ describe("external v1 API routes", () => {
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
       lists: [
-        { id: "list-1", name: "Weekly groceries" },
-        { id: "list-2", name: "BBQ party" }
+        { id: LIST_ID, name: "Weekly groceries" },
+        { id: SECOND_LIST_ID, name: "BBQ party" }
       ]
     });
     assert.match(queryArgs[0], /FROM lists l/);
@@ -121,33 +128,44 @@ describe("external v1 API routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          assert.deepEqual(params, ["list-1", "user-1"]);
-          return { rows: [{ id: "list-1" }] };
+          assert.deepEqual(params, [LIST_ID, "user-1"]);
+          return { rows: [{ id: LIST_ID }] };
         }
 
         assert.match(normalizeSql(sql), /SELECT id, text, status FROM entries/);
-        assert.deepEqual(params, ["list-1"]);
+        assert.deepEqual(params, [LIST_ID]);
         return {
           rows: [
-            { id: "item-1", text: "Milk", status: "open" },
-            { id: "item-2", text: "Bread", status: "done" }
+            { id: ITEM_ID, text: "Milk", status: "open" },
+            { id: SECOND_ITEM_ID, text: "Bread", status: "done" }
           ]
         };
       }
     };
 
     const response = await request(createV1App(pool))
-      .get("/api/v1/lists/list-1/items")
+      .get(`/api/v1/lists/${LIST_ID}/items`)
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
       items: [
-        { id: "item-1", name: "Milk", status: "open" },
-        { id: "item-2", name: "Bread", status: "done" }
+        { id: ITEM_ID, name: "Milk", status: "open" },
+        { id: SECOND_ITEM_ID, name: "Bread", status: "done" }
       ]
     });
     assert.equal(callCount, 2);
+  });
+
+  it("returns 404 for an invalid list ID when listing items", async () => {
+    const pool = createUnexpectedQueryPool();
+
+    const response = await request(createV1App(pool))
+      .get("/api/v1/lists/{listId}/items")
+      .set("X-Api-Key", "valid-api-key");
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(response.body, { error: "List not found." });
   });
 
   it("returns 400 when creating an item without a name", async () => {
@@ -158,7 +176,7 @@ describe("external v1 API routes", () => {
     };
 
     const response = await request(createV1App(pool))
-      .post("/api/v1/lists/list-1/items")
+      .post(`/api/v1/lists/${LIST_ID}/items`)
       .set("X-Api-Key", "valid-api-key")
       .send({});
 
@@ -173,27 +191,39 @@ describe("external v1 API routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: LIST_ID }] };
         }
 
         assert.match(normalizeSql(sql), /INSERT INTO entries \(list_id, text, status\)/);
-        assert.deepEqual(params, ["list-1", "Milk"]);
+        assert.deepEqual(params, [LIST_ID, "Milk"]);
         return {
-          rows: [{ id: "item-1", text: "Milk", status: "open" }]
+          rows: [{ id: ITEM_ID, text: "Milk", status: "open" }]
         };
       }
     };
 
     const response = await request(createV1App(pool))
-      .post("/api/v1/lists/list-1/items")
+      .post(`/api/v1/lists/${LIST_ID}/items`)
       .set("X-Api-Key", "valid-api-key")
       .send({ name: " Milk " });
 
     assert.equal(response.status, 201);
     assert.deepEqual(response.body, {
-      item: { id: "item-1", name: "Milk", status: "open" }
+      item: { id: ITEM_ID, name: "Milk", status: "open" }
     });
     assert.equal(callCount, 2);
+  });
+
+  it("returns 404 for an invalid list ID when creating an item", async () => {
+    const pool = createUnexpectedQueryPool();
+
+    const response = await request(createV1App(pool))
+      .post("/api/v1/lists/{listId}/items")
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: "Milk" });
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(response.body, { error: "List not found." });
   });
 
   it("toggles an open item to done", async () => {
@@ -203,30 +233,41 @@ describe("external v1 API routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: LIST_ID }] };
         }
 
         if (callCount === 2) {
           assert.match(normalizeSql(sql), /SELECT id, text, status FROM entries/);
-          assert.deepEqual(params, ["item-1", "list-1"]);
-          return { rows: [{ id: "item-1", text: "Milk", status: "open" }] };
+          assert.deepEqual(params, [ITEM_ID, LIST_ID]);
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open" }] };
         }
 
         assert.match(normalizeSql(sql), /UPDATE entries SET status = \$1, updated_at = NOW\(\)/);
-        assert.deepEqual(params, ["done", "item-1", "list-1"]);
-        return { rows: [{ id: "item-1", text: "Milk", status: "done" }] };
+        assert.deepEqual(params, ["done", ITEM_ID, LIST_ID]);
+        return { rows: [{ id: ITEM_ID, text: "Milk", status: "done" }] };
       }
     };
 
     const response = await request(createV1App(pool))
-      .post("/api/v1/lists/list-1/items/item-1/toggle")
+      .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      item: { id: "item-1", name: "Milk", status: "done" }
+      item: { id: ITEM_ID, name: "Milk", status: "done" }
     });
     assert.equal(callCount, 3);
+  });
+
+  it("returns 404 for an invalid item ID when toggling an item", async () => {
+    const pool = createUnexpectedQueryPool();
+
+    const response = await request(createV1App(pool))
+      .post(`/api/v1/lists/${LIST_ID}/items/{itemId}/toggle`)
+      .set("X-Api-Key", "valid-api-key");
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(response.body, { error: "Item not found." });
   });
 
   it("returns 404 when toggling an unknown item", async () => {
@@ -234,12 +275,12 @@ describe("external v1 API routes", () => {
     const pool = {
       async query() {
         callCount += 1;
-        return callCount === 1 ? { rows: [{ id: "list-1" }] } : { rows: [] };
+        return callCount === 1 ? { rows: [{ id: LIST_ID }] } : { rows: [] };
       }
     };
 
     const response = await request(createV1App(pool))
-      .post("/api/v1/lists/list-1/items/item-missing/toggle")
+      .post(`/api/v1/lists/${LIST_ID}/items/${MISSING_ITEM_ID}/toggle`)
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
@@ -253,17 +294,17 @@ describe("external v1 API routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: LIST_ID }] };
         }
 
         assert.match(normalizeSql(sql), /DELETE FROM entries/);
-        assert.deepEqual(params, ["item-1", "list-1"]);
-        return { rows: [{ id: "item-1" }] };
+        assert.deepEqual(params, [ITEM_ID, LIST_ID]);
+        return { rows: [{ id: ITEM_ID }] };
       }
     };
 
     const response = await request(createV1App(pool))
-      .delete("/api/v1/lists/list-1/items/item-1")
+      .delete(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 204);
@@ -271,23 +312,42 @@ describe("external v1 API routes", () => {
     assert.equal(callCount, 2);
   });
 
+  it("returns 404 for an invalid item ID when deleting an item", async () => {
+    const pool = createUnexpectedQueryPool();
+
+    const response = await request(createV1App(pool))
+      .delete(`/api/v1/lists/${LIST_ID}/items/not-a-uuid`)
+      .set("X-Api-Key", "valid-api-key");
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(response.body, { error: "Item not found." });
+  });
+
   it("returns 404 when deleting an unknown item", async () => {
     let callCount = 0;
     const pool = {
       async query() {
         callCount += 1;
-        return callCount === 1 ? { rows: [{ id: "list-1" }] } : { rows: [] };
+        return callCount === 1 ? { rows: [{ id: LIST_ID }] } : { rows: [] };
       }
     };
 
     const response = await request(createV1App(pool))
-      .delete("/api/v1/lists/list-1/items/item-missing")
+      .delete(`/api/v1/lists/${LIST_ID}/items/${MISSING_ITEM_ID}`)
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
     assert.deepEqual(response.body, { error: "Item not found." });
   });
 });
+
+function createUnexpectedQueryPool() {
+  return {
+    async query() {
+      throw new Error("database query should not run for invalid path parameters");
+    }
+  };
+}
 
 function normalizeSql(sql) {
   return sql.replace(/\s+/g, " ").trim();

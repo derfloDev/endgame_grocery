@@ -429,6 +429,57 @@ Toggle-Logik in `v1.js` (`open` ↔ `done`) bleibt unverändert – sie arbeitet
 
 ---
 
+---
+
+## T-009 – Backend: v1 API – UUID-Validierung für Pfadparameter
+
+### Ursache
+Wenn ein Pfadparameter keine gültige UUID ist (z. B. Swagger-UI-Platzhalter `{listId}` oder freie Texteingabe), leitet der aktuelle Code die Zeichenkette direkt an PostgreSQL weiter. PostgreSQL wirft dann einen Fehler `invalid input syntax for type uuid`, Express fängt ihn nicht spezifisch ab, und die globale Fehlerbehandlung antwortet mit 500.
+
+### Fix
+
+#### Hilfsfunktion in `backend/src/routes/v1.js`
+```js
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUuid(id) {
+  return typeof id === "string" && UUID_RE.test(id);
+}
+```
+
+#### Validierung in allen Routen mit `:listId` oder `:itemId`
+Vor dem ersten DB-Zugriff (d. h. vor `ensureListAccess` oder der Query) prüfen:
+```js
+if (!isValidUuid(req.params.listId)) {
+  res.status(404).json({ error: "List not found." });
+  return;
+}
+// bei itemId analog:
+if (!isValidUuid(req.params.itemId)) {
+  res.status(404).json({ error: "Item not found." });
+  return;
+}
+```
+
+Betroffen sind alle vier Routen mit Pfadparametern:
+- `GET /api/v1/lists/:listId/items`
+- `POST /api/v1/lists/:listId/items`
+- `POST /api/v1/lists/:listId/items/:itemId/toggle`
+- `DELETE /api/v1/lists/:listId/items/:itemId`
+
+### Dateien
+- **Aktualisiert**: `backend/src/routes/v1.js` – `isValidUuid`-Hilfsfunktion + Guards in 4 Routen
+- **Aktualisiert**: `backend/src/v1.test.js` – neue Tests: `listId = '{listId}'` → 404; `itemId = 'not-a-uuid'` → 404
+
+### Tests (Pflicht)
+- `GET /lists/{listId}/items` mit Literal `{listId}` → 404
+- `POST /lists/{listId}/items` mit Literal `{listId}` → 404
+- `POST /lists/valid-uuid/items/{itemId}/toggle` mit Literal `{itemId}` → 404
+- `DELETE /lists/valid-uuid/items/not-a-uuid` → 404
+- Bestehende Tests bleiben grün
+
+---
+
 ## Implementierungsreihenfolge
 
 ```
@@ -436,6 +487,7 @@ T-001 → T-002 → T-003 → T-004 → T-005 → T-006
                                            ↓
                                    T-007 (Bugfix T-004)
                                    T-008 (Rework T-003)
+                                   T-009 (Bugfix T-003)
 ```
 
 T-001 bis T-004 sind Backend-Aufgaben; T-005 und T-006 sind Frontend. T-006 (Styling-Fix) setzt T-005 voraus. Jede Aufgabe kann in einem einzigen Commit landen.

@@ -2,6 +2,12 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { createRequireApiKey } from "../middleware/auth.js";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUuid(id) {
+  return typeof id === "string" && UUID_RE.test(id);
+}
+
 async function ensureListAccess(pool, listId, userId) {
   const result = await pool.query(
     `
@@ -66,6 +72,11 @@ export function createV1Router({ pool = getPool(), requireApiKey } = {}) {
   });
 
   router.get("/lists/:listId/items", async (req, res, next) => {
+    if (!isValidUuid(req.params.listId)) {
+      res.status(404).json({ error: "List not found." });
+      return;
+    }
+
     if (!pool) {
       next(new Error("Database connection is not configured."));
       return;
@@ -98,6 +109,11 @@ export function createV1Router({ pool = getPool(), requireApiKey } = {}) {
   });
 
   router.post("/lists/:listId/items", async (req, res, next) => {
+    if (!isValidUuid(req.params.listId)) {
+      res.status(404).json({ error: "List not found." });
+      return;
+    }
+
     const { name } = req.body ?? {};
 
     if (!name?.trim()) {
@@ -136,6 +152,16 @@ export function createV1Router({ pool = getPool(), requireApiKey } = {}) {
   });
 
   router.post("/lists/:listId/items/:itemId/toggle", async (req, res, next) => {
+    if (!isValidUuid(req.params.listId)) {
+      res.status(404).json({ error: "List not found." });
+      return;
+    }
+
+    if (!isValidUuid(req.params.itemId)) {
+      res.status(404).json({ error: "Item not found." });
+      return;
+    }
+
     if (!pool) {
       next(new Error("Database connection is not configured."));
       return;
@@ -185,6 +211,16 @@ export function createV1Router({ pool = getPool(), requireApiKey } = {}) {
   });
 
   router.delete("/lists/:listId/items/:itemId", async (req, res, next) => {
+    if (!isValidUuid(req.params.listId)) {
+      res.status(404).json({ error: "List not found." });
+      return;
+    }
+
+    if (!isValidUuid(req.params.itemId)) {
+      res.status(404).json({ error: "Item not found." });
+      return;
+    }
+
     if (!pool) {
       next(new Error("Database connection is not configured."));
       return;

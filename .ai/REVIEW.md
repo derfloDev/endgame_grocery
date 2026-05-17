@@ -358,3 +358,49 @@ No blocking or major issues found. All changes are minimal, targeted, and correc
 
 #### Verdict
 `PASS`
+
+## Task: T-009
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-17
+
+#### Findings
+
+No blocking or major issues found. Implementation is clean and minimal.
+
+- **nit** · `backend/src/routes/v1.js` — `isValidUuid()` guards precede the `!pool` null-check in each route. Functionally correct (early exit avoids DB work) and a reasonable ordering; the plan does not specify guard ordering relative to the pool check.
+
+- **nit** · `backend/src/v1.test.js` — Existing non-UUID path parameters (`list-1`, `item-1`, `list-foreign`, etc.) replaced with proper UUID constants (`LIST_ID`, `ITEM_ID`, etc.). This is a welcome clean-up: prior tests were technically testing behaviour with invalid IDs — now all baseline tests use correctly-formatted UUIDs, which better reflects real usage. No test coverage was lost.
+
+#### Verification
+
+##### Steps
+1. Read `backend/src/routes/v1.js` diff — `UUID_RE` regex (`/^[0-9a-f]{8}-...$/i`) and `isValidUuid()` helper match the plan exactly. Guards inserted before any DB access in all four parameterised routes: `GET /lists/:listId/items`, `POST /lists/:listId/items`, `POST /lists/:listId/items/:itemId/toggle`, `DELETE /lists/:listId/items/:itemId`. ✅
+2. Read `backend/src/v1.test.js` diff — Six named UUID constants defined at top; four new tests cover the plan's exact scenarios: `{listId}` on GET/POST list-items → 404, `{itemId}` on toggle → 404, `not-a-uuid` on delete → 404. `createUnexpectedQueryPool()` helper ensures no DB query fires for invalid params. ✅
+3. Read `backend/src/openapi/v1.yaml` diff — `ListId`/`ItemId` parameters updated with `format: uuid` and description "UUID"; `GET /lists/{listId}/items` and `POST /lists/{listId}/items` now include `404` response reference; `NotFound` description updated to "The requested list or item was not found." ✅
+4. Read `backend/src/docs.test.js` diff — YAML content test gains `assert.match(response.text, /format: uuid/)`. ✅
+5. Read `README.md` diff — One-liner updated to note path IDs must be UUIDs and invalid IDs return 404. ✅
+6. Read `ROADMAP.md` diff — Added `Path-IDs: listId und itemId müssen UUIDs sein; ungültige Werte liefern 404.` under constraints. ✅
+7. Ran `node --test src/v1.test.js src/docs.test.js` in `backend/` — **26/26 pass** (22 v1 + 4 docs; up from 22 pre-T-009). ✅
+8. Ran `npm run lint` — 0 errors (1 pre-existing frontend fast-refresh warning). ✅
+9. Ran `npm run build` — clean. ✅
+10. Ran `npm test` (full backend suite) — **140/140 pass** (up from 136; 4 new v1 tests). ✅
+11. Ran `npm run test --workspace frontend` — **409/409 pass**, 28/28 test files. ✅
+
+##### Findings
+- All acceptance criteria met: invalid `listId`/`itemId` (literal `{listId}`, `not-a-uuid`, etc.) → 404 with descriptive JSON; no PostgreSQL UUID parse error; all tests green.
+- OpenAPI spec correctly documents UUID format constraint and the new 404 response on list-item endpoints.
+- `createUnexpectedQueryPool()` helper proves no DB round-trip occurs for invalid IDs.
+- No regressions.
+
+##### Risks
+- None. Guards short-circuit before any DB access; they cannot interfere with existing valid-UUID paths.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

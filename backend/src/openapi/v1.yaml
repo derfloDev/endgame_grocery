@@ -51,6 +51,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     post:
       summary: Create a grocery item
       operationId: createGroceryItem
@@ -84,6 +86,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /lists/{listId}/items/{itemId}/toggle:
     parameters:
       - $ref: '#/components/parameters/ListId'
@@ -138,14 +142,16 @@ components:
       required: true
       schema:
         type: string
-      description: Grocery list identifier.
+        format: uuid
+      description: Grocery list UUID.
     ItemId:
       name: itemId
       in: path
       required: true
       schema:
         type: string
-      description: Grocery item identifier.
+        format: uuid
+      description: Grocery item UUID.
   schemas:
     List:
       type: object
@@ -200,7 +206,7 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     NotFound:
-      description: The requested item was not found.
+      description: The requested list or item was not found.
       content:
         application/json:
           schema:

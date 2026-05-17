@@ -198,6 +198,30 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-009 — plan — 2026-05-17T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned UUID path-parameter validation for v1 routes to prevent PostgreSQL errors and return 404 instead of 500 for invalid IDs. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-009 — implement — 2026-05-17T15:34:17Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added UUID validation for v1 list and item path parameters so invalid IDs return 404 before any database query, and updated OpenAPI/README/roadmap documentation. |
+| Files Changed | `backend/src/routes/v1.js`, `backend/src/v1.test.js`, `backend/src/docs.test.js`, `backend/src/openapi/v1.yaml`, `README.md`, `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/v1.test.js src/docs.test.js` passed; `npm run lint` passed with the existing React fast-refresh warning; `npm run build` passed with existing frontend bundle warnings; `npm run test --workspace backend` passed; `npm run test --workspace frontend -- --testTimeout=15000` passed after sandbox EPERM rerun. `npm test` was run twice and failed only on unrelated frontend app tests hitting the default 5s/10s Vitest timeouts. |
+| Commit | `fix(api): return 404 for invalid v1 UUIDs` |
+| Next Role | review |
+
+---
+
 ### T-008 — plan — 2026-05-15T00:00:00Z
 
 | Field | Value |
@@ -367,6 +391,31 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
 | Validation | Review approved with PASS; previous implement and review validation remained green |
 | Commit | `fix(api): return raw v1 item statuses` |
+| Next Role | none |
+
+---
+
+### T-009 — review — 2026-05-17T15:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed UUID validation guards for v1 path parameters; all 4 routes guard both listId and itemId, OpenAPI spec updated with uuid format, 140/140 backend + 409/409 frontend tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-009 — implement — 2026-05-17T16:13:28Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed v1 UUID validation task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
+| Validation | Review approved with PASS; previous implement and review validation remained green |
+| Commit | `fix(api): return 404 for invalid v1 UUIDs` |
 | Next Role | none |
 
 ---
