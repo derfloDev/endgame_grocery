@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/derfloDev/endgame_grocery/compare/v0.17.0...v0.18.0) (2026-05-17)
+
+
+### Features
+
+* **api:** broadcast v1 item mutations ([3719386](https://github.com/derfloDev/endgame_grocery/commit/3719386e7403d4115edfa047937484530613e002))
+
 ## [0.17.0](https://github.com/derfloDev/endgame_grocery/compare/v0.16.0...v0.17.0) (2026-05-17)
 
 
