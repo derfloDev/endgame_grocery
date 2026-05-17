@@ -41,6 +41,7 @@ describe("external v1 API routes", () => {
     ["get", `/api/v1/lists/${LIST_ID}/items`],
     ["post", `/api/v1/lists/${LIST_ID}/items`],
     ["post", `/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`],
+    ["patch", `/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`],
     ["delete", `/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`]
   ];
 
@@ -76,15 +77,17 @@ describe("external v1 API routes", () => {
     ["get", `/api/v1/lists/${FOREIGN_LIST_ID}/items`],
     ["post", `/api/v1/lists/${FOREIGN_LIST_ID}/items`],
     ["post", `/api/v1/lists/${FOREIGN_LIST_ID}/items/${ITEM_ID}/toggle`],
+    ["patch", `/api/v1/lists/${FOREIGN_LIST_ID}/items/${ITEM_ID}`],
     ["delete", `/api/v1/lists/${FOREIGN_LIST_ID}/items/${ITEM_ID}`]
   ];
 
   for (const [method, path] of listAccessEndpoints) {
     it(`returns 403 for ${method.toUpperCase()} ${path} when the API key user cannot access the list`, async () => {
       const agent = request(createV1App(createAccessDeniedPool()));
+      const body = (method === "post" && path.endsWith("/items")) || method === "patch" ? { name: "Oat milk" } : undefined;
       const response = await agent[method](path)
         .set("X-Api-Key", "valid-api-key")
-        .send(method === "post" && path.endsWith("/items") ? { name: "Milk" } : undefined);
+        .send(body);
 
       assert.equal(response.status, 403);
       assert.deepEqual(response.body, { error: "You do not have access to this list." });
@@ -285,6 +288,110 @@ describe("external v1 API routes", () => {
 
     assert.equal(response.status, 404);
     assert.deepEqual(response.body, { error: "Item not found." });
+  });
+
+  it("returns 400 when renaming an item without a name", async () => {
+    const pool = createUnexpectedQueryPool();
+
+    const response = await request(createV1App(pool))
+      .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({});
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: "Item name is required." });
+  });
+
+  it("returns 400 when renaming an item with a blank name", async () => {
+    const pool = createUnexpectedQueryPool();
+
+    const response = await request(createV1App(pool))
+      .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: "  " });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: "Item name is required." });
+  });
+
+  it("returns 404 for an invalid list ID when renaming an item", async () => {
+    const pool = createUnexpectedQueryPool();
+
+    const response = await request(createV1App(pool))
+      .patch(`/api/v1/lists/{listId}/items/${ITEM_ID}`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: "Oat milk" });
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(response.body, { error: "List not found." });
+  });
+
+  it("returns 404 for an invalid item ID when renaming an item", async () => {
+    const pool = createUnexpectedQueryPool();
+
+    const response = await request(createV1App(pool))
+      .patch(`/api/v1/lists/${LIST_ID}/items/not-a-uuid`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: "Oat milk" });
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(response.body, { error: "Item not found." });
+  });
+
+  it("returns 404 when renaming an unknown item", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: LIST_ID }] };
+        }
+
+        assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, updated_at = NOW\(\)/);
+        assert.deepEqual(params, ["Oat milk", MISSING_ITEM_ID, LIST_ID]);
+        return { rows: [] };
+      }
+    };
+
+    const response = await request(createV1App(pool))
+      .patch(`/api/v1/lists/${LIST_ID}/items/${MISSING_ITEM_ID}`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: "Oat milk" });
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.equal(callCount, 2);
+  });
+
+  it("renames an existing item and returns the updated item", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: LIST_ID }] };
+        }
+
+        assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, updated_at = NOW\(\)/);
+        assert.deepEqual(params, ["Oat milk", ITEM_ID, LIST_ID]);
+        return {
+          rows: [{ id: ITEM_ID, text: "Oat milk", status: "open" }]
+        };
+      }
+    };
+
+    const response = await request(createV1App(pool))
+      .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: " Oat milk " });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      item: { id: ITEM_ID, name: "Oat milk", status: "open" }
+    });
+    assert.equal(callCount, 2);
   });
 
   it("deletes an existing item", async () => {

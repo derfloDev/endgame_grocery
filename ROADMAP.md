@@ -15,7 +15,7 @@ Objective: Jeder User kann in „Info & Einstellungen" einen eindeutigen API-Key
 
 ## Priority 2 – Externe REST-API v1
 
-Objective: Fünf Home-Assistant-taugliche Endpunkte unter `/api/v1/`, gesichert via `X-Api-Key`-Header.
+Objective: Sechs Home-Assistant-taugliche Endpunkte unter `/api/v1/`, gesichert via `X-Api-Key`-Header.
 
 Constraints:
 - Auth: `X-Api-Key: <key>` Header – kein JWT, kein Bearer Token.
@@ -29,7 +29,8 @@ Endpunkte:
 2. `GET /api/v1/lists/:listId/items` – alle Einträge einer Liste (mit Ownership-Check).
 3. `POST /api/v1/lists/:listId/items` – neues Item anlegen (`{ "name": "..." }`).
 4. `POST /api/v1/lists/:listId/items/:itemId/toggle` – Status umschalten (`open` ↔ `done`).
-5. `DELETE /api/v1/lists/:listId/items/:itemId` – Item endgültig löschen.
+5. `PATCH /api/v1/lists/:listId/items/:itemId` – Item umbenennen (`{ "name": "..." }`).
+6. `DELETE /api/v1/lists/:listId/items/:itemId` – Item endgültig löschen.
 
 Response-Format für Items: `id`, `name` (mapped von `text`), `status` (`open` | `done`).
 
@@ -40,12 +41,12 @@ Objective: Die v1-API ist vollständig dokumentiert und über den Backend-Server
 - OpenAPI 3.1-Spec als statische Datei `backend/src/openapi/v1.yaml`.
 - Swagger UI serviert unter `GET /api/docs` via `swagger-ui-express`.
 - Spec-Datei erreichbar unter `GET /api/docs/openapi.yaml` (raw YAML).
-- Dokumentation umfasst alle 5 Endpunkte inkl. Authentifizierung, Request/Response-Schemas und Fehlerresponses.
+- Dokumentation umfasst alle 6 Endpunkte inkl. Authentifizierung, Request/Response-Schemas und Fehlerresponses.
 
 ## Acceptance Criteria (gesamt)
 
 - API-Key kann im Frontend erzeugt, angezeigt und kopiert werden.
-- Alle 5 v1-Endpunkte funktionieren mit gültigem API-Key.
+- Alle 6 v1-Endpunkte funktionieren mit gültigem API-Key.
 - Ungültiger/fehlender Key → 401.
 - Zugriff auf fremde Liste → 403.
 - Swagger UI ist unter `/api/docs` erreichbar und zeigt alle Endpunkte.

@@ -198,6 +198,30 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-010 — plan — 2026-05-17T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned PATCH endpoint for renaming v1 items, including UUID guards, 400/403/404 error cases, and OpenAPI spec update. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-010 — implement — 2026-05-17T17:32:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added `PATCH /api/v1/lists/:listId/items/:itemId` for renaming v1 items with UUID guards, access checks, validation errors, OpenAPI docs, and roadmap/README updates. |
+| Files Changed | `backend/src/routes/v1.js`, `backend/src/v1.test.js`, `backend/src/docs.test.js`, `backend/src/openapi/v1.yaml`, `README.md`, `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/v1.test.js src/docs.test.js` passed; `npm run lint` passed with the existing React fast-refresh warning; `npm run build` passed with existing frontend bundle warnings; `npm test` passed |
+| Commit | `feat(api): add v1 item rename endpoint` |
+| Next Role | review |
+
+---
+
 ### T-009 — plan — 2026-05-17T00:00:00Z
 
 | Field | Value |
@@ -426,5 +450,30 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 |-------|-------|
 | Summary | All tasks done; cycle closed |
 | Version | unversioned |
+
+---
+
+### T-010 — review — 2026-05-17T17:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed PATCH /api/v1/lists/:listId/items/:itemId rename endpoint; all plan logic, tests (8 new), OpenAPI spec, and documentation verified; 148/148 backend + 409/409 frontend tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-010 — implement — 2026-05-17T17:45:59Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed v1 item rename task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
+| Validation | Review approved with PASS; previous implement and review validation remained green |
+| Commit | `feat(api): add v1 item rename endpoint` |
+| Next Role | none |
 
 ---

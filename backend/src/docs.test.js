@@ -41,6 +41,7 @@ describe("API docs routes", () => {
     assert.match(response.text, /ApiKeyAuth:/);
     assert.match(response.text, /name: X-Api-Key/);
     assert.match(response.text, /format: uuid/);
+    assert.match(response.text, /operationId: renameGroceryItem/);
     assert.match(response.text, /- open/);
     assert.match(response.text, /- done/);
     assert.doesNotMatch(response.text, /needs_action/);
