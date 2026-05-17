@@ -317,3 +317,44 @@ No blocking or major issues found. Both fixes are correct; the implementation is
 
 #### Verdict
 `PASS`
+
+## Task: T-008
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-17
+
+#### Findings
+
+No blocking or major issues found. All changes are minimal, targeted, and correct.
+
+- **nit** · `backend/src/routes/v1.js` — `toHaStatus()` helper removed, `serializeItem()` simplified to `status: row.status`. Cleaner than the original; no dead code left behind.
+
+#### Verification
+
+##### Steps
+1. Read `backend/src/routes/v1.js` diff — `toHaStatus()` function removed entirely; `serializeItem()` now returns `status: row.status` (raw DB value). No other logic changed. ✅
+2. Read `backend/src/openapi/v1.yaml` diff — `Item.status` enum changed from `[needs_action, completed]` to `[open, done]`. Both Items schemas (response body and toggle response) updated. ✅
+3. Read `backend/src/v1.test.js` diff — All `needs_action` → `open` and `completed` → `done` assertion updates; test names updated to match. 18 tests cover all 5 endpoints, 401/403/404 error paths, and owner/member access. ✅
+4. Read `backend/src/docs.test.js` diff — YAML content test extended with `assert.match(..., /- open/)`, `assert.match(..., /- done/)`, `assert.doesNotMatch(..., /needs_action/)`, `assert.doesNotMatch(..., /completed/)`. ✅
+5. Read `backend/src/openapi/v1.yaml` — Confirmed no remaining `needs_action` or `completed` references anywhere in the file. ✅
+6. Read `README.md` and `ROADMAP.md` diffs — Documentation updated to reflect raw `open`/`done` status values instead of HA status mapping. ✅
+7. Ran `node --test src/v1.test.js src/docs.test.js` in `backend/` — **22/22 pass** (18 v1 + 4 docs). ✅
+8. Ran `npm run lint` — 0 errors (1 pre-existing frontend fast-refresh warning). ✅
+9. Ran `npm run build` — clean, no new warnings. ✅
+10. Ran `npm test` (full suite) — **136/136 backend pass**, **409/409 frontend pass** (1 pre-existing flaky timing test passed on re-run; unrelated to T-008). ✅
+
+##### Findings
+- All acceptance criteria met: v1 item responses return `open`/`done`; OpenAPI spec enum updated; no HA mapping references remain; all tests green.
+- No regressions to any previously green test.
+
+##### Risks
+- Breaking change for any existing consumer expecting `needs_action`/`completed` — intentional and documented. No compatibility shim needed (no external consumers existed at the time of change).
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

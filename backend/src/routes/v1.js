@@ -20,15 +20,11 @@ async function ensureListAccess(pool, listId, userId) {
   return Boolean(result.rows[0]);
 }
 
-function toHaStatus(dbStatus) {
-  return dbStatus === "done" ? "completed" : "needs_action";
-}
-
 function serializeItem(row) {
   return {
     id: row.id,
     name: row.text,
-    status: toHaStatus(row.status)
+    status: row.status
   };
 }
 

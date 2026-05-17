@@ -20,7 +20,7 @@ Objective: Fünf Home-Assistant-taugliche Endpunkte unter `/api/v1/`, gesichert 
 Constraints:
 - Auth: `X-Api-Key: <key>` Header – kein JWT, kein Bearer Token.
 - Scope: Listen, die der User besitzt **oder** bei denen er Mitglied ist.
-- Entry-Status-Mapping: DB `open` ↔ HA `needs_action`; DB `done` ↔ HA `completed`.
+- Entry-Status: v1 responses return raw DB values, `open` or `done`.
 - Toggle-Endpunkt: kein Body erforderlich, Status wird automatisch umgeschaltet.
 
 Endpunkte:
@@ -30,7 +30,7 @@ Endpunkte:
 4. `POST /api/v1/lists/:listId/items/:itemId/toggle` – Status umschalten (`open` ↔ `done`).
 5. `DELETE /api/v1/lists/:listId/items/:itemId` – Item endgültig löschen.
 
-Response-Format für Items: `id`, `name` (mapped von `text`), `status` (`needs_action` | `completed`).
+Response-Format für Items: `id`, `name` (mapped von `text`), `status` (`open` | `done`).
 
 ## Priority 3 – OpenAPI-Dokumentation & Swagger UI
 

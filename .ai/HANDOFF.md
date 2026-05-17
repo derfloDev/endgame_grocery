@@ -332,3 +332,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-008 — implement — 2026-05-17T13:58:06Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed Home Assistant status mapping from the v1 API so item responses and OpenAPI docs use raw `open`/`done` values. |
+| Files Changed | `backend/src/routes/v1.js`, `backend/src/v1.test.js`, `backend/src/docs.test.js`, `backend/src/openapi/v1.yaml`, `README.md`, `ROADMAP.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/v1.test.js src/docs.test.js` passed after sandbox EPERM rerun; `npm run lint` passed with one existing React fast-refresh warning; `npm run build` passed with existing frontend bundle warnings; `npm test` passed |
+| Commit | `fix(api): return raw v1 item statuses` |
+| Next Role | review |
+
+---
+
+### T-008 — review — 2026-05-17T14:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed removal of HA status mapping from v1 API; raw `open`/`done` values confirmed in routes, OpenAPI spec, tests, and docs; 136/136 backend + 409/409 frontend tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-008 — implement — 2026-05-17T14:37:49Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed v1 raw status task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
+| Validation | Review approved with PASS; previous implement and review validation remained green |
+| Commit | `fix(api): return raw v1 item statuses` |
+| Next Role | none |
+
+---

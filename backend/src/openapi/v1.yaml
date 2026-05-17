@@ -171,8 +171,8 @@ components:
         status:
           type: string
           enum:
-            - needs_action
-            - completed
+            - open
+            - done
     Error:
       type: object
       required:

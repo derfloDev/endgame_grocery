@@ -40,6 +40,10 @@ describe("API docs routes", () => {
     assert.match(response.text, /openapi: 3\.1\.0/);
     assert.match(response.text, /ApiKeyAuth:/);
     assert.match(response.text, /name: X-Api-Key/);
+    assert.match(response.text, /- open/);
+    assert.match(response.text, /- done/);
+    assert.doesNotMatch(response.text, /needs_action/);
+    assert.doesNotMatch(response.text, /completed/);
 
     for (const path of [
       "/lists:",

@@ -114,7 +114,7 @@ describe("external v1 API routes", () => {
     assert.deepEqual(queryArgs[1], ["user-1"]);
   });
 
-  it("returns list items with Home Assistant status values", async () => {
+  it("returns list items with raw entry status values", async () => {
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -143,8 +143,8 @@ describe("external v1 API routes", () => {
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
       items: [
-        { id: "item-1", name: "Milk", status: "needs_action" },
-        { id: "item-2", name: "Bread", status: "completed" }
+        { id: "item-1", name: "Milk", status: "open" },
+        { id: "item-2", name: "Bread", status: "done" }
       ]
     });
     assert.equal(callCount, 2);
@@ -166,7 +166,7 @@ describe("external v1 API routes", () => {
     assert.deepEqual(response.body, { error: "Item name is required." });
   });
 
-  it("creates an open item and returns the Home Assistant item shape", async () => {
+  it("creates an open item and returns the raw entry status", async () => {
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -191,12 +191,12 @@ describe("external v1 API routes", () => {
 
     assert.equal(response.status, 201);
     assert.deepEqual(response.body, {
-      item: { id: "item-1", name: "Milk", status: "needs_action" }
+      item: { id: "item-1", name: "Milk", status: "open" }
     });
     assert.equal(callCount, 2);
   });
 
-  it("toggles an open item to completed", async () => {
+  it("toggles an open item to done", async () => {
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -224,7 +224,7 @@ describe("external v1 API routes", () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      item: { id: "item-1", name: "Milk", status: "completed" }
+      item: { id: "item-1", name: "Milk", status: "done" }
     });
     assert.equal(callCount, 3);
   });
