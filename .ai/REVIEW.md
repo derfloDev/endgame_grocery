@@ -450,3 +450,52 @@ No blocking or major issues found. Implementation is clean, consistent with prio
 
 #### Verdict
 `PASS`
+
+## Task: T-011
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-17
+
+#### Findings
+
+No blocking or major issues found. Implementation is correct, well-tested, and more defensive than the plan's minimal inline pattern.
+
+- **nit** · `backend/src/routes/v1.js` `broadcastListEvent()` — The plan specified the inline `void sseManager.broadcastToList(...).catch(...)` pattern. The implementation extracts this into a helper and additionally wraps the call in a synchronous `try/catch`. This is strictly more defensive (handles synchronous throws from `broadcastToList`) and the helper reduces repetition across four call sites. The functional contract is identical.
+
+- **nit** · `backend/src/v1.test.js` `waitForAsyncHandlers()` — `setTimeout(resolve, 0)` pushes to the macrotask queue, ensuring the `.catch()` microtask callback has already fired before log assertions are made. Correct and idiomatic for this test pattern.
+
+#### Verification
+
+##### Steps
+1. Read `backend/src/routes/v1.js` diff — `logger` and `sseManager` imported with `default` aliases; both parameters added to `createV1Router` destructured signature with defaults. `broadcastListEvent()` helper added: uses `void Promise.resolve(...).catch(...)` pattern wrapped in `try/catch`; calls `logger.error` in both catch paths. Four `broadcastListEvent()` calls inserted immediately after the successful response data is available (before `res.status(...).json()` / `res.json()` / `res.status(204).send()`), with correct event types: `entry:created`, `entry:updated` (toggle), `entry:updated` (rename), `entry:deleted`. ✅
+2. Verified `app.js` already includes `sseManager` in `routerOptions` (line 48) and passes it to `v1Routes(routerOptions)` (line 89) — no `app.js` changes needed. ✅
+3. Read `backend/src/v1.test.js` diff — `createV1App` extended with `options.logger` and `options.sseManager ?? createSseManagerSpy()`. Three helpers added: `createSseManagerSpy()` (records calls, resolves), `createRejectingSseManager()` (records calls, rejects), `createLogCapture()` (pino in-memory sink). `waitForAsyncHandlers()` used to drain microtask/macrotask queues before log assertions. ✅
+4. SSE spy assertions added to four existing mutation tests (create, toggle, rename, delete) — each verifies `[listId, eventType, { listId, entryId }]` tuple. ✅
+5. One new test "keeps create responses successful when the SSE broadcast fails" — confirms 201 returned, `sseManager.calls` recorded, and error logged. ✅
+6. All plan-required tests present: create → `entry:created`; toggle → `entry:updated`; rename → `entry:updated`; delete → `entry:deleted`; broadcast failure → no 500. ✅
+7. Read `README.md` diff — SSE behaviour documented in the v1 API bullet. ✅
+8. Read `ROADMAP.md` diff — SSE constraint and acceptance criterion added. ✅
+9. Ran `node --test src/v1.test.js` — **31/31 pass** (up from 30). ✅
+10. Ran `npm run lint` — 0 errors (1 pre-existing frontend warning). ✅
+11. Ran `npm run build` — clean. ✅
+12. Ran `npm test` (full backend suite) — **149/149 pass** (up from 148; 1 new test). ✅
+13. Ran `npm run test --workspace frontend` — **409/409 pass**, 28/28 test files. ✅
+
+##### Findings
+- All acceptance criteria met: SSE events broadcast after every v1 mutation; web clients receive real-time updates without manual reload.
+- Broadcast is non-blocking — `void` pattern ensures HTTP response is sent before (and regardless of) broadcast outcome.
+- Broadcast errors are swallowed and logged, never surfaced as HTTP 500.
+- `sseManager` flows correctly from `app.js` → `routerOptions` → `createV1Router` — no `app.js` changes required.
+- No regressions to any previously green test.
+
+##### Risks
+- None. Broadcasts are fire-and-forget; failure is contained to the logger.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

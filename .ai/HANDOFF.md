@@ -198,6 +198,30 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-011 — plan — 2026-05-17T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned SSE broadcast calls in v1 router after create, toggle, rename, and delete mutations so the web app receives real-time updates from external API changes. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-011 — implement — 2026-05-17T18:16:33Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added non-blocking SSE broadcasts to v1 item create, toggle, rename, and delete mutations with coverage for event payloads and broadcast failures. |
+| Files Changed | `backend/src/routes/v1.js`, `backend/src/v1.test.js`, `README.md`, `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/v1.test.js` passed; `npm run lint` passed with the existing React fast-refresh warning; `npm run build` passed with existing frontend bundle warnings; `npm test` passed |
+| Commit | `feat(api): broadcast v1 item mutations` |
+| Next Role | review |
+
+---
+
 ### T-010 — plan — 2026-05-17T00:00:00Z
 
 | Field | Value |
@@ -484,5 +508,30 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 |-------|-------|
 | Summary | All tasks done; cycle closed |
 | Version | unversioned |
+
+---
+
+### T-011 — review — 2026-05-17T18:25:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed SSE broadcast wiring for v1 mutations; all 4 event types confirmed correct, broadcast-failure test passes, 149/149 backend + 409/409 frontend tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-011 — implement — 2026-05-17T18:25:28Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed v1 SSE broadcast task done and committed the approved changes. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, reviewed task files staged for commit |
+| Validation | Review approved with PASS; previous implement and review validation remained green |
+| Commit | `feat(api): broadcast v1 item mutations` |
+| Next Role | none |
 
 ---

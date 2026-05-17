@@ -529,6 +529,70 @@ PATCH /api/v1/lists/:listId/items/:itemId
 
 ---
 
+---
+
+## T-011 – Backend: v1 API – SSE-Broadcasts nach Mutationen
+
+### Problem
+Der v1-Router ruft `sseManager.broadcastToList()` nach keiner seiner Mutationen auf. Die Web-App empfängt daher keine SSE-Events, wenn Änderungen über die externe API vorgenommen werden, und zeigt den veralteten Stand, bis der User manuell neu lädt.
+
+### Zu sendende Events (analog zu `entries.js`)
+
+| v1-Mutation | SSE-Event |
+|-------------|-----------|
+| `POST /lists/:listId/items` (Create) | `entry:created` |
+| `POST /lists/:listId/items/:itemId/toggle` | `entry:updated` |
+| `PATCH /lists/:listId/items/:itemId` (Rename) | `entry:updated` |
+| `DELETE /lists/:listId/items/:itemId` | `entry:deleted` |
+
+### Änderungen in `backend/src/routes/v1.js`
+
+`sseManager` wird bereits via `routerOptions` an den Router übergeben (in `app.js` ist `sseManager` Teil von `routerOptions`). Die Funktion `createV1Router` muss es nur entgegennehmen und nutzen.
+
+```js
+// Signatur erweitern:
+export function createV1Router({ pool, requireApiKey, sseManager = defaultSseManager } = {}) { ... }
+
+// Nach erfolgreichem INSERT (Create):
+void sseManager.broadcastToList(pool, req.params.listId, "entry:created", {
+  listId: req.params.listId,
+  entryId: result.rows[0].id
+}).catch((err) => logger.error({ err }, "Failed to broadcast SSE event"));
+
+// Nach UPDATE (Toggle, Rename):
+void sseManager.broadcastToList(pool, req.params.listId, "entry:updated", {
+  listId: req.params.listId,
+  entryId: req.params.itemId
+}).catch((err) => logger.error({ err }, "Failed to broadcast SSE event"));
+
+// Nach DELETE:
+void sseManager.broadcastToList(pool, req.params.listId, "entry:deleted", {
+  listId: req.params.listId,
+  entryId: req.params.itemId
+}).catch((err) => logger.error({ err }, "Failed to broadcast SSE event"));
+```
+
+Wichtig: `void` + `.catch()` – identisches Muster wie in `entries.js`. Der Broadcast darf die HTTP-Response nicht blockieren.
+
+### Logger
+`v1.js` benötigt einen Logger für `.catch()`-Fehlerausgaben. `logger` ebenfalls aus `routerOptions` entgegennehmen (analog zu anderen Routern):
+```js
+export function createV1Router({ pool, requireApiKey, sseManager = defaultSseManager, logger = defaultLogger } = {}) { ... }
+```
+
+### Dateien
+- **Aktualisiert**: `backend/src/routes/v1.js` – `sseManager` + `logger` in Signatur; Broadcasts in 4 Mutations-Handlern
+- **Aktualisiert**: `backend/src/v1.test.js` – `sseManager`-Spy übergeben; prüfen dass Broadcast nach jeder Mutation aufgerufen wird (Spy-Pattern wie in `lists.test.js` oder `entries.test.js`)
+
+### Tests (Pflicht)
+- Create-Endpoint: `sseManager.broadcastToList` mit Event `entry:created` aufgerufen
+- Toggle-Endpoint: `sseManager.broadcastToList` mit Event `entry:updated` aufgerufen
+- Rename-Endpoint: `sseManager.broadcastToList` mit Event `entry:updated` aufgerufen
+- Delete-Endpoint: `sseManager.broadcastToList` mit Event `entry:deleted` aufgerufen
+- Fehler im Broadcast (Spy wirft) führt **nicht** zu einem 500 – Response ist trotzdem 2xx
+
+---
+
 ## Implementierungsreihenfolge
 
 ```
@@ -538,6 +602,7 @@ T-001 → T-002 → T-003 → T-004 → T-005 → T-006
                                    T-008 (Rework T-003)
                                    T-009 (Bugfix T-003)
                                    T-010 (Erweiterung v1)
+                                   T-011 (Erweiterung v1)
 ```
 
 T-001 bis T-004 sind Backend-Aufgaben; T-005 und T-006 sind Frontend. T-006 (Styling-Fix) setzt T-005 voraus. Jede Aufgabe kann in einem einzigen Commit landen.
