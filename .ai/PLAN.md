@@ -480,6 +480,55 @@ Betroffen sind alle vier Routen mit Pfadparametern:
 
 ---
 
+---
+
+## T-010 – Backend: v1 API – Item umbenennen
+
+### Neuer Endpunkt
+
+```
+PATCH /api/v1/lists/:listId/items/:itemId
+```
+
+**Request Body:** `{ "name": "Neuer Name" }`  
+**Response 200:** `{ "item": { "id", "name", "status" } }`
+
+### Logik
+
+```
+1. isValidUuid(listId) → 404 wenn ungültig
+2. isValidUuid(itemId) → 404 wenn ungültig
+3. name fehlt oder leer → 400 { error: "Item name is required." }
+4. ensureListAccess(pool, listId, userId) → 403 wenn kein Zugriff
+5. UPDATE entries SET text = $1, updated_at = NOW()
+   WHERE id = $2 AND list_id = $3
+   RETURNING id, text, status
+6. rows[0] fehlt → 404 { error: "Item not found." }
+7. res.json({ item: serializeItem(rows[0]) })
+```
+
+### Dateien
+
+- **Aktualisiert**: `backend/src/routes/v1.js`
+  - Neue Route `router.patch("/lists/:listId/items/:itemId", ...)` nach dem Toggle-Handler
+- **Aktualisiert**: `backend/src/v1.test.js`
+  - Tests: fehlender Name → 400; 403 bei fremder Liste; 404 bei unbekanntem Item; 404 bei ungültiger UUID; 200 mit aktualisiertem Item
+- **Aktualisiert**: `backend/src/openapi/v1.yaml`
+  - Neuer Path `patch /lists/{listId}/items/{itemId}` mit Request-Body-Schema und Response-Schemas (200, 400, 401, 403, 404)
+- **Aktualisiert**: `ROADMAP.md`
+  - Endpunkt-Liste um `PATCH /api/v1/lists/:listId/items/:itemId – Item umbenennen` ergänzen
+
+### Tests (Pflicht)
+- `PATCH` ohne `name` → 400
+- `PATCH` mit `name: "  "` (nur Leerzeichen) → 400
+- `PATCH` mit ungültiger `listId`-UUID → 404
+- `PATCH` mit ungültiger `itemId`-UUID → 404
+- `PATCH` auf fremde Liste → 403
+- `PATCH` auf nicht-existentes Item → 404
+- `PATCH` mit gültigem `name` → 200, `item.name` aktualisiert
+
+---
+
 ## Implementierungsreihenfolge
 
 ```
@@ -488,6 +537,7 @@ T-001 → T-002 → T-003 → T-004 → T-005 → T-006
                                    T-007 (Bugfix T-004)
                                    T-008 (Rework T-003)
                                    T-009 (Bugfix T-003)
+                                   T-010 (Erweiterung v1)
 ```
 
 T-001 bis T-004 sind Backend-Aufgaben; T-005 und T-006 sind Frontend. T-006 (Styling-Fix) setzt T-005 voraus. Jede Aufgabe kann in einem einzigen Commit landen.

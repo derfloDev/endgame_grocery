@@ -117,6 +117,41 @@ paths:
     parameters:
       - $ref: '#/components/parameters/ListId'
       - $ref: '#/components/parameters/ItemId'
+    patch:
+      summary: Rename a grocery item
+      operationId: renameGroceryItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+      responses:
+        '200':
+          description: The renamed item.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - item
+                properties:
+                  item:
+                    $ref: '#/components/schemas/Item'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     delete:
       summary: Delete a grocery item
       operationId: deleteGroceryItem

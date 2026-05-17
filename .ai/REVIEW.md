@@ -404,3 +404,49 @@ No blocking or major issues found. Implementation is clean and minimal.
 
 #### Verdict
 `PASS`
+
+## Task: T-010
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-17
+
+#### Findings
+
+No blocking or major issues found. Implementation is clean, consistent with prior v1 routes, and covers all plan scenarios.
+
+- **nit** · `backend/src/routes/v1.js` — Name validation (`400`) is checked before `ensureListAccess` (`403`). This means a malformed request from an unauthorised user gets a 400, not a 403. This is an intentional and acceptable trade-off (fail-fast on bad input); consistent with how `POST /items` handles the same case.
+
+- **nit** · `backend/src/openapi/v1.yaml` — `name` field in request body has `minLength: 1` but no `maxLength`. No issue — there is no DB column constraint to enforce here and the route already trims and rejects blank values at the application layer.
+
+#### Verification
+
+##### Steps
+1. Read `backend/src/routes/v1.js` diff — New `router.patch("/lists/:listId/items/:itemId", ...)` handler inserted between the toggle and delete handlers. Logic order matches plan exactly: UUID guards → name validation → pool null-check → `ensureListAccess` → `UPDATE … RETURNING` → 404 if not found → 200 with `serializeItem`. Name is trimmed (`name.trim()`) before being passed to the query. ✅
+2. Read `backend/src/v1.test.js` diff — PATCH endpoint added to both `endpointsRequiringApiKey` and `listAccessEndpoints` loops (403 test includes `{ name: "Oat milk" }` body). Seven new standalone tests cover all plan requirements: missing name → 400, blank name → 400, invalid listId → 404, invalid itemId → 404, unknown item → 404, successful rename → 200 (verifies SQL params and trim). ✅
+3. Read `backend/src/openapi/v1.yaml` diff — `patch` operation added under `/lists/{listId}/items/{itemId}` path. `operationId: renameGroceryItem`, request body schema with `name` (required, `minLength: 1`), responses 200/400/401/403/404 all present. ✅
+4. Read `backend/src/docs.test.js` diff — Added `assert.match(response.text, /operationId: renameGroceryItem/)` to YAML content test. ✅
+5. Read `README.md` diff — `PATCH /api/v1/lists/:listId/items/:itemId` added to endpoint list. ✅
+6. Read `ROADMAP.md` diff — Objective updated "Fünf" → "Sechs"; PATCH endpoint added between toggle and delete; acceptance criteria and docs scope updated to "6 Endpunkte". ✅
+7. Ran `node --test src/v1.test.js src/docs.test.js` — **34/34 pass** (30 v1 + 4 docs; up from 26). ✅
+8. Ran `npm run lint` — 0 errors (1 pre-existing frontend warning). ✅
+9. Ran `npm run build` — clean. ✅
+10. Ran `npm test` (full backend suite) — **148/148 pass** (up from 140; 8 new tests). ✅
+11. Ran `npm run test --workspace frontend` — **409/409 pass**, 28/28 test files. ✅
+
+##### Findings
+- All acceptance criteria met: `PATCH` with valid name → 200 with updated item; 400 on missing/blank name; 403 on foreign list; 404 on unknown item or invalid UUID; OpenAPI spec documents new endpoint; all tests green.
+- SQL uses `WHERE id = $2 AND list_id = $3` which correctly prevents cross-list item updates.
+- `serializeItem()` reuse ensures response shape (`id`, `name`, `status`) is consistent with all other item endpoints.
+- No regressions.
+
+##### Risks
+- None. The new route is fully isolated; it cannot affect existing routes.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
