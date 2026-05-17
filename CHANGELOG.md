@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.16.0](https://github.com/derfloDev/endgame_grocery/compare/v0.15.0...v0.16.0) (2026-05-17)
+
+
+### Features
+
+* **api:** add external grocery REST API ([aa95ebd](https://github.com/derfloDev/endgame_grocery/commit/aa95ebd6b6b0d240d8ef6321f89118365b34c256))
+* **api:** add OpenAPI docs ([84b881a](https://github.com/derfloDev/endgame_grocery/commit/84b881a36cec9a1f309a64b2b4028ece409fe67e))
+* **auth:** add API key management endpoints ([ed48061](https://github.com/derfloDev/endgame_grocery/commit/ed4806136e4de3f15d3e4f4fe5bfd1a822961e6b))
+* **db:** add API key column to users ([090cf9e](https://github.com/derfloDev/endgame_grocery/commit/090cf9ebbc3a1bcac2d40e1e90bbe96f6420d424))
+* **settings:** manage API keys in InfoSheet ([c7b938b](https://github.com/derfloDev/endgame_grocery/commit/c7b938bb5626b8f763dc1ada656b6ba432a72a38))
+
+
+### Bug Fixes
+
+* **api:** redirect Swagger UI docs path ([7912919](https://github.com/derfloDev/endgame_grocery/commit/79129192d4bc28f4980354ba0409ac65fb9a76a7))
+* **api:** return 404 for invalid v1 UUIDs ([564e491](https://github.com/derfloDev/endgame_grocery/commit/564e49117b22aa19e0269e433eaf7f632306feee))
+* **api:** return raw v1 item statuses ([dddd9fc](https://github.com/derfloDev/endgame_grocery/commit/dddd9fcf6c944bb54ead96753c66dfbe77772b32))
+* **settings:** polish API key controls ([fa54389](https://github.com/derfloDev/endgame_grocery/commit/fa54389baa881423658af67619f31df40890304d))
+
 ## [0.15.0](https://github.com/derfloDev/endgame_grocery/compare/v0.14.0...v0.15.0) (2026-05-13)
 
 
