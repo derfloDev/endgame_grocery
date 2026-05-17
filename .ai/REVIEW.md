@@ -2,52 +2,45 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
----
-
 ## Task: T-001
 
 ### Review Round 1
 
-Status: **PASS_WITH_NOTES**
+Status: **PASS**
 
-Reviewed: 2026-05-12
+Reviewed: 2026-05-15
 
 #### Findings
 
-| # | Severity | File | Description | Required Fix |
-|---|----------|------|-------------|--------------|
-| 1 | nit | `frontend/src/styles/shared.css:43` | `.eg-btn` added to the button base selector group — not present in original `index.css` and not listed in the plan. Harmless alias, but it's out of scope for T-001. | No |
-| 2 | nit | `frontend/src/styles/tokens.css` (new file) | `tokens.css` was created to hold CSS custom properties extracted from `index.css`. This file is not mentioned in the plan (T-001 scope is `shared.css` + `auth.module.css` only). The extraction is beneficial and forward-compatible with T-005, but it is an unplanned addition. `index.css` now imports it first and the `:root` block was stripped of variable declarations. | No |
+No blocking or major issues found.
 
-No blockers or major findings.
+- **nit** · `backend/src/db/migrations/1778803200000_add_api_key_to_users.cjs` line 1  
+  `const shorthands = undefined;` is a no-op boilerplate. Harmless; consistent with existing migrations.
 
 #### Verification
 
 ##### Steps
-- Read `frontend/src/styles/shared.css`, `auth.module.css`, `tokens.css`, and `frontend/src/index.css`.
-- Cross-checked all planned classes from `.ai/PLAN.md` CSS class inventory against `shared.css` and `auth.module.css`.
-- Verified `index.css` contains `@import "./styles/tokens.css"`, `@import "./styles/shared.css"`, and `@import "./styles/auth.module.css"` at the top.
-- Confirmed no TSX files were modified (scope check via git diff — clean).
-- Ran `npm run lint` → 0 errors, 1 pre-existing warning (`AuthContext.tsx` Fast Refresh).
-- Ran `npm run build` → clean build, pre-existing chunk size warning only.
-- Ran `npm test` → 106/106 pass, 0 fail.
+1. Read migration file `1778803200000_add_api_key_to_users.cjs` — correct `addColumns`/`dropColumns` structure, UUID type, unique constraint, nullable (no `notNull` flag).
+2. Read updated `backend/src/db/migrations.test.js` — new test case asserts both `up` and `down` paths via the pgm spy, matching expected call signatures.
+3. Ran `node --test src/db/migrations.test.js` in `backend/` — **9/9 pass**, including the new `api_key` test.
+4. Ran `npm run lint` — 0 errors (1 pre-existing warning in frontend, unrelated to T-001).
+5. Ran `npm run build` — clean build for both frontend and backend.
+6. Ran `npm test` — **107/107 pass** across all workspaces.
+7. Inspected `git diff` — exactly two files changed: migration file (new) and test file (extended). No unintended side-effects.
 
 ##### Findings
-- All `eg-*` and shared utility classes from the plan are present in `shared.css`. ✓
-- All `auth-*` classes (`.auth-layout`, `.auth-card`, `.auth-brand`, `.auth-logo`, `.auth-brand-title`, `.auth-brand-sub`, `.auth-form`, `.compact-form`) plus descendant rules (`.auth-card h1`, `.auth-card > p`) and the responsive `@media (max-width: 640px) .auth-card` block are present in `auth.module.css`. ✓
-- `index.css` correctly imports both new files and the additional `tokens.css`. ✓
-- No component TSX changes. ✓
-- `shared.test.ts` added with per-class existence assertions covering all planned shared and auth classes.
+- All automated checks green.
+- Migration schema matches plan exactly: `api_key` is `uuid`, `unique: true`, nullable (no `notNull: true`), no default value.
+- Down migration correctly drops only the `api_key` column.
 
 ##### Risks
-- `auth.module.css` is both globally imported in `index.css` (plain CSS) and will later be consumed as a CSS Module by TSX pages (T-004). Vite will inject the file twice in production builds — once as global CSS and once as a scoped module chunk. This is expected to be resolved during T-004 (removing the `@import` from `index.css` once all auth pages use the module). No action needed in T-001.
-- `tokens.css` is now imported before `shared.css` in `index.css`. If any later task adds a `tokens.css` with conflicting variable names, the load order is already established.
+- None. Migration is additive and fully reversible.
 
 #### Open Questions
 - None.
 
 #### Verdict
-`PASS_WITH_NOTES`
+`PASS`
 
 ---
 
@@ -55,51 +48,46 @@ No blockers or major findings.
 
 ### Review Round 1
 
-Status: **PASS_WITH_NOTES**
+Status: **PASS**
 
-Reviewed: 2026-05-12
+Reviewed: 2026-05-15
 
 #### Findings
 
-| # | Severity | File | Description | Required Fix |
-|---|----------|------|-------------|--------------|
-| 1 | minor | `frontend/src/components/AddItemSheet.tsx:62` | `AddItemSheet` still uses the legacy global class string `"bottom-sheet--browser-open"` via the `className` prop instead of the new `browserOpen={showIconBrowser}` boolean prop. This is T-003 scope (AddItemSheet migration is T-003), but it means the `browserOpen` prop is implemented yet not wired up. **Risk:** If T-005 runs before T-003 completes the AddItemSheet migration, the icon-browser layout will break because global class `.bottom-sheet--browser-open` will be removed from `index.css`. T-002 has no blocker here, but T-003 must migrate this before T-005 runs. | No (T-003 scope) |
-| 2 | nit | `frontend/src/components/ui/ui.test.tsx:85` | `browserOpen` class test asserts `className.split(" ").length >= 3` as a proxy for confirming the modifier class was applied. Passes in JSDOM since CSS Module hashes aren't resolved, but the assertion doesn't verify the actual modifier class identity. Acceptable pragmatism. | No |
+No blocking or major issues found.
 
-No blocker or major findings.
+- **nit** · `backend/src/routes/auth.js` lines 465–522  
+  Both new routes include a `!pool` guard consistent with the existing pattern. No issue — just noting the style is uniform.
+
+- **nit** · `backend/src/auth.test.js` — "regenerates an API key" test  
+  The test verifies that two successive POSTs produce different keys and the second key is returned correctly, but does not explicitly assert that the old key would be rejected by the middleware. This is acceptable: the query mock returns `{ api_key: params[0] }`, so the DB always holds the latest key, and the middleware's separate unit tests cover rejection of unknown keys. Combined coverage is sufficient.
 
 #### Verification
 
 ##### Steps
-- Read all 7 component TSX files and all 6 CSS module files (Icon has no module).
-- Verified all plan-specified module classes are present in each module file.
-- Verified CSS Module keyframes are locally scoped with prefixed names (`bottom-sheet-slide-up`, `bottom-sheet-fade-in`, `loading-shimmer`).
-- Verified `ui/index.ts` exports all 7 components from their sub-folder paths.
-- Grep'd for any remaining flat import paths (`ui/BottomSheet`, `ui/TopBar`, etc.) — none found.
-- Verified consuming feature components (`AddItemSheet`, `InfoSheet`, `ListOptionsSheet`, `NewListSheet`, `RenameListSheet`, `ShareListSheet`, page components) all import from the `./ui` or `../components/ui` barrel — paths unchanged and correct.
-- Ran `npm run lint` → 0 errors, 1 pre-existing warning.
-- Ran `npm run build` → clean, pre-existing chunk size warning only.
-- Ran `npm test` → 106/106 pass, 0 fail.
+1. Read `backend/src/routes/auth.js` — two new routes (`GET /api-key`, `POST /api-key`) at lines 465–522, both gated by `requireAuth`. SQL queries and response shapes match the plan exactly.
+2. Read `backend/src/middleware/auth.js` — `createRequireApiKey` exported at lines 30–67. Checks `x-api-key` header, queries `SELECT id FROM users WHERE api_key = $1 LIMIT 1`, sets `req.user = { sub: user.id }`, wraps DB error via `next(error)`. Matches plan spec exactly.
+3. Read `backend/src/auth.test.js` — 7 new tests added (4 route tests + 3 middleware unit tests). All required test scenarios from the plan covered.
+4. Read `README.md` diff — one-liner added documenting the new API-key endpoints. Documentation rule satisfied.
+5. Ran `node --test src/auth.test.js` in `backend/` — **27/27 pass** (22 auth routes + 2 requireAuth + 3 requireApiKey).
+6. Ran `npm run lint` — 0 errors (1 pre-existing React fast-refresh warning, unrelated).
+7. Ran `npm run build` — clean.
+8. Ran `npm test` — **114/114 pass** (107 baseline + 7 new tests).
+9. Inspected `git diff` — 4 files changed: `routes/auth.js`, `middleware/auth.js`, `auth.test.js`, `README.md`. No unintended side-effects.
 
 ##### Findings
-- **T-002 scope fully met**: all 7 UI primitives moved into sub-folders with co-located CSS Modules (where applicable); `browserOpen` prop added to `BottomSheet`; `ui/index.ts` updated.
-- **Plan class inventory verified**:
-  - `TopBar`: `topbar`, `topbar-copy`, `topbar-title`, `topbar-subtitle` ✓
-  - `FAB`: `fab` + `:hover` ✓
-  - `BottomSheet`: `bottom-sheet-backdrop`, `bottom-sheet`, `bottom-sheet--browser-open`, `bottom-sheet form`, `bottom-sheet-handle`, `bottom-sheet-title` ✓
-  - `EmptyState`: `empty-state`, `empty-state-title`, `empty-state-body`, `empty-state-action` ✓
-  - `ErrorState`: `error-state`, `error-state-title`, `error-state-body`, `error-state-action` ✓
-  - `LoadingState`: `loading-state`, `loading-state-row` + local `@keyframes loading-shimmer` ✓
-  - `Icon`: no module (no private styles) ✓
+- All plan acceptance criteria verified: `GET` returns `{ api_key: null | string }`, `POST` generates/replaces key, middleware accepts valid keys and rejects missing/invalid ones with 401.
+- `generateApiKey` is injectable, consistent with codebase patterns for testability.
+- Documentation updated in `README.md` per AGENTS.md documentation rule.
 
 ##### Risks
-- `AddItemSheet` passes `className="bottom-sheet--browser-open"` (global string) to `BottomSheet` — this relies on the global rule still existing in `index.css`. T-003 must switch this to `browserOpen={showIconBrowser}` before T-005 removes the global class.
+- None. Routes are additive; middleware is a new export with no changes to existing exports.
 
 #### Open Questions
 - None.
 
 #### Verdict
-`PASS_WITH_NOTES`
+`PASS`
 
 ---
 
@@ -107,48 +95,46 @@ No blocker or major findings.
 
 ### Review Round 1
 
-Status: **PASS_WITH_NOTES**
+Status: **PASS**
 
-Reviewed: 2026-05-12
+Reviewed: 2026-05-15
 
 #### Findings
 
-| # | Severity | File | Description | Required Fix |
-|---|----------|------|-------------|--------------|
-| 1 | minor | `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx:26-28` | Uses `"entry-section"`, `"entry-section-header"`, and `"detail-section-label"` as global class strings. Per the plan these are listed as private `ListDetailPage.module.css` classes (T-004 scope). Since `RecentlyUsedSection` also applies these classes to its own root, they are cross-component shared utilities — NOT page-private. **T-004 must NOT move these to `ListDetailPage.module.css`.** They must stay global or be added to `shared.css`. This is a T-004 guard, not a T-003 defect. | No (T-004 guard) |
-| 2 | minor | `frontend/src/components/ShareListSheet/ShareListSheet.tsx:66-67` | Uses `"detail-banner"` as a global class. `detail-banner` is also used in `ListDetailPage.tsx:574` and is planned as a `ListDetailPage` private module class (T-004). If T-004 privatizes it, `ShareListSheet` loses `margin-bottom: 12px` on its feedback area. T-004 must keep `detail-banner` in `shared.css` or as a global. | No (T-004 guard) |
-| 3 | nit | `frontend/src/components/ShareListSheet/ShareListSheet.module.css:6-17` | `.sharing-panel` and `.sharing-panel-form` are defined in the module but not referenced in `ShareListSheet.tsx`. Dead CSS Module classes — no functional impact. | No |
-| 4 | nit | `frontend/src/components/.gitkeep` | Orphaned `.gitkeep` placeholder file in the now-populated components root directory. Harmless. | No |
+No blocking or major issues found.
 
-No blocker or major findings. The T-002 risk (AddItemSheet using global `bottom-sheet--browser-open` string) is **resolved** — `AddItemSheet.tsx:181` correctly passes `browserOpen={showIconBrowser}` to `BottomSheet`. ✓
+- **minor** · `backend/src/v1.test.js` — toggle test only covers `open→done`; the `done→open` branch is not exercised. The implementation logic is trivially symmetrical (`!== "done" ? "done" : "open"`), so the behaviour is correct. Not a required fix but worth noting.
+
+- **nit** · `backend/src/routes/v1.js` line 107 — `!name?.trim()` correctly rejects both missing and whitespace-only names; `name.trim()` is also applied on INSERT. Bonus robustness beyond the plan's `{ name: string }` requirement.
+
+- **nit** · `backend/src/app.js` — `pool` is now explicitly extracted from `options` at the top of `createApp` and forwarded in `routerOptions`. Sensible refactor (single source of truth for the pool reference), no regressions.
+
+- **nit** · Plan mentioned a `toDbStatus` helper; it was correctly omitted since no endpoint accepts a HA-format status as input — toggle only reads and flips the DB value.
 
 #### Verification
 
 ##### Steps
-- Read all 13 feature component TSX files and all 11 CSS module files (OfflineBanner and ProtectedRoute have no module per plan).
-- Verified all plan-specified module classes are present in each module file.
-- Verified compound selector resolution in `AddItemSheet`: all 5 compound selectors (form, disclosure, icon-browser, icon-browser-inner, icon-browser-grid) replaced by state-driven `--browser-open` modifier classes applied directly in TSX. ✓
-- Verified `BottomSheet` receives `browserOpen={showIconBrowser}` — T-002 risk resolved. ✓
-- Checked `animation: spin` in `ShareListSheet.module.css` — global `@keyframes spin` is retained in `index.css` after T-005 per plan; reference is valid. ✓
-- Verified `add-item-form--browser-open > :not(.add-item-disclosure)` — CSS Modules scopes class names inside `:not()` correctly. ✓
-- Confirmed no old flat-path imports remain for any moved component. All page/App.tsx imports use sub-folder paths. ✓
-- Confirmed `eg-btn` class usage in `InfoSheet.tsx:42` is valid (added to `shared.css` in T-001). ✓
-- Ran `npm run lint` → 0 errors, 1 pre-existing warning.
-- Ran `npm run build` → clean, pre-existing chunk size warning only.
-- Ran `npm test` → 106/106 pass, 0 fail.
+1. Read `backend/src/routes/v1.js` — all 5 endpoints present; `ensureListAccess` used on every list-scoped route; status mapping (`toHaStatus`, `serializeItem`) matches plan; `createV1Router` signature accepts `{ pool, requireApiKey }` with pool-level fallback.
+2. Read `backend/src/v1.test.js` — 18 tests covering: 5× missing-key 401, 1× real-middleware unknown-key 401, 4× foreign-list 403, GET lists shape, GET items with HA status mapping, POST 400 no-name, POST 201 create with trim, toggle open→done + 404, DELETE 204 + 404.
+3. Read `backend/src/app.js` diff — `v1Routes` registered under `/api/v1`; `requireApiKey` created once from extracted `pool` and forwarded via `routerOptions`; no regressions to existing routes.
+4. Read `README.md` diff — one-liner documenting all 5 v1 endpoints and HA status values.
+5. Ran `node --test src/v1.test.js` in `backend/` — **18/18 pass**.
+6. Ran `npm run lint` — 0 errors (1 pre-existing frontend warning).
+7. Ran `npm run build` — clean.
+8. Ran `npm test` — **132/132 pass** (114 baseline + 18 new).
 
 ##### Findings
-- **T-003 scope fully met**: all 13 feature components in sub-folders; 11 have co-located CSS Modules; AddItemSheet compound selectors resolved; all consumer import paths updated.
-- `entry-tile-grid` stays as a global (layout wrapper in `ListDetailPage`) — correctly absent from `EntryTile.module.css`. ✓
+- All plan acceptance criteria met: 5 endpoints under `/api/v1/`, correct status mapping, 401/403/404 error handling.
+- `app.js` pool refactor is safe — extracted value is identical to what each router would have resolved from `getPool()`.
 
 ##### Risks
-- **T-004 implementation guard**: `entry-section`, `entry-section-header`, `detail-section-label`, and `detail-banner` are shared between `ListDetailPage.tsx` and feature components (`RecentlyUsedSection`, `ShareListSheet`). The plan erroneously lists these as `ListDetailPage` private module classes. T-004 **must** move them to `shared.css` (or leave them global) rather than privatizing them, or feature component rendering will break when T-005 cleans `index.css`.
+- None. Toggle done→open path is correct by inspection even without an explicit test.
 
 #### Open Questions
 - None.
 
 #### Verdict
-`PASS_WITH_NOTES`
+`PASS`
 
 ---
 
@@ -158,36 +144,35 @@ No blocker or major findings. The T-002 risk (AddItemSheet using global `bottom-
 
 Status: **PASS**
 
-Reviewed: 2026-05-12
+Reviewed: 2026-05-15
 
 #### Findings
 
-No findings. All scope items implemented correctly. T-003 guards honoured.
+No blocking or major issues found.
+
+- **nit** · `backend/src/routes/docs.js` lines 19–20 — `router.get('/', swaggerUi.setup(spec))` is registered before `router.use('/', swaggerUi.serve)`, reversing the order shown in the plan example. Functionally correct because `router.get('/')` matches only the root path and does not interfere with `router.use('/')` handling static asset sub-paths. Tests pass; no rework required.
+
+- **nit** · `backend/src/routes/docs.js` line 12 — `createDocsRouter()` accepts no parameters but is called as `docsRoutes(routerOptions)` in `app.js`. The extra argument is silently ignored. Harmless; consistent with the factory pattern of other routers.
 
 #### Verification
 
 ##### Steps
-- Read `App.tsx`, `App.module.css`, all 9 page TSX files, all 3 non-auth page CSS modules, `page-components.test.ts`, `ListDetailPage.test.tsx`.
-- Verified all 6 auth pages import `styles` from `"../../styles/auth.module.css"` and use `styles["auth-layout"]`, `styles["auth-card"]`, `styles["auth-form"]`. ✓
-- Verified `App.tsx` imports `styles from "./App.module.css"` and uses `styles["app-shell"]`. ✓
-- Verified `App.module.css` uses `:global(.stack)` for the `.stack` descendant selector. ✓
-- Verified T-003 guards: `entry-section`, `entry-section-header`, `detail-section-label`, `detail-banner` are **NOT** in `ListDetailPage.module.css` — they were instead added to `shared.css` (lines 264–313 of `shared.css`). ✓
-- Verified `ListDetailPage.module.css` contains only truly-private classes: `detail-content`, `detail-meta`, `detail-member-badges`, `entry-tile-grid`. ✓
-- Verified `OverviewPage.module.css` contains all plan-specified classes: `overview-topbar`, `overview-brand`, `overview-brand-title`, `overview-brand-sub`, `overview-actions`, `overview-logo`, `overview-content`, `overview-header`. ✓
-- Verified `SearchPage.module.css` contains `search-page`, `search-page-title`. ✓
-- Verified `page-components.test.ts` includes a dedicated assertion (`keeps cross-component detail and entry section classes shared`) that guards against future regressions of the T-003 finding. ✓
-- All page import paths in `App.tsx` updated to sub-folder form (`./pages/LoginPage/LoginPage` etc.). ✓
-- Ran `npm run lint` → 0 errors, 1 pre-existing warning.
-- Ran `npm run build` → clean, pre-existing chunk size warning only.
-- Ran `npm test` → 106/106 pass, 0 fail.
+1. Read `backend/src/openapi/v1.yaml` — OpenAPI 3.1.0 with correct `info`, `servers: [{ url: /api/v1 }]`, global `security: [{ ApiKeyAuth: [] }]`, `ApiKeyAuth` scheme (`apiKey`, `header`, `X-Api-Key`). All 5 endpoints documented with request bodies, response schemas, and correct 401/403/404 error responses. `Item.status` enum matches HA values (`needs_action`, `completed`). `Error` schema used for all error responses.
+2. Read `backend/src/routes/docs.js` — `GET /openapi.yaml` sets `Content-Type: application/yaml` and sends the file via `res.sendFile`; Swagger UI served via `swaggerUi.setup(spec)` + `swaggerUi.serve`. Both acceptance criteria served.
+3. Read `backend/src/docs.test.js` — 2 tests: `GET /api/docs` checks status 200, content-type `text/html`, body matches `/Swagger UI/i`; `GET /api/docs/openapi.yaml` checks status 200, content-type `application/yaml`, verifies all 4 path keys and 401/403/404 response codes present in YAML.
+4. Confirmed `backend/package.json` diff adds `js-yaml` and `swagger-ui-express` dependencies.
+5. Confirmed `app.js` registers `docsRoutes` at `/api/docs`.
+6. Confirmed `README.md` adds one-liner documenting Swagger UI and raw YAML endpoints.
+7. Ran `node --test src/docs.test.js` in `backend/` — **2/2 pass**.
+8. Ran `npm run lint` — 0 errors.
+9. Ran `npm test` — **134/134 pass** (132 baseline + 2 new).
 
 ##### Findings
-- **T-004 scope fully met**: all 9 pages moved to sub-folders; 3 non-auth pages have co-located CSS Modules; 6 auth pages use shared `auth.module.css`; `App.tsx` uses `App.module.css`; all import paths updated.
-- The `page-components.test.ts` cross-component guard test locks in the T-003 finding resolution — any regression would fail CI. Excellent defensive coverage.
-- `SearchPage` is not yet wired into the router in `App.tsx` — this is pre-existing behaviour (it was not in the router before T-004 either). Not a T-004 regression.
+- Both acceptance criteria met: `GET /api/docs` → 200 HTML with Swagger UI; `GET /api/docs/openapi.yaml` → 200 `application/yaml`.
+- Spec covers all 5 v1 endpoints with schemas and error responses; content is accurate relative to the implementation.
 
 ##### Risks
-- `auth.module.css` is still imported globally via `@import` in `index.css` AND as a CSS Module by auth pages. This causes the auth styles to be injected twice (once globally, once via the module). T-005 must remove the `@import "./styles/auth.module.css"` line from `index.css` to resolve this duplication.
+- None. The docs router is read-only and additive; no existing routes are affected.
 
 #### Open Questions
 - None.
@@ -203,32 +188,216 @@ No findings. All scope items implemented correctly. T-003 guards honoured.
 
 Status: **PASS**
 
-Reviewed: 2026-05-12
+Reviewed: 2026-05-15
 
 #### Findings
 
-No findings. All scope items implemented correctly. T-004 risk (auth.module.css double-injection) resolved.
+No blocking or major issues found. The implementation exceeds the plan's UX baseline in several good ways.
+
+- **nit** · `frontend/src/components/InfoSheet/InfoSheet.tsx` line 24 — `apiKeyLoaded` state is an addition beyond the plan's three state variables. It is a positive enhancement that gates the "Generate key" button and shows a loading placeholder until the fetch resolves. No issue.
+
+- **nit** · `InfoSheet.tsx` lines 35–56 — async fetch uses a `cancelled` flag for cleanup on unmount/re-open. This is correct and prevents set-state-after-unmount warnings. Not in the plan spec, good practice.
+
+- **nit** · `InfoSheet.tsx` line 114 — `aria-live="polite"` on the "Copied!" feedback. Accessibility bonus not required by the plan. No issue.
+
+- **nit** · Plan listed "Bestätigungs-Dialog oder direkt" for regeneration; implementation chose "direkt" (no confirmation dialog). This is within the plan's accepted range.
 
 #### Verification
 
 ##### Steps
-- Read `frontend/src/index.css` — confirmed 17 non-empty lines, no class selectors, `@import "./styles/auth.module.css"` removed (T-004 risk resolved), all 4 keyframes present (`shimmer`, `slideUp`, `fadeIn`, `spin`). ✓
-- Read `frontend/src/styles/index-cleanup.test.ts` — confirmed new regression-guard test covers ≤40 line limit, no-class-selector rule, import assertions, and keyframe presence assertions. ✓
-- Verified `index.css` only contains: `@import` lines, element/pseudo-class/ID selectors (`:root`, `*`, `html`, `body`, `button`, `input`, `#root`, `h1`, `p`, `@media`), and `@keyframes`. Zero class (`.`) selectors. ✓
-- Confirmed `@import "./styles/auth.module.css"` is absent — T-004 double-injection risk resolved. ✓
-- Confirmed `shared.css` cross-component classes (`entry-section`, `entry-section-header`, `detail-section-label`, `detail-banner`) retained — global keyframes (`shimmer`, `slideUp`, `fadeIn`, `spin`) remain in `index.css` for CSS Module consumers that reference them by name (e.g., `ShareListSheet.module.css animation: spin`). ✓
-- Ran `npm run lint` → 0 errors, 1 pre-existing warning (`AuthContext.tsx` Fast Refresh). ✓
-- Ran `npm run build` → clean build, pre-existing chunk size warning only. ✓
-- Ran `npm test` → 106/106 pass, 0 fail. ✓
-- Ran targeted acceptance tests (`styles/index-cleanup.test.ts styles/shared.test.ts components/AddItemSheet/AddItemSheet.test.tsx pages/ListDetailPage.test.tsx pages/page-components.test.ts app.test.tsx`) → 1 intermittent timeout (`AddItemSheet > supports edit mode with prefilled text and icon state`) under CPU contention. Pre-existing flakiness reported by implementer; does not reproduce in isolated `npm test` run (106/106 pass). Not a T-005 regression. ✓
+1. Read `frontend/src/api/auth.ts` — `fetchApiKey(token)` calls `GET /api/auth/api-key`; `regenerateApiKey(token)` calls `POST /api/auth/api-key`. Both typed correctly (`ApiKeyResult`, `{ api_key: string }`). ✅
+2. Read `frontend/src/components/InfoSheet/InfoSheet.tsx` — API-key section rendered between user-identity and language-switcher as planned. Three required state vars present plus `apiKeyLoaded` UX bonus. `fetchApiKey` called on open via `useEffect([open, token])`. Copy calls `navigator.clipboard.writeText`. Regenerate calls `regenerateApiKey`, updates `apiKey` state. Cancel flag prevents stale-closure updates.  ✅
+3. Read `InfoSheet.test.tsx` — 9 tests total (5 pre-existing + 4 new): fetch-on-open, show key + copy/regen buttons, empty state + generate button, clipboard write + "Copied!" feedback, regenerate updates displayed key. All 5 plan-required test scenarios covered. ✅
+4. Read DE/EN locale files — all 7 plan-specified i18n keys present in both locales with correct text values. ✅
+5. Read `InfoSheet.module.css` diff — new CSS classes for `.info-sheet-api-key`, `.info-sheet-api-key-header`, `.info-sheet-api-key-hint`, `.info-sheet-api-key-empty`, `.info-sheet-api-key-row`, `.info-sheet-api-key-value`, `.info-sheet-api-key-status`. Uses design tokens, monospace font for key display. ✅
+6. Ran `npm run test --workspace frontend` — **407/407 pass** (28 test files).
+7. Ran `npm run lint` — 0 errors (1 pre-existing frontend warning).
+8. Ran `npm test` (full suite) — **134/134 backend pass**, **407/407 frontend pass**.
+9. Confirmed README updated with API key management description (via HANDOFF evidence).
 
 ##### Findings
-- **T-005 scope fully met**: `index.css` trimmed from ~1648 lines to 17 lines; zero class selectors remain; all 4 global keyframes retained; both `@import` lines (`tokens.css`, `shared.css`) present; `auth.module.css` global import removed.
-- `index-cleanup.test.ts` regression guard correctly implemented — locks the ≤40 line boundary and no-class-selector invariant for future cycles.
-- `@keyframes spin` retained in `index.css` for `ShareListSheet.module.css` (`animation: spin`). Valid — global keyframes are accessible from CSS Module contexts. ✓
+- All plan acceptance criteria met: InfoSheet shows API-key section; key can be generated, displayed (monospace), and copied; regenerating updates the displayed key; all 7 i18n keys present in DE and EN.
+- Section placement (between user-identity and language-switcher) is correct.
+- UX is better than the plan minimum: loading state, proper effect cleanup, and copy feedback timeout.
 
 ##### Risks
-- No new risks. The flaky `AddItemSheet` test is pre-existing CPU-contention behaviour unrelated to this task.
+- None. Frontend-only change; no backend routes affected.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-15
+
+#### Findings
+
+No blocking or major issues found. All three plan fixes applied correctly.
+
+- **nit** · `frontend/src/components/InfoSheet/InfoSheet.tsx` — `info-sheet-api-key-action` class applied only to Regenerate and Generate buttons, not to the Copy button. Copy sits in a two-column grid row alongside the key value, so full-width would break the layout there. Correct omission.
+
+- **nit** · `frontend/src/styles/shared.test.ts` — The new regex spans the entire selector block with `/s` (dotAll). Robust enough; order of properties is hard-coded in the regex matching the implementation order. No issue.
+
+#### Verification
+
+##### Steps
+1. Read `frontend/src/styles/shared.css` diff — exactly `display: inline-flex; align-items: center; justify-content: center; gap: 8px;` added to the combined button-class block (`.button-primary, .eg-btn, .eg-btn-primary, .button-secondary, .eg-btn-secondary, .eg-btn-ghost, .eg-btn-danger`). Matches plan spec precisely. ✅
+2. Read `frontend/src/components/InfoSheet/InfoSheet.module.css` diff — four changes: (a) `.info-sheet-api-key` gap raised to `var(--space-3)` ✅; (b) `.info-sheet-api-key-hint` `margin-bottom: var(--space-1)` added ✅; (c) `.info-sheet-logout` redundant `display/align-items/justify-content/gap` removed ✅; (d) new `.info-sheet-api-key-action { width: 100% }` class ✅.
+3. Read `frontend/src/components/InfoSheet/InfoSheet.tsx` diff — Regenerate button: `plus` → `refreshCw` + `info-sheet-api-key-action` class added ✅; Generate button: `plus` → `key` + `info-sheet-api-key-action` class added ✅.
+4. Read `frontend/src/components/ui/Icon/Icon.tsx` diff — `key` (circle + 3 paths) and `refreshCw` (2 polylines + 2 paths) added to `iconPaths`. Standard Lucide icon paths. ✅
+5. Read `frontend/src/components/ui/ui.test.tsx` diff — new test verifies `key` and `refreshCw` render 2 SVGs with ≥6 path/polyline elements (no fallback circle). ✅
+6. Read `frontend/src/styles/shared.test.ts` diff — new test asserts all button classes include the `inline-flex` flex group via dotAll regex. ✅
+7. Ran `npm run test --workspace frontend` — **409/409 pass** (407 baseline + 2 new: 1 in shared.test, 1 in ui.test).
+8. Ran `npm run lint` — 0 errors (1 pre-existing frontend warning).
+9. Ran `npm run build` — clean.
+10. Ran `npm test` (full) — **134/134 backend pass**, **409/409 frontend pass**.
+
+##### Findings
+- All three plan fixes delivered: global button flex alignment, icon swap (plus→key, plus→refreshCw), CSS cleanup (gap, hint margin, redundant logout flex, full-width action buttons).
+- No behavioral changes: no new i18n keys, no API changes, no logic delta. ✅
+- Existing InfoSheet tests all pass without modification (icon names not asserted by name in those tests).
+
+##### Risks
+- None. CSS-only and icon-path changes; no logic affected.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
+## Task: T-007
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-15
+
+#### Findings
+
+No blocking or major issues found. Both fixes are correct; the implementation is slightly more defensive than the plan's one-liner.
+
+- **nit** · `backend/src/app.js` lines 78–84 — The plan specified a simple `app.get("/api/docs", (_req, res) => res.redirect(301, "/api/docs/"))`. The implementation adds an `if (req.path === "/api/docs") … else next()` guard. This is a sound defensive pattern: if Express's non-strict routing were to match `/api/docs/` with `app.get("/api/docs", ...)`, the guard prevents an infinite 301 redirect loop. The tests confirm the guard works correctly: `GET /api/docs` → 301, `GET /api/docs/` → 200.
+
+- **nit** · `backend/src/routes/docs.js` — Two-line swap (`router.use("/", swaggerUi.serve)` before `router.get("/", swaggerUi.setup(spec))`). Exactly matches plan Fix 2 and is proven correct by the new asset-serving test.
+
+#### Verification
+
+##### Steps
+1. Read `backend/src/app.js` diff — `app.get("/api/docs", ...)` redirect handler inserted immediately before `app.use("/api/docs", docsRoutes(...))`. Guard condition `req.path === "/api/docs"` correctly discriminates with-slash from without-slash requests and prevents infinite redirect. ✅
+2. Read `backend/src/routes/docs.js` diff — `router.use("/", swaggerUi.serve)` moved above `router.get("/", swaggerUi.setup(spec))` as specified by the plan. ✅
+3. Read `backend/src/docs.test.js` diff — test suite expanded from 2 → 4 tests: (a) `GET /api/docs` → 301, `Location: /api/docs/`; (b) `GET /api/docs/` → 200 HTML (replaces old `GET /api/docs` test); (c) `GET /api/docs/swagger-ui.css` + `GET /api/docs/swagger-ui-bundle.js` → 200 with correct content-types; (d) YAML test unchanged. ✅
+4. Read `README.md` diff — one-liner updated to document trailing-slash behavior and the redirect. ✅
+5. Ran `node --test src/docs.test.js` in `backend/` — **4/4 pass**. Server logs confirm: `GET /api/docs` → 301, `GET /api/docs/` → 200, CSS → 200, bundle JS → 200, YAML → 200. ✅
+6. Ran `npm run lint` — 0 errors (1 pre-existing frontend warning).
+7. Ran `npm test` (full suite) — **136/136 backend pass** (134 baseline + 2 new), **409/409 frontend pass** (unchanged).
+
+##### Findings
+- Both acceptance criteria met: `GET /api/docs` → 301 to `/api/docs/`; Swagger UI assets serve correctly under `/api/docs/`.
+- Middleware order fix (`serve` before `setup`) is confirmed working by the new asset test.
+- No regressions to any previously green test.
+
+##### Risks
+- None. Redirect is a server-side 301; browser bookmarks using `/api/docs` will be silently updated to `/api/docs/` by the browser.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+## Task: T-008
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-17
+
+#### Findings
+
+No blocking or major issues found. All changes are minimal, targeted, and correct.
+
+- **nit** · `backend/src/routes/v1.js` — `toHaStatus()` helper removed, `serializeItem()` simplified to `status: row.status`. Cleaner than the original; no dead code left behind.
+
+#### Verification
+
+##### Steps
+1. Read `backend/src/routes/v1.js` diff — `toHaStatus()` function removed entirely; `serializeItem()` now returns `status: row.status` (raw DB value). No other logic changed. ✅
+2. Read `backend/src/openapi/v1.yaml` diff — `Item.status` enum changed from `[needs_action, completed]` to `[open, done]`. Both Items schemas (response body and toggle response) updated. ✅
+3. Read `backend/src/v1.test.js` diff — All `needs_action` → `open` and `completed` → `done` assertion updates; test names updated to match. 18 tests cover all 5 endpoints, 401/403/404 error paths, and owner/member access. ✅
+4. Read `backend/src/docs.test.js` diff — YAML content test extended with `assert.match(..., /- open/)`, `assert.match(..., /- done/)`, `assert.doesNotMatch(..., /needs_action/)`, `assert.doesNotMatch(..., /completed/)`. ✅
+5. Read `backend/src/openapi/v1.yaml` — Confirmed no remaining `needs_action` or `completed` references anywhere in the file. ✅
+6. Read `README.md` and `ROADMAP.md` diffs — Documentation updated to reflect raw `open`/`done` status values instead of HA status mapping. ✅
+7. Ran `node --test src/v1.test.js src/docs.test.js` in `backend/` — **22/22 pass** (18 v1 + 4 docs). ✅
+8. Ran `npm run lint` — 0 errors (1 pre-existing frontend fast-refresh warning). ✅
+9. Ran `npm run build` — clean, no new warnings. ✅
+10. Ran `npm test` (full suite) — **136/136 backend pass**, **409/409 frontend pass** (1 pre-existing flaky timing test passed on re-run; unrelated to T-008). ✅
+
+##### Findings
+- All acceptance criteria met: v1 item responses return `open`/`done`; OpenAPI spec enum updated; no HA mapping references remain; all tests green.
+- No regressions to any previously green test.
+
+##### Risks
+- Breaking change for any existing consumer expecting `needs_action`/`completed` — intentional and documented. No compatibility shim needed (no external consumers existed at the time of change).
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+## Task: T-009
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-17
+
+#### Findings
+
+No blocking or major issues found. Implementation is clean and minimal.
+
+- **nit** · `backend/src/routes/v1.js` — `isValidUuid()` guards precede the `!pool` null-check in each route. Functionally correct (early exit avoids DB work) and a reasonable ordering; the plan does not specify guard ordering relative to the pool check.
+
+- **nit** · `backend/src/v1.test.js` — Existing non-UUID path parameters (`list-1`, `item-1`, `list-foreign`, etc.) replaced with proper UUID constants (`LIST_ID`, `ITEM_ID`, etc.). This is a welcome clean-up: prior tests were technically testing behaviour with invalid IDs — now all baseline tests use correctly-formatted UUIDs, which better reflects real usage. No test coverage was lost.
+
+#### Verification
+
+##### Steps
+1. Read `backend/src/routes/v1.js` diff — `UUID_RE` regex (`/^[0-9a-f]{8}-...$/i`) and `isValidUuid()` helper match the plan exactly. Guards inserted before any DB access in all four parameterised routes: `GET /lists/:listId/items`, `POST /lists/:listId/items`, `POST /lists/:listId/items/:itemId/toggle`, `DELETE /lists/:listId/items/:itemId`. ✅
+2. Read `backend/src/v1.test.js` diff — Six named UUID constants defined at top; four new tests cover the plan's exact scenarios: `{listId}` on GET/POST list-items → 404, `{itemId}` on toggle → 404, `not-a-uuid` on delete → 404. `createUnexpectedQueryPool()` helper ensures no DB query fires for invalid params. ✅
+3. Read `backend/src/openapi/v1.yaml` diff — `ListId`/`ItemId` parameters updated with `format: uuid` and description "UUID"; `GET /lists/{listId}/items` and `POST /lists/{listId}/items` now include `404` response reference; `NotFound` description updated to "The requested list or item was not found." ✅
+4. Read `backend/src/docs.test.js` diff — YAML content test gains `assert.match(response.text, /format: uuid/)`. ✅
+5. Read `README.md` diff — One-liner updated to note path IDs must be UUIDs and invalid IDs return 404. ✅
+6. Read `ROADMAP.md` diff — Added `Path-IDs: listId und itemId müssen UUIDs sein; ungültige Werte liefern 404.` under constraints. ✅
+7. Ran `node --test src/v1.test.js src/docs.test.js` in `backend/` — **26/26 pass** (22 v1 + 4 docs; up from 22 pre-T-009). ✅
+8. Ran `npm run lint` — 0 errors (1 pre-existing frontend fast-refresh warning). ✅
+9. Ran `npm run build` — clean. ✅
+10. Ran `npm test` (full backend suite) — **140/140 pass** (up from 136; 4 new v1 tests). ✅
+11. Ran `npm run test --workspace frontend` — **409/409 pass**, 28/28 test files. ✅
+
+##### Findings
+- All acceptance criteria met: invalid `listId`/`itemId` (literal `{listId}`, `not-a-uuid`, etc.) → 404 with descriptive JSON; no PostgreSQL UUID parse error; all tests green.
+- OpenAPI spec correctly documents UUID format constraint and the new 404 response on list-item endpoints.
+- `createUnexpectedQueryPool()` helper proves no DB round-trip occurs for invalid IDs.
+- No regressions.
+
+##### Risks
+- None. Guards short-circuit before any DB access; they cannot interfere with existing valid-UUID paths.
 
 #### Open Questions
 - None.

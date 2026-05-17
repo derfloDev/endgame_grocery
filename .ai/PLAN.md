@@ -2,138 +2,495 @@
 
 Status: **ready**
 
-Goal: CSS-Refactoring — migrate `frontend/src/index.css` from one monolithic file to per-component CSS Modules, while retaining a shared design-system stylesheet for cross-component utility classes.
+Goal: Home Assistant Integration – API-Key-Verwaltung, externe REST-API v1, OpenAPI-Dokumentation mit Swagger UI.
 
 ## Scope
 
-All `.tsx` files under `frontend/src/` and the global stylesheet `frontend/src/index.css`.
+- **T-001** DB-Migration: `api_key`-Spalte in `users`
+- **T-002** Backend: API-Key-Management-Endpoints + `X-Api-Key`-Middleware
+- **T-003** Backend: Externe REST-API v1 (5 Endpunkte)
+- **T-004** Backend: OpenAPI 3.1-Spec + Swagger UI
+- **T-005** Frontend: API-Key-Verwaltung im InfoSheet
 
 ## Acceptance Criteria
 
-- Every component with private styles has a co-located `ComponentName.module.css`.
-- `index.css` retains only: `:root`, `*`, `html`, `body`, `button/input` resets, `h1/p` base, `#root`, and `@keyframes` declarations.
-- All component-specific global class strings are replaced by CSS Module references (`styles.foo`).
-- `eg-*` and other shared utility classes remain as global strings but live in `styles/shared.css`.
-- `npm run build` passes with zero errors.
-- `npm run lint` passes with zero warnings.
-- `npm test` passes.
-
-## Architecture Decision
-
-**Option A confirmed:** `eg-*` and shared utility classes stay as global class strings, sourced from `styles/shared.css` (globally imported via `index.css`). Only component-private classes become CSS Module locals.
-
-## Folder Convention
-
-`ComponentName/ComponentName.tsx` + `ComponentName/ComponentName.module.css`  
-Original filename is preserved (not renamed to `index.tsx`) for readable stack traces.
-
-Import paths update automatically — see task-level details below.
+- User kann API-Key im InfoSheet erzeugen, einsehen und kopieren.
+- `POST /api/auth/api-key` erzeugt/erneuert einen Key (JWT-Auth); `GET /api/auth/api-key` liefert den aktuellen Key.
+- Alle 5 v1-Endpunkte funktionieren mit gültigem `X-Api-Key`-Header.
+- Ungültiger/fehlender Key → 401; Zugriff auf fremde Liste → 403.
+- Swagger UI unter `GET /api/docs` erreichbar; Raw-Spec unter `GET /api/docs/openapi.yaml`.
+- `npm run lint`, `npm run build`, `npm test` sind grün.
 
 ---
 
-## CSS class inventory
+## T-001 – DB-Migration: api_key-Spalte
 
-### Stays in `index.css` (resets + animations only after T-005)
+### Ziel
+Neue Spalte `api_key` (UUID, nullable, unique) in `users`.
 
-`:root` (color-scheme + font), `*`, `html`, `body`, `button, input`, `button` (letter-spacing), `h1`, `p`, `#root`, `@keyframes shimmer/slideUp/fadeIn/spin`, `@media (max-width: 640px) h1`.
+### Dateien
+- **Neu**: `backend/src/db/migrations/<timestamp>_add_api_key_to_users.cjs`
+  - `pgm.addColumns("users", { api_key: { type: "uuid", unique: true } })`
+  - `down`: `pgm.dropColumns("users", ["api_key"])`
+- **Aktualisiert**: `backend/src/db/migrations.test.js`
+  - Smoke-Test: Migration läuft ohne Fehler durch.
 
-### Moves to `styles/shared.css` (design system — used across 2+ components)
-
-| Class(es) | Consumed by |
-|-----------|-------------|
-| `.eg-btn-primary`, `.eg-btn-secondary`, `.eg-btn-ghost`, `.eg-btn-danger`, `.destructive-button`, `.button-primary`, `.button-secondary` | All pages + sheets |
-| `.eg-icon-btn` | TopBar, ListCardHome, OverviewPage |
-| `.eg-field`, `.field`, `.eg-input`, `.eg-input-wrap`, `.eg-input-anchor`, `.field input`, `.stack input` (focus + base) | AddItemSheet, LoginPage, RenameListSheet, ShareListSheet, … |
-| `.button-row` | Auth pages, AddItemSheet, ListCardHome |
-| `.eg-card`, `.eg-card-overlay` | ListCardHome |
-| `.eg-chip-purple`, `.eg-chip-cyan`, `.eg-chip-success`, `.eg-chip-queued`, `.eg-chip-member-initial`, `.pill`, `.shared-pill` | EntryTile, ListCardHome, ListDetailPage |
-| `.eg-orbitron`, `.eg-mono`, `.eg-gradient-text` | TopBar, OverviewPage, auth pages |
-| `.eg-link`, `.muted-link`, `.muted-text` | Auth pages |
-| `.eg-error-banner`, `.error-banner`, `.eg-offline-banner`, `.eg-success-banner` | OfflineBanner, LoginPage, ShareListSheet |
-| `.stack`, `.tight-stack`, `.list-grid` | Multiple pages |
-| `.list-card`, `.list-card-chips` | ListCardHome + ListDetailPage share `.list-card-chips` |
-| `.entry-card`, `.entry-card-done`, `.entry-toggle`, `.entry-copy`, `.entry-text`, `.entry-text-done` | May be legacy; keep in shared to avoid breakage |
-| `.member-card`, `.member-name` | ShareListSheet / ListDetailPage |
-| `.card-title`, `.detail-title`, `.link-button` | Legacy utilities |
-| `.visually-hidden` | AddItemSheet, ListCardHome |
-| `.icon-picker-sheet`, `.icon-picker-search`, `.icon-picker-grid`, `.icon-picker-btn` | Dead code — keep in shared for safety |
-| `@media (max-width: 640px)` > `.member-card`, `.auth-card` responsive rules | Shared + auth module |
-
-### Moves to `styles/auth.module.css` (shared by all 6 auth pages)
-
-`.auth-layout`, `.auth-card`, `.auth-card h1`, `.auth-card > p`, `.auth-brand`, `.auth-logo`, `.auth-brand-title`, `.auth-brand-sub`, `.auth-form`, `.compact-form`  
-`@media (max-width: 640px)` > `.auth-card`
-
-### Component CSS Modules (private styles only)
-
-| Component | Module classes |
-|-----------|----------------|
-| `ui/TopBar` | `topbar`, `topbar-copy`, `topbar-title`, `topbar-subtitle` |
-| `ui/FAB` | `fab` (incl. `:hover`) |
-| `ui/BottomSheet` | `bottom-sheet-backdrop`, `bottom-sheet`, `bottom-sheet--browser-open`, `bottom-sheet form`, `bottom-sheet-handle`, `bottom-sheet-title` |
-| `ui/EmptyState` | `empty-state`, `empty-state-title`, `empty-state-body`, `empty-state-action` |
-| `ui/ErrorState` | `error-state`, `error-state-title`, `error-state-body`, `error-state-action` |
-| `ui/LoadingState` | `loading-state`, `loading-state-row` (references `@keyframes shimmer` via `:global` or re-declares animation name) |
-| `components/AddItemSheet` | `add-item-form`, `add-item-disclosure`, `add-item-disclosure--open`, `add-item-preview`, `add-item-preview-loading`, `add-item-preview-svg`, `add-item-preview-spinner`, `add-item-icon-picker`, `add-item-icon-picker-btn`, `add-item-icon-picker-btn--selected`, `add-item-more-btn`, `add-item-actions`, `add-item-icon-browser`, `add-item-icon-browser-inner`, `add-item-icon-browser--open`, `add-item-icon-browser-grid`, `add-item-icon-browser-btn`, `add-item-icon-browser-btn--selected`, `icon-picker-btn-label`; **compound selectors resolved** (see note below) |
-| `components/AutocompleteSuggestions` | `autocomplete-suggestions`, `autocomplete-chip` |
-| `components/EntryTile` | `entry-tile` (incl. modifiers + `:hover/:focus-visible`), `entry-tile-icon`, `entry-tile-text`, `entry-tile-details`, `entry-tile-chip` |
-| `components/InfoSheet` | `info-sheet-section`, `info-sheet-logout`, `info-sheet-meta`, `info-sheet-user-name`, `info-sheet-user-email`, `info-sheet-language`, `info-sheet-label`, `info-sheet-value`, `info-sheet-link`, `info-sheet-donate` |
-| `components/LanguageSwitcher` | `language-switcher`, `language-switcher-button`, `language-switcher-button-active` |
-| `components/ListCardHome` | `list-card-home` (incl. `:hover`), `list-card-row`, `list-card-info`, `list-card-name`, `list-card-menu`, `list-card-menu-btn`, `list-card-menu-actions` |
-| `components/ListOptionsSheet` | `list-options-sheet`, `list-option-row` (incl. `:hover` + sibling), `list-option-icon`, `list-option-icon-edit`, `list-option-icon-share`, `list-option-text`, `list-option-label`, `list-option-desc` |
-| `components/NewListSheet` | `new-list-form` — **not in index.css**, create new: `display: grid; gap: 16px;` |
-| `components/RecentlyUsedSection` | `recently-used-section`, `recently-used-grid`, `recently-used-cell`, `recently-used-chip` (incl. `:hover/:focus-visible`), `recently-used-chip-icon`, `recently-used-chip-text`, `recently-used-chip-dismiss` (incl. `:hover/:focus-visible`) |
-| `components/RenameListSheet` | `rename-list-form` |
-| `components/ShareListSheet` | `share-list-form`, `sharing-panel`, `sharing-panel-form`, `member-row` (incl. `:first-of-type`), `member-row-copy`, `member-row-name`, `member-row-email`, `member-row-actions`, `member-row-revoke`, `share-list-sheet-feedback`, `share-invite-spinner`, `share-list-label`, `share-sheet-members-label` |
-| `pages/OverviewPage` | `overview-topbar`, `overview-brand`, `overview-brand-title`, `overview-brand-sub`, `overview-actions`, `overview-logo`, `overview-content`, `overview-header` |
-| `pages/ListDetailPage` | `detail-content`, `detail-meta`, `detail-member-badges`, `detail-banner`, `detail-section-label` (incl. modifiers), `entry-section`, `entry-section-header`, `entry-section-collapse`, `entry-tile-grid`; sibling combinator `.entry-section + .entry-section` and `.entry-section-collapse .eg-chip-success` (using `:global`) |
-| `pages/SearchPage` | `search-page`, `search-page-title` |
-| `App.tsx` | `app-shell`, `app-shell > .stack` (using `:global(.stack)`), `app-shell > [aria-label="Search page"]` |
-
-**Components with no private styles** (folder moved, no CSS module needed):  
-`ui/Icon`, `components/OfflineBanner`, `components/ProtectedRoute`
+### Hinweise
+- Timestamp: aktuell (z. B. `1747350000000`).
+- Kein Default-Wert – `null` bis der User explizit einen Key anfordert.
 
 ---
 
-## Compound selector resolution (AddItemSheet)
+## T-002 – Backend: API-Key-Endpoints + Middleware
 
-`index.css` contains 6 selectors of the form `.bottom-sheet--browser-open .add-item-*`.  
-These apply layout overrides to AddItemSheet's children when the icon browser is open.
+### Ziel
+Management-Endpoints für JWT-Auth-User und neues `createRequireApiKey`-Middleware für externe API.
 
-**Resolution:** since `AddItemSheet` already tracks `showIconBrowser` in state, replace each compound selector with a direct modifier class applied by the component itself:
+### Neue Backend-Endpoints in `backend/src/routes/auth.js`
 
-```tsx
-// Before
-className={`add-item-form`}
-// After
-className={[styles.addItemForm, showIconBrowser && styles.addItemFormBrowserOpen].filter(Boolean).join(' ')}
+| Method | Path | Auth | Beschreibung |
+|--------|------|------|-------------|
+| `GET`  | `/api/auth/api-key` | JWT Bearer | Gibt `{ api_key: string \| null }` zurück |
+| `POST` | `/api/auth/api-key` | JWT Bearer | Erzeugt/erneuert Key → `{ api_key: string }` |
+
+**POST-Logik:**
+```
+api_key = crypto.randomUUID()
+UPDATE users SET api_key = $1 WHERE id = $2
+RETURNING api_key
 ```
 
-Add `addItemFormBrowserOpen`, `addItemDisclosureBrowserOpen`, `addItemIconBrowserBrowserOpen`, `addItemIconBrowserInnerBrowserOpen`, `addItemIconBrowserGridBrowserOpen` classes to the module. The `BottomSheet`'s `className` prop no longer needs `bottom-sheet--browser-open`; that class can be removed from BottomSheet or kept as-is (it's a no-op once AddItemSheet stops relying on it).
+### Neues Middleware in `backend/src/middleware/auth.js`
 
-The `bottom-sheet--browser-open` class itself lives in `BottomSheet.module.css` for the `flex + overflow: hidden` layout override on the sheet container.  
-In `AddItemSheet.tsx`, set `sheetClassName = showIconBrowser ? styles.browserOpen : ""` and import the sheet's module — **but** since `BottomSheet` is a separate component, the cleanest approach is to add a `browserOpen?: boolean` prop to `BottomSheet` and let it apply the modifier class internally. This avoids leaking module hashes across component boundaries.
+```js
+export function createRequireApiKey({ pool }) {
+  return async function requireApiKey(req, res, next) {
+    const key = req.headers['x-api-key'];
+    if (!key) { res.status(401).json({ error: 'API key is required.' }); return; }
+    const result = await pool.query(
+      'SELECT id FROM users WHERE api_key = $1 LIMIT 1', [key]
+    );
+    if (!result.rows[0]) { res.status(401).json({ error: 'Invalid API key.' }); return; }
+    req.user = { sub: result.rows[0].id };
+    next();
+  };
+}
+```
+
+### Dateien
+- **Aktualisiert**: `backend/src/routes/auth.js` – zwei neue Routes
+- **Aktualisiert**: `backend/src/middleware/auth.js` – `createRequireApiKey` exportieren
+- **Aktualisiert**: `backend/src/auth.test.js` – Tests für beide neuen Routes + Middleware-Tests
+
+### Tests (Pflicht)
+- `GET /api/auth/api-key` → 200 mit `{ api_key: null }` wenn noch kein Key
+- `GET /api/auth/api-key` → 200 mit `{ api_key: "..." }` wenn Key vorhanden
+- `POST /api/auth/api-key` → 200, Key im Response, Key in DB gesetzt
+- `POST /api/auth/api-key` (zweites Mal) → 200, neuer Key, alter Key ungültig
+- Middleware: fehlender Header → 401; unbekannter Key → 401; gültiger Key → `req.user.sub` gesetzt
 
 ---
 
-## Implementation Phases
+## T-003 – Backend: Externe REST-API v1
 
-### Phase 1 — T-001: Shared stylesheet foundation
-Create `styles/shared.css` and `styles/auth.module.css`. Update `index.css` imports. No component TSX changes.
+### Ziel
+Fünf Home-Assistant-taugliche Endpunkte unter `/api/v1/`, gesichert via `X-Api-Key`.
 
-### Phase 2 — T-002: UI primitive CSS Modules
-TopBar, FAB, BottomSheet (+ `browserOpen` prop), EmptyState, ErrorState, LoadingState, Icon. Update `ui/index.ts`.
+### Datei-Struktur
+- **Neu**: `backend/src/routes/v1.js` – alle 5 Endpunkte
+- **Aktualisiert**: `backend/src/app.js` – `import v1Routes from './routes/v1.js'` + `app.use('/api/v1', v1Routes(routerOptions))`
+- **Neu**: `backend/src/v1.test.js` – Tests für alle Endpunkte
 
-### Phase 3 — T-003: Feature component CSS Modules
-AddItemSheet, AutocompleteSuggestions, EntryTile, InfoSheet, LanguageSwitcher, ListCardHome, ListOptionsSheet, NewListSheet, OfflineBanner, ProtectedRoute, RecentlyUsedSection, RenameListSheet, ShareListSheet.
+### Endpunkte
 
-### Phase 4 — T-004: Page CSS Modules
-LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage, InviteAcceptPage (all import `styles/auth.module.css`), OverviewPage, ListDetailPage, SearchPage, App.tsx.
+#### 1. `GET /api/v1/lists`
+- Auth: `requireApiKey`
+- Query: gleiche SQL wie `GET /api/lists` (owner + member)
+- Response: `{ lists: [{ id, name }] }`
 
-### Phase 5 — T-005: Global stylesheet cleanup
-Remove all extracted classes from `index.css`; leave only resets and `@keyframes`. Run full validation.
+#### 2. `GET /api/v1/lists/:listId/items`
+- Auth: `requireApiKey`
+- Security: `ensureListAccess(pool, listId, userId)` → 403 wenn kein Zugriff
+- Query: alle Entries der Liste
+- Response: `{ items: [{ id, name, status }] }` (status: `needs_action` | `completed`)
+
+#### 3. `POST /api/v1/lists/:listId/items`
+- Auth: `requireApiKey`
+- Body: `{ name: string }` (Pflichtfeld)
+- Security: `ensureListAccess` → 403
+- INSERT Entry mit `status = 'open'`
+- Response 201: `{ item: { id, name, status: 'needs_action' } }`
+
+#### 4. `POST /api/v1/lists/:listId/items/:itemId/toggle`
+- Auth: `requireApiKey`
+- Security: `ensureListAccess` → 403
+- Liest aktuellen Status; flippt: `open` → `done`, `done` → `open`
+- UPDATE Entry, RETURNING
+- Response: `{ item: { id, name, status } }` (HA-gemapped)
+
+#### 5. `DELETE /api/v1/lists/:listId/items/:itemId`
+- Auth: `requireApiKey`
+- Security: `ensureListAccess` → 403
+- DELETE Entry; 404 wenn nicht gefunden
+- Response 204: kein Body
+
+### Status-Mapping (intern → HA)
+```js
+function toHaStatus(dbStatus) {
+  return dbStatus === 'done' ? 'completed' : 'needs_action';
+}
+function toDbStatus(haStatus) {
+  return haStatus === 'completed' ? 'done' : 'open';
+}
+function serializeItem(row) {
+  return { id: row.id, name: row.text, status: toHaStatus(row.status) };
+}
+```
+
+### `createV1Router` Signatur
+```js
+export function createV1Router({ pool, requireApiKey } = {}) { ... }
+```
+Im `app.js` wird `requireApiKey` via `createRequireApiKey({ pool })` erzeugt.
+
+### Tests (Pflicht – alle mit Mock-Pool)
+- Jeder Endpoint: fehlender Key → 401, fremde Liste → 403
+- GET /api/v1/lists → korrekte Listenstruktur
+- GET /api/v1/lists/:id/items → Status-Mapping korrekt
+- POST create → 400 wenn kein `name`; 201 mit korrektem Item
+- POST toggle → Status wird gekippt
+- DELETE → 204; 404 wenn Item nicht gefunden
 
 ---
+
+## T-004 – Backend: OpenAPI 3.1 Spec + Swagger UI
+
+### Ziel
+Vollständige API-Dokumentation, serviert als Swagger UI unter `/api/docs`.
+
+### Abhängigkeiten
+```bash
+# im backend/-Verzeichnis:
+npm install swagger-ui-express js-yaml
+```
+
+### Dateien
+- **Neu**: `backend/src/openapi/v1.yaml` – OpenAPI 3.1-Spec
+- **Neu**: `backend/src/routes/docs.js` – Router für `/api/docs`
+- **Aktualisiert**: `backend/src/app.js` – `app.use('/api/docs', docsRoutes(routerOptions))`
+- **Aktualisiert**: `backend/package.json` – neue Dependencies
+
+### OpenAPI-Spec Inhalt (`v1.yaml`)
+- `openapi: 3.1.0`
+- `info.title: Endgame Grocery API`, `version: 1.0.0`
+- `servers: [{ url: /api/v1 }]`
+- `components.securitySchemes.ApiKeyAuth: { type: apiKey, in: header, name: X-Api-Key }`
+- `security: [{ ApiKeyAuth: [] }]` (global)
+- Alle 5 Paths dokumentiert inkl. Request Body, Response-Schemas, 401/403/404-Fehlerresponses
+
+### `docs.js` Router
+```js
+import swaggerUi from 'swagger-ui-express';
+import { readFileSync } from 'node:fs';
+import { load } from 'js-yaml';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const spec = load(readFileSync(path.join(__dirname, '../openapi/v1.yaml'), 'utf8'));
+
+export function createDocsRouter() {
+  const router = Router();
+  router.get('/openapi.yaml', (_req, res) => {
+    res.setHeader('Content-Type', 'application/yaml');
+    res.sendFile(path.join(__dirname, '../openapi/v1.yaml'));
+  });
+  router.use('/', swaggerUi.serve);
+  router.get('/', swaggerUi.setup(spec));
+  return router;
+}
+```
+
+### Tests
+- `GET /api/docs` → 200, HTML mit Swagger UI
+- `GET /api/docs/openapi.yaml` → 200, Content-Type `application/yaml`
+
+---
+
+## T-005 – Frontend: API-Key-Verwaltung im InfoSheet
+
+### Ziel
+User kann im InfoSheet ("Info & Einstellungen") einen API-Key erzeugen, einsehen und kopieren.
+
+### Neue API-Funktionen in `frontend/src/api/auth.ts`
+```ts
+export function fetchApiKey(token: string): Promise<{ api_key: string | null }> {
+  return sendJsonRequest('/api/auth/api-key', { token }) as Promise<...>;
+}
+
+export function regenerateApiKey(token: string): Promise<{ api_key: string }> {
+  return sendJsonRequest('/api/auth/api-key', { token, method: 'POST' }) as Promise<...>;
+}
+```
+
+### InfoSheet-Erweiterung (`frontend/src/components/InfoSheet/InfoSheet.tsx`)
+
+Neuer Abschnitt zwischen User-Identität und Sprach-Switcher:
+
+```
+[ API-Key-Label ]
+[ xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx ] [ Kopieren ]
+[ Neu generieren ]
+```
+
+**State:**
+- `apiKey: string | null` – initialisiert per `GET /api/auth/api-key` beim Öffnen des Sheets
+- `copySuccess: boolean` – kurze Bestätigung nach Kopieren
+- `regenerating: boolean` – Loading-State während POST
+
+**Verhalten:**
+- Sheet öffnet → `fetchApiKey(token)` wird aufgerufen
+- Kein Key vorhanden → Hinweistext + „Key generieren"-Button (löst `POST` aus)
+- Key vorhanden → Key anzeigen (masked oder plain) + „Kopieren" + „Neu generieren"
+- Kopieren: `navigator.clipboard.writeText(apiKey)` → kurzes "Kopiert!"-Feedback
+- Neu generieren: Bestätigungs-Dialog oder direkt → `POST /api/auth/api-key`
+
+### i18n-Keys (beide Locales)
+
+| Key | DE | EN |
+|-----|----|----|
+| `settings.apiKey` | `API-Schlüssel` | `API Key` |
+| `settings.apiKeyNone` | `Noch kein API-Schlüssel vorhanden.` | `No API key generated yet.` |
+| `settings.apiKeyGenerate` | `Schlüssel generieren` | `Generate key` |
+| `settings.apiKeyCopy` | `Kopieren` | `Copy` |
+| `settings.apiKeyCopied` | `Kopiert!` | `Copied!` |
+| `settings.apiKeyRegenerate` | `Neu generieren` | `Regenerate` |
+| `settings.apiKeyHint` | `Verwende diesen Schlüssel für die Home Assistant Integration.` | `Use this key for the Home Assistant integration.` |
+
+### Dateien
+- **Aktualisiert**: `frontend/src/api/auth.ts`
+- **Aktualisiert**: `frontend/src/components/InfoSheet/InfoSheet.tsx`
+- **Aktualisiert**: `frontend/src/components/InfoSheet/InfoSheet.module.css` (ggf. neues Styling)
+- **Aktualisiert**: `frontend/src/locales/de/translation.json`
+- **Aktualisiert**: `frontend/src/locales/en/translation.json`
+- **Aktualisiert**: `frontend/src/components/InfoSheet/InfoSheet.test.tsx`
+
+### Tests (Pflicht)
+- Sheet öffnet → `fetchApiKey` wird aufgerufen
+- Key vorhanden → Key-Text und Kopieren-Button sichtbar
+- Kein Key → „Noch kein API-Schlüssel"-Text und Generate-Button sichtbar
+- Kopieren-Button → `navigator.clipboard.writeText` aufgerufen
+- Neu-generieren → `regenerateApiKey` aufgerufen, neuer Key angezeigt
+
+---
+
+---
+
+## T-006 – Frontend: InfoSheet API-Key-Sektion – Styling-Fix
+
+### Problem
+1. **Icon/Text-Alignment**: Buttons mit `<Icon>` + Text (Generate, Regenerate) nutzen `eg-btn-secondary` / `eg-btn-ghost`, die kein `display: inline-flex; align-items: center; gap` haben. Das `+`-Icon und der Label-Text sind dadurch nicht vertikal ausgerichtet.
+2. **Falsches Icon**: Der „Neu generieren"-Button verwendet `<Icon name="plus">` – semantisch falsch (Plus = neu anlegen, nicht aktualisieren/ersetzen).
+3. **Unaufgeräumtes Layout**: Abstand, Hierarchie und Konsistenz der API-Key-Sektion wirken unfertig.
+
+### Fix-Strategie
+
+#### 1. Globale Button-Basis-Fix in `shared.css`
+Alle Button-Klassen erhalten `display: inline-flex; align-items: center; gap: 8px;`:
+```css
+.button-primary,
+.eg-btn,
+.eg-btn-primary,
+.button-secondary,
+.eg-btn-secondary,
+.eg-btn-ghost,
+.eg-btn-danger {
+  /* bestehende Regeln … */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+```
+Das behebt das Alignment-Problem überall, auch beim Logout-Button (die `info-sheet-logout`-Klasse kann dann `display/align-items/gap` entfernen, da redundant).
+
+#### 2. Icon-Tausch in `InfoSheet.tsx`
+- „Schlüssel generieren"-Button: `<Icon name="plus">` → `<Icon name="key">` (oder weglassen – ein Generate-Button braucht kein Icon)
+- „Neu generieren"-Button: `<Icon name="plus">` → passendes Refresh-Icon (z. B. `<Icon name="refreshCw">` o. Ä., je nach vorhandenen Icons)
+
+> **Vor der Implementierung**: Den `Icon`-Katalog prüfen (`frontend/src/components/ui/Icon` o. Ä.), welche Icon-Namen verfügbar sind, und das am besten passende „Refresh"-Icon wählen.
+
+#### 3. CSS-Aufräumen in `InfoSheet.module.css`
+- `.info-sheet-api-key` – Gap zwischen den Elementen auf `var(--space-3)` erhöhen für mehr Luft
+- `.info-sheet-api-key-hint` – konsistente Bottom-Margin ergänzen (`margin-bottom: var(--space-1)`)
+- `.info-sheet-logout` – redundante Flex-Regeln entfernen (nach globalem Fix in shared.css)
+- Die beiden Buttons (Generate / Regenerate) mit `width: 100%` versehen, damit sie die volle Breite einnehmen und konsistent mit dem Logout-Button wirken
+
+### Dateien
+- **Aktualisiert**: `frontend/src/styles/shared.css` – `display: inline-flex; align-items: center; justify-content: center; gap: 8px` in die Button-Basis-Gruppe
+- **Aktualisiert**: `frontend/src/components/InfoSheet/InfoSheet.tsx` – Icon-Namen korrigieren; Buttons auf `width: 100%` setzen (ggf. via CSS-Klasse)
+- **Aktualisiert**: `frontend/src/components/InfoSheet/InfoSheet.module.css` – Gap, Hint-Margin, redundante Logout-Flex-Styles entfernen
+- **Aktualisiert**: `frontend/src/components/InfoSheet/InfoSheet.test.tsx` – ggf. neue Icon-Namen in Snapshot-Tests anpassen (falls vorhanden)
+
+### Keine verhaltensändernden Anpassungen
+Nur visuelle/CSS-Korrekturen. Keine neuen i18n-Keys, keine API-Änderungen, kein Logik-Delta.
+
+### Tests
+- Bestehende Tests müssen weiterhin grün sein (`npm test`, `npm run lint`, `npm run build`).
+- Falls Icon-Namen in Tests referenziert werden, anpassen.
+
+---
+
+---
+
+## T-007 – Backend: Swagger UI – Trailing-Slash-Redirect + Middleware-Reihenfolge
+
+### Ursache
+`swagger-ui-express` generiert HTML mit relativen Asset-Pfaden (`./swagger-ui-bundle.js`, `./swagger-ui.css`). Wenn der Browser `/api/docs` (ohne abschließenden `/`) aufruft, löst er diese relativen Pfade relativ zum **Elternverzeichnis** `/api/` auf – nicht zu `/api/docs/`. Ergebnis: Der Browser sucht die Assets unter `/api/swagger-ui.css` statt `/api/docs/swagger-ui.css`.
+
+Zusätzlich ist die Middleware-Reihenfolge in `docs.js` falsch: `swaggerUi.setup` steht vor `swaggerUi.serve`, obwohl `serve` zuerst kommen muss, damit statische Assets korrekt ausgeliefert werden.
+
+### Fix 1 – Redirect in `app.js`
+
+Vor dem `app.use('/api/docs', ...)` eine explizite `app.get`-Route einfügen, die ohne Trailing Slash auf die Version mit Slash weiterleitet:
+
+```js
+// in createApp(), vor dem docs-Router:
+app.get("/api/docs", (_req, res) => res.redirect(301, "/api/docs/"));
+app.use("/api/docs", docsRoutes(routerOptions));
+```
+
+### Fix 2 – Middleware-Reihenfolge in `docs.js`
+
+`swaggerUi.serve` muss **vor** `swaggerUi.setup` registriert sein:
+
+```js
+// Vorher (falsch):
+router.get("/", swaggerUi.setup(spec));
+router.use("/", swaggerUi.serve);
+
+// Nachher (korrekt):
+router.use("/", swaggerUi.serve);
+router.get("/", swaggerUi.setup(spec));
+```
+
+### Dateien
+- **Aktualisiert**: `backend/src/app.js` – `app.get('/api/docs', redirect)` vor `app.use('/api/docs', ...)`
+- **Aktualisiert**: `backend/src/routes/docs.js` – `swaggerUi.serve` vor `swaggerUi.setup`
+- **Aktualisiert**: `backend/src/docs.test.js` – Test dass `GET /api/docs` → 301 auf `/api/docs/`
+
+### Tests
+- `GET /api/docs` → 301, `Location: /api/docs/`
+- `GET /api/docs/` → 200, Content-Type `text/html`
+- `GET /api/docs/openapi.yaml` → 200, Content-Type `application/yaml`
+- Bestehende Tests bleiben grün
+
+---
+
+---
+
+## T-008 – Backend: v1 API – HA-Statusmapping entfernen
+
+### Änderung
+Das ursprüngliche HA-Statusmapping (`open` → `needs_action`, `done` → `completed`) wird entfernt. Die v1 API gibt den DB-Statuswert direkt zurück: `open` oder `done`.
+
+### Dateien
+
+#### `backend/src/routes/v1.js`
+- Funktion `toHaStatus()` **entfernen**
+- Funktion `serializeItem()` vereinfachen – `status` direkt aus dem DB-Row übernehmen:
+  ```js
+  // Vorher:
+  function toHaStatus(dbStatus) {
+    return dbStatus === "done" ? "completed" : "needs_action";
+  }
+  function serializeItem(row) {
+    return { id: row.id, name: row.text, status: toHaStatus(row.status) };
+  }
+
+  // Nachher:
+  function serializeItem(row) {
+    return { id: row.id, name: row.text, status: row.status };
+  }
+  ```
+
+#### `backend/src/v1.test.js`
+- Alle Assertions, die `needs_action` oder `completed` erwarten, auf `open` bzw. `done` ändern.
+
+#### `backend/src/openapi/v1.yaml`
+- Überall wo der Item-Status als Enum definiert ist, von `[needs_action, completed]` auf `[open, done]` ändern.
+- Beschreibungstexte entsprechend anpassen.
+
+#### `ROADMAP.md`
+- Zeile `Entry-Status-Mapping: DB open ↔ HA needs_action; DB done ↔ HA completed` entfernen oder auf „Status wird unverändert zurückgegeben: `open` | `done`" aktualisieren.
+
+### Keine sonstigen Änderungen
+Toggle-Logik in `v1.js` (`open` ↔ `done`) bleibt unverändert – sie arbeitet bereits mit DB-Werten. Frontend und andere Backend-Routen sind nicht betroffen.
+
+---
+
+---
+
+## T-009 – Backend: v1 API – UUID-Validierung für Pfadparameter
+
+### Ursache
+Wenn ein Pfadparameter keine gültige UUID ist (z. B. Swagger-UI-Platzhalter `{listId}` oder freie Texteingabe), leitet der aktuelle Code die Zeichenkette direkt an PostgreSQL weiter. PostgreSQL wirft dann einen Fehler `invalid input syntax for type uuid`, Express fängt ihn nicht spezifisch ab, und die globale Fehlerbehandlung antwortet mit 500.
+
+### Fix
+
+#### Hilfsfunktion in `backend/src/routes/v1.js`
+```js
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUuid(id) {
+  return typeof id === "string" && UUID_RE.test(id);
+}
+```
+
+#### Validierung in allen Routen mit `:listId` oder `:itemId`
+Vor dem ersten DB-Zugriff (d. h. vor `ensureListAccess` oder der Query) prüfen:
+```js
+if (!isValidUuid(req.params.listId)) {
+  res.status(404).json({ error: "List not found." });
+  return;
+}
+// bei itemId analog:
+if (!isValidUuid(req.params.itemId)) {
+  res.status(404).json({ error: "Item not found." });
+  return;
+}
+```
+
+Betroffen sind alle vier Routen mit Pfadparametern:
+- `GET /api/v1/lists/:listId/items`
+- `POST /api/v1/lists/:listId/items`
+- `POST /api/v1/lists/:listId/items/:itemId/toggle`
+- `DELETE /api/v1/lists/:listId/items/:itemId`
+
+### Dateien
+- **Aktualisiert**: `backend/src/routes/v1.js` – `isValidUuid`-Hilfsfunktion + Guards in 4 Routen
+- **Aktualisiert**: `backend/src/v1.test.js` – neue Tests: `listId = '{listId}'` → 404; `itemId = 'not-a-uuid'` → 404
+
+### Tests (Pflicht)
+- `GET /lists/{listId}/items` mit Literal `{listId}` → 404
+- `POST /lists/{listId}/items` mit Literal `{listId}` → 404
+- `POST /lists/valid-uuid/items/{itemId}/toggle` mit Literal `{itemId}` → 404
+- `DELETE /lists/valid-uuid/items/not-a-uuid` → 404
+- Bestehende Tests bleiben grün
+
+---
+
+## Implementierungsreihenfolge
+
+```
+T-001 → T-002 → T-003 → T-004 → T-005 → T-006
+                                           ↓
+                                   T-007 (Bugfix T-004)
+                                   T-008 (Rework T-003)
+                                   T-009 (Bugfix T-003)
+```
+
+T-001 bis T-004 sind Backend-Aufgaben; T-005 und T-006 sind Frontend. T-006 (Styling-Fix) setzt T-005 voraus. Jede Aufgabe kann in einem einzigen Commit landen.
 
 ## Validation
 

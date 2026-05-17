@@ -19,6 +19,9 @@ const listInvitesMigrationPath = path.resolve(
 const pushTablesMigrationPath = path.resolve(
   "src/db/migrations/1713920400000_add_push_tables.cjs"
 );
+const apiKeyMigrationPath = path.resolve(
+  "src/db/migrations/1778803200000_add_api_key_to_users.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -489,5 +492,29 @@ describe("database migrations", () => {
       ["dropTable", "pending_push_jobs", { ifExists: true, cascade: true }],
       ["dropTable", "push_subscriptions", { ifExists: true, cascade: true }]
     ]);
+  });
+
+  it("adds and removes the api_key column on users", async () => {
+    const migration = await import(pathToFileURL(apiKeyMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "addColumns",
+        "users",
+        {
+          api_key: {
+            type: "uuid",
+            unique: true
+          }
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [["dropColumns", "users", ["api_key"]]]);
   });
 });

@@ -27,4 +27,43 @@ export function createRequireAuthFn({ jwtLib = jwt, config = getConfig() } = {})
   };
 }
 
+export function createRequireApiKey({ pool } = {}) {
+  return async function requireApiKey(req, res, next) {
+    const apiKey = req.headers["x-api-key"];
+
+    if (!apiKey) {
+      res.status(401).json({ error: "API key is required." });
+      return;
+    }
+
+    if (!pool) {
+      next(new Error("Database connection is not configured."));
+      return;
+    }
+
+    try {
+      const result = await pool.query(
+        `
+          SELECT id
+          FROM users
+          WHERE api_key = $1
+          LIMIT 1
+        `,
+        [apiKey]
+      );
+      const user = result.rows[0];
+
+      if (!user) {
+        res.status(401).json({ error: "Invalid API key." });
+        return;
+      }
+
+      req.user = { sub: user.id };
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
 export const requireAuth = createRequireAuth();

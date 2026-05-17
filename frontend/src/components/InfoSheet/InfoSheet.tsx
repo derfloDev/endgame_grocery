@@ -1,6 +1,8 @@
 /* global __APP_VERSION__ */
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ReactElement } from "react";
+import { fetchApiKey, regenerateApiKey } from "../../api/auth";
 import { useAuth } from "../../context/AuthContext";
 import LanguageSwitcher from "../LanguageSwitcher/LanguageSwitcher";
 import { BottomSheet, Icon } from "../ui";
@@ -17,13 +19,84 @@ function getAppVersion(): string {
 
 export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactElement {
   const { t } = useTranslation();
-  const { logout, user } = useAuth();
+  const { logout, token, user } = useAuth();
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [apiKeyLoaded, setApiKeyLoaded] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const appVersion = getAppVersion();
   const showUserIdentity = Boolean(user?.display_name || user?.email);
+
+  useEffect(() => {
+    if (!open || !token) {
+      return;
+    }
+
+    let cancelled = false;
+
+    setApiKeyLoaded(false);
+    setCopySuccess(false);
+    fetchApiKey(token)
+      .then((result) => {
+        if (!cancelled) {
+          setApiKey(result.api_key);
+          setApiKeyLoaded(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setApiKey(null);
+          setApiKeyLoaded(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, token]);
+
+  useEffect(() => {
+    if (!copySuccess) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setCopySuccess(false);
+    }, 1800);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [copySuccess]);
 
   function handleLogout() {
     onClose();
     logout();
+  }
+
+  async function handleCopyApiKey() {
+    if (!apiKey) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(apiKey);
+    setCopySuccess(true);
+  }
+
+  async function handleRegenerateApiKey() {
+    if (!token) {
+      return;
+    }
+
+    setRegenerating(true);
+    setCopySuccess(false);
+    try {
+      const result = await regenerateApiKey(token);
+      setApiKey(result.api_key);
+      setApiKeyLoaded(true);
+    } finally {
+      setRegenerating(false);
+    }
   }
 
   return (
@@ -34,6 +107,51 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
           {user?.email ? <div className={styles["info-sheet-user-email"]}>{user.email}</div> : null}
         </div>
       ) : null}
+      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-api-key"]}`}>
+        <div className={styles["info-sheet-api-key-header"]}>
+          <span className={styles["info-sheet-label"]}>{t("settings.apiKey")}</span>
+          {copySuccess ? (
+            <span className={styles["info-sheet-api-key-status"]} aria-live="polite">
+              {t("settings.apiKeyCopied")}
+            </span>
+          ) : null}
+        </div>
+        <p className={styles["info-sheet-api-key-hint"]}>{t("settings.apiKeyHint")}</p>
+        {apiKey ? (
+          <>
+            <div className={styles["info-sheet-api-key-row"]}>
+              <code className={styles["info-sheet-api-key-value"]}>{apiKey}</code>
+              <button className="eg-btn-secondary" type="button" onClick={handleCopyApiKey}>
+                {t("settings.apiKeyCopy")}
+              </button>
+            </div>
+            <button
+              className={`eg-btn-ghost ${styles["info-sheet-api-key-action"]}`}
+              type="button"
+              disabled={regenerating}
+              onClick={handleRegenerateApiKey}
+            >
+              <Icon name="refreshCw" size={16} color="currentColor" />
+              {t("settings.apiKeyRegenerate")}
+            </button>
+          </>
+        ) : (
+          <>
+            <p className={styles["info-sheet-api-key-empty"]}>
+              {apiKeyLoaded ? t("settings.apiKeyNone") : t("common.loading")}
+            </p>
+            <button
+              className={`eg-btn-secondary ${styles["info-sheet-api-key-action"]}`}
+              type="button"
+              disabled={!apiKeyLoaded || regenerating}
+              onClick={handleRegenerateApiKey}
+            >
+              <Icon name="key" size={16} color="currentColor" />
+              {t("settings.apiKeyGenerate")}
+            </button>
+          </>
+        )}
+      </div>
       <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-language"]}`}>
         <span className={styles["info-sheet-label"]}>{t("settings.language")}</span>
         <LanguageSwitcher />

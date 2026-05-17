@@ -72,6 +72,18 @@ describe("shared Endgame UI components", () => {
     expect(screen.queryByText("Add Item")).toBeNull();
   });
 
+  it("renders key and refresh icons without falling back to the unknown icon circle", () => {
+    const { container } = render(
+      <>
+        <Icon name="key" />
+        <Icon name="refreshCw" />
+      </>
+    );
+
+    expect(container.querySelectorAll("svg").length).toBe(2);
+    expect(container.querySelectorAll("path, polyline").length).toBeGreaterThanOrEqual(6);
+  });
+
   it("applies custom and browser-open classes to the bottom sheet container", () => {
     render(
       <BottomSheet browserOpen className="custom-sheet" open title="Add Item" onClose={() => {}}>

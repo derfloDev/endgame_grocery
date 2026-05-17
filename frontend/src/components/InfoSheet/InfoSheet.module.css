@@ -4,10 +4,6 @@
 
 .info-sheet-logout {
   width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
 }
 
 .info-sheet-meta {
@@ -34,6 +30,60 @@
 .info-sheet-language {
   display: grid;
   gap: var(--space-2);
+}
+
+.info-sheet-api-key {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.info-sheet-api-key-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.info-sheet-api-key-hint,
+.info-sheet-api-key-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.info-sheet-api-key-hint {
+  margin-bottom: var(--space-1);
+}
+
+.info-sheet-api-key-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.info-sheet-api-key-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.7rem 0.75rem;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.info-sheet-api-key-status {
+  color: var(--neon-cyan);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.info-sheet-api-key-action {
+  width: 100%;
 }
 
 .info-sheet-label {

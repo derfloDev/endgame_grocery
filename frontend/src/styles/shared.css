@@ -46,6 +46,10 @@
 .eg-btn-secondary,
 .eg-btn-ghost,
 .eg-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border-radius: 999px;
   padding: 0.85rem 1.2rem;
   font: inherit;

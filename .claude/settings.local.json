@@ -32,7 +32,9 @@
       "Bash(grep -v 'Icon$')",
       "Read(//mnt/c/develop/**)",
       "Read(//c/Users/flori/**)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('devDependencies',{}\\), indent=2\\)\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('devDependencies',{}\\), indent=2\\)\\)\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('settings', {}\\), indent=2, ensure_ascii=False\\)\\)\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(k\\) for k in d.keys\\(\\)]\")"
     ]
   }
 }
