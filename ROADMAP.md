@@ -22,6 +22,7 @@ Constraints:
 - Scope: Listen, die der User besitzt **oder** bei denen er Mitglied ist.
 - Entry-Status: v1 responses return raw DB values, `open` or `done`.
 - Path-IDs: `listId` und `itemId` müssen UUIDs sein; ungültige Werte liefern 404.
+- Item-Mutationen über v1 senden SSE-Events (`entry:created`, `entry:updated`, `entry:deleted`) an Listen-Subscriber.
 - Toggle-Endpunkt: kein Body erforderlich, Status wird automatisch umgeschaltet.
 
 Endpunkte:
@@ -47,6 +48,7 @@ Objective: Die v1-API ist vollständig dokumentiert und über den Backend-Server
 
 - API-Key kann im Frontend erzeugt, angezeigt und kopiert werden.
 - Alle 6 v1-Endpunkte funktionieren mit gültigem API-Key.
+- Mutationen über die v1-API aktualisieren geöffnete Web-Clients via SSE ohne manuellen Reload.
 - Ungültiger/fehlender Key → 401.
 - Zugriff auf fremde Liste → 403.
 - Swagger UI ist unter `/api/docs` erreichbar und zeigt alle Endpunkte.

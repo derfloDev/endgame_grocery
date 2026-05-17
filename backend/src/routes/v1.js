@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
+import { logger as defaultLogger } from "../logger.js";
 import { createRequireApiKey } from "../middleware/auth.js";
+import { sseManager as defaultSseManager } from "../sseManager.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -34,7 +36,22 @@ function serializeItem(row) {
   };
 }
 
-export function createV1Router({ pool = getPool(), requireApiKey } = {}) {
+function broadcastListEvent({ sseManager, logger, pool, listId, eventType, data }) {
+  try {
+    void Promise.resolve(sseManager.broadcastToList(pool, listId, eventType, data)).catch((broadcastError) => {
+      logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+    });
+  } catch (broadcastError) {
+    logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+  }
+}
+
+export function createV1Router({
+  pool = getPool(),
+  requireApiKey,
+  logger = defaultLogger,
+  sseManager = defaultSseManager
+} = {}) {
   const router = Router();
   const requireApiKeyMiddleware = requireApiKey ?? createRequireApiKey({ pool });
 
@@ -143,6 +160,18 @@ export function createV1Router({ pool = getPool(), requireApiKey } = {}) {
         [req.params.listId, name.trim()]
       );
 
+      broadcastListEvent({
+        sseManager,
+        logger,
+        pool,
+        listId: req.params.listId,
+        eventType: "entry:created",
+        data: {
+          listId: req.params.listId,
+          entryId: result.rows[0].id
+        }
+      });
+
       res.status(201).json({
         item: serializeItem(result.rows[0])
       });
@@ -202,6 +231,18 @@ export function createV1Router({ pool = getPool(), requireApiKey } = {}) {
         [nextStatus, req.params.itemId, req.params.listId]
       );
 
+      broadcastListEvent({
+        sseManager,
+        logger,
+        pool,
+        listId: req.params.listId,
+        eventType: "entry:updated",
+        data: {
+          listId: req.params.listId,
+          entryId: req.params.itemId
+        }
+      });
+
       res.json({
         item: serializeItem(updateResult.rows[0])
       });
@@ -256,6 +297,18 @@ export function createV1Router({ pool = getPool(), requireApiKey } = {}) {
         return;
       }
 
+      broadcastListEvent({
+        sseManager,
+        logger,
+        pool,
+        listId: req.params.listId,
+        eventType: "entry:updated",
+        data: {
+          listId: req.params.listId,
+          entryId: req.params.itemId
+        }
+      });
+
       res.json({
         item: serializeItem(result.rows[0])
       });
@@ -301,6 +354,18 @@ export function createV1Router({ pool = getPool(), requireApiKey } = {}) {
         res.status(404).json({ error: "Item not found." });
         return;
       }
+
+      broadcastListEvent({
+        sseManager,
+        logger,
+        pool,
+        listId: req.params.listId,
+        eventType: "entry:deleted",
+        data: {
+          listId: req.params.listId,
+          entryId: req.params.itemId
+        }
+      });
 
       res.status(204).send();
     } catch (error) {

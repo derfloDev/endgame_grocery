@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
 
@@ -10,9 +11,11 @@ const ITEM_ID = "44444444-4444-4444-8444-444444444444";
 const SECOND_ITEM_ID = "55555555-5555-4555-8555-555555555555";
 const MISSING_ITEM_ID = "66666666-6666-4666-8666-666666666666";
 
-function createV1App(pool) {
+function createV1App(pool, options = {}) {
   return createApp({
     pool,
+    logger: options.logger,
+    sseManager: options.sseManager ?? createSseManagerSpy(),
     requireApiKey(req, res, next) {
       if (!req.headers["x-api-key"]) {
         res.status(401).json({ error: "API key is required." });
@@ -188,6 +191,7 @@ describe("external v1 API routes", () => {
   });
 
   it("creates an open item and returns the raw entry status", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -205,7 +209,7 @@ describe("external v1 API routes", () => {
       }
     };
 
-    const response = await request(createV1App(pool))
+    const response = await request(createV1App(pool, { sseManager }))
       .post(`/api/v1/lists/${LIST_ID}/items`)
       .set("X-Api-Key", "valid-api-key")
       .send({ name: " Milk " });
@@ -215,6 +219,39 @@ describe("external v1 API routes", () => {
       item: { id: ITEM_ID, name: "Milk", status: "open" }
     });
     assert.equal(callCount, 2);
+    assert.deepEqual(sseManager.calls, [
+      [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID }]
+    ]);
+  });
+
+  it("keeps create responses successful when the SSE broadcast fails", async () => {
+    const { logger, getEntries } = createLogCapture();
+    const sseManager = createRejectingSseManager();
+    let callCount = 0;
+    const pool = {
+      async query() {
+        callCount += 1;
+        return callCount === 1
+          ? { rows: [{ id: LIST_ID }] }
+          : { rows: [{ id: ITEM_ID, text: "Milk", status: "open" }] };
+      }
+    };
+
+    const response = await request(createV1App(pool, { logger, sseManager }))
+      .post(`/api/v1/lists/${LIST_ID}/items`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: "Milk" });
+
+    await waitForAsyncHandlers();
+    assert.equal(response.status, 201);
+    assert.deepEqual(response.body, {
+      item: { id: ITEM_ID, name: "Milk", status: "open" }
+    });
+    assert.equal(callCount, 2);
+    assert.deepEqual(sseManager.calls, [
+      [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID }]
+    ]);
+    assert.ok(getEntries().some((entry) => entry.msg === "Failed to broadcast SSE event"));
   });
 
   it("returns 404 for an invalid list ID when creating an item", async () => {
@@ -230,6 +267,7 @@ describe("external v1 API routes", () => {
   });
 
   it("toggles an open item to done", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -251,7 +289,7 @@ describe("external v1 API routes", () => {
       }
     };
 
-    const response = await request(createV1App(pool))
+    const response = await request(createV1App(pool, { sseManager }))
       .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
       .set("X-Api-Key", "valid-api-key");
 
@@ -260,6 +298,9 @@ describe("external v1 API routes", () => {
       item: { id: ITEM_ID, name: "Milk", status: "done" }
     });
     assert.equal(callCount, 3);
+    assert.deepEqual(sseManager.calls, [
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+    ]);
   });
 
   it("returns 404 for an invalid item ID when toggling an item", async () => {
@@ -365,6 +406,7 @@ describe("external v1 API routes", () => {
   });
 
   it("renames an existing item and returns the updated item", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -382,7 +424,7 @@ describe("external v1 API routes", () => {
       }
     };
 
-    const response = await request(createV1App(pool))
+    const response = await request(createV1App(pool, { sseManager }))
       .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
       .set("X-Api-Key", "valid-api-key")
       .send({ name: " Oat milk " });
@@ -392,9 +434,13 @@ describe("external v1 API routes", () => {
       item: { id: ITEM_ID, name: "Oat milk", status: "open" }
     });
     assert.equal(callCount, 2);
+    assert.deepEqual(sseManager.calls, [
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+    ]);
   });
 
   it("deletes an existing item", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -410,13 +456,16 @@ describe("external v1 API routes", () => {
       }
     };
 
-    const response = await request(createV1App(pool))
+    const response = await request(createV1App(pool, { sseManager }))
       .delete(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 204);
     assert.equal(response.text, "");
     assert.equal(callCount, 2);
+    assert.deepEqual(sseManager.calls, [
+      [LIST_ID, "entry:deleted", { listId: LIST_ID, entryId: ITEM_ID }]
+    ]);
   });
 
   it("returns 404 for an invalid item ID when deleting an item", async () => {
@@ -452,6 +501,48 @@ function createUnexpectedQueryPool() {
   return {
     async query() {
       throw new Error("database query should not run for invalid path parameters");
+    }
+  };
+}
+
+function createSseManagerSpy() {
+  return {
+    calls: [],
+    broadcastToList(pool, listId, eventType, data) {
+      void pool;
+      this.calls.push([listId, eventType, data]);
+      return Promise.resolve();
+    }
+  };
+}
+
+function createRejectingSseManager() {
+  return {
+    calls: [],
+    broadcastToList(pool, listId, eventType, data) {
+      void pool;
+      this.calls.push([listId, eventType, data]);
+      return Promise.reject(new Error("broadcast failed"));
+    }
+  };
+}
+
+async function waitForAsyncHandlers() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function createLogCapture() {
+  const lines = [];
+  const logger = pino({ level: "trace", base: null }, {
+    write(chunk) {
+      lines.push(chunk.trim());
+    }
+  });
+
+  return {
+    logger,
+    getEntries() {
+      return lines.filter(Boolean).map((line) => JSON.parse(line));
     }
   };
 }
