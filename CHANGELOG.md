@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/derfloDev/endgame_grocery/compare/v0.16.0...v0.17.0) (2026-05-17)
+
+
+### Features
+
+* **api:** add v1 item rename endpoint ([4e26975](https://github.com/derfloDev/endgame_grocery/commit/4e269759b1a8e08d00ac5131d9daebcb97fb9938))
+
 ## [0.16.0](https://github.com/derfloDev/endgame_grocery/compare/v0.15.0...v0.16.0) (2026-05-17)
 
 
