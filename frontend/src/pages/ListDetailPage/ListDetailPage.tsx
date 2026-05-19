@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { createTemporaryId } from "../../api/client";
+import { AuthExpiredError, createTemporaryId } from "../../api/client";
 import { createEntry, fetchEntries, updateEntry } from "../../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../../api/history";
 import { writeCachedResource } from "../../api/offlineStore";
@@ -76,7 +76,7 @@ export default function ListDetailPage(): ReactElement {
   const [members, setMembers] = useState<DetailMember[]>([]);
   const [recentlyUsed, setRecentlyUsed] = useState<Suggestion[]>([]);
   const [shareEmail, setShareEmail] = useState<string>("");
-  const [entryError, setEntryError] = useState<string>("");
+  const [entryError, setEntryError] = useState<unknown>(null);
   const [shareError, setShareError] = useState<string>("");
   const [shareNotice, setShareNotice] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -122,7 +122,7 @@ export default function ListDetailPage(): ReactElement {
         return nextEntries;
       } catch (loadError) {
         if (isMountedRef.current) {
-          setEntryError(getErrorMessage(loadError));
+          setEntryError(loadError);
         }
 
         if (throwOnError) {
@@ -161,7 +161,7 @@ export default function ListDetailPage(): ReactElement {
         return nextMembers;
       } catch (loadError) {
         if (isMountedRef.current) {
-          setEntryError(getErrorMessage(loadError));
+          setEntryError(loadError);
         }
 
         if (throwOnError) {
@@ -180,7 +180,7 @@ export default function ListDetailPage(): ReactElement {
 
   useEffect(() => {
     async function loadListDetail(): Promise<void> {
-      setEntryError("");
+      setEntryError(null);
       setShareError("");
       setShareNotice("");
       setIsLoading(true);
@@ -228,7 +228,7 @@ export default function ListDetailPage(): ReactElement {
         }
       } catch (loadError) {
         if (isMountedRef.current) {
-          setEntryError(getErrorMessage(loadError));
+          setEntryError(loadError);
           setList(null);
           setEntries([]);
           setMembers([]);
@@ -518,6 +518,7 @@ export default function ListDetailPage(): ReactElement {
   const openEntries = entries.filter((entry) => entry.status === "open");
   const visibleRecentlyUsed = filterRecentlyUsedItems(recentlyUsed, openEntries);
   const visibleMemberBadges = list?.is_owner ? members.filter((member) => !member.is_owner) : [];
+  const shouldSuppressEntryError = entryError instanceof AuthExpiredError;
 
   return (
     <div>
@@ -572,7 +573,9 @@ export default function ListDetailPage(): ReactElement {
           </div>
         ) : null}
 
-        {entryError ? <div className="detail-banner eg-error-banner">{entryError}</div> : null}
+        {entryError && !shouldSuppressEntryError ? (
+          <div className="detail-banner eg-error-banner">{getErrorMessage(entryError)}</div>
+        ) : null}
         {isLoading ? <LoadingState rows={4} /> : null}
 
         {!isLoading ? (

@@ -1,55 +1,21 @@
 # ROADMAP
 
-Goal: Home Assistant Integration – externe REST-API mit API-Key-Authentifizierung und OpenAPI-Dokumentation (Swagger UI).
+Goal: When the user's session token expires, they are automatically redirected to the login page instead of seeing a generic error message.
 
-## Priority 1 – API-Key-Verwaltung
+## Priority 1
 
-Objective: Jeder User kann in „Info & Einstellungen" einen eindeutigen API-Key erzeugen und einsehen.
+Objective: Automatic session-timeout redirect to login page.
 
-- Ein API-Key pro User (UUID, generiert via `crypto.randomUUID`).
-- Bestehender Key wird bei Regenerierung sofort ungültig.
-- Key wird in der DB gespeichert (neue Spalte `api_key` in `users`).
-- Frontend zeigt den Key im InfoSheet mit „Kopieren"- und „Neu generieren"-Button.
-- Backend: `POST /api/auth/api-key` – erzeugt oder erneuert den API-Key des eingeloggten Users (JWT-Auth).
-- Backend: `GET /api/auth/api-key` – gibt den aktuellen API-Key des eingeloggten Users zurück (JWT-Auth).
+### Acceptance Criteria
+- When any API request returns HTTP 401 (expired/invalid token), the app clears the local session and navigates the user to `/login` immediately.
+- The login page shows a short hint: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an." when redirected due to a session timeout.
+- The `from` location is preserved in `location.state` so the user lands back on the page they were on after a successful re-login.
+- The generic "Etwas ist schiefgelaufen"-error is **not** shown for session-timeout 401s.
+- Non-session 403 errors (e.g. "no access to this list") remain unchanged.
+- 401 errors during the login request itself (wrong credentials) are **not** treated as session expiry.
 
-## Priority 2 – Externe REST-API v1
-
-Objective: Sechs Home-Assistant-taugliche Endpunkte unter `/api/v1/`, gesichert via `X-Api-Key`-Header.
-
-Constraints:
-- Auth: `X-Api-Key: <key>` Header – kein JWT, kein Bearer Token.
-- Scope: Listen, die der User besitzt **oder** bei denen er Mitglied ist.
-- Entry-Status: v1 responses return raw DB values, `open` or `done`.
-- Path-IDs: `listId` und `itemId` müssen UUIDs sein; ungültige Werte liefern 404.
-- Item-Mutationen über v1 senden SSE-Events (`entry:created`, `entry:updated`, `entry:deleted`) an Listen-Subscriber.
-- Toggle-Endpunkt: kein Body erforderlich, Status wird automatisch umgeschaltet.
-
-Endpunkte:
-1. `GET /api/v1/lists` – alle Listen des authentifizierten Users.
-2. `GET /api/v1/lists/:listId/items` – alle Einträge einer Liste (mit Ownership-Check).
-3. `POST /api/v1/lists/:listId/items` – neues Item anlegen (`{ "name": "..." }`).
-4. `POST /api/v1/lists/:listId/items/:itemId/toggle` – Status umschalten (`open` ↔ `done`).
-5. `PATCH /api/v1/lists/:listId/items/:itemId` – Item umbenennen (`{ "name": "..." }`).
-6. `DELETE /api/v1/lists/:listId/items/:itemId` – Item endgültig löschen.
-
-Response-Format für Items: `id`, `name` (mapped von `text`), `status` (`open` | `done`).
-
-## Priority 3 – OpenAPI-Dokumentation & Swagger UI
-
-Objective: Die v1-API ist vollständig dokumentiert und über den Backend-Server erreichbar.
-
-- OpenAPI 3.1-Spec als statische Datei `backend/src/openapi/v1.yaml`.
-- Swagger UI serviert unter `GET /api/docs` via `swagger-ui-express`.
-- Spec-Datei erreichbar unter `GET /api/docs/openapi.yaml` (raw YAML).
-- Dokumentation umfasst alle 6 Endpunkte inkl. Authentifizierung, Request/Response-Schemas und Fehlerresponses.
-
-## Acceptance Criteria (gesamt)
-
-- API-Key kann im Frontend erzeugt, angezeigt und kopiert werden.
-- Alle 6 v1-Endpunkte funktionieren mit gültigem API-Key.
-- Mutationen über die v1-API aktualisieren geöffnete Web-Clients via SSE ohne manuellen Reload.
-- Ungültiger/fehlender Key → 401.
-- Zugriff auf fremde Liste → 403.
-- Swagger UI ist unter `/api/docs` erreichbar und zeigt alle Endpunkte.
-- Minor-Release (neue MINOR-Version via `Release-As` im Cycle-Close-Commit).
+### Technical Decisions
+- **Mechanism:** `client.ts` dispatches a global `auth:expired` DOM event on 401. `AuthContext` listens for this event, calls `logout()`, and navigates to `/login` with `{ state: { from: currentLocation, sessionExpired: true } }`.
+- 401 from `/api/auth/login` must **not** trigger the event (it's a credential error, not a session expiry).
+- The login-page info banner reads `sessionExpired` from `location.state` to decide whether to show the hint.
+- i18n keys are added to `de/translation.json` and `en/translation.json`.

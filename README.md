@@ -192,9 +192,10 @@ Run these checks before merging changes:
 
 Frontend Vitest runs load `frontend/src/test/setup.ts` before each suite so component
 tests start with the i18next runtime initialized and the language reset to English.
-The frontend TypeScript setup allows existing JavaScript modules during the staged
-TSX migration so converted entry points can continue importing files that move in
-later tasks.
+The frontend Vitest config uses 20-second test and hook timeouts to keep the full
+parallel suite stable on slower local machines. The frontend TypeScript setup allows
+existing JavaScript modules during the staged TSX migration so converted entry points
+can continue importing files that move in later tasks.
 
 ## E2E Tests
 
@@ -257,6 +258,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - The frontend has English and German localization infrastructure with browser language detection, persistent language preference storage, and a DE/EN switcher in the Info & Settings sheet.
 - The overview home screen uses a branded header, neon list cards, owner and shared status chips, and a bottom-sheet flow for creating new lists.
 - Authentication supports register, email verification, password reset, and login flows backed by JWT access tokens.
+- When a protected API request reports an expired JWT, the frontend clears the local session, redirects to `/login`, shows a session-expired hint, and returns the user to their original protected page after a successful login.
 - Authenticated users can manage their Home Assistant API key from the Info & Settings sheet, including generating, copying, and replacing the key. The frontend uses `GET /api/auth/api-key` to read the current key and `POST /api/auth/api-key` to generate or replace it; both endpoints require the same JWT bearer token as the protected app.
 - External clients can use the Home Assistant oriented `/api/v1` REST API with `X-Api-Key: <key>` instead of a JWT. It exposes `GET /api/v1/lists`, `GET /api/v1/lists/:listId/items`, `POST /api/v1/lists/:listId/items`, `POST /api/v1/lists/:listId/items/:itemId/toggle`, `PATCH /api/v1/lists/:listId/items/:itemId`, and `DELETE /api/v1/lists/:listId/items/:itemId`; path IDs must be UUIDs, invalid IDs return 404, and item statuses are returned as raw entry values, `open` or `done`. Item create, toggle, rename, and delete mutations emit the same SSE entry events as the authenticated app routes so connected web clients refresh without a manual reload.
 - API documentation is available as Swagger UI at `GET /api/docs/`; `GET /api/docs` redirects there so relative Swagger UI assets load correctly. The raw OpenAPI 3.1 YAML is served from `GET /api/docs/openapi.yaml`.

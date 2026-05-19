@@ -107,6 +107,7 @@
   "search.pageLabel": "Suchseite",
   "auth.welcomeBack": "Willkommen zurück",
   "auth.signIn": "Melde dich an, um fortzufahren.",
+  "auth.sessionExpired": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
   "auth.email": "E-Mail",
   "auth.password": "Passwort",
   "auth.signingIn": "Anmeldung...",

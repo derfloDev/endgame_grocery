@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { createTemporaryId } from "../../api/client";
+import { AuthExpiredError, createTemporaryId } from "../../api/client";
 import { writeCachedResource } from "../../api/offlineStore";
 import { createList, deleteList, fetchLists, renameList } from "../../api/lists";
 import InfoSheet from "../../components/InfoSheet/InfoSheet";
@@ -30,7 +30,7 @@ export default function OverviewPage(): ReactElement {
   const { token } = useAuth();
   const { syncVersion } = useOfflineQueue();
   const [lists, setLists] = useState<OverviewList[]>([]);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showInfo, setShowInfo] = useState<boolean>(false);
   const [showNew, setShowNew] = useState<boolean>(false);
@@ -45,7 +45,7 @@ export default function OverviewPage(): ReactElement {
   }, []);
 
   const loadLists = useCallback(async (): Promise<void> => {
-    setError("");
+    setError(null);
     setIsLoading(true);
 
     try {
@@ -56,7 +56,7 @@ export default function OverviewPage(): ReactElement {
       }
     } catch (loadError) {
       if (isMountedRef.current) {
-        setError(getErrorMessage(loadError));
+        setError(loadError);
       }
     } finally {
       if (isMountedRef.current) {
@@ -93,7 +93,7 @@ export default function OverviewPage(): ReactElement {
     }
 
     try {
-      setError("");
+      setError(null);
 
       const temporaryList: OverviewList = {
         id: createTemporaryId("list"),
@@ -109,7 +109,7 @@ export default function OverviewPage(): ReactElement {
         result?.queued ? temporaryList : (result.list as OverviewList)
       ]);
     } catch (submitError) {
-      setError(getErrorMessage(submitError));
+      setError(submitError);
     }
   }
 
@@ -119,7 +119,7 @@ export default function OverviewPage(): ReactElement {
     }
 
     try {
-      setError("");
+      setError(null);
       const result = await renameList(token, listId, { name: newName });
 
       await updateLists((currentLists) =>
@@ -133,7 +133,7 @@ export default function OverviewPage(): ReactElement {
         )
       );
     } catch (submitError) {
-      setError(getErrorMessage(submitError));
+      setError(submitError);
     }
   }
 
@@ -143,13 +143,15 @@ export default function OverviewPage(): ReactElement {
     }
 
     try {
-      setError("");
+      setError(null);
       await deleteList(token, listId);
       await updateLists((currentLists) => currentLists.filter((list) => list.id !== listId));
     } catch (submitError) {
-      setError(getErrorMessage(submitError));
+      setError(submitError);
     }
   }
+
+  const shouldSuppressError = error instanceof AuthExpiredError;
 
   return (
     <div>
@@ -169,7 +171,7 @@ export default function OverviewPage(): ReactElement {
       </div>
 
       <div className={styles["overview-content"]}>
-        {error ? <ErrorState onRetry={() => void loadLists()} /> : null}
+        {error && !shouldSuppressError ? <ErrorState onRetry={() => void loadLists()} /> : null}
         {isLoading ? <LoadingState rows={3} /> : null}
         {!isLoading && !error && lists.length === 0 ? (
           <EmptyState
@@ -201,8 +203,4 @@ export default function OverviewPage(): ReactElement {
       />
     </div>
   );
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

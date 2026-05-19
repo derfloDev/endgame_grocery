@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { fetchCurrentUser, loginUser, registerUser } from "../api/auth";
 import type { User } from "../types";
+import { SESSION_EXPIRED_REDIRECT_KEY } from "./authStorage";
 
 const STORAGE_KEY = "endgame_grocery.auth_token";
 const USER_STORAGE_KEY = "endgame_grocery.auth_user";
@@ -55,6 +57,8 @@ function parseJwtSubject(token: string): string | null {
 }
 
 export function AuthProvider({ children }: AuthProviderProps): ReactElement {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [token, setToken] = useState(() => window.localStorage.getItem(STORAGE_KEY) ?? "");
   const [user, setUser] = useState(() => getStoredUser(window.localStorage.getItem(STORAGE_KEY) ?? ""));
 
@@ -79,6 +83,32 @@ export function AuthProvider({ children }: AuthProviderProps): ReactElement {
 
     setUser(normalizedUser);
   }, []);
+
+  const logout = useCallback((): void => {
+    setAuthToken("");
+  }, [setAuthToken]);
+
+  useEffect(() => {
+    function handleAuthExpired(): void {
+      const redirectState = {
+        from: location.pathname,
+        sessionExpired: true
+      };
+
+      window.sessionStorage.setItem(SESSION_EXPIRED_REDIRECT_KEY, JSON.stringify(redirectState));
+      navigate("/login", {
+        replace: true,
+        state: redirectState
+      });
+      logout();
+    }
+
+    window.addEventListener("auth:expired", handleAuthExpired);
+
+    return () => {
+      window.removeEventListener("auth:expired", handleAuthExpired);
+    };
+  }, [location.pathname, logout, navigate]);
 
   useEffect(() => {
     if (!token || user?.display_name) {
@@ -111,10 +141,6 @@ export function AuthProvider({ children }: AuthProviderProps): ReactElement {
 
   async function register(payload: unknown): Promise<unknown> {
     return registerUser(payload as Parameters<typeof registerUser>[0]);
-  }
-
-  function logout(): void {
-    setAuthToken("");
   }
 
   const value: AuthContextValue = {

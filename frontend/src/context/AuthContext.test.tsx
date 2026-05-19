@@ -1,5 +1,6 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { fetchCurrentUser, loginUser, registerUser } from "../api/auth";
 import { AuthProvider, useAuth } from "./AuthContext";
 
@@ -15,6 +16,7 @@ const registerUserMock = vi.mocked(registerUser);
 
 function AuthState() {
   const { token, user } = useAuth();
+  const location = useLocation();
 
   return (
     <>
@@ -22,13 +24,37 @@ function AuthState() {
       <div data-testid="user-id">{user?.id ?? ""}</div>
       <div data-testid="user-name">{user?.display_name ?? ""}</div>
       <div data-testid="user-email">{user?.email ?? ""}</div>
+      <div data-testid="pathname">{location.pathname}</div>
+      <div data-testid="from">{(location.state as { from?: string } | null)?.from ?? ""}</div>
+      <div data-testid="session-expired">
+        {(location.state as { sessionExpired?: boolean } | null)?.sessionExpired ? "yes" : "no"}
+      </div>
     </>
+  );
+}
+
+function renderAuthProvider(initialEntries = ["/"]) {
+  return render(
+    <MemoryRouter
+      future={{
+        v7_relativeSplatPath: true,
+        v7_startTransition: true
+      }}
+      initialEntries={initialEntries}
+    >
+      <AuthProvider>
+        <Routes>
+          <Route element={<AuthState />} path="*" />
+        </Routes>
+      </AuthProvider>
+    </MemoryRouter>
   );
 }
 
 describe("AuthProvider", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
     vi.clearAllMocks();
     loginUserMock.mockResolvedValue({ token: "" });
     registerUserMock.mockResolvedValue({ message: "ok" });
@@ -47,11 +73,7 @@ describe("AuthProvider", () => {
     });
     window.localStorage.setItem("endgame_grocery.auth_token", token);
 
-    render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>
-    );
+    renderAuthProvider();
 
     expect(screen.getByTestId("token").textContent).toBe(token);
     expect(screen.getByTestId("user-id").textContent).toBe("user-1");
@@ -80,11 +102,7 @@ describe("AuthProvider", () => {
       })
     );
 
-    render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>
-    );
+    renderAuthProvider();
 
     await waitFor(() => {
       expect(screen.getByTestId("user-name").textContent).toBe("Demo User");
@@ -97,11 +115,7 @@ describe("AuthProvider", () => {
     fetchCurrentUserMock.mockRejectedValue(new Error("offline"));
     window.localStorage.setItem("endgame_grocery.auth_token", token);
 
-    render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>
-    );
+    renderAuthProvider();
 
     await waitFor(() => {
       expect(fetchCurrentUser).toHaveBeenCalledWith(token);
@@ -110,6 +124,34 @@ describe("AuthProvider", () => {
     expect(screen.getByTestId("user-id").textContent).toBe("user-1");
     expect(screen.getByTestId("user-name").textContent).toBe("");
     expect(window.localStorage.getItem("endgame_grocery.auth_token")).toBe(token);
+    expect(window.localStorage.getItem("endgame_grocery.auth_user")).toBeNull();
+  });
+
+  it("clears the stored session and redirects with state when auth expires", async () => {
+    const token = createFakeJwt("user-1");
+    window.localStorage.setItem("endgame_grocery.auth_token", token);
+    window.localStorage.setItem(
+      "endgame_grocery.auth_user",
+      JSON.stringify({
+        id: "user-1",
+        display_name: "Demo User",
+        email: "demo@example.com"
+      })
+    );
+
+    renderAuthProvider(["/lists/list-1"]);
+
+    act(() => {
+      window.dispatchEvent(new Event("auth:expired"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pathname").textContent).toBe("/login");
+    });
+    expect(screen.getByTestId("from").textContent).toBe("/lists/list-1");
+    expect(screen.getByTestId("session-expired").textContent).toBe("yes");
+    expect(screen.getByTestId("token").textContent).toBe("");
+    expect(window.localStorage.getItem("endgame_grocery.auth_token")).toBeNull();
     expect(window.localStorage.getItem("endgame_grocery.auth_user")).toBeNull();
   });
 });

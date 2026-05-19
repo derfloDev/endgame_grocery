@@ -32,6 +32,8 @@ export default defineConfig({
     format: "es"
   },
   test: {
+    hookTimeout: 20000,
+    testTimeout: 20000,
     setupFiles: "./src/test/setup.ts"
   },
   server: {

@@ -18,6 +18,13 @@ interface ErrorResponse {
   error?: string;
 }
 
+export class AuthExpiredError extends Error {
+  constructor(message = "session:expired") {
+    super(message);
+    this.name = "AuthExpiredError";
+  }
+}
+
 export function createCacheKey(resource: string, suffix = ""): string {
   return suffix ? `${resource}:${suffix}` : resource;
 }
@@ -61,6 +68,11 @@ export async function sendJsonRequest(
     const data = (await response.json().catch(() => ({}))) as ErrorResponse;
 
     if (!response.ok) {
+      if (response.status === 401 && token) {
+        window.dispatchEvent(new Event("auth:expired"));
+        throw new AuthExpiredError();
+      }
+
       throw new Error(data.error ?? "Request failed.");
     }
 
