@@ -1,55 +1,29 @@
 # ROADMAP
 
-Goal: Home Assistant Integration – externe REST-API mit API-Key-Authentifizierung und OpenAPI-Dokumentation (Swagger UI).
+Goal: define and deliver the scope for this cycle.
 
-## Priority 1 – API-Key-Verwaltung
+Delete any unused example sections below. Only the Goal and one concrete priority are required.
 
-Objective: Jeder User kann in „Info & Einstellungen" einen eindeutigen API-Key erzeugen und einsehen.
+## Priority 1
 
-- Ein API-Key pro User (UUID, generiert via `crypto.randomUUID`).
-- Bestehender Key wird bei Regenerierung sofort ungültig.
-- Key wird in der DB gespeichert (neue Spalte `api_key` in `users`).
-- Frontend zeigt den Key im InfoSheet mit „Kopieren"- und „Neu generieren"-Button.
-- Backend: `POST /api/auth/api-key` – erzeugt oder erneuert den API-Key des eingeloggten Users (JWT-Auth).
-- Backend: `GET /api/auth/api-key` – gibt den aktuellen API-Key des eingeloggten Users zurück (JWT-Auth).
+Objective: replace with objective.
 
-## Priority 2 – Externe REST-API v1
+- Replace with planned outcome.
 
-Objective: Sechs Home-Assistant-taugliche Endpunkte unter `/api/v1/`, gesichert via `X-Api-Key`-Header.
+## Examples
 
-Constraints:
-- Auth: `X-Api-Key: <key>` Header – kein JWT, kein Bearer Token.
-- Scope: Listen, die der User besitzt **oder** bei denen er Mitglied ist.
-- Entry-Status: v1 responses return raw DB values, `open` or `done`.
-- Path-IDs: `listId` und `itemId` müssen UUIDs sein; ungültige Werte liefern 404.
-- Item-Mutationen über v1 senden SSE-Events (`entry:created`, `entry:updated`, `entry:deleted`) an Listen-Subscriber.
-- Toggle-Endpunkt: kein Body erforderlich, Status wird automatisch umgeschaltet.
+These example sections are optional illustrations, not required structure.
 
-Endpunkte:
-1. `GET /api/v1/lists` – alle Listen des authentifizierten Users.
-2. `GET /api/v1/lists/:listId/items` – alle Einträge einer Liste (mit Ownership-Check).
-3. `POST /api/v1/lists/:listId/items` – neues Item anlegen (`{ "name": "..." }`).
-4. `POST /api/v1/lists/:listId/items/:itemId/toggle` – Status umschalten (`open` ↔ `done`).
-5. `PATCH /api/v1/lists/:listId/items/:itemId` – Item umbenennen (`{ "name": "..." }`).
-6. `DELETE /api/v1/lists/:listId/items/:itemId` – Item endgültig löschen.
+<!-- Example: remove or replace this section -->
+## Priority 2
 
-Response-Format für Items: `id`, `name` (mapped von `text`), `status` (`open` | `done`).
+Objective: optional second objective.
 
-## Priority 3 – OpenAPI-Dokumentation & Swagger UI
+- Replace with optional planned outcome.
 
-Objective: Die v1-API ist vollständig dokumentiert und über den Backend-Server erreichbar.
+<!-- Example: remove or replace this section -->
+## Priority 3
 
-- OpenAPI 3.1-Spec als statische Datei `backend/src/openapi/v1.yaml`.
-- Swagger UI serviert unter `GET /api/docs` via `swagger-ui-express`.
-- Spec-Datei erreichbar unter `GET /api/docs/openapi.yaml` (raw YAML).
-- Dokumentation umfasst alle 6 Endpunkte inkl. Authentifizierung, Request/Response-Schemas und Fehlerresponses.
+Objective: optional third objective.
 
-## Acceptance Criteria (gesamt)
-
-- API-Key kann im Frontend erzeugt, angezeigt und kopiert werden.
-- Alle 6 v1-Endpunkte funktionieren mit gültigem API-Key.
-- Mutationen über die v1-API aktualisieren geöffnete Web-Clients via SSE ohne manuellen Reload.
-- Ungültiger/fehlender Key → 401.
-- Zugriff auf fremde Liste → 403.
-- Swagger UI ist unter `/api/docs` erreichbar und zeigt alle Endpunkte.
-- Minor-Release (neue MINOR-Version via `Release-As` im Cycle-Close-Commit).
+- Replace with optional planned outcome.
