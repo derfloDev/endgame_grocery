@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/derfloDev/endgame_grocery/compare/v0.18.0...v0.19.0) (2026-05-19)
+
+
+### Features
+
+* **auth:** redirect expired sessions to login ([70d220d](https://github.com/derfloDev/endgame_grocery/commit/70d220d9fc8bc67f5a97c7b43e5db1e92e94472a))
+
 ## [0.18.0](https://github.com/derfloDev/endgame_grocery/compare/v0.17.0...v0.18.0) (2026-05-17)
 
 
