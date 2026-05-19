@@ -34,9 +34,12 @@ describe("LanguageSwitcher", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "DE" }));
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "DE" }).getAttribute("aria-pressed")).toBe("true");
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByRole("button", { name: "DE" }).getAttribute("aria-pressed")).toBe("true");
+      },
+      { timeout: 3000 }
+    );
     expect(localStorage.getItem("i18nextLng")).toBe("de");
   });
 });

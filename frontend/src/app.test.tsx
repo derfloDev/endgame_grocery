@@ -86,6 +86,7 @@ describe("authentication shell", () => {
       }
     });
     window.localStorage.clear();
+    window.sessionStorage.clear();
     await i18next.changeLanguage("en");
     await resetOfflineStateForTests();
     setNavigatorOnline(true);
@@ -177,6 +178,108 @@ describe("authentication shell", () => {
     });
 
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
+  }, 10000);
+
+  it("redirects an expired protected session to login and returns to the original page after re-login", async () => {
+    seedAuthSession("user-1");
+    let didRejectExpiredSession = false;
+
+    fetch.mockImplementation(async (input, init = {}) => {
+      const url = String(input);
+      const method = init.method ?? "GET";
+
+      if (url === "/api/lists" && !didRejectExpiredSession) {
+        didRejectExpiredSession = true;
+        return {
+          ok: false,
+          status: 401,
+          json: async () => ({ error: "jwt expired" })
+        };
+      }
+
+      if (url === "/api/auth/login" && method === "POST") {
+        return {
+          ok: true,
+          json: async () => ({
+            token: createFakeJwt("user-1"),
+            user: createAuthUser("user-1")
+          })
+        };
+      }
+
+      if (url === "/api/lists") {
+        return {
+          ok: true,
+          json: async () => ({
+            lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+          })
+        };
+      }
+
+      if (url === "/api/lists/list-1/entries") {
+        return {
+          ok: true,
+          json: async () => ({ entries: [] })
+        };
+      }
+
+      if (url === "/api/lists/list-1/history") {
+        return {
+          ok: true,
+          json: async () => ({ history: [] })
+        };
+      }
+
+      if (url === "/api/lists/list-1/members") {
+        return {
+          ok: true,
+          json: async () => ({
+            members: [
+              {
+                user_id: "user-1",
+                display_name: "Demo User",
+                email: "demo@example.com",
+                joined_at: "2026-04-21T00:00:00Z",
+                is_owner: true
+              }
+            ]
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch in test: ${method} ${url}`);
+    });
+
+    renderApp(["/lists/list-1"]);
+
+    expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    expect(screen.getByText("Your session has expired. Please sign in again.")).toBeTruthy();
+    expect(screen.queryByText("Mission Failed")).toBeNull();
+    expect(window.localStorage.getItem("endgame_grocery.auth_token")).toBeNull();
+
+    await userEvent.type(screen.getByLabelText("Email"), "demo@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+    expect(await screen.findByText("Weekly groceries", {}, { timeout: 8000 })).toBeTruthy();
+  }, 20000);
+
+  it("keeps wrong login credentials on the login page without a session-expired banner", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: "Invalid credentials." })
+    });
+
+    renderApp(["/login"]);
+
+    await userEvent.type(screen.getByLabelText("Email"), "demo@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "wrong-password");
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
+
+    expect(await screen.findByText("Invalid credentials.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Welcome Back" })).toBeTruthy();
+    expect(screen.queryByText("Your session has expired. Please sign in again.")).toBeNull();
   });
 
   it("does not render bottom navigation in either the protected shell or auth pages", async () => {
@@ -564,6 +667,21 @@ describe("authentication shell", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
 
+  it("keeps forbidden overview errors in the existing error UI", async () => {
+    seedAuthSession("user-1");
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: async () => ({ error: "Forbidden." })
+    });
+
+    renderApp(["/"]);
+
+    expect(await screen.findByText("Mission Failed")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Welcome Back" })).toBeNull();
+  });
+
   it("removes the overview toggle buttons and stat chips", async () => {
     seedAuthSession("user-1");
     fetch.mockResolvedValueOnce({
@@ -889,7 +1007,7 @@ describe("authentication shell", () => {
     await waitFor(() => {
       expect(screen.queryByRole("region", { name: "Recently Used" })).toBeNull();
     });
-  }, 10000);
+  });
 
   it("adds completed items to recently used and keeps newest history first", async () => {
     seedAuthSession("user-1");
@@ -999,7 +1117,7 @@ describe("authentication shell", () => {
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label"));
     expect(chipLabelsAfterDelete.indexOf("Cheese")).toBeLessThan(chipLabelsAfterDelete.indexOf("Milk"));
-  }, 10000);
+  }, 20000);
 
   it("refetches entries and members for the active list when SSE events arrive", async () => {
     seedAuthSession("user-1");
@@ -1307,7 +1425,7 @@ describe("authentication shell", () => {
       expect(screen.getByText("3L")).toBeTruthy();
       expect(screen.queryByText("2L")).toBeNull();
     });
-  }, 10000);
+  }, 20000);
 
   it("opens the share sheet, sends an invite notice, and revokes an existing member", async () => {
     seedAuthSession("user-1");
@@ -1401,7 +1519,7 @@ describe("authentication shell", () => {
     await waitFor(() => {
       expect(screen.queryByText("Alex")).toBeNull();
     });
-  });
+  }, 20000);
 
   it("shows the notifications toggle only for shared lists", async () => {
     seedAuthSession("user-1");

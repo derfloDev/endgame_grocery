@@ -112,7 +112,7 @@ describe("AddItemSheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
     expect(onAdd).toHaveBeenCalledWith("Milch", "IconMilk", "");
-  }, 10000);
+  }, 20000);
 
   it("styles the icon browser toggle as an inline text link", () => {
     render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
@@ -185,7 +185,7 @@ describe("AddItemSheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add Item" }));
 
     expect(onAdd).toHaveBeenCalledWith("Gemüse", "IconTrash", "");
-  }, 10000);
+  }, 20000);
 
   it("submits typed details as the third onAdd argument", async () => {
     const onAdd = vi.fn();

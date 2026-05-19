@@ -107,6 +107,7 @@
   "search.pageLabel": "Search page",
   "auth.welcomeBack": "Welcome Back",
   "auth.signIn": "Sign in to access your mission.",
+  "auth.sessionExpired": "Your session has expired. Please sign in again.",
   "auth.email": "Email",
   "auth.password": "Password",
   "auth.signingIn": "Signing in...",

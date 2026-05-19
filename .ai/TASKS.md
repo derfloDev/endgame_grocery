@@ -20,4 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
+| T-001 | Automatic session-timeout redirect to login page | done | 401 with valid token redirects to /login; session-expired banner shown; re-login returns user to original page; wrong credentials do NOT redirect; 403 errors unchanged; lint + build pass | `npm run lint`; `npm run build`; `npm test` | none |
