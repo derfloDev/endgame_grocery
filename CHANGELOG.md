@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/derfloDev/endgame_grocery/compare/v0.19.0...v0.20.0) (2026-05-20)
+
+
+### Features
+
+* **entries:** enforce per-list entry limits ([9472626](https://github.com/derfloDev/endgame_grocery/commit/9472626320f2a7c0ed2677216e34035b3b4416ce))
+
 ## [0.19.0](https://github.com/derfloDev/endgame_grocery/compare/v0.18.0...v0.19.0) (2026-05-19)
 
 
