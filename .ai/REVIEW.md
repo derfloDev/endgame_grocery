@@ -127,3 +127,45 @@ Reviewed: 2026-05-20
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-05-20
+
+#### Findings
+
+- **nit** — `useListDetailData.ts` — The hook goes beyond the plan scope (moves mutations like `addEntryByText`, `toggleStatus`, `submitEditEntry`, `addRecentlyUsedEntry`, `dismissRecentlyUsedEntry` in addition to the planned data-loading logic). This is a positive over-delivery that produces a cleaner separation; not a defect.
+- **nit** — `useListDetailData.ts` returns `setIsSharingLoading` and `setRecentlyUsed` which are not consumed by `ListDetailPage.tsx`. Harmless unused returns from the hook.
+
+#### Verification
+
+##### Steps
+1. Read `.ai/PLAN.md` to confirm acceptance criteria: `ListDetailPage.tsx` < 400 lines; hook in own file; frontend tests green.
+2. Read `frontend/src/pages/ListDetailPage/useListDetailData.ts` (436 lines) — confirmed hook contains all planned state (`list`, `entries`, `members`, `recentlyUsed`, `entryError`, `isLoading`, `isSharingLoading`), `loadEntries` callback, `loadMembers` callback, and the main `useEffect` for parallel loading.
+3. Read `frontend/src/pages/ListDetailPage/ListDetailPage.tsx` (374 lines) — confirmed it imports `useListDetailData` and destructures state/callbacks from it; no local duplicates of moved state.
+4. Verified `DetailEntry`, `DetailList`, `DetailMember` interfaces are exported from the hook file and re-imported by `ListDetailPage.tsx`.
+5. Read `frontend/src/pages/ListDetailPage.test.tsx` diff — confirmed new structural test: checks page < 400 lines, import from `./useListDetailData`, `useListDetailData` export, and presence of `loadEntries`/`loadMembers` in hook source.
+6. Ran `npm run lint` (root) — 0 errors (pre-existing fast-refresh warning).
+7. Ran `npm run build` — clean.
+8. Ran `npm test -w @endgame-grocery/frontend` — 415/415 pass (414 baseline + 1 new structural test). The previously flaky `adds and edits entry details` test passed in 7.7 s this run.
+
+##### Findings
+- `ListDetailPage.tsx`: 374 lines ✅ (< 400 required).
+- `useListDetailData.ts`: hook exported, `loadEntries`, `loadMembers`, parallel-load `useEffect` present ✅.
+- New structural test validates the extraction is maintained ✅.
+- Lint: 0 errors. Build: clean. Tests: 415/415 pass.
+
+##### Risks
+- None. The refactor is additive (no API surface change, no behavioral change).
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

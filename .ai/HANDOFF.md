@@ -147,3 +147,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — review — 2026-05-20T19:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 hook extraction: ListDetailPage.tsx at 374 lines, useListDetailData correctly exports all data/mutation logic, 415/415 frontend tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-05-20T16:47:06Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Extracted list detail data loading and entry/history mutations into useListDetailData, reducing ListDetailPage below 400 lines. |
+| Files Changed | frontend/src/pages/ListDetailPage/useListDetailData.ts, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage.test.tsx, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` pass with existing AuthContext fast-refresh warning; `npm run test --workspace frontend -- src/pages/ListDetailPage.test.tsx` pass; `npm run build` pass with existing transformer/bundle warnings; `npm test` pass |
+| Commit | `refactor(frontend): extract list detail data hook` |
+| Next Role | review |
+
+---
+
+### T-004 — commit_task — 2026-05-20T16:53:35Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-004 done and committed the reviewed frontend list detail hook extraction. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Review passed; no additional validation run during commit step |
+| Commit | `refactor(frontend): extract list detail data hook` |
+| Next Role | none |
+
+---
