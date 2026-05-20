@@ -72,6 +72,12 @@ describe("entry routes", () => {
         }
 
         if (callCount === 2) {
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
+          assert.deepEqual(params, ["list-1"]);
+          return { rows: [{ cnt: "999" }] };
+        }
+
+        if (callCount === 3) {
           assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details\)/);
           assert.deepEqual(params, ["list-1", "Milk", "🥛", null]);
 
@@ -89,13 +95,13 @@ describe("entry routes", () => {
           };
         }
 
-        if (callCount === 3) {
+        if (callCount === 4) {
           assert.match(sql, /SELECT id, items, fire_at\s+FROM pending_push_jobs/);
           assert.deepEqual(params, ["list-1", "user-1"]);
           return { rows: [] };
         }
 
-        if (callCount === 4) {
+        if (callCount === 5) {
           assert.match(sql, /INSERT INTO pending_push_jobs/);
           assert.deepEqual(params, ["list-1", "user-1", params[2], ["Milk"]]);
           assert.equal(params[2] instanceof Date, true);
@@ -117,7 +123,7 @@ describe("entry routes", () => {
     assert.equal(response.body.entry.status, "open");
     assert.equal(response.body.entry.icon, "🥛");
     await waitForQueuedPushInsert();
-    assert.equal(callCount, 4);
+    assert.equal(callCount, 5);
     assert.deepEqual(sseManager.calls, [
       ["list-1", "entry:created", { listId: "list-1", entryId: "entry-1" }]
     ]);
@@ -134,6 +140,12 @@ describe("entry routes", () => {
         }
 
         if (callCount === 2) {
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
+          assert.deepEqual(params, ["list-1"]);
+          return { rows: [{ cnt: "999" }] };
+        }
+
+        if (callCount === 3) {
           assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details\)/);
           assert.deepEqual(params, ["list-1", "Milk", null, null]);
 
@@ -142,12 +154,12 @@ describe("entry routes", () => {
           };
         }
 
-        if (callCount === 3) {
+        if (callCount === 4) {
           assert.match(sql, /SELECT id, items, fire_at\s+FROM pending_push_jobs/);
           return { rows: [] };
         }
 
-        if (callCount === 4) {
+        if (callCount === 5) {
           assert.match(sql, /INSERT INTO pending_push_jobs/);
           assert.deepEqual(params, ["list-1", "user-1", params[2], ["Milk"]]);
           assert.equal(params[2] instanceof Date, true);
@@ -165,7 +177,7 @@ describe("entry routes", () => {
     assert.equal(response.status, 201);
     assert.equal(response.body.entry.id, "entry-1");
     await waitForQueuedPushInsert();
-    assert.equal(callCount, 4);
+    assert.equal(callCount, 5);
   });
 
   it("stores and returns entry details on create", async () => {
@@ -179,6 +191,12 @@ describe("entry routes", () => {
         }
 
         if (callCount === 2) {
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
+          assert.deepEqual(params, ["list-1"]);
+          return { rows: [{ cnt: "999" }] };
+        }
+
+        if (callCount === 3) {
           assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details\)/);
           assert.deepEqual(params, ["list-1", "Milk", "🥛", "2L"]);
 
@@ -196,12 +214,12 @@ describe("entry routes", () => {
           };
         }
 
-        if (callCount === 3) {
+        if (callCount === 4) {
           assert.match(sql, /SELECT id, items, fire_at\s+FROM pending_push_jobs/);
           return { rows: [] };
         }
 
-        if (callCount === 4) {
+        if (callCount === 5) {
           assert.match(sql, /INSERT INTO pending_push_jobs/);
           assert.deepEqual(params, ["list-1", "user-1", params[2], ["Milk"]]);
           assert.equal(params[2] instanceof Date, true);
@@ -228,7 +246,36 @@ describe("entry routes", () => {
       details: "2L"
     });
     await waitForQueuedPushInsert();
-    assert.equal(callCount, 4);
+    assert.equal(callCount, 5);
+  });
+
+  it("rejects entry creation when the list already has 1000 open entries", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        if (callCount === 2) {
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
+          assert.deepEqual(params, ["list-1"]);
+          return { rows: [{ cnt: "1000" }] };
+        }
+
+        assert.fail(`Unexpected query ${callCount}: ${sql}`);
+      }
+    };
+
+    const response = await request(createAuthedApp(pool)).post("/api/lists/list-1/entries").send({
+      text: "Milk"
+    });
+
+    assert.equal(response.status, 422);
+    assert.match(response.body.error, /maximum of 1,000 open entries/);
+    assert.equal(callCount, 2);
   });
 
   it("writes autocomplete history when an entry is marked done", async () => {
@@ -243,6 +290,12 @@ describe("entry routes", () => {
         }
 
         if (callCount === 2) {
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'done'/);
+          assert.deepEqual(params, ["list-1"]);
+          return { rows: [{ cnt: "199" }] };
+        }
+
+        if (callCount === 3) {
           assert.match(sql, /UPDATE entries/);
           assert.deepEqual(params, ["Oat milk", "done", null, false, null, "entry-1", "list-1"]);
 
@@ -260,12 +313,16 @@ describe("entry routes", () => {
           };
         }
 
-        assert.match(sql, /INSERT INTO autocomplete_history/);
-        assert.match(sql, /ON CONFLICT \(user_id, list_id, text\)/);
-        assert.match(sql, /use_count\s*=\s*autocomplete_history\.use_count \+ 1/);
-        assert.deepEqual(params, ["user-1", "list-1", "Oat milk", null]);
+        if (callCount === 4) {
+          assert.match(sql, /INSERT INTO autocomplete_history/);
+          assert.match(sql, /ON CONFLICT \(user_id, list_id, text\)/);
+          assert.match(sql, /use_count\s*=\s*autocomplete_history\.use_count \+ 1/);
+          assert.deepEqual(params, ["user-1", "list-1", "Oat milk", null]);
 
-        return { rows: [] };
+          return { rows: [] };
+        }
+
+        assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
 
@@ -280,7 +337,71 @@ describe("entry routes", () => {
     assert.equal(response.body.entry.text, "Oat milk");
     assert.equal(response.body.entry.status, "done");
     assert.equal(response.body.entry.details, "Barista");
-    assert.equal(callCount, 3);
+    assert.equal(callCount, 4);
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "entry:updated", { listId: "list-1", entryId: "entry-1" }]
+    ]);
+  });
+
+  it("evicts the oldest done entry before marking another entry done at the done-entry limit", async () => {
+    const sseManager = createSseManagerSpy();
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        if (callCount === 2) {
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'done'/);
+          assert.deepEqual(params, ["list-1"]);
+          return { rows: [{ cnt: "200" }] };
+        }
+
+        if (callCount === 3) {
+          assert.match(sql, /DELETE FROM entries/);
+          assert.match(sql, /ORDER BY updated_at ASC, created_at ASC/);
+          assert.deepEqual(params, ["list-1"]);
+          return { rows: [] };
+        }
+
+        if (callCount === 4) {
+          assert.match(sql, /UPDATE entries/);
+          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "entry-1", "list-1"]);
+
+          return {
+            rows: [
+              {
+                id: "entry-1",
+                list_id: "list-1",
+                text: "Oat milk",
+                status: "done",
+                icon: null,
+                details: null
+              }
+            ]
+          };
+        }
+
+        assert.match(sql, /INSERT INTO autocomplete_history/);
+        assert.deepEqual(params, ["user-1", "list-1", "Oat milk", null]);
+
+        return { rows: [] };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool, { sseManager }))
+      .patch("/api/lists/list-1/entries/entry-1")
+      .send({
+        text: "Oat milk",
+        status: "done"
+      });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.entry.status, "done");
+    assert.equal(callCount, 5);
     assert.deepEqual(sseManager.calls, [
       ["list-1", "entry:updated", { listId: "list-1", entryId: "entry-1" }]
     ]);
