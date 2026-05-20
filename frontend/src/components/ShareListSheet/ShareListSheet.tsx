@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 import type { FormEvent, ReactElement } from "react";
 import type { Member } from "../../types";
-import { BottomSheet, LoadingState } from "../ui";
+import BottomSheet from "../ui/BottomSheet/BottomSheet";
+import LoadingState from "../ui/LoadingState/LoadingState";
 import styles from "./ShareListSheet.module.css";
 
 interface SharedListMember extends Member {

@@ -5,7 +5,7 @@ APP_VERSION=$(node -p "JSON.parse(require('fs').readFileSync('/app/package.json'
 echo "Version: ${APP_VERSION}"
 
 echo "Running database migrations..."
-node /app/node_modules/node-pg-migrate/bin/node-pg-migrate.mjs up \
+node /app/node_modules/node-pg-migrate/bin/node-pg-migrate.js up \
   --migrations-dir /app/backend/src/db/migrations
 
 echo "Starting services..."

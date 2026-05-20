@@ -10,12 +10,35 @@ import createMailer from "../mail/mailer.js";
 import { createRequireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
+/**
+ * Creates a signed JWT for an authenticated user.
+ *
+ * @param {{ jwtLib: typeof jwt, config: { jwtSecret: string, jwtExpiresIn: string }, userId: string }} options Token options.
+ * @returns {string} Signed JWT.
+ */
 function createToken({ jwtLib, config, userId }) {
   return jwtLib.sign({ sub: userId }, config.jwtSecret, {
     expiresIn: config.jwtExpiresIn
   });
 }
 
+/**
+ * Creates the authentication router.
+ *
+ * @param {object} [options] Router dependencies.
+ * @param {import("pg").Pool} [options.pool] Database pool.
+ * @param {typeof bcrypt} [options.bcryptLib] Password hashing library.
+ * @param {typeof jwt} [options.jwtLib] JWT library.
+ * @param {ReturnType<typeof getConfig>} [options.config] Runtime configuration.
+ * @param {typeof defaultLogger} [options.logger] Application logger.
+ * @param {typeof defaultSseManager} [options.sseManager] SSE broadcaster.
+ * @param {ReturnType<typeof createMailer>} [options.mailer] Mail delivery adapter.
+ * @param {() => string} [options.generateVerificationToken] Verification token generator.
+ * @param {() => string} [options.generatePasswordResetToken] Password reset token generator.
+ * @param {() => string} [options.generateApiKey] API key generator.
+ * @param {() => Date} [options.now] Current-time provider.
+ * @returns {import("express").Router} Configured auth router.
+ */
 export function createAuthRouter({
   pool = getPool(),
   bcryptLib = bcrypt,
@@ -524,20 +547,47 @@ export function createAuthRouter({
   return router;
 }
 
+/**
+ * Adds hours to a date.
+ *
+ * @param {Date} date Base date.
+ * @param {number} hours Hours to add.
+ * @returns {Date} Shifted date.
+ */
 function addHours(date, hours) {
   return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
 
+/**
+ * Builds an application URL from the configured base URL and path.
+ *
+ * @param {string} baseUrl Application base URL.
+ * @param {string} path Absolute application path.
+ * @returns {string} Full application URL or path when no base URL is configured.
+ */
 function buildAppUrl(baseUrl, path) {
   const normalizedBaseUrl = baseUrl?.replace(/\/$/, "") ?? "";
 
   return normalizedBaseUrl ? `${normalizedBaseUrl}${path}` : path;
 }
 
+/**
+ * Checks whether an invite belongs to the registering email address.
+ *
+ * @param {string} email Normalized candidate email address.
+ * @param {{ invited_email?: string } | null} invite Pending invite row.
+ * @returns {boolean} Whether the invite email matches.
+ */
 function isInviteEmailMatch(email, invite) {
   return Boolean(invite) && invite.invited_email?.toLowerCase() === email.toLowerCase();
 }
 
+/**
+ * Serializes a database user row for auth responses.
+ *
+ * @param {{ id: string, email: string, display_name: string }} user User row.
+ * @returns {{ id: string, email: string, display_name: string }} Public auth user.
+ */
 function serializeAuthUser(user) {
   return {
     id: user.id,
@@ -546,6 +596,16 @@ function serializeAuthUser(user) {
   };
 }
 
+/**
+ * Sends an email verification message.
+ *
+ * @param {object} options Email options.
+ * @param {ReturnType<typeof getConfig>} options.config Runtime configuration.
+ * @param {ReturnType<typeof createMailer>} options.mailer Mail delivery adapter.
+ * @param {string} options.token Verification token.
+ * @param {{ email: string, display_name: string }} options.user User row.
+ * @returns {Promise<void>} Resolves when the mailer accepts the message.
+ */
 async function sendVerificationEmail({ config, mailer, token, user }) {
   await mailer.send({
     to: user.email,
@@ -564,6 +624,16 @@ async function sendVerificationEmail({ config, mailer, token, user }) {
   });
 }
 
+/**
+ * Sends a password reset message.
+ *
+ * @param {object} options Email options.
+ * @param {ReturnType<typeof getConfig>} options.config Runtime configuration.
+ * @param {ReturnType<typeof createMailer>} options.mailer Mail delivery adapter.
+ * @param {string} options.token Password reset token.
+ * @param {{ email: string, display_name: string }} options.user User row.
+ * @returns {Promise<void>} Resolves when the mailer accepts the message.
+ */
 async function sendPasswordResetEmail({ config, mailer, token, user }) {
   await mailer.send({
     to: user.email,

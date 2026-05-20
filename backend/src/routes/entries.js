@@ -1,30 +1,13 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { logger as defaultLogger } from "../logger.js";
+import { ensureListAccess } from "../middleware/listAccess.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 import { enqueuePushJob } from "../workers/pushWorker.js";
 
 const MAX_OPEN_ENTRIES_PER_LIST = 1000;
 const MAX_DONE_ENTRIES_PER_LIST = 200;
-
-async function ensureListAccess(pool, listId, userId) {
-  const result = await pool.query(
-    `
-      SELECT l.id
-      FROM lists l
-      LEFT JOIN list_members lm
-        ON lm.list_id = l.id
-       AND lm.user_id = $2
-      WHERE l.id = $1
-        AND (l.owner_id = $2 OR lm.user_id = $2)
-      LIMIT 1
-    `,
-    [listId, userId]
-  );
-
-  return Boolean(result.rows[0]);
-}
 
 function upsertAutocompleteHistory(pool, { userId, listId, text, icon }) {
   return pool.query(
@@ -50,6 +33,16 @@ function normalizeDetails(details) {
   return trimmedDetails ? trimmedDetails : null;
 }
 
+/**
+ * Creates the authenticated list entry router.
+ *
+ * @param {object} [options] Router dependencies.
+ * @param {import("pg").Pool} [options.pool] Database pool.
+ * @param {import("express").RequestHandler} [options.requireAuthMiddleware] Auth middleware.
+ * @param {typeof defaultLogger} [options.logger] Application logger.
+ * @param {typeof defaultSseManager} [options.sseManager] SSE broadcaster.
+ * @returns {import("express").Router} Configured entry router.
+ */
 export function createEntryRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth,

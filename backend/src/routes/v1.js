@@ -2,30 +2,13 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { logger as defaultLogger } from "../logger.js";
 import { createRequireApiKey } from "../middleware/auth.js";
+import { ensureListAccess } from "../middleware/listAccess.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isValidUuid(id) {
   return typeof id === "string" && UUID_RE.test(id);
-}
-
-async function ensureListAccess(pool, listId, userId) {
-  const result = await pool.query(
-    `
-      SELECT l.id
-      FROM lists l
-      LEFT JOIN list_members lm
-        ON lm.list_id = l.id
-       AND lm.user_id = $2
-      WHERE l.id = $1
-        AND (l.owner_id = $2 OR lm.user_id = $2)
-      LIMIT 1
-    `,
-    [listId, userId]
-  );
-
-  return Boolean(result.rows[0]);
 }
 
 function serializeItem(row) {
@@ -46,6 +29,16 @@ function broadcastListEvent({ sseManager, logger, pool, listId, eventType, data 
   }
 }
 
+/**
+ * Creates the external v1 API router.
+ *
+ * @param {object} [options] Router dependencies.
+ * @param {import("pg").Pool} [options.pool] Database pool.
+ * @param {import("express").RequestHandler} [options.requireApiKey] API key middleware override.
+ * @param {typeof defaultLogger} [options.logger] Application logger.
+ * @param {typeof defaultSseManager} [options.sseManager] SSE broadcaster.
+ * @returns {import("express").Router} Configured v1 router.
+ */
 export function createV1Router({
   pool = getPool(),
   requireApiKey,

@@ -1,25 +1,16 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { requireAuth } from "../middleware/auth.js";
+import { ensureListAccess } from "../middleware/listAccess.js";
 
-async function ensureListAccess(pool, listId, userId) {
-  const result = await pool.query(
-    `
-      SELECT l.id
-      FROM lists l
-      LEFT JOIN list_members lm
-        ON lm.list_id = l.id
-       AND lm.user_id = $2
-      WHERE l.id = $1
-        AND (l.owner_id = $2 OR lm.user_id = $2)
-      LIMIT 1
-    `,
-    [listId, userId]
-  );
-
-  return Boolean(result.rows[0]);
-}
-
+/**
+ * Creates the authenticated autocomplete suggestions router.
+ *
+ * @param {object} [options] Router dependencies.
+ * @param {import("pg").Pool} [options.pool] Database pool.
+ * @param {import("express").RequestHandler} [options.requireAuthMiddleware] Auth middleware.
+ * @returns {import("express").Router} Configured suggestions router.
+ */
 export function createSuggestionsRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth

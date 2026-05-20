@@ -440,7 +440,7 @@ export const ICON_REGISTRY: Readonly<Record<string, ComponentType<IconProps>>> =
 
 export const FALLBACK_ICON_NAME = "IconShoppingCart";
 // Future icon renames should add one alias entry here instead of patching each caller.
-export const ICON_ALIASES: Readonly<Record<string, string>> = Object.freeze({});
+const ICON_ALIASES: Readonly<Record<string, string>> = Object.freeze({});
 export const ICON_REGISTRY_KEYS = Object.freeze(Object.keys(ICON_REGISTRY));
 
 export function resolveIconName(name: string | null | undefined): string | null {

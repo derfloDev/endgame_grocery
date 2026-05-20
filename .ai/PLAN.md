@@ -1,100 +1,184 @@
 # Plan
 
-Status: **ready**
+Status: **ready_for_implement**
 
-Goal: Enforce per-list entry limits to prevent unbounded database growth.
+Goal: Code Cleanup, Sicherheits-Audit und Release 1.0.0 gemäß `ROADMAP.md`.
+
+## Audit-Ergebnisse (Zusammenfassung)
+
+| Kategorie | Befund | Priorität |
+|-----------|--------|-----------|
+| DRY-Verletzung | `ensureListAccess()` 4× dupliziert in entries.js, history.js, suggestions.js, v1.js | P0 |
+| Sicherheit | `protobufjs` (critical, transitiv via @xenova/transformers); `bcrypt@5` + `node-pg-migrate@7` veraltet (high) | P0 |
+| JSDoc | Alle Backend-Route-Factories und Hilfsfunktionen (auth.js, inviteService.js, sseManager.js) ohne JSDoc | P1 |
+| Dead Code | Keine eindeutigen Fälle – statische Analyse (ts-unused-exports, depcheck) zur Bestätigung nötig | P1 |
+| Refactoring | `ListDetailPage.tsx` (616 Zeilen, 11 useState-Hooks, ≥5 Verantwortlichkeiten) | P2 |
+| Namenskonventionen | Vollständig konform – kein Handlungsbedarf | — |
+| TypeScript | Exzellent – keine `any`-Typen, vollständige Return-Types | — |
+| XSS / SQLi | Keine Risiken gefunden | — |
+| Hardcoded Secrets | Keine gefunden | — |
+| Fehlerbehandlung | Sicher – kein Stack-Trace in HTTP-Responses | — |
+| Auth-Middleware | Konsistent auf alle geschützten Routen angewendet | — |
+
+---
 
 ## Scope
 
-Two independent limits apply to entries per list:
+### T-001 — Dead Code Scan & Removal
 
-| Limit | Trigger | Behaviour |
-|---|---|---|
-| 1 000 open entries | `POST /api/lists/:id/entries` | Reject with HTTP 422 + error message |
-| 200 done entries | `PATCH /api/lists/:id/entries/:entryId` (status → "done") | Auto-delete oldest done entry, then complete the update |
+**Ziel:** Bestätigte tote Imports, Variablen und Funktionen entfernen.
 
-Both limits are enforced entirely in the backend. The frontend already surfaces backend error strings via the existing `entryError` banner in `ListDetailPage` — no frontend code changes are required.
+**Vorgehen:**
+1. `npx ts-unused-exports tsconfig.json` im Frontend ausführen und Ergebnis sichten.
+2. `npx depcheck` im Root ausführen und ungenutzte Pakete identifizieren.
+3. `frontend/src/workers/iconWorkerClient.ts` – prüfen, ob alle Exports verwendet werden.
+4. Bestätigte Dead-Code-Funde entfernen. Bei Unsicherheit konservativ bleiben (nicht löschen).
+5. `npm run lint && npm run build && npm test` grün bestätigen.
+
+**Files to change:**
+- Jede Datei mit bestätigtem Dead Code (erst nach Analyse bekannt).
+- Keine Dokumentations-Updates erforderlich (keine API/Verhaltensänderung).
+
+---
+
+### T-002 — Backend DRY: `ensureListAccess` in Shared Middleware
+
+**Ziel:** 4× identisch duplizierte `ensureListAccess`-Funktion in eine gemeinsame Datei auslagern.
+
+**Vorgehen:**
+1. Neue Datei `backend/src/middleware/listAccess.js` anlegen.
+2. Funktion `ensureListAccess(pool, listId, userId)` mit vollständigem JSDoc dorthin verschieben.
+3. In folgenden Dateien den lokalen Block entfernen und den Import ergänzen:
+   - `backend/src/routes/entries.js` (Zeile 11–27)
+   - `backend/src/routes/history.js` (Zeile 5–21)
+   - `backend/src/routes/suggestions.js` (Zeile 5–21)
+   - `backend/src/routes/v1.js` (Zeile 13–29)
+4. `npm run lint && npm run build && npm test` grün bestätigen.
+
+**Files to change:**
+- `backend/src/middleware/listAccess.js` (neu)
+- `backend/src/routes/entries.js`
+- `backend/src/routes/history.js`
+- `backend/src/routes/suggestions.js`
+- `backend/src/routes/v1.js`
+
+---
+
+### T-003 — Backend JSDoc Annotations
+
+**Ziel:** Alle exportierten und öffentlich genutzten Backend-Funktionen mit JSDoc (`@param`, `@returns`) versehen.
+
+**Scope (prioritisiert):**
+
+**`backend/src/routes/auth.js`:**
+- `createAuthRouter({ pool, logger, config, mailer, jwtLib })` – Route-Factory
+- `createToken({ jwtLib, config, userId })` – Token-Helper
+- `addHours(date, hours)` – Datum-Helper
+- `buildAppUrl(baseUrl, path)` – URL-Helper
+- `isInviteEmailMatch(email, invite)` – Validierungs-Helper
+- `serializeAuthUser(user)` – Serialisierungs-Helper
+- `sendVerificationEmail({ config, mailer, token, user })`
+- `sendPasswordResetEmail(...)` / `sendInviteEmail(...)`
+
+**`backend/src/routes/entries.js`:** `createEntryRouter(...)` – Factory
+**`backend/src/routes/lists.js`:** `createListRouter(...)` – Factory
+**`backend/src/routes/sharing.js`:** `createSharingRouter(...)` – Factory
+**`backend/src/routes/history.js`:** `createHistoryRouter(...)` – Factory
+**`backend/src/routes/suggestions.js`:** `createSuggestionsRouter(...)` – Factory
+**`backend/src/routes/push.js`:** Route-Factory (falls vorhanden)
+
+**`backend/src/inviteService.js`:**
+- `getPendingInviteByToken(pool, token, now)`
+- `acceptInviteForUser({ pool, invite, userId })`
+
+**`backend/src/sseManager.js` (Klasse `SseManager`):**
+- Klassen-JSDoc
+- `add(userId, res)`, `remove(userId, res)`, `sendToUsers(userIds, eventType, data)`, `broadcastToList(pool, listId, eventType, data)`
+
+5. `npm run lint` grün bestätigen.
+
+**Files to change:**
+- `backend/src/routes/auth.js`
+- `backend/src/routes/entries.js`
+- `backend/src/routes/lists.js`
+- `backend/src/routes/sharing.js`
+- `backend/src/routes/history.js`
+- `backend/src/routes/suggestions.js`
+- `backend/src/routes/push.js`
+- `backend/src/inviteService.js`
+- `backend/src/sseManager.js`
+
+---
+
+### T-004 — Frontend Refactoring: `useListDetailData`-Hook
+
+**Ziel:** `ListDetailPage.tsx` (616 Zeilen, 11 useState-Hooks, ≥5 Verantwortlichkeiten) entlasten, indem die Datenabruf-Logik in einen eigenen Hook ausgelagert wird.
+
+**Vorgehen:**
+1. Neuen Hook `frontend/src/pages/ListDetailPage/useListDetailData.ts` anlegen.
+2. In den Hook verschieben:
+   - `useState`-Variablen für `list`, `entries`, `members`, `history` und die zugehörigen Loading-/Error-States.
+   - `loadEntries()`-Callback.
+   - `loadMembers()`-Callback.
+   - Den `useEffect`, der paralleles Laden von Listen, Entries und History steuert.
+3. `ListDetailPage.tsx` importiert und nutzt den Hook statt der direkten State-Definitionen.
+4. Bestehende Tests müssen weiterhin grün bleiben.
+5. `npm run lint && npm run build && npm test` grün bestätigen.
+
+**Files to change:**
+- `frontend/src/pages/ListDetailPage/useListDetailData.ts` (neu)
+- `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`
+
+---
+
+### T-005 — Sicherheits-Audit & Dependency-Upgrades
+
+**Ziel:** Kritische und hohe CVEs beseitigen; manuelle Sicherheitscheckliste abarbeiten.
+
+**Befunde aus `npm audit`:**
+- **critical**: `protobufjs` (transitiv via `@xenova/transformers`) → Erfordert Untersuchung, ob `@xenova/transformers` auf eine nicht-vulnerable Version aktualisiert oder durch `@huggingface/transformers` ersetzt werden kann. Downgrade auf 2.0.1 ist keine valide Option.
+- **high**: `bcrypt@5` → Upgrade auf `bcrypt@6.0.0` (breaking: Node.js ≥ 18 erwartet; API-kompatibel).
+- **high**: `node-pg-migrate@7` → Upgrade auf `node-pg-migrate@8.0.4` (breaking: Migration-Script-API prüfen).
+- **high**: mehrere transitive Deps (`@babel/...`, `rollup/...`, `serialize-javascript`, `workbox-build`) → `npm audit fix` versuchen.
+
+**Vorgehen:**
+1. `npm audit fix` ausführen (auto-fixbare transitive Deps).
+2. `bcrypt` auf v6 upgraden: `npm install bcrypt@^6 -w backend`. Smoke-Test: Passwort-Hash/-Verify im Test grün.
+3. `node-pg-migrate` auf v8 upgraden: `npm install node-pg-migrate@^8 -w backend`. Migration-Script testen.
+4. `@xenova/transformers` analysieren: neueste stabile `@huggingface/transformers`-Version prüfen (der offizielle Nachfolger). Falls kompatibel, migrieren; ansonsten Risiko in Sicherheitsdokumentation festhalten.
+5. `npm audit` erneut ausführen und Ergebnisse dokumentieren.
+6. `npm run lint && npm run build && npm test` grün bestätigen.
+
+**Manuelle Code-Review-Checkliste (gemäß Audit-Ergebnissen bereits geprüft):**
+
+| Punkt | Befund | Status |
+|-------|--------|--------|
+| Hardcoded Secrets | Keine gefunden | ✅ |
+| SQL-Injection | Parametrisierte Queries, keine Risiken | ✅ |
+| XSS (dangerouslySetInnerHTML) | Nicht verwendet | ✅ |
+| Error Handling (Stack Trace in Response) | Generische 500-Meldung, sicher | ✅ |
+| JWT-Konfiguration | HS256, Expiry konfiguriert, Secret aus env | ✅ |
+| Auth-Middleware-Konsistenz | Alle geschützten Routen abgesichert | ✅ |
+| Token-Storage (localStorage) | Akzeptabel für PWA; Risiko dokumentiert | ⚠️ |
+
+**Files to change:**
+- `backend/package.json` (bcrypt, node-pg-migrate Version)
+- `frontend/package.json` (@xenova/transformers oder @huggingface/transformers)
+- `package-lock.json`
+- Ggf. `backend/src/` wenn Breaking Changes bei Upgrades Anpassungen erfordern.
+
+---
 
 ## Acceptance Criteria
 
-1. `POST` that would create the 1 001st open entry → HTTP 422 `{ error: "..." }`, no row inserted.
-2. `POST` that creates the 1 000th open entry → HTTP 201, succeeds normally.
-3. `PATCH status=done` when list already has 200 done entries → oldest done entry deleted, entry updated, HTTP 200.
-4. `PATCH status=done` when list has fewer than 200 done entries → unaffected.
-5. `PATCH` to fields other than `status` (or `status=open`) is never subject to the done-evict logic.
-6. All existing entry-route tests continue to pass.
-7. New unit tests cover the boundary conditions (999→1000 success, 1000→fail, 199→200 success+no-evict, 200→evict+succeed).
-
-## Implementation
-
-### Task T-001 — Enforce entry limits (backend)
-
-**File:** `backend/src/routes/entries.js`
-
-#### POST handler — open-entry cap
-
-After `ensureListAccess` passes (before the `INSERT`), add a COUNT query:
-
-```js
-const countResult = await pool.query(
-  `SELECT COUNT(*) AS cnt FROM entries WHERE list_id = $1 AND status = 'open'`,
-  [req.params.id]
-);
-if (Number(countResult.rows[0].cnt) >= 1000) {
-  res.status(422).json({
-    error:
-      "This list has reached the maximum of 1,000 open entries. Please complete or remove some items first."
-  });
-  return;
-}
-```
-
-The INSERT that follows is unchanged.
-
-#### PATCH handler — done-entry auto-evict
-
-After `ensureListAccess` passes and **only when** the incoming `status` field equals `"done"`, add a count-and-evict step before the UPDATE:
-
-```js
-if (status === "done") {
-  const doneCount = await pool.query(
-    `SELECT COUNT(*) AS cnt FROM entries WHERE list_id = $1 AND status = 'done'`,
-    [req.params.id]
-  );
-  if (Number(doneCount.rows[0].cnt) >= 200) {
-    await pool.query(
-      `DELETE FROM entries
-       WHERE id = (
-         SELECT id FROM entries
-         WHERE list_id = $1 AND status = 'done'
-         ORDER BY updated_at ASC, created_at ASC
-         LIMIT 1
-       )`,
-      [req.params.id]
-    );
-  }
-}
-```
-
-The existing UPDATE query that follows is unchanged.
-
-**Atomicity note:** The evict and the update are two separate `pool.query` calls (consistent with the rest of the file). A failure between the two is extremely unlikely given the guard above but is acceptable for this use case.
-
-### Task T-001 — Tests
-
-**File:** `backend/src/entries.test.js`
-
-Add a new `describe` block (or extend existing) with the following cases:
-
-| Test | Pool mock strategy |
-|---|---|
-| POST rejects at 1 001st open entry (returns 422) | Access check → COUNT = 1000 → assert no INSERT called |
-| POST succeeds at 1 000th open entry (COUNT = 999) | Access check → COUNT = 999 → INSERT succeeds → 201 |
-| PATCH to `done` with 200 existing done entries → evict oldest, then update | Access check → COUNT = 200 → DELETE (check SQL) → UPDATE |
-| PATCH to `done` with 199 existing done entries → no evict | Access check → COUNT = 199 → UPDATE directly |
-| PATCH to other fields (text only) → count query never called | Access check → UPDATE |
-
-Follow the existing mock-pool pattern in `entries.test.js`: track `callCount`, assert SQL patterns and params per call, use `assert.fail` for unexpected calls.
+| Task | Kriterium |
+|------|-----------|
+| T-001 | Keine ungenutzten Importe/Variablen (bestätigt durch ts-unused-exports); Build grün |
+| T-002 | `ensureListAccess` nur noch in `middleware/listAccess.js`; alle Backend-Tests grün |
+| T-003 | Alle exportierten Backend-Funktionen haben JSDoc mit `@param` und `@returns`; Lint grün |
+| T-004 | `ListDetailPage.tsx` unter 400 Zeilen; `useListDetailData`-Hook exportiert; Tests grün |
+| T-005 | `npm audit`: keine critical, keine high Findings in Prod-Deps; oder dokumentierte Ausnahmen |
+| Alle | `npm run lint && npm run build && npm test` grün |
 
 ## Validation
 
@@ -102,4 +186,5 @@ Follow the existing mock-pool pattern in `entries.test.js`: track `callCount`, a
 npm run lint
 npm run build
 npm test
+npm audit
 ```

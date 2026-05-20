@@ -7,6 +7,20 @@ import createMailer from "../mail/mailer.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
+/**
+ * Creates the authenticated list sharing router.
+ *
+ * @param {object} [options] Router dependencies.
+ * @param {import("pg").Pool} [options.pool] Database pool.
+ * @param {import("express").RequestHandler} [options.requireAuthMiddleware] Auth middleware.
+ * @param {ReturnType<typeof getConfig>} [options.config] Runtime configuration.
+ * @param {typeof defaultLogger} [options.logger] Application logger.
+ * @param {typeof defaultSseManager} [options.sseManager] SSE broadcaster.
+ * @param {ReturnType<typeof createMailer>} [options.mailer] Mail delivery adapter.
+ * @param {() => string} [options.generateInviteToken] Invite token generator.
+ * @param {() => Date} [options.now] Current-time provider.
+ * @returns {import("express").Router} Configured sharing router.
+ */
 export function createSharingRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth,
@@ -222,6 +236,14 @@ export function createSharingRouter({
   return router;
 }
 
+/**
+ * Loads a list row when the user owns the list.
+ *
+ * @param {import("pg").Pool} pool Database pool.
+ * @param {string} listId List identifier.
+ * @param {string} ownerId Candidate owner user identifier.
+ * @returns {Promise<object | null>} Owned list row, or null when the user is not the owner.
+ */
 async function getOwnedList(pool, listId, ownerId) {
   const result = await pool.query(
     `
@@ -243,16 +265,43 @@ async function getOwnedList(pool, listId, ownerId) {
   return result.rows[0] ?? null;
 }
 
+/**
+ * Adds days to a date.
+ *
+ * @param {Date} date Base date.
+ * @param {number} days Days to add.
+ * @returns {Date} Shifted date.
+ */
 function addDays(date, days) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
+/**
+ * Builds an application URL from the configured base URL and path.
+ *
+ * @param {string} baseUrl Application base URL.
+ * @param {string} path Absolute application path.
+ * @returns {string} Full application URL or path when no base URL is configured.
+ */
 function buildAppUrl(baseUrl, path) {
   const normalizedBaseUrl = baseUrl?.replace(/\/$/, "") ?? "";
 
   return normalizedBaseUrl ? `${normalizedBaseUrl}${path}` : path;
 }
 
+/**
+ * Sends an invite email for either an existing or new user.
+ *
+ * @param {object} options Invite email options.
+ * @param {ReturnType<typeof getConfig>} options.config Runtime configuration.
+ * @param {string} options.inviteToken Invite token.
+ * @param {string} options.invitedEmail Invite recipient email.
+ * @param {string} options.inviterName Inviting user's display name.
+ * @param {string} options.listName Shared list name.
+ * @param {ReturnType<typeof createMailer>} options.mailer Mail delivery adapter.
+ * @param {string} options.recipientName Existing user's display name, when available.
+ * @returns {Promise<void>} Resolves when the mailer accepts the message.
+ */
 async function sendInviteEmail({
   config,
   inviteToken,
@@ -295,6 +344,15 @@ async function sendInviteEmail({
   });
 }
 
+/**
+ * Sends an email when list access is revoked.
+ *
+ * @param {object} options Revocation email options.
+ * @param {string} options.listName List name.
+ * @param {ReturnType<typeof createMailer>} options.mailer Mail delivery adapter.
+ * @param {{ email: string, display_name: string }} options.member Removed member row.
+ * @returns {Promise<void>} Resolves when the mailer accepts the message.
+ */
 async function sendRevocationEmail({ listName, mailer, member }) {
   await mailer.send({
     to: member.email,

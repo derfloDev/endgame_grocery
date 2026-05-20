@@ -6,7 +6,7 @@ import { formatIconName, ICON_REGISTRY, ICON_REGISTRY_KEYS, resolveIconName } fr
 import { useAutocomplete } from "../../hooks/useAutocomplete";
 import { useIconSuggestion } from "../../hooks/useIconSuggestion";
 import AutocompleteSuggestions from "../AutocompleteSuggestions/AutocompleteSuggestions";
-import { BottomSheet } from "../ui";
+import BottomSheet from "../ui/BottomSheet/BottomSheet";
 import styles from "./AddItemSheet.module.css";
 
 interface AddItemSheetProps {

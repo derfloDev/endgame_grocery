@@ -1,4 +1,4 @@
-export interface IconDbEntry {
+interface IconDbEntry {
   label: string;
   icon: string;
   tags?: string[];

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { ReactElement } from "react";
-import { BottomSheet, Icon } from "../ui";
+import BottomSheet from "../ui/BottomSheet/BottomSheet";
+import Icon from "../ui/Icon/Icon";
 import styles from "./ListOptionsSheet.module.css";
 
 interface ListOptionsSheetProps {

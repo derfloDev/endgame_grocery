@@ -21,10 +21,10 @@ const cssSource = [
   .map((filePath) => readFileSync(path.resolve(import.meta.dirname, filePath), "utf8"))
   .join("\n");
 const pageSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage/ListDetailPage.tsx"), "utf8");
+const hookSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage/useListDetailData.ts"), "utf8");
 
 vi.mock("../api/entries", () => ({
   createEntry: vi.fn(),
-  deleteEntry: vi.fn(),
   fetchEntries: vi.fn(),
   updateEntry: vi.fn()
 }));
@@ -290,5 +290,13 @@ describe("ListDetailPage layout styles", () => {
     expect(pageSource).toContain("EntryTile");
     expect(pageSource).not.toContain("handleDeleteEntry");
     expect(pageSource).not.toContain("deleteEntry");
+  });
+
+  it("keeps list detail data loading in a dedicated hook", () => {
+    expect(pageSource.split(/\r?\n/).length).toBeLessThan(400);
+    expect(pageSource).toContain('from "./useListDetailData"');
+    expect(hookSource).toContain("export function useListDetailData");
+    expect(hookSource).toContain("loadEntries");
+    expect(hookSource).toContain("loadMembers");
   });
 });

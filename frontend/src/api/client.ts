@@ -3,7 +3,7 @@ import type { QueueMeta } from "../types";
 
 export const OFFLINE_SYNC_COMPLETE_EVENT = "endgame_grocery.offline_sync_complete";
 
-export interface SendJsonRequestOptions {
+interface SendJsonRequestOptions {
   token?: string;
   method?: string;
   payload?: unknown;
@@ -29,7 +29,7 @@ export function createCacheKey(resource: string, suffix = ""): string {
   return suffix ? `${resource}:${suffix}` : resource;
 }
 
-export function isNetworkError(error: unknown): boolean {
+function isNetworkError(error: unknown): boolean {
   return error instanceof TypeError || (error instanceof Error && error.message === "Failed to fetch");
 }
 

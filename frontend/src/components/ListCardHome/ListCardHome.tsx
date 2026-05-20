@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { KeyboardEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import type { List } from "../../types";
-import { Icon } from "../ui";
+import Icon from "../ui/Icon/Icon";
 import styles from "./ListCardHome.module.css";
 
 interface HomeList extends List {

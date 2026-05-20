@@ -41,46 +41,45 @@ describe("iconWorkerClient", () => {
   });
 
   it("primes the shared worker with an init message", async () => {
-    const { getIconWorker, primeIconWorker } = await import("./iconWorkerClient");
+    const { primeIconWorker } = await import("./iconWorkerClient");
 
     primeIconWorker();
 
-    const worker = getIconWorker();
+    const worker = MockWorker.instances[0];
 
     expect(worker).toBeInstanceOf(MockWorker);
-    expect((worker as MockWorker | null)?.options).toEqual({ type: "module" });
-    expect((worker as MockWorker | null)?.postMessage).toHaveBeenCalledWith({ type: "init" });
+    expect(worker?.options).toEqual({ type: "module" });
+    expect(worker?.postMessage).toHaveBeenCalledWith({ type: "init" });
   });
 
   it("rejects pending matches and recreates the worker after an error", async () => {
-    const { getIconWorker, requestIconMatch } = await import("./iconWorkerClient");
-    const firstWorker = getIconWorker();
+    const { requestIconMatch } = await import("./iconWorkerClient");
     const firstRequest = requestIconMatch("Gemuese");
+    const firstWorker = MockWorker.instances[0];
 
-    expect((firstWorker as MockWorker | null)?.postMessage).toHaveBeenCalledWith({
+    expect(firstWorker?.postMessage).toHaveBeenCalledWith({
       type: "match",
       id: 0,
       text: "Gemuese"
     });
 
-    (firstWorker as MockWorker | null)?.dispatch("error");
+    firstWorker?.dispatch("error");
 
     await expect(firstRequest).rejects.toThrow("Icon worker failed.");
 
-    const secondWorker = getIconWorker();
+    const secondRequest = requestIconMatch("Gemuese");
+    const secondWorker = MockWorker.instances[1];
 
     expect(secondWorker).toBeInstanceOf(MockWorker);
     expect(secondWorker).not.toBe(firstWorker);
 
-    const secondRequest = requestIconMatch("Gemuese");
-
-    expect((secondWorker as MockWorker | null)?.postMessage).toHaveBeenCalledWith({
+    expect(secondWorker?.postMessage).toHaveBeenCalledWith({
       type: "match",
       id: 1,
       text: "Gemuese"
     });
 
-    (secondWorker as MockWorker | null)?.dispatch("message", new MessageEvent("message", {
+    secondWorker?.dispatch("message", new MessageEvent("message", {
       data: {
         type: "matchResult",
         id: 1,

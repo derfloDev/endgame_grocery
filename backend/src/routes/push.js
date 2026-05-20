@@ -3,6 +3,15 @@ import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { requireAuth } from "../middleware/auth.js";
 
+/**
+ * Creates the push notification router.
+ *
+ * @param {object} [options] Router dependencies.
+ * @param {import("pg").Pool} [options.pool] Database pool.
+ * @param {ReturnType<typeof getConfig>} [options.config] Runtime configuration.
+ * @param {import("express").RequestHandler} [options.requireAuthMiddleware] Auth middleware.
+ * @returns {import("express").Router} Configured push router.
+ */
 export function createPushRouter({
   pool = getPool(),
   config = getConfig(),

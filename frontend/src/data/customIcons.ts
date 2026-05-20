@@ -66,7 +66,7 @@ type CustomIconProps = IconProps & {
   color?: string;
 };
 
-export function normalizeCustomIcon(
+function normalizeCustomIcon(
   SvgComponent: ComponentType<SVGProps<SVGSVGElement>>,
   displayName: string
 ): FC<CustomIconProps> {
