@@ -109,3 +109,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-05-20T15:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 JSDoc annotations: all 26 plan targets covered with @param/@returns, jsdoc.test.js passes, 154/154 backend tests green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-05-20T15:37:34Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added JSDoc coverage for planned backend route factories, auth/sharing helpers, invite helpers, and SSE manager APIs. |
+| Files Changed | backend/src/jsdoc.test.js, backend/src/routes/auth.js, backend/src/routes/entries.js, backend/src/routes/lists.js, backend/src/routes/sharing.js, backend/src/routes/history.js, backend/src/routes/suggestions.js, backend/src/routes/push.js, backend/src/routes/v1.js, backend/src/inviteService.js, backend/src/sseManager.js, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `node --test src/jsdoc.test.js` pass; `npm run lint` pass with existing AuthContext fast-refresh warning; `npm run build` pass with existing transformer/bundle warnings; `npm test` pass |
+| Commit | `docs(backend): document route factories and helpers` |
+| Next Role | review |
+
+---
+
+### T-003 — commit_task — 2026-05-20T16:21:27Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-003 done and committed the reviewed backend JSDoc documentation update. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Review passed; no additional validation run during commit step |
+| Commit | `docs(backend): document route factories and helpers` |
+| Next Role | none |
+
+---

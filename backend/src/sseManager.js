@@ -1,8 +1,18 @@
+/**
+ * Tracks server-sent event connections and broadcasts list events.
+ */
 export class SseManager {
   constructor() {
     this.connections = new Map();
   }
 
+  /**
+   * Adds a response stream to a user's active SSE connections.
+   *
+   * @param {string} userId User identifier.
+   * @param {import("http").ServerResponse} res Open SSE response.
+   * @returns {void}
+   */
   add(userId, res) {
     if (!this.connections.has(userId)) {
       this.connections.set(userId, new Set());
@@ -11,6 +21,13 @@ export class SseManager {
     this.connections.get(userId).add(res);
   }
 
+  /**
+   * Removes a response stream from a user's active SSE connections.
+   *
+   * @param {string} userId User identifier.
+   * @param {import("http").ServerResponse} res SSE response to remove.
+   * @returns {void}
+   */
   remove(userId, res) {
     const userConnections = this.connections.get(userId);
 
@@ -25,6 +42,14 @@ export class SseManager {
     }
   }
 
+  /**
+   * Sends an event payload to all active connections for the given users.
+   *
+   * @param {Iterable<string>} userIds User identifiers.
+   * @param {string} eventType SSE event type.
+   * @param {unknown} data JSON-serializable event payload.
+   * @returns {void}
+   */
   sendToUsers(userIds, eventType, data) {
     const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
 
@@ -50,6 +75,15 @@ export class SseManager {
     }
   }
 
+  /**
+   * Broadcasts an event to the owner and members of a list.
+   *
+   * @param {import("pg").Pool} pool Database pool.
+   * @param {string} listId List identifier.
+   * @param {string} eventType SSE event type.
+   * @param {unknown} data JSON-serializable event payload.
+   * @returns {Promise<void>} Resolves after recipients are queried and notified.
+   */
   async broadcastToList(pool, listId, eventType, data) {
     if (!pool) {
       throw new Error("Database connection is not configured.");

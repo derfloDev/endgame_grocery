@@ -33,6 +33,16 @@ function normalizeDetails(details) {
   return trimmedDetails ? trimmedDetails : null;
 }
 
+/**
+ * Creates the authenticated list entry router.
+ *
+ * @param {object} [options] Router dependencies.
+ * @param {import("pg").Pool} [options.pool] Database pool.
+ * @param {import("express").RequestHandler} [options.requireAuthMiddleware] Auth middleware.
+ * @param {typeof defaultLogger} [options.logger] Application logger.
+ * @param {typeof defaultSseManager} [options.sseManager] SSE broadcaster.
+ * @returns {import("express").Router} Configured entry router.
+ */
 export function createEntryRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth,

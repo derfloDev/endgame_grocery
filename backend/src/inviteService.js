@@ -1,3 +1,11 @@
+/**
+ * Finds a pending, unexpired invite by token.
+ *
+ * @param {import("pg").Pool} pool Database pool.
+ * @param {string} token Invite token.
+ * @param {Date} now Current time.
+ * @returns {Promise<object | null>} Pending invite row, or null when not found.
+ */
 export async function getPendingInviteByToken(pool, token, now) {
   const result = await pool.query(
     `
@@ -14,6 +22,15 @@ export async function getPendingInviteByToken(pool, token, now) {
   return result.rows[0] ?? null;
 }
 
+/**
+ * Accepts an invite for a user and adds list membership when needed.
+ *
+ * @param {object} options Invite acceptance options.
+ * @param {import("pg").Pool} options.pool Database pool.
+ * @param {{ id: string, list_id: string }} options.invite Invite row.
+ * @param {string} options.userId User accepting the invite.
+ * @returns {Promise<{ listId: string, memberAdded: boolean }>} Acceptance result.
+ */
 export async function acceptInviteForUser({ pool, invite, userId }) {
   const existingMemberResult = await pool.query(
     `

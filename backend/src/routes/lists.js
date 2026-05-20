@@ -4,6 +4,16 @@ import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
+/**
+ * Creates the authenticated list router.
+ *
+ * @param {object} [options] Router dependencies.
+ * @param {import("pg").Pool} [options.pool] Database pool.
+ * @param {import("express").RequestHandler} [options.requireAuthMiddleware] Auth middleware.
+ * @param {typeof defaultLogger} [options.logger] Application logger.
+ * @param {typeof defaultSseManager} [options.sseManager] SSE broadcaster.
+ * @returns {import("express").Router} Configured list router.
+ */
 export function createListRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth,

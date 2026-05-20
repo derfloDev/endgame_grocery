@@ -3,6 +3,14 @@ import { getPool } from "../db/client.js";
 import { requireAuth } from "../middleware/auth.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
 
+/**
+ * Creates the authenticated autocomplete suggestions router.
+ *
+ * @param {object} [options] Router dependencies.
+ * @param {import("pg").Pool} [options.pool] Database pool.
+ * @param {import("express").RequestHandler} [options.requireAuthMiddleware] Auth middleware.
+ * @returns {import("express").Router} Configured suggestions router.
+ */
 export function createSuggestionsRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth

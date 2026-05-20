@@ -29,6 +29,16 @@ function broadcastListEvent({ sseManager, logger, pool, listId, eventType, data 
   }
 }
 
+/**
+ * Creates the external v1 API router.
+ *
+ * @param {object} [options] Router dependencies.
+ * @param {import("pg").Pool} [options.pool] Database pool.
+ * @param {import("express").RequestHandler} [options.requireApiKey] API key middleware override.
+ * @param {typeof defaultLogger} [options.logger] Application logger.
+ * @param {typeof defaultSseManager} [options.sseManager] SSE broadcaster.
+ * @returns {import("express").Router} Configured v1 router.
+ */
 export function createV1Router({
   pool = getPool(),
   requireApiKey,
