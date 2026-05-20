@@ -2,51 +2,47 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
-## Task: T-001 — Automatic session-timeout redirect to login page
+## Task: T-001
 
 ### Review Round 1
 
-Status: **PASS_WITH_NOTES**
+Status: **complete**
 
-Reviewed: 2026-05-19
+Reviewed: 2026-05-20
 
 #### Findings
 
-- **nit** — `frontend/src/context/AuthContext.tsx` (useEffect handler)  
-  `navigate()` is called before `logout()` in `handleAuthExpired`, which is the reverse of the order stated in the plan ("calls `logout()` and then `navigate(...)`"). In React 18, both state updates are batched so there is no visible flash or incorrect re-render. Functionally correct; the ordering is safe. No fix required.
-
-- **nit** — `frontend/src/components/ProtectedRoute/ProtectedRoute.tsx`  
-  Added `readSessionExpiredRedirect()` helper + sessionStorage read. This file was not listed in the plan's "Files to Change" table. The addition is a valid resilience enhancement that handles the browser-back-button edge case (user navigates back to a protected route after the AuthContext redirect has already cleared the token). It does not contradict any acceptance criterion and tests pass. No fix required.
-
-- **nit** — `frontend/src/context/AuthContext.tsx` line 158 — pre-existing lint warning  
-  `react-refresh/only-export-components` warning for `useAuth`. Confirmed pre-existing (present at line 132 on the baseline commit); this task did not introduce it. No fix required.
+| # | Severity | Location | Description | Required Fix |
+|---|----------|----------|-------------|--------------|
+| 1 | minor | `backend/src/routes/entries.js:206` | PATCH with a non-existent `entryId` and `status=done` triggers the eviction DELETE before the UPDATE returns 404, permanently removing a done entry on an invalid request. Plan acknowledges non-atomic design as acceptable for this use case. | No — accepted trade-off per plan |
+| 2 | minor | `backend/src/entries.test.js` | No dedicated test explicitly named for AC2 ("POST at exactly 999 open entries → 201"); boundary is only covered implicitly via updated existing "creates an entry" tests that happen to return `cnt: "999"`. | No — implicitly covered |
+| 3 | nit | `backend/src/routes/entries.js` | Concurrent POST requests could each see `count < 1000` and both insert, transiently exceeding the cap. Plan accepts this non-atomic behaviour. | No — accepted trade-off per plan |
 
 #### Verification
 
 ##### Steps
-1. Read `.ai/PLAN.md` — verified scope, architecture, and acceptance criteria.
-2. `git diff HEAD` — reviewed all changed files against the plan.
-3. `npm run lint` (in `frontend/`) — confirmed 0 errors, 1 pre-existing warning.
-4. `npm run build` (in `frontend/`) — clean build with no new errors.
-5. `npm test` — all 416 tests pass, including:
-   - `src/api/client.test.ts` — 3 new unit tests covering 401+token, 401 no-token, 403+token paths.
-   - `src/context/AuthContext.test.tsx` — new test: `auth:expired` event → logout + navigate with correct state.
-   - `src/app.test.tsx` — new E2E tests: session-expired redirect + re-login return; wrong credentials stay on login; 403 keeps error UI.
+1. Read `.ai/PLAN.md` — verified all acceptance criteria, implementation guidance, and test table.
+2. Read `backend/src/routes/entries.js` — confirmed constants `MAX_OPEN_ENTRIES_PER_LIST = 1000` and `MAX_DONE_ENTRIES_PER_LIST = 200`, POST COUNT guard, PATCH evict-before-update logic, all matching the plan exactly.
+3. Read `backend/src/entries.test.js` — confirmed 2 new dedicated tests (`rejects entry creation when the list already has 1000 open entries`, `evicts the oldest done entry before marking another entry done at the done-entry limit`) plus correct updates to all existing POST tests to account for the new COUNT query step.
+4. Ran `node --test src/entries.test.js` (16 tests): **16 pass, 0 fail**.
+5. Ran `npm run lint`: **0 errors**, 1 pre-existing frontend Fast Refresh warning (unchanged from baseline).
+6. Ran `npm run build`: **pass**, pre-existing chunk size and eval warnings only.
+7. Reviewed `git diff HEAD -- README.md`: confirmed a single sentence added documenting the 1 000 open-entry cap and 200 done-entry auto-eviction behaviour.
 
 ##### Findings
-- All 7 plan-required files modified correctly.
-- `authStorage.ts` (new, unplanned) — tiny constant-only module; reduces magic-string duplication across three files. Sound addition.
-- `ProtectedRoute.tsx` (unplanned) — additive only; passes sessionExpired state through on browser-back navigations. Does not affect primary happy path.
-- Acceptance criteria met:
-  - ✅ 401 with token → redirect to `/login`, no generic error screen.
-  - ✅ Session-expired banner rendered in both DE and EN.
-  - ✅ Successful re-login returns user to original page.
-  - ✅ Wrong credentials do NOT trigger session-expired redirect or banner.
-  - ✅ 403 errors show existing error UI unchanged.
-  - ✅ `npm run lint` passes (0 errors).
-  - ✅ `npm run build` completes cleanly.
-  - ✅ `npm test` — 416/416 pass.
+- All 6 acceptance criteria from the plan are satisfied:
+  - AC1 ✅ POST at 1 001st open entry → 422, no INSERT (test `rejects entry creation…`, callCount = 2).
+  - AC2 ✅ POST at 1 000th open entry → 201 (existing tests updated with `cnt: "999"`, INSERT proceeds).
+  - AC3 ✅ PATCH→done at 200 done entries → oldest evicted then updated (test `evicts the oldest done entry…`).
+  - AC4 ✅ PATCH→done at <200 done entries → no evict (test `writes autocomplete history when an entry is marked done`, callCount = 4).
+  - AC5 ✅ PATCH non-status or status=open fields → no COUNT query called (existing icon/text-only tests with 2-query assertions).
+  - AC6 ✅ All 16 existing + new tests pass.
+- Documentation updated in `README.md` per AGENTS.md documentation rules.
+- Named constants used instead of magic numbers.
 
 ##### Risks
-- The `sessionStorage` fallback in `ProtectedRoute` and `LoginPage` relies on both reading the same key before LoginPage's cleanup `useEffect` fires. In the browser-back scenario this works correctly; in the direct navigate scenario both location.state and sessionStorage carry the flag and the cleanup runs on mount. No risk identified.
-- Dependency array `[location.pathname, logout, navigate]` in AuthContext is correct; `logout` is `useCallback`-wrapped, `navigate` is stable from React Router. No stale-closure risk.
+- Low: The non-atomic evict+update could theoretically delete a done entry on a 404 PATCH. Acknowledged and accepted per plan.
+- Low: Concurrent POSTs near the limit could briefly exceed 1 000 open entries. Accepted per plan.
+
+#### Verdict
+`PASS`

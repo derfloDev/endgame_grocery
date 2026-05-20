@@ -1,81 +1,105 @@
-# PLAN — Session-Timeout Redirect to Login
+# Plan
 
-Status: **ready_for_implement**
+Status: **ready**
 
-Goal: When a JWT token expires, the user is automatically redirected to `/login` with a session-expired info banner instead of seeing the generic "Etwas ist schiefgelaufen"-error.
+Goal: Enforce per-list entry limits to prevent unbounded database growth.
 
 ## Scope
 
-Single task: **T-001**.
+Two independent limits apply to entries per list:
 
----
+| Limit | Trigger | Behaviour |
+|---|---|---|
+| 1 000 open entries | `POST /api/lists/:id/entries` | Reject with HTTP 422 + error message |
+| 200 done entries | `PATCH /api/lists/:id/entries/:entryId` (status → "done") | Auto-delete oldest done entry, then complete the update |
 
-## Architecture
+Both limits are enforced entirely in the backend. The frontend already surfaces backend error strings via the existing `entryError` banner in `ListDetailPage` — no frontend code changes are required.
 
-### Mechanism: Custom DOM Event
+## Acceptance Criteria
 
+1. `POST` that would create the 1 001st open entry → HTTP 422 `{ error: "..." }`, no row inserted.
+2. `POST` that creates the 1 000th open entry → HTTP 201, succeeds normally.
+3. `PATCH status=done` when list already has 200 done entries → oldest done entry deleted, entry updated, HTTP 200.
+4. `PATCH status=done` when list has fewer than 200 done entries → unaffected.
+5. `PATCH` to fields other than `status` (or `status=open`) is never subject to the done-evict logic.
+6. All existing entry-route tests continue to pass.
+7. New unit tests cover the boundary conditions (999→1000 success, 1000→fail, 199→200 success+no-evict, 200→evict+succeed).
+
+## Implementation
+
+### Task T-001 — Enforce entry limits (backend)
+
+**File:** `backend/src/routes/entries.js`
+
+#### POST handler — open-entry cap
+
+After `ensureListAccess` passes (before the `INSERT`), add a COUNT query:
+
+```js
+const countResult = await pool.query(
+  `SELECT COUNT(*) AS cnt FROM entries WHERE list_id = $1 AND status = 'open'`,
+  [req.params.id]
+);
+if (Number(countResult.rows[0].cnt) >= 1000) {
+  res.status(422).json({
+    error:
+      "This list has reached the maximum of 1,000 open entries. Please complete or remove some items first."
+  });
+  return;
+}
 ```
-client.ts (401 + token present)
-  └─ window.dispatchEvent(new Event("auth:expired"))
-  └─ throw new AuthExpiredError()
 
-AuthContext.tsx (useEffect, event listener)
-  └─ logout()                      // clears token + localStorage
-  └─ navigate("/login", { replace: true, state: { from: location.pathname, sessionExpired: true } })
+The INSERT that follows is unchanged.
 
-LoginPage.tsx (reads location.state.sessionExpired)
-  └─ shows info banner: t("auth.sessionExpired")
+#### PATCH handler — done-entry auto-evict
+
+After `ensureListAccess` passes and **only when** the incoming `status` field equals `"done"`, add a count-and-evict step before the UPDATE:
+
+```js
+if (status === "done") {
+  const doneCount = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM entries WHERE list_id = $1 AND status = 'done'`,
+    [req.params.id]
+  );
+  if (Number(doneCount.rows[0].cnt) >= 200) {
+    await pool.query(
+      `DELETE FROM entries
+       WHERE id = (
+         SELECT id FROM entries
+         WHERE list_id = $1 AND status = 'done'
+         ORDER BY updated_at ASC, created_at ASC
+         LIMIT 1
+       )`,
+      [req.params.id]
+    );
+  }
+}
 ```
 
-### Why `AuthExpiredError`?
+The existing UPDATE query that follows is unchanged.
 
-Throwing a plain `Error` after dispatching the DOM event would still propagate to the calling page component (OverviewPage, ListDetailPage) and trigger the "Etwas ist schiefgelaufen" error state before the React Router navigation completes. By throwing a typed `AuthExpiredError`, the pages can detect it and render `null` instead of the error UI, avoiding any visible flash.
+**Atomicity note:** The evict and the update are two separate `pool.query` calls (consistent with the rest of the file). A failure between the two is extremely unlikely given the guard above but is acceptable for this use case.
 
-### 401 Exclusion for unauthenticated requests
+### Task T-001 — Tests
 
-The `auth:expired` event must only fire when the request was made with a token (i.e., `token !== ""`). This naturally excludes:
-- `POST /api/auth/login` — no token passed; 401 = wrong credentials
-- `POST /api/auth/register` — no token
-- `POST /api/auth/resend-verification` — no token
-- `POST /api/auth/reset-password` — no token
+**File:** `backend/src/entries.test.js`
 
-`GET /api/auth/me` **does** use a token and **should** trigger the redirect if the token is expired.
+Add a new `describe` block (or extend existing) with the following cases:
 
----
+| Test | Pool mock strategy |
+|---|---|
+| POST rejects at 1 001st open entry (returns 422) | Access check → COUNT = 1000 → assert no INSERT called |
+| POST succeeds at 1 000th open entry (COUNT = 999) | Access check → COUNT = 999 → INSERT succeeds → 201 |
+| PATCH to `done` with 200 existing done entries → evict oldest, then update | Access check → COUNT = 200 → DELETE (check SQL) → UPDATE |
+| PATCH to `done` with 199 existing done entries → no evict | Access check → COUNT = 199 → UPDATE directly |
+| PATCH to other fields (text only) → count query never called | Access check → UPDATE |
 
-## Task T-001: Automatic session-timeout redirect to login
-
-### Files to Change
-
-| # | File | Change |
-|---|------|--------|
-| 1 | `frontend/src/api/client.ts` | Export `AuthExpiredError` class. Inside `sendJsonRequest`, before the generic `throw new Error(...)`, check: if `response.status === 401` and `token` is non-empty, dispatch `window.dispatchEvent(new Event("auth:expired"))` and throw `new AuthExpiredError("session:expired")` instead. |
-| 2 | `frontend/src/context/AuthContext.tsx` | Import `useNavigate`, `useLocation` from react-router-dom. Add a `useEffect` (defined before the existing profile-rehydration `useEffect`) that registers an `auth:expired` event listener on `window`. The handler calls `logout()` and then `navigate("/login", { replace: true, state: { from: location.pathname, sessionExpired: true } })`. The `useEffect` must clean up the listener on unmount. Dependency array: `[logout, navigate, location.pathname]`. |
-| 3 | `frontend/src/pages/LoginPage/LoginPage.tsx` | Extend `LoginLocationState` interface to include `sessionExpired?: boolean`. Read `locationState?.sessionExpired` and render the `auth.sessionExpired` translation as an info banner (use `eg-success-banner` class for the info style, matching existing banner usage). Position the banner above the existing `successMessage` banner. The banner only renders when `sessionExpired` is `true`. |
-| 4 | `frontend/src/pages/OverviewPage/OverviewPage.tsx` | Import `AuthExpiredError` from `../../api/client`. Where the component renders `<ErrorState />` for a list-load error, add a guard: if the error is `instanceof AuthExpiredError`, render `null` instead. |
-| 5 | `frontend/src/pages/ListDetailPage/ListDetailPage.tsx` | Same as #4: import `AuthExpiredError`; render `null` instead of `<ErrorState />` when error is `instanceof AuthExpiredError`. |
-| 6 | `frontend/src/locales/de/translation.json` | Add key `"auth.sessionExpired": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an."` (after the `"auth.signIn"` key). |
-| 7 | `frontend/src/locales/en/translation.json` | Add key `"auth.sessionExpired": "Your session has expired. Please sign in again."` (after the `"auth.signIn"` key). |
-
-### Acceptance Criteria
-
-- [ ] Navigating to a protected page with an expired token redirects to `/login` without showing the generic error screen.
-- [ ] The login page displays the session-expired info banner (both DE and EN locales).
-- [ ] After a successful re-login, the user is returned to the original page (via `from` in `location.state`).
-- [ ] Entering wrong credentials on the login page does NOT trigger the session-expired redirect.
-- [ ] 403 access errors (e.g. "no access to this list") continue to display their existing error UI unchanged.
-- [ ] `npm run lint` passes without new errors.
-- [ ] `npm run build` completes without errors.
-
-### Implementation Notes
-
-- `AuthExpiredError` is a plain subclass of `Error`; set `this.name = "AuthExpiredError"` in the constructor for reliable `instanceof` checks across module boundaries.
-- The `useEffect` event listener in `AuthContext` depends on `logout`, `navigate`, and `location.pathname`. `logout` is already wrapped via `setAuthToken`'s `useCallback`. `navigate` is stable from React Router.
-- Do NOT dispatch the event from the network-error catch block — only from the `if (!response.ok)` HTTP path with status 401.
-- The `successMessage` banner and the `sessionExpired` banner are mutually exclusive in practice but can coexist in code without conflict.
+Follow the existing mock-pool pattern in `entries.test.js`: track `callCount`, assert SQL patterns and params per call, use `assert.fail` for unexpected calls.
 
 ## Validation
 
-- `npm run lint`
-- `npm run build`
-- `npm test`
+```
+npm run lint
+npm run build
+npm test
+```

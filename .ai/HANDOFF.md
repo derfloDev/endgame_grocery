@@ -23,56 +23,55 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
-### T-001 — plan — 2026-05-19T00:00:00Z
+### T-001 — plan — 2026-05-20T00:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Planned automatic session-timeout redirect: 401 with token dispatches `auth:expired` DOM event; AuthContext handles logout + navigate to /login; LoginPage shows session-expired banner; OverviewPage and ListDetailPage suppress AuthExpiredError from showing generic error UI. |
-| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `ROADMAP.md` |
+| Summary | Planned per-list entry limits: HTTP 422 on POST when open entries ≥ 1 000; oldest done-entry auto-evict on PATCH status→done when done entries ≥ 200. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-05-19T11:50:09Z
+### T-001 — implement — 2026-05-20T10:52:17Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Implemented automatic session-expiry handling: authenticated 401s dispatch `auth:expired`, clear the local session, redirect to `/login` with a session-expired banner, and return users to the original protected page after login while keeping login 401s and 403s unchanged. |
-| Files Changed | `README.md`, `frontend/vite.config.ts`, `frontend/src/api/client.ts`, `frontend/src/api/client.test.ts`, `frontend/src/components/AddItemSheet/AddItemSheet.test.tsx`, `frontend/src/components/LanguageSwitcher/LanguageSwitcher.test.tsx`, `frontend/src/components/ProtectedRoute/ProtectedRoute.tsx`, `frontend/src/context/AuthContext.tsx`, `frontend/src/context/AuthContext.test.tsx`, `frontend/src/context/authStorage.ts`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/LoginPage/LoginPage.tsx`, `frontend/src/pages/OverviewPage/OverviewPage.tsx`, `frontend/src/app.test.tsx` |
-| Validation | `npm run lint` passed with existing Fast Refresh warning for `AuthContext.tsx`; `npm run build` passed with existing ONNX eval and chunk-size warnings; `npm test` passed (frontend 416/416, backend 149/149). |
-| Commit | `feat(auth): redirect expired sessions to login` |
+| Summary | Enforced authenticated entry caps: POST rejects lists with 1,000 open entries, and PATCH status `done` evicts the oldest done entry once 200 done entries already exist. |
+| Files Changed | `backend/src/routes/entries.js`, `backend/src/entries.test.js`, `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/entries.test.js` pass; first sandboxed run failed with `spawn EPERM`, approved rerun passed. `npm run lint` pass with existing frontend Fast Refresh warning. `npm run build` first hit 120s timeout, rerun with 300s timeout passed with existing Vite chunk/eval warnings. `npm test` failed only in frontend `src/app.test.tsx` timeout for "adds and edits entry details from the list detail sheet"; targeted rerun of that test also timed out. Backend tests in full suite passed. |
+| Commit | `feat(entries): enforce per-list entry limits` |
 | Next Role | review |
 
 ---
 
-### T-001 — review — 2026-05-19T12:35:00Z
+### T-001 — review — 2026-05-20T11:30:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed session-timeout redirect implementation; all acceptance criteria met, 416/416 tests pass, lint and build clean; approved with minor notes on logout/navigate order and unplanned ProtectedRoute enhancement (both non-blocking). |
-| Verdict | PASS_WITH_NOTES |
+| Summary | Reviewed per-list entry limit implementation; all 6 acceptance criteria verified, 16 backend tests pass, lint and build clean. |
+| Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-001 — commit_task — 2026-05-19T12:33:31Z
+### T-001 — commit_task — 2026-05-20T11:49:34Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Marked T-001 done and committed the approved session-timeout redirect implementation. |
-| Files Changed | `.ai/HANDOFF.md`, `.ai/TASKS.md`, all approved T-001 implementation and review files |
-| Validation | Reused approved validation from implementation/review: `npm run lint`, `npm run build`, `npm test` |
-| Commit | `feat(auth): redirect expired sessions to login` |
+| Summary | Marked T-001 done and committed the reviewed entry limit changes. |
+| Files Changed | `backend/src/routes/entries.js`, `backend/src/entries.test.js`, `README.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md`, `ROADMAP.md`, `.claude/settings.local.json` |
+| Commit | `feat(entries): enforce per-list entry limits` |
 | Next Role | none |
 
 ---
 
-### Cycle closed — unversioned — 2026-05-19T12:34:33Z
+### Cycle closed — unversioned — 2026-05-20T12:02:42Z
 
 | Field | Value |
 |-------|-------|

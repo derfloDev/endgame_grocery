@@ -1,21 +1,20 @@
 # ROADMAP
 
-Goal: When the user's session token expires, they are automatically redirected to the login page instead of seeing a generic error message.
+Goal: Prevent unbounded database growth by capping the number of list entries per list and per status.
 
 ## Priority 1
 
-Objective: Automatic session-timeout redirect to login page.
+Objective: Enforce per-list entry limits for "open" and "done" statuses.
 
-### Acceptance Criteria
-- When any API request returns HTTP 401 (expired/invalid token), the app clears the local session and navigates the user to `/login` immediately.
-- The login page shows a short hint: "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an." when redirected due to a session timeout.
-- The `from` location is preserved in `location.state` so the user lands back on the page they were on after a successful re-login.
-- The generic "Etwas ist schiefgelaufen"-error is **not** shown for session-timeout 401s.
-- Non-session 403 errors (e.g. "no access to this list") remain unchanged.
-- 401 errors during the login request itself (wrong credentials) are **not** treated as session expiry.
+- **Open-entry cap (1 000):** When a `POST /api/lists/:id/entries` request would create the 1 001st "open" entry in a list, reject the request with HTTP 422 and a user-readable error message. The frontend surfaces this message to the user.
+- **Done-entry cap (200, auto-evict):** When a `PATCH /api/lists/:id/entries/:entryId` request transitions an entry to `"done"` and the list already has 200 "done" entries, automatically delete the oldest "done" entry (by `updated_at` or `created_at`) before completing the update. No error is shown to the user.
+- The limits are enforced inside the existing route handlers in `backend/src/routes/entries.js` using a COUNT query before the mutating SQL.
+- Frontend receives the 422 error and displays an appropriate inline message to the user.
 
-### Technical Decisions
-- **Mechanism:** `client.ts` dispatches a global `auth:expired` DOM event on 401. `AuthContext` listens for this event, calls `logout()`, and navigates to `/login` with `{ state: { from: currentLocation, sessionExpired: true } }`.
-- 401 from `/api/auth/login` must **not** trigger the event (it's a credential error, not a session expiry).
-- The login-page info banner reads `sessionExpired` from `location.state` to decide whether to show the hint.
-- i18n keys are added to `de/translation.json` and `en/translation.json`.
+### Acceptance criteria
+- Creating the 1 001st open entry returns HTTP 422 with `{ error: "..." }` and no entry is inserted.
+- Creating the 1 000th open entry succeeds normally.
+- Transitioning to "done" when 200 done entries exist deletes the oldest done entry and completes the status change atomically; the caller receives the updated entry.
+- Transitioning to "done" when fewer than 200 done entries exist is unaffected.
+- All existing entry-creation and entry-update tests continue to pass.
+- New unit/integration tests cover the boundary conditions for both limits.

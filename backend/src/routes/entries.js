@@ -5,6 +5,9 @@ import { requireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 import { enqueuePushJob } from "../workers/pushWorker.js";
 
+const MAX_OPEN_ENTRIES_PER_LIST = 1000;
+const MAX_DONE_ENTRIES_PER_LIST = 200;
+
 async function ensureListAccess(pool, listId, userId) {
   const result = await pool.query(
     `
@@ -110,6 +113,23 @@ export function createEntryRouter({
         return;
       }
 
+      const openEntryCount = await pool.query(
+        `
+          SELECT COUNT(*) AS cnt
+          FROM entries
+          WHERE list_id = $1 AND status = 'open'
+        `,
+        [req.params.id]
+      );
+
+      if (Number(openEntryCount.rows[0]?.cnt) >= MAX_OPEN_ENTRIES_PER_LIST) {
+        res.status(422).json({
+          error:
+            "This list has reached the maximum of 1,000 open entries. Please complete or remove some items first."
+        });
+        return;
+      }
+
       const result = await pool.query(
         `
           INSERT INTO entries (list_id, text, status, icon, details)
@@ -171,6 +191,33 @@ export function createEntryRouter({
       if (!hasAccess) {
         res.status(403).json({ error: "You do not have access to this list." });
         return;
+      }
+
+      if (status === "done") {
+        const doneEntryCount = await pool.query(
+          `
+            SELECT COUNT(*) AS cnt
+            FROM entries
+            WHERE list_id = $1 AND status = 'done'
+          `,
+          [req.params.id]
+        );
+
+        if (Number(doneEntryCount.rows[0]?.cnt) >= MAX_DONE_ENTRIES_PER_LIST) {
+          await pool.query(
+            `
+              DELETE FROM entries
+              WHERE id = (
+                SELECT id
+                FROM entries
+                WHERE list_id = $1 AND status = 'done'
+                ORDER BY updated_at ASC, created_at ASC
+                LIMIT 1
+              )
+            `,
+            [req.params.id]
+          );
+        }
       }
 
       const result = await pool.query(
