@@ -76,7 +76,7 @@ function createIconWorker(): Worker | null {
   return worker;
 }
 
-export function getIconWorker(): Worker | null {
+function getIconWorker(): Worker | null {
   if (iconWorker == null) {
     iconWorker = createIconWorker();
   }

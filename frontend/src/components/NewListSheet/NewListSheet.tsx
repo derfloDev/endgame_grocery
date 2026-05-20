@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { BottomSheet } from "../ui";
+import BottomSheet from "../ui/BottomSheet/BottomSheet";
 import styles from "./NewListSheet.module.css";
 
 interface NewListSheetProps {

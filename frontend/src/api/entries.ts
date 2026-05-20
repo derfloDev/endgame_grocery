@@ -81,9 +81,3 @@ export function updateEntry(
     payload
   }) as Promise<EntryMutationResponse>;
 }
-
-export function deleteEntry(listId: string, entryId: string, token: string): Promise<unknown> {
-  return sendEntryRequest(listId, token, `/${entryId}`, {
-    method: "DELETE"
-  });
-}

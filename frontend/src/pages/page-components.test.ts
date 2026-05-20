@@ -17,8 +17,7 @@ const authPages = [
 
 const moduleClasses = {
   OverviewPage: ["overview-topbar", "overview-brand", "overview-content", "overview-header"],
-  ListDetailPage: ["detail-content", "detail-meta", "detail-member-badges", "entry-tile-grid"],
-  SearchPage: ["search-page", "search-page-title"]
+  ListDetailPage: ["detail-content", "detail-meta", "detail-member-badges", "entry-tile-grid"]
 } as const;
 
 describe("page CSS module layout", () => {

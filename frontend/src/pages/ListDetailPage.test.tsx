@@ -24,7 +24,6 @@ const pageSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailP
 
 vi.mock("../api/entries", () => ({
   createEntry: vi.fn(),
-  deleteEntry: vi.fn(),
   fetchEntries: vi.fn(),
   updateEntry: vi.fn()
 }));

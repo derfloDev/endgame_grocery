@@ -103,8 +103,6 @@
   "topbar.back": "Back",
   "topbar.action": "Open actions",
   "autocomplete.label": "Autocomplete suggestions",
-  "search.title": "Search",
-  "search.pageLabel": "Search page",
   "auth.welcomeBack": "Welcome Back",
   "auth.signIn": "Sign in to access your mission.",
   "auth.sessionExpired": "Your session has expired. Please sign in again.",

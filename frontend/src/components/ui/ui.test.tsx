@@ -1,21 +1,18 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  BottomSheet,
-  EmptyState,
-  ErrorState,
-  FAB,
-  Icon,
-  LoadingState,
-  TopBar
-} from ".";
+import BottomSheet from "./BottomSheet/BottomSheet";
+import EmptyState from "./EmptyState/EmptyState";
+import ErrorState from "./ErrorState/ErrorState";
+import FAB from "./FAB/FAB";
+import Icon from "./Icon/Icon";
+import LoadingState from "./LoadingState/LoadingState";
+import TopBar from "./TopBar/TopBar";
 
 const uiDir = import.meta.dirname;
-const indexSource = readFileSync(path.resolve(uiDir, "index.ts"), "utf8");
 
 describe("shared Endgame UI components", () => {
   afterEach(() => {
@@ -97,7 +94,7 @@ describe("shared Endgame UI components", () => {
     expect(className.split(" ").length).toBeGreaterThanOrEqual(3);
   });
 
-  it("exports UI primitives from their component folders", () => {
+  it("keeps UI primitives in their component folders", () => {
     const componentFiles = [
       "BottomSheet/BottomSheet.tsx",
       "EmptyState/EmptyState.tsx",
@@ -111,9 +108,5 @@ describe("shared Endgame UI components", () => {
     for (const fileName of componentFiles) {
       expect(existsSync(path.resolve(uiDir, fileName))).toBe(true);
     }
-
-    expect(indexSource).toContain('export { default as BottomSheet } from "./BottomSheet/BottomSheet";');
-    expect(indexSource).toContain('export { default as Icon } from "./Icon/Icon";');
-    expect(indexSource).not.toContain('from "./BottomSheet";');
   });
 });

@@ -68,7 +68,7 @@ export interface Suggestion {
 
 // Icon worker
 
-export interface TopMatch {
+interface TopMatch {
   iconName: string;
   score: number;
 }

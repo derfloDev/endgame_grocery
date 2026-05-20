@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../../data/iconRegistry";
 import type { Suggestion } from "../../types";
 import type { ReactElement } from "react";
-import { Icon } from "../ui";
+import Icon from "../ui/Icon/Icon";
 import styles from "./RecentlyUsedSection.module.css";
 
 interface RecentlyUsedSectionProps {

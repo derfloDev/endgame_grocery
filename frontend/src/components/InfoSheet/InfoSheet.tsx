@@ -5,7 +5,8 @@ import type { ReactElement } from "react";
 import { fetchApiKey, regenerateApiKey } from "../../api/auth";
 import { useAuth } from "../../context/AuthContext";
 import LanguageSwitcher from "../LanguageSwitcher/LanguageSwitcher";
-import { BottomSheet, Icon } from "../ui";
+import BottomSheet from "../ui/BottomSheet/BottomSheet";
+import Icon from "../ui/Icon/Icon";
 import styles from "./InfoSheet.module.css";
 
 interface InfoSheetProps {
