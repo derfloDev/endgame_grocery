@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0](https://github.com/derfloDev/endgame_grocery/compare/v0.20.0...v1.0.0) (2026-05-20)
+
+
+### Bug Fixes
+
+* **security:** upgrade vulnerable dependencies ([4e49d20](https://github.com/derfloDev/endgame_grocery/commit/4e49d20cfd0636935d877154b53c9b808f7dd155))
+
+
+### Miscellaneous Chores
+
+* **ai:** close cycle ([72df79d](https://github.com/derfloDev/endgame_grocery/commit/72df79daaa2cb65eb6564bbaef8e0661c67c5c75))
+
 ## [0.20.0](https://github.com/derfloDev/endgame_grocery/compare/v0.19.0...v0.20.0) (2026-05-20)
 
 
