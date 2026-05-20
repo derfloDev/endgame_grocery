@@ -2,30 +2,13 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { logger as defaultLogger } from "../logger.js";
 import { createRequireApiKey } from "../middleware/auth.js";
+import { ensureListAccess } from "../middleware/listAccess.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isValidUuid(id) {
   return typeof id === "string" && UUID_RE.test(id);
-}
-
-async function ensureListAccess(pool, listId, userId) {
-  const result = await pool.query(
-    `
-      SELECT l.id
-      FROM lists l
-      LEFT JOIN list_members lm
-        ON lm.list_id = l.id
-       AND lm.user_id = $2
-      WHERE l.id = $1
-        AND (l.owner_id = $2 OR lm.user_id = $2)
-      LIMIT 1
-    `,
-    [listId, userId]
-  );
-
-  return Boolean(result.rows[0]);
 }
 
 function serializeItem(row) {

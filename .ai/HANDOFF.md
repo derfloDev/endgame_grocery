@@ -71,3 +71,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-05-20T15:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 middleware extraction: single shared definition confirmed, all 4 route files import it, SQL identical to original, 2 new tests passing. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-20T15:15:45Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Extracted duplicated list access checks into shared backend middleware and updated entries, history, suggestions, and v1 routes to import it. |
+| Files Changed | backend/src/middleware/listAccess.js, backend/src/middleware/listAccess.test.js, backend/src/routes/entries.js, backend/src/routes/history.js, backend/src/routes/suggestions.js, backend/src/routes/v1.js, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `rg -n -F "ensureListAccess" backend/src` confirms shared definition/imports; `npm run lint` pass with existing AuthContext fast-refresh warning; `npm run test --workspace backend` pass; `npm run build` pass with existing transformer/bundle warnings; `npm test` pass |
+| Commit | `refactor(backend): share list access checks` |
+| Next Role | review |
+
+---
+
+### T-002 — commit_task — 2026-05-20T15:27:52Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and committed the reviewed shared list access middleware refactor. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Review passed; no additional validation run during commit step |
+| Commit | `refactor(backend): share list access checks` |
+| Next Role | none |
+
+---

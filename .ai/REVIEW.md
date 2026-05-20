@@ -45,3 +45,46 @@ Reviewed: 2026-05-20
 `PASS_WITH_NOTES`
 
 Notes: One pre-existing flaky test (`adds and edits entry details from the list detail sheet`) may intermittently time out in CI; unrelated to this task's changes.
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-05-20
+
+#### Findings
+
+- No issues found.
+
+#### Verification
+
+##### Steps
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm task scope and acceptance criteria.
+2. Read `backend/src/middleware/listAccess.js` — confirmed single authoritative definition with full JSDoc (`@param`, `@returns`).
+3. Read `backend/src/middleware/listAccess.test.js` — confirmed 2 tests covering true (has access) and false (no access) paths, verifying SQL structure and params.
+4. Read first lines of all 4 route files (`entries.js`, `history.js`, `suggestions.js`, `v1.js`) — confirmed `ensureListAccess` imported from `../middleware/listAccess.js` in each.
+5. Ran `rg -n -F "ensureListAccess" backend/src` — confirmed: 1 definition (middleware), 4 import sites, 0 remaining local definitions.
+6. Cross-checked shared SQL against original in `entries.js` (via `git show fb9da63:backend/src/routes/entries.js`) — identical query, params, and return value. Pure structural refactor, no behavioral change.
+7. Ran `npm run lint` (root) — 0 errors (1 pre-existing fast-refresh warning, frontend only).
+8. Ran `npm run build` — clean pass.
+9. Ran `npm test -w @endgame-grocery/backend` — 153/153 pass (151 baseline + 2 new middleware tests).
+
+##### Findings
+- `ensureListAccess` defined exactly once in `middleware/listAccess.js`, with JSDoc.
+- All 4 target route files (`entries.js`, `history.js`, `suggestions.js`, `v1.js`) import from the shared middleware.
+- New test file covers both access paths and validates SQL/params.
+- No local copy of the function remains anywhere in `backend/src`.
+- Lint: 0 errors. Build: clean. Backend tests: 153/153 pass.
+
+##### Risks
+- None. The extraction is mechanically identical to the original; no logic changed.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
