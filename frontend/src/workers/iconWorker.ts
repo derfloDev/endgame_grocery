@@ -1,4 +1,4 @@
-import { pipeline } from "@xenova/transformers";
+import { pipeline } from "@huggingface/transformers";
 import type { IconMatchResult } from "../types";
 import { ICON_DB } from "../data/iconDatabase";
 import { cosineSimilarity } from "../utils/cosineSimilarity";
@@ -15,7 +15,7 @@ type FeatureExtractor = (
   options: { normalize: boolean; pooling: "mean" }
 ) => Promise<ExtractorOutput>;
 type WorkerFeatureExtractor = FeatureExtractor & {
-  readonly __workerBoundary: "xenova-feature-extraction";
+  readonly __workerBoundary: "huggingface-feature-extraction";
 };
 type FeatureExtractorLoader = () => Promise<WorkerFeatureExtractor>;
 type ReferenceEmbedding = {
@@ -36,7 +36,7 @@ let extractorPromise: Promise<FeatureExtractor> | undefined;
 let referenceEmbeddingsPromise: Promise<ReferenceEmbedding[]> | undefined;
 
 const workerSelf = self as unknown as IconWorkerGlobalScope;
-// @ts-expect-error: @xenova/transformers pipeline output is narrowed at the worker boundary and validated before use.
+// @ts-expect-error: transformers pipeline output is narrowed at the worker boundary and validated before use.
 const loadFeatureExtractor: FeatureExtractorLoader = () => {
   return pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
     quantized: true

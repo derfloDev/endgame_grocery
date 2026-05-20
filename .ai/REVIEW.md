@@ -169,3 +169,53 @@ Reviewed: 2026-05-20
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **ready_to_commit**
+
+Reviewed: 2026-05-20
+
+#### Findings
+
+- **nit** — `backend/package.json` — `nodemailer` upgraded from `^7.0.13` to `^8.0.7`, which was not in the plan scope. This is a low-risk bonus: backend auth tests covering email sending (verification, password reset, invite) all pass, confirming API compatibility. No action required.
+
+#### Verification
+
+##### Steps
+1. Read `.ai/PLAN.md` to confirm acceptance criteria: `npm audit` no critical/high in prod deps; build and tests green.
+2. Reviewed `git diff HEAD` for all changed files:
+   - `backend/package.json`: `bcrypt@^5.1.1` → `^6.0.0`, `node-pg-migrate@^7.9.1` → `^8.0.4`, `nodemailer@^7` → `^8.0.7`; migrate script `.mjs` → `.js`.
+   - `docker/entrypoint.sh`: migrate CLI path `.mjs` → `.js` (matches node-pg-migrate v8 entry point).
+   - `frontend/package.json`: `@xenova/transformers@^2.17.2` removed, `@huggingface/transformers@^4.2.0` added.
+   - `frontend/src/workers/iconWorker.ts`: import updated to `@huggingface/transformers`; `__workerBoundary` type tag updated.
+   - `frontend/vite.config.ts`: `resolve.alias` changed from simple object to array with regex `find` (required by `@huggingface/transformers` v4); `optimizeDeps.exclude` updated.
+   - `frontend/src/vite-config.test.ts`: test updated to assert regex-based alias format via source inspection rather than config object key.
+3. Verified `node_modules/node-pg-migrate/bin/` contains `node-pg-migrate.js` (not `.mjs`) — CLI path change is correct for v8 ✅.
+4. Verified `npm list` shows installed: `bcrypt@6.0.0`, `node-pg-migrate@8.0.4`, `nodemailer@8.0.7`, `@huggingface/transformers@4.2.0`; `@xenova/transformers` absent ✅.
+5. Scanned source for remaining `@xenova` references — none found ✅.
+6. Ran `npm audit --omit=dev` — **0 vulnerabilities** (was: 1 critical via `protobufjs` + 2 high) ✅.
+7. Ran `npm audit` (full, including dev) — **0 vulnerabilities** ✅.
+8. Ran `npm run lint` — 0 errors (pre-existing fast-refresh warning only) ✅.
+9. Ran `npm run build` — clean; pre-cache size reduced from 2093 KiB to 1819 KiB (HF transformers ships lighter than xenova) ✅.
+10. Ran `npm test` — 415 frontend + 154 backend = **569/569 pass, 0 fail** ✅.
+
+##### Findings
+- All CVEs eliminated: `npm audit --omit=dev` reports 0 vulnerabilities.
+- `bcrypt@6.0.0` installed and all auth tests (password hashing/verification paths) passing.
+- `node-pg-migrate@8.0.4` installed; CLI path updated in both `backend/package.json` and `docker/entrypoint.sh`.
+- `@xenova/transformers` fully replaced by `@huggingface/transformers@4.2.0`; vite config and worker import updated accordingly.
+- `nodemailer@8.0.7` upgrade (out-of-plan) is API-compatible as confirmed by 154/154 backend tests including full auth email flows.
+
+##### Risks
+- `nodemailer` v8 is a major bump outside the plan. Risk is low given full test coverage of email paths, but a changelog review would be prudent before shipping to production.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

@@ -148,6 +148,18 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-005 — review — 2026-05-20T19:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 dependency upgrades: 0 vulnerabilities in audit, bcrypt v6 + node-pg-migrate v8 + @huggingface/transformers installed, 569/569 tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-004 — review — 2026-05-20T19:00:00Z
 
 | Field | Value |
@@ -182,6 +194,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
 | Validation | Review passed; no additional validation run during commit step |
 | Commit | `refactor(frontend): extract list detail data hook` |
+| Next Role | none |
+
+---
+
+### T-005 — implement — 2026-05-20T17:33:46Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Upgraded vulnerable production dependencies, migrated local icon embeddings from @xenova/transformers to @huggingface/transformers, updated the node-pg-migrate v8 CLI path, and applied audit fixes for dev transitive advisories. |
+| Files Changed | backend/package.json, frontend/package.json, package-lock.json, frontend/src/workers/iconWorker.ts, frontend/vite.config.ts, frontend/src/vite-config.test.ts, docker/entrypoint.sh, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm audit` pass; `npm audit --omit=dev` pass; `npm run lint` pass with existing AuthContext fast-refresh warning; `node node_modules/node-pg-migrate/bin/node-pg-migrate.js --help` pass; `npm run test --workspace backend` pass; `npm run test --workspace frontend -- src/vite-config.test.ts src/workers/iconWorkerClient.test.ts` pass; `npm run build` pass with existing chunk-size warning; `npm test` pass |
+| Commit | `fix(security): upgrade vulnerable dependencies` |
+| Next Role | review |
+
+---
+
+### T-005 — commit_task — 2026-05-20T17:48:58Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-005 done and committed the reviewed dependency security upgrades. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Review passed; no additional validation run during commit step |
+| Commit | `fix(security): upgrade vulnerable dependencies` |
 | Next Role | none |
 
 ---

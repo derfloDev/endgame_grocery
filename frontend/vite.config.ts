@@ -19,13 +19,16 @@ export default defineConfig({
     // external UMD parameter — self.ort — which is never set in a Worker module context, causing the
     // "registerBackend" crash. ort.min.js is the self-contained build: it bundles onnxruntime-common
     // inline and calls its factory with no arguments, so it works in any context without globals.
-    alias: {
-      "onnxruntime-web": "onnxruntime-web/dist/ort.min.js"
-    }
+    alias: [
+      {
+        find: /^onnxruntime-web$/,
+        replacement: "onnxruntime-web/dist/ort.min.js"
+      }
+    ]
   },
   optimizeDeps: {
     // Both packages ship their own worker/WASM loading path and must stay out of Vite pre-bundling.
-    exclude: ["@xenova/transformers", "onnxruntime-web"]
+    exclude: ["@huggingface/transformers", "onnxruntime-web"]
   },
   worker: {
     // transformers.js relies on the worker bundle staying ESM so ONNX runtime can register its backend.
