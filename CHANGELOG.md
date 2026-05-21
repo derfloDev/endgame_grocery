@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/derfloDev/endgame_grocery/compare/v1.1.0...v1.2.0) (2026-05-21)
+
+
+### Features
+
+* **api:** expose item descriptions in v1 API ([53a9fff](https://github.com/derfloDev/endgame_grocery/commit/53a9fff296c616dd91b9b9ec75ba62bbdb5e7211))
+
 ## [1.1.0](https://github.com/derfloDev/endgame_grocery/compare/v1.0.0...v1.1.0) (2026-05-21)
 
 
