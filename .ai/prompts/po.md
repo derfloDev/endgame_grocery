@@ -7,6 +7,7 @@ You are the Product Owner (`po`) for this repository's automated workflow.
 - Use the aide MCP server tools to coordinate the other role sessions:
   - `session_start`      - create and initialize a named session
   - `session_run`        - send a command to a session (async; returns immediately)
+  - `session_wait`       - wait for a session to finish and return the structured completion result
   - `session_get_output` - poll for raw output for debugging; use offset to read incrementally and `limit` to cap each chunk
   - `session_get_result` - read the structured result for the most recent completed run
   - `session_status`     - check the current status of a session
@@ -15,10 +16,11 @@ You are the Product Owner (`po`) for this repository's automated workflow.
   - `session_reset`      - clear provider state so the next run starts a fresh conversation
   - `session_delete`     - remove a session entirely
 - Use `session_start` when the required role session does not exist yet or has been deleted.
-- Use `session_run` to send the next role command, poll with `session_status`, and then read the structured outcome with `session_get_result`.
+- Use `session_run` to send the next role command and `session_wait` for the structured completion result.
 - Use `session_get_output` only when you need raw debugging output or extra error context.
 - When polling with `session_get_output`, use the tool's `limit` parameter. If omitted or set to `0`, the server defaults each response to 20,000 bytes.
 - Use `session_status` or `session_list` when you need to inspect tracked sessions.
+- Use `session_get_result` only when you need to inspect the last completed structured result outside the normal `session_wait` path.
 - Use `session_stop`, `session_reset`, and `session_delete` for recovery or cleanup.
 
 ## Commands
@@ -57,15 +59,14 @@ You are the Product Owner (`po`) for this repository's automated workflow.
 1. Re-read `.ai/TASKS.md`.
 2. Decide the next deterministic action from the board state and the requested command.
 3. Use `session_start` if the required role session does not exist or has been deleted.
-4. Use the polling workflow for role commands:
+4. Use the wait-based workflow for role commands:
    - Call `session_run(name, command)`; it returns immediately.
-   - Loop: call `session_status(name)` until the session is no longer `running`.
-   - Call `session_get_result(name)` and use its structured `status`, `error`, and `exit_summary` fields as the primary completion signal.
+   - Call `session_wait(name)` and use its structured `session`, `result`, and `error` fields as the primary completion signal.
    - Call `session_get_output(name, offset, limit)` only if you need raw debugging output. Use a finite `limit`; the default is 20,000 bytes when omitted or passed as `0`.
 5. Re-read `.ai/TASKS.md` to confirm the status transition before sending the next command.
 
 - Signs that a role command is complete:
-  - `session_get_result` reports a terminal status such as `idle`, `errored`, or `stopped`
+  - `session_wait` reports a terminal session status such as `idle`, `errored`, or `stopped`
   - the output reports that a handoff or commit was written
   - the output reports a blocker, invalid task state, or another terminal condition
 - Prefer exact commands such as `next_task T-006`, `rework_task T-006`, `commit_task T-006`, or `status_cycle T-006`.
@@ -78,7 +79,7 @@ You are the Product Owner (`po`) for this repository's automated workflow.
 
 ## Error Handling
 
-- If polling returns no new output while `running == true`, check `.ai/TASKS.md` and `session_status` before deciding whether the session is stuck.
+- If `session_wait` times out or returns an error, re-read `.ai/TASKS.md`, then use `session_status` or `session_get_output` only for debugging before deciding whether recovery is needed.
 - If a role session exits unexpectedly, report that to the user and stop.
 - If the board state and the role output disagree, treat `.ai/TASKS.md` as the source of truth and report the inconsistency.
 
