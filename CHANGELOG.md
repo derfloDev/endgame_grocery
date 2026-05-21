@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/derfloDev/endgame_grocery/compare/v1.0.0...v1.1.0) (2026-05-21)
+
+
+### Features
+
+* **api:** add v1 completed items to recently used ([7591203](https://github.com/derfloDev/endgame_grocery/commit/759120319d28e26aa6728779848f00288dabaa03))
+* **frontend:** preserve details in recently used history ([f8aa54d](https://github.com/derfloDev/endgame_grocery/commit/f8aa54d912029c5e4c3b90c3aa6b143f0ae7c600))
+
+
+### Bug Fixes
+
+* **sync:** refresh recently used after external toggles ([a973d68](https://github.com/derfloDev/endgame_grocery/commit/a973d68d9d9c59c558ebd6c8afdea9251abb3bc9))
+
 ## [1.0.0](https://github.com/derfloDev/endgame_grocery/compare/v0.20.0...v1.0.0) (2026-05-20)
 
 
