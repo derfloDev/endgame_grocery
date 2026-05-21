@@ -63,6 +63,7 @@ export interface OfflineQueueContextValue {
 export interface Suggestion {
   text: string;
   icon?: string | null;
+  details?: string;
   useCount?: number;
 }
 

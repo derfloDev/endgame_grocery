@@ -10,6 +10,7 @@ import { fetchRecentlyUsed } from "../api/history";
 import { fetchLists } from "../api/lists";
 import { fetchListMembers } from "../api/sharing";
 import { writeCachedResource } from "../api/offlineStore";
+import { useListEvents } from "../hooks/useListEvents";
 import ListDetailPage from "./ListDetailPage/ListDetailPage";
 import type { Entry, List, Suggestion } from "../types";
 
@@ -76,6 +77,7 @@ const fetchEntriesMock = vi.mocked(fetchEntries);
 const fetchRecentlyUsedMock = vi.mocked(fetchRecentlyUsed);
 const fetchListsMock = vi.mocked(fetchLists);
 const fetchListMembersMock = vi.mocked(fetchListMembers);
+const useListEventsMock = vi.mocked(useListEvents);
 const updateEntryMock = vi.mocked(updateEntry);
 const writeCachedResourceMock = vi.mocked(writeCachedResource);
 
@@ -235,6 +237,37 @@ describe("ListDetailPage optimistic updates", () => {
     );
   });
 
+  it("preserves details when reactivating an entry from history", async () => {
+    mockListDetailData({
+      entries: [],
+      history: [
+        {
+          text: "Tomatoes",
+          icon: "IconSalad",
+          details: "Cherry tomatoes",
+          last_used_at: "2026-04-21T00:00:00Z"
+        }
+      ]
+    });
+    createEntryMock.mockReturnValue(new Promise(() => {}));
+
+    renderListDetailPage();
+
+    expect(await screen.findByRole("region", { name: "Recently Used" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Tomatoes" }));
+
+    await waitFor(() => {
+      expect(within(getOpenItemsSection()).getByText("Tomatoes")).toBeTruthy();
+      expect(within(getOpenItemsSection()).getByText("Cherry tomatoes")).toBeTruthy();
+    });
+    expect(createEntry).toHaveBeenCalledWith(
+      "list-1",
+      "test-token",
+      { text: "Tomatoes", icon: "IconSalad", details: "Cherry tomatoes" },
+      { tempId: expect.stringMatching(/^temp-entry-/) }
+    );
+  });
+
   it("renders open entries in the tile grid", async () => {
     mockListDetailData({
       entries: [
@@ -252,6 +285,61 @@ describe("ListDetailPage optimistic updates", () => {
 
     expect(await screen.findByTestId("entry-tile-entry-1")).toBeTruthy();
     expect(within(getOpenItemsSection()).getByTestId("entry-tile-grid")).toBeTruthy();
+  });
+
+  it("re-fetches recently used history when an entry update SSE event arrives", async () => {
+    fetchListsMock.mockResolvedValue({
+      lists: [
+        { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List
+      ]
+    });
+    fetchEntriesMock
+      .mockResolvedValueOnce({
+        entries: [
+          {
+            id: "entry-1",
+            text: "Milk",
+            status: "open",
+            icon: "IconMilk",
+            created_at: "2026-04-21T00:00:00Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        entries: [
+          {
+            id: "entry-1",
+            text: "Milk",
+            status: "done",
+            icon: "IconMilk",
+            created_at: "2026-04-21T00:00:00Z"
+          }
+        ]
+      });
+    fetchRecentlyUsedMock
+      .mockResolvedValueOnce({ history: [] })
+      .mockResolvedValueOnce({
+        history: [{ text: "Milk", icon: "IconMilk", useCount: 1 }]
+      });
+    fetchListMembersMock.mockResolvedValue({ members: [] });
+    writeCachedResourceMock.mockResolvedValue(undefined);
+
+    renderListDetailPage();
+
+    expect(await screen.findByText("Milk")).toBeTruthy();
+    const entryUpdatedHandler = useListEventsMock.mock.calls.find(([eventType]) => eventType === "entry:updated")?.[2];
+
+    if (!entryUpdatedHandler) {
+      throw new Error("Expected entry:updated handler to be registered.");
+    }
+
+    entryUpdatedHandler({ listId: "list-1", entryId: "entry-1" });
+
+    await waitFor(() => {
+      expect(fetchRecentlyUsed).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole("region", { name: "Recently Used" })).toBeTruthy();
+    });
+    expect(screen.getByRole("button", { name: "Milk" })).toBeTruthy();
   });
 });
 

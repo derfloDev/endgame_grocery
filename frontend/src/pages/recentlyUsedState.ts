@@ -1,6 +1,6 @@
 import type { Entry, Suggestion } from "../types";
 
-type RecentlyUsedEntry = Pick<Entry, "text" | "icon">;
+type RecentlyUsedEntry = Pick<Entry, "text" | "icon"> & { details?: string | null };
 type OpenEntry = Pick<Entry, "text" | "status">;
 
 export function upsertRecentlyUsedItems(currentItems: Suggestion[], entry: RecentlyUsedEntry): Suggestion[] {
@@ -11,9 +11,11 @@ export function upsertRecentlyUsedItems(currentItems: Suggestion[], entry: Recen
   }
 
   const existing = currentItems.find((item) => item.text === text);
+  const details = entry.details ?? existing?.details;
   const nextItem = {
     text,
     icon: entry.icon ?? existing?.icon ?? null,
+    ...(details !== undefined ? { details } : {}),
     useCount: (existing?.useCount ?? 0) + 1
   };
 

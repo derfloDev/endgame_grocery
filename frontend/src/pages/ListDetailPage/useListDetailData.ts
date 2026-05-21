@@ -99,6 +99,23 @@ export function useListDetailData({
     [listId, token]
   );
 
+  const reloadHistory = useCallback(
+    async (entriesOverride?: DetailEntry[]): Promise<void> => {
+      try {
+        const historyResult = await fetchRecentlyUsed(listId, token);
+
+        if (isMountedRef.current) {
+          setRecentlyUsed((currentItems) =>
+            filterRecentlyUsedItems(historyResult?.history ?? currentItems, entriesOverride ?? entries)
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load recently used history.", error);
+      }
+    },
+    [entries, listId, token]
+  );
+
   const loadMembers = useCallback(
     async ({ isOwner = false, throwOnError = false }: LoadMembersOptions = {}): Promise<DetailMember[]> => {
       if (!isOwner) {
@@ -299,11 +316,11 @@ export function useListDetailData({
   );
 
   const addRecentlyUsedEntry = useCallback(
-    async (text: string, icon: string | null): Promise<void> => {
+    async (text: string, icon: string | null, details?: string): Promise<void> => {
       const historyItem = recentlyUsed.find((item) => item.text === text);
       setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
 
-      const didAdd = await addEntryByText(text, icon);
+      const didAdd = await addEntryByText(text, icon, details ?? "");
 
       if (!didAdd && historyItem) {
         setRecentlyUsed((currentItems) => {
@@ -406,6 +423,7 @@ export function useListDetailData({
     loadMembers,
     members,
     recentlyUsed,
+    reloadHistory,
     setEntryError,
     setIsSharingLoading,
     setList,

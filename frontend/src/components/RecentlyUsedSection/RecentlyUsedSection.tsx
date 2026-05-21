@@ -7,7 +7,7 @@ import styles from "./RecentlyUsedSection.module.css";
 
 interface RecentlyUsedSectionProps {
   items: Suggestion[];
-  onAdd?: (text: string, iconName: string | null) => void;
+  onAdd?: (text: string, iconName: string | null, details?: string) => void;
   onDismiss?: (text: string) => void;
 }
 
@@ -40,7 +40,7 @@ export default function RecentlyUsedSection({
                 aria-label={item.text}
                 className={styles["recently-used-chip"]}
                 type="button"
-                onClick={() => onAdd?.(item.text, item.icon ?? null)}
+                onClick={() => onAdd?.(item.text, item.icon ?? null, item.details)}
               >
                 <ItemIcon
                   aria-hidden="true"

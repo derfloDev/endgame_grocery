@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
+import { upsertAutocompleteHistory } from "../db/historyUtils.js";
 import { logger as defaultLogger } from "../logger.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -8,21 +9,6 @@ import { enqueuePushJob } from "../workers/pushWorker.js";
 
 const MAX_OPEN_ENTRIES_PER_LIST = 1000;
 const MAX_DONE_ENTRIES_PER_LIST = 200;
-
-function upsertAutocompleteHistory(pool, { userId, listId, text, icon }) {
-  return pool.query(
-    `
-      INSERT INTO autocomplete_history (user_id, list_id, text, icon, use_count, last_used_at)
-      VALUES ($1, $2, $3, $4, 1, NOW())
-      ON CONFLICT (user_id, list_id, text)
-      DO UPDATE SET
-        icon = EXCLUDED.icon,
-        use_count = autocomplete_history.use_count + 1,
-        last_used_at = NOW()
-    `,
-    [userId, listId, text, icon]
-  );
-}
 
 function normalizeDetails(details) {
   if (typeof details !== "string") {

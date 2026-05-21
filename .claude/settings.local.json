@@ -38,7 +38,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\develop\\\\endgame_grocery\" -Recurse -Directory)",
       "Bash(Select-Object -First 20 FullName)",
       "Bash(Select-Object -First 20)",
-      "Bash(Format-Table FullName)"
+      "Bash(Format-Table FullName)",
+      "Bash(xargs grep -l \"toggle\\\\|done.*open\")",
+      "Bash(xargs grep -l \"toggle\")"
     ]
   }
 }

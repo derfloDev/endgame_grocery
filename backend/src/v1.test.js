@@ -267,7 +267,8 @@ describe("external v1 API routes", () => {
   });
 
   it("toggles an open item to done", async () => {
-    const sseManager = createSseManagerSpy();
+    const order = [];
+    const sseManager = createSseManagerSpy(() => order.push("broadcast"));
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -278,14 +279,21 @@ describe("external v1 API routes", () => {
         }
 
         if (callCount === 2) {
-          assert.match(normalizeSql(sql), /SELECT id, text, status FROM entries/);
+          assert.match(normalizeSql(sql), /SELECT id, text, status, icon FROM entries/);
           assert.deepEqual(params, [ITEM_ID, LIST_ID]);
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open" }] };
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk" }] };
         }
 
-        assert.match(normalizeSql(sql), /UPDATE entries SET status = \$1, updated_at = NOW\(\)/);
-        assert.deepEqual(params, ["done", ITEM_ID, LIST_ID]);
-        return { rows: [{ id: ITEM_ID, text: "Milk", status: "done" }] };
+        if (callCount === 3) {
+          assert.match(normalizeSql(sql), /UPDATE entries SET status = \$1, updated_at = NOW\(\)/);
+          assert.deepEqual(params, ["done", ITEM_ID, LIST_ID]);
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done" }] };
+        }
+
+        assert.match(normalizeSql(sql), /INSERT INTO autocomplete_history/);
+        assert.deepEqual(params, ["user-1", LIST_ID, "Milk", "IconMilk"]);
+        order.push("history");
+        return { rows: [] };
       }
     };
 
@@ -297,10 +305,150 @@ describe("external v1 API routes", () => {
     assert.deepEqual(response.body, {
       item: { id: ITEM_ID, name: "Milk", status: "done" }
     });
+    assert.equal(callCount, 4);
+    assert.deepEqual(sseManager.calls, [
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+    ]);
+    assert.deepEqual(order, ["history", "broadcast"]);
+  });
+
+  it("broadcasts after history upsert completes when toggling to done", async () => {
+    const order = [];
+    const sseManager = createSseManagerSpy(() => order.push("broadcast"));
+    let callCount = 0;
+    const pool = {
+      async query(sql) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: LIST_ID }] };
+        }
+
+        if (callCount === 2) {
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk" }] };
+        }
+
+        if (callCount === 3) {
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done" }] };
+        }
+
+        assert.match(normalizeSql(sql), /INSERT INTO autocomplete_history/);
+        order.push("history:start");
+        await waitForAsyncHandlers();
+        order.push("history:done");
+        return { rows: [] };
+      }
+    };
+
+    const response = await request(createV1App(pool, { sseManager }))
+      .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
+      .set("X-Api-Key", "valid-api-key");
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(order, ["history:start", "history:done", "broadcast"]);
+  });
+
+  it("does not upsert autocomplete history when toggling a done item to open", async () => {
+    const sseManager = createSseManagerSpy();
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: LIST_ID }] };
+        }
+
+        if (callCount === 2) {
+          assert.match(normalizeSql(sql), /SELECT id, text, status, icon FROM entries/);
+          assert.deepEqual(params, [ITEM_ID, LIST_ID]);
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done", icon: "IconMilk" }] };
+        }
+
+        assert.match(normalizeSql(sql), /UPDATE entries SET status = \$1, updated_at = NOW\(\)/);
+        assert.deepEqual(params, ["open", ITEM_ID, LIST_ID]);
+        return { rows: [{ id: ITEM_ID, text: "Milk", status: "open" }] };
+      }
+    };
+
+    const response = await request(createV1App(pool, { sseManager }))
+      .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
+      .set("X-Api-Key", "valid-api-key");
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      item: { id: ITEM_ID, name: "Milk", status: "open" }
+    });
     assert.equal(callCount, 3);
     assert.deepEqual(sseManager.calls, [
       [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
     ]);
+  });
+
+  it("keeps toggle responses successful when the autocomplete history upsert fails", async () => {
+    const { logger, getEntries } = createLogCapture();
+    let callCount = 0;
+    const pool = {
+      async query(sql) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: LIST_ID }] };
+        }
+
+        if (callCount === 2) {
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk" }] };
+        }
+
+        if (callCount === 3) {
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done" }] };
+        }
+
+        assert.match(normalizeSql(sql), /INSERT INTO autocomplete_history/);
+        throw new Error("history failed");
+      }
+    };
+
+    const response = await request(createV1App(pool, { logger }))
+      .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
+      .set("X-Api-Key", "valid-api-key");
+
+    await waitForAsyncHandlers();
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      item: { id: ITEM_ID, name: "Milk", status: "done" }
+    });
+    assert.equal(callCount, 4);
+    assert.ok(getEntries().some((entry) => entry.msg === "Failed to upsert autocomplete history"));
+  });
+
+  it("keeps toggle responses successful when the SSE broadcast fails", async () => {
+    const { logger, getEntries } = createLogCapture();
+    const sseManager = createRejectingSseManager();
+    let callCount = 0;
+    const pool = {
+      async query() {
+        callCount += 1;
+        return callCount === 1
+          ? { rows: [{ id: LIST_ID }] }
+          : { rows: [{ id: ITEM_ID, text: "Milk", status: callCount === 2 ? "done" : "open", icon: "IconMilk" }] };
+      }
+    };
+
+    const response = await request(createV1App(pool, { logger, sseManager }))
+      .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
+      .set("X-Api-Key", "valid-api-key");
+
+    await waitForAsyncHandlers();
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      item: { id: ITEM_ID, name: "Milk", status: "open" }
+    });
+    assert.equal(callCount, 3);
+    assert.deepEqual(sseManager.calls, [
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+    ]);
+    assert.ok(getEntries().some((entry) => entry.msg === "Failed to broadcast SSE event"));
   });
 
   it("returns 404 for an invalid item ID when toggling an item", async () => {
@@ -505,11 +653,12 @@ function createUnexpectedQueryPool() {
   };
 }
 
-function createSseManagerSpy() {
+function createSseManagerSpy(onBroadcast = () => undefined) {
   return {
     calls: [],
     broadcastToList(pool, listId, eventType, data) {
       void pool;
+      onBroadcast();
       this.calls.push([listId, eventType, data]);
       return Promise.resolve();
     }

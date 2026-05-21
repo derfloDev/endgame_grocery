@@ -94,6 +94,7 @@ paths:
       - $ref: '#/components/parameters/ItemId'
     post:
       summary: Toggle a grocery item status
+      description: Toggles between `open` and `done`; toggles to `done` also update autocomplete history for the list.
       operationId: toggleGroceryItem
       responses:
         '200':
