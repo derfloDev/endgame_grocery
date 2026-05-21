@@ -285,7 +285,7 @@ export default function ListDetailPage(): ReactElement {
 
             <RecentlyUsedSection
               items={visibleRecentlyUsed}
-              onAdd={(text, icon) => void addRecentlyUsedEntry(text, icon)}
+              onAdd={(text, icon, details) => void addRecentlyUsedEntry(text, icon, details)}
               onDismiss={dismissRecentlyUsedEntry}
             />
           </>

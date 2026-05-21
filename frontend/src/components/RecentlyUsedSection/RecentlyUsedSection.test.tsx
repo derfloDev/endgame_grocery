@@ -15,7 +15,7 @@ describe("RecentlyUsedSection", () => {
     render(
       <RecentlyUsedSection
         items={[
-          { text: "Tomatoes", icon: "IconSalad", useCount: 7 },
+          { text: "Tomatoes", icon: "IconSalad", details: "Cherry tomatoes", useCount: 7 },
           { text: "Bread", icon: "IconBread", useCount: 4 }
         ]}
         onAdd={onAdd}
@@ -30,7 +30,7 @@ describe("RecentlyUsedSection", () => {
     expect(screen.getAllByTestId("recently-used-cell")).toHaveLength(2);
 
     await userEvent.click(within(section).getByRole("button", { name: "Tomatoes" }));
-    expect(onAdd).toHaveBeenCalledWith("Tomatoes", "IconSalad");
+    expect(onAdd).toHaveBeenCalledWith("Tomatoes", "IconSalad", "Cherry tomatoes");
     expect(onDismiss).not.toHaveBeenCalled();
 
     await userEvent.click(within(section).getByRole("button", { name: "Dismiss Bread" }));

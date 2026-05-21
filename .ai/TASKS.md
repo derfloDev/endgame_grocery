@@ -20,4 +20,5 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
+| T-001 | Frontend: preserve `details` through the recently-used pipeline (types, state, component, hooks, call sites, tests) | done | (1) Re-added entry from "Zuletzt Verwendet" carries original description; (2) entries without description unaffected; (3) unit + integration tests pass; (4) lint, build, test green | `npm run test --workspace frontend -- recentlyUsedState RecentlyUsedSection ListDetailPage`; `npm run lint`; `npm run build`; `npm test` | none |
+| T-002 | Backend: v1 toggle endpoint upserts `autocomplete_history` when status → done; extract shared `upsertAutocompleteHistory` utility; extend v1 tests | ready_for_implement | (1) Toggle open→done writes history row with correct userId/listId/text/icon; (2) Toggle done→open skips history upsert; (3) History failure does not affect response; (4) lint, build, test green | n/a | implement |

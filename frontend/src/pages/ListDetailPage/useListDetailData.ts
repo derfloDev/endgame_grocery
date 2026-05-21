@@ -299,11 +299,11 @@ export function useListDetailData({
   );
 
   const addRecentlyUsedEntry = useCallback(
-    async (text: string, icon: string | null): Promise<void> => {
+    async (text: string, icon: string | null, details?: string): Promise<void> => {
       const historyItem = recentlyUsed.find((item) => item.text === text);
       setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
 
-      const didAdd = await addEntryByText(text, icon);
+      const didAdd = await addEntryByText(text, icon, details ?? "");
 
       if (!didAdd && historyItem) {
         setRecentlyUsed((currentItems) => {

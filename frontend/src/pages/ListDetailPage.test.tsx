@@ -235,6 +235,37 @@ describe("ListDetailPage optimistic updates", () => {
     );
   });
 
+  it("preserves details when reactivating an entry from history", async () => {
+    mockListDetailData({
+      entries: [],
+      history: [
+        {
+          text: "Tomatoes",
+          icon: "IconSalad",
+          details: "Cherry tomatoes",
+          last_used_at: "2026-04-21T00:00:00Z"
+        }
+      ]
+    });
+    createEntryMock.mockReturnValue(new Promise(() => {}));
+
+    renderListDetailPage();
+
+    expect(await screen.findByRole("region", { name: "Recently Used" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Tomatoes" }));
+
+    await waitFor(() => {
+      expect(within(getOpenItemsSection()).getByText("Tomatoes")).toBeTruthy();
+      expect(within(getOpenItemsSection()).getByText("Cherry tomatoes")).toBeTruthy();
+    });
+    expect(createEntry).toHaveBeenCalledWith(
+      "list-1",
+      "test-token",
+      { text: "Tomatoes", icon: "IconSalad", details: "Cherry tomatoes" },
+      { tempId: expect.stringMatching(/^temp-entry-/) }
+    );
+  });
+
   it("renders open entries in the tile grid", async () => {
     mockListDetailData({
       entries: [
