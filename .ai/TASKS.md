@@ -20,8 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | Dead Code Scan & Removal (frontend + backend) | done | Keine ungenutzten Importe/Variablen (ts-unused-exports clean); `npm run lint && npm run build && npm test` grün | `npx ts-unused-exports tsconfig.json` clean; `npx depcheck` clean; `npm run lint`, `npm run build`, `npm test` pass | none |
-| T-002 | Backend DRY: `ensureListAccess` → `middleware/listAccess.js` | done | Funktion nur noch in middleware/listAccess.js; alle 4 Route-Dateien importieren sie; Backend-Tests grün | `rg -n -F "ensureListAccess" backend/src` confirms shared definition/imports; `npm run lint`, `npm run test --workspace backend`, `npm run build`, `npm test` pass | none |
-| T-003 | Backend JSDoc Annotations (route factories + key helpers) | done | Alle exportierten Backend-Funktionen haben @param/@returns JSDoc; `npm run lint` grün | `node --test src/jsdoc.test.js`, `npm run lint`, `npm run build`, `npm test` pass | none |
-| T-004 | Frontend Refactoring: `useListDetailData`-Hook aus ListDetailPage extrahieren | done | ListDetailPage.tsx < 400 Zeilen; Hook in eigenem File; Frontend-Tests grün | `ListDetailPage.tsx` 374 lines; `npm run lint`, `npm run test --workspace frontend -- src/pages/ListDetailPage.test.tsx`, `npm run build`, `npm test` pass | none |
-| T-005 | Security Audit & Dependency Upgrades (npm audit fix + bcrypt v6 + node-pg-migrate v8 + @xenova/transformers) | done | `npm audit` ohne critical/high in Prod-Deps (oder dokumentierte Ausnahmen); `npm run build && npm test` grün | `npm audit`, `npm audit --omit=dev`, `npm run lint`, `npm run build`, `npm test` pass; migration CLI path smoke test pass | none |
+| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
