@@ -16,7 +16,8 @@ function serializeItem(row) {
   return {
     id: row.id,
     name: row.text,
-    status: row.status
+    status: row.status,
+    description: row.details ?? null
   };
 }
 
@@ -103,7 +104,7 @@ export function createV1Router({
 
       const result = await pool.query(
         `
-          SELECT id, text, status
+          SELECT id, text, status, details
           FROM entries
           WHERE list_id = $1
           ORDER BY status ASC, created_at ASC
@@ -125,7 +126,7 @@ export function createV1Router({
       return;
     }
 
-    const { name } = req.body ?? {};
+    const { name, description } = req.body ?? {};
 
     if (!name?.trim()) {
       res.status(400).json({ error: "Item name is required." });
@@ -147,11 +148,11 @@ export function createV1Router({
 
       const result = await pool.query(
         `
-          INSERT INTO entries (list_id, text, status)
-          VALUES ($1, $2, 'open')
-          RETURNING id, text, status
+          INSERT INTO entries (list_id, text, status, details)
+          VALUES ($1, $2, 'open', $3)
+          RETURNING id, text, status, details
         `,
-        [req.params.listId, name.trim()]
+        [req.params.listId, name.trim(), description?.trim() ?? null]
       );
 
       broadcastListEvent({
@@ -200,7 +201,7 @@ export function createV1Router({
 
       const currentResult = await pool.query(
         `
-          SELECT id, text, status, icon
+          SELECT id, text, status, icon, details
           FROM entries
           WHERE id = $1 AND list_id = $2
           LIMIT 1
@@ -220,7 +221,7 @@ export function createV1Router({
           UPDATE entries
           SET status = $1, updated_at = NOW()
           WHERE id = $2 AND list_id = $3
-          RETURNING id, text, status
+          RETURNING id, text, status, details
         `,
         [nextStatus, req.params.itemId, req.params.listId]
       );
@@ -267,7 +268,7 @@ export function createV1Router({
       return;
     }
 
-    const { name } = req.body ?? {};
+    const { name, description } = req.body ?? {};
 
     if (!name?.trim()) {
       res.status(400).json({ error: "Item name is required." });
@@ -287,15 +288,26 @@ export function createV1Router({
         return;
       }
 
-      const result = await pool.query(
-        `
-          UPDATE entries
-          SET text = $1, updated_at = NOW()
-          WHERE id = $2 AND list_id = $3
-          RETURNING id, text, status
-        `,
-        [name.trim(), req.params.itemId, req.params.listId]
-      );
+      const shouldUpdateDescription = "description" in (req.body ?? {});
+      const result = shouldUpdateDescription
+        ? await pool.query(
+          `
+            UPDATE entries
+            SET text = $1, details = $2, updated_at = NOW()
+            WHERE id = $3 AND list_id = $4
+            RETURNING id, text, status, details
+          `,
+          [name.trim(), description?.trim() ?? null, req.params.itemId, req.params.listId]
+        )
+        : await pool.query(
+          `
+            UPDATE entries
+            SET text = $1, updated_at = NOW()
+            WHERE id = $2 AND list_id = $3
+            RETURNING id, text, status, details
+          `,
+          [name.trim(), req.params.itemId, req.params.listId]
+        );
 
       if (!result.rows[0]) {
         res.status(404).json({ error: "Item not found." });
