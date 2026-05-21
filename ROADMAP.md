@@ -1,28 +1,20 @@
 # ROADMAP
 
-Goal: ensure the optional description survives the done→recently-used→open round-trip, and that items toggled via the external v1 API appear in "Zuletzt Verwendet".
+Goal: Extend the v1 API `Item` response object with an optional `description` field that maps to the existing `details` column in the `entries` table.
 
-## Priority 1 — Frontend: preserve details through the recently-used pipeline
+## Priority 1
 
-Objective: fix the data-loss bug so that an entry's `details` field is kept when it moves from open → recently used → open.
+Objective: Expose `description` (read + write) on the v1 API `Item` object.
 
-- `Suggestion` type gains an optional `details` field.
-- `upsertRecentlyUsedItems` stores the entry's `details` alongside `text` and `icon`.
-- `RecentlyUsedSection.onAdd` callback forwards `details` to the caller.
-- `addRecentlyUsedEntry` passes `details` through to `addEntryByText`.
-- All affected tests are updated or extended to cover the new behaviour.
+- `GET /api/v1/lists/:listId/items` — each item includes `description` (null when empty).
+- `POST /api/v1/lists/:listId/items` — accepts optional `description` in the request body; response includes `description`.
+- `PATCH /api/v1/lists/:listId/items/:itemId` — accepts optional `description` in the request body; response includes `description`.
+- `POST /api/v1/lists/:listId/items/:itemId/toggle` — response includes `description`.
+- OpenAPI spec (`v1.yaml`) updated to reflect the new field on `Item` and updated request bodies.
+- All tests updated/added to cover the new field.
 
-## Priority 2 — Backend: v1 toggle endpoint upserts autocomplete history
+### Constraints
 
-Objective: when an item is toggled to "done" via `POST /api/v1/lists/{listId}/items/{itemId}/toggle`, write it to `autocomplete_history` so it appears in "Zuletzt Verwendet".
-
-- Extract `upsertAutocompleteHistory` from `entries.js` to a shared utility module.
-- v1 toggle handler fetches `icon` in the SELECT and calls the shared utility when `nextStatus === "done"`.
-- v1 tests are extended: assert the history upsert is called on done-toggle and skipped on open-toggle.
-
-## Priority 3 — Real-time sync: "Zuletzt Verwendet" updates without page reload
-
-Objective: after an external toggle (e.g. Home Assistant), the "Zuletzt Verwendet" section refreshes automatically in the open browser tab.
-
-- Fix race condition in `v1.js`: await the history upsert before broadcasting the SSE event.
-- Fix frontend: on `entry:updated` SSE, re-fetch the history API so "Zuletzt Verwendet" reflects the server state.
+- The `details` column already exists in the DB (migration `1713906000000_add_details_to_entries.cjs`); no new migration needed.
+- `description` is always optional (nullable); existing items without details return `description: null`.
+- No change to authentication, list access, or status-toggle logic.

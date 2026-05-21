@@ -138,12 +138,12 @@ describe("external v1 API routes", () => {
           return { rows: [{ id: LIST_ID }] };
         }
 
-        assert.match(normalizeSql(sql), /SELECT id, text, status FROM entries/);
+        assert.match(normalizeSql(sql), /SELECT id, text, status, details FROM entries/);
         assert.deepEqual(params, [LIST_ID]);
         return {
           rows: [
-            { id: ITEM_ID, text: "Milk", status: "open" },
-            { id: SECOND_ITEM_ID, text: "Bread", status: "done" }
+            { id: ITEM_ID, text: "Milk", status: "open", details: null },
+            { id: SECOND_ITEM_ID, text: "Bread", status: "done", details: "Sourdough" }
           ]
         };
       }
@@ -156,8 +156,8 @@ describe("external v1 API routes", () => {
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
       items: [
-        { id: ITEM_ID, name: "Milk", status: "open" },
-        { id: SECOND_ITEM_ID, name: "Bread", status: "done" }
+        { id: ITEM_ID, name: "Milk", status: "open", description: null },
+        { id: SECOND_ITEM_ID, name: "Bread", status: "done", description: "Sourdough" }
       ]
     });
     assert.equal(callCount, 2);
@@ -201,10 +201,10 @@ describe("external v1 API routes", () => {
           return { rows: [{ id: LIST_ID }] };
         }
 
-        assert.match(normalizeSql(sql), /INSERT INTO entries \(list_id, text, status\)/);
-        assert.deepEqual(params, [LIST_ID, "Milk"]);
+        assert.match(normalizeSql(sql), /INSERT INTO entries \(list_id, text, status, details\)/);
+        assert.deepEqual(params, [LIST_ID, "Milk", null]);
         return {
-          rows: [{ id: ITEM_ID, text: "Milk", status: "open" }]
+          rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: null }]
         };
       }
     };
@@ -216,12 +216,42 @@ describe("external v1 API routes", () => {
 
     assert.equal(response.status, 201);
     assert.deepEqual(response.body, {
-      item: { id: ITEM_ID, name: "Milk", status: "open" }
+      item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
     });
     assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
       [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID }]
     ]);
+  });
+
+  it("creates an item with a description", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: LIST_ID }] };
+        }
+
+        assert.match(normalizeSql(sql), /INSERT INTO entries \(list_id, text, status, details\)/);
+        assert.deepEqual(params, [LIST_ID, "Milk", "fresh"]);
+        return {
+          rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: "fresh" }]
+        };
+      }
+    };
+
+    const response = await request(createV1App(pool))
+      .post(`/api/v1/lists/${LIST_ID}/items`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: " Milk ", description: " fresh " });
+
+    assert.equal(response.status, 201);
+    assert.deepEqual(response.body, {
+      item: { id: ITEM_ID, name: "Milk", status: "open", description: "fresh" }
+    });
+    assert.equal(callCount, 2);
   });
 
   it("keeps create responses successful when the SSE broadcast fails", async () => {
@@ -233,7 +263,7 @@ describe("external v1 API routes", () => {
         callCount += 1;
         return callCount === 1
           ? { rows: [{ id: LIST_ID }] }
-          : { rows: [{ id: ITEM_ID, text: "Milk", status: "open" }] };
+          : { rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: null }] };
       }
     };
 
@@ -245,7 +275,7 @@ describe("external v1 API routes", () => {
     await waitForAsyncHandlers();
     assert.equal(response.status, 201);
     assert.deepEqual(response.body, {
-      item: { id: ITEM_ID, name: "Milk", status: "open" }
+      item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
     });
     assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
@@ -279,15 +309,15 @@ describe("external v1 API routes", () => {
         }
 
         if (callCount === 2) {
-          assert.match(normalizeSql(sql), /SELECT id, text, status, icon FROM entries/);
+          assert.match(normalizeSql(sql), /SELECT id, text, status, icon, details FROM entries/);
           assert.deepEqual(params, [ITEM_ID, LIST_ID]);
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk" }] };
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk", details: null }] };
         }
 
         if (callCount === 3) {
           assert.match(normalizeSql(sql), /UPDATE entries SET status = \$1, updated_at = NOW\(\)/);
           assert.deepEqual(params, ["done", ITEM_ID, LIST_ID]);
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done" }] };
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done", details: null }] };
         }
 
         assert.match(normalizeSql(sql), /INSERT INTO autocomplete_history/);
@@ -303,7 +333,7 @@ describe("external v1 API routes", () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      item: { id: ITEM_ID, name: "Milk", status: "done" }
+      item: { id: ITEM_ID, name: "Milk", status: "done", description: null }
     });
     assert.equal(callCount, 4);
     assert.deepEqual(sseManager.calls, [
@@ -325,11 +355,11 @@ describe("external v1 API routes", () => {
         }
 
         if (callCount === 2) {
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk" }] };
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk", details: null }] };
         }
 
         if (callCount === 3) {
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done" }] };
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done", details: null }] };
         }
 
         assert.match(normalizeSql(sql), /INSERT INTO autocomplete_history/);
@@ -360,14 +390,14 @@ describe("external v1 API routes", () => {
         }
 
         if (callCount === 2) {
-          assert.match(normalizeSql(sql), /SELECT id, text, status, icon FROM entries/);
+          assert.match(normalizeSql(sql), /SELECT id, text, status, icon, details FROM entries/);
           assert.deepEqual(params, [ITEM_ID, LIST_ID]);
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done", icon: "IconMilk" }] };
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done", icon: "IconMilk", details: null }] };
         }
 
         assert.match(normalizeSql(sql), /UPDATE entries SET status = \$1, updated_at = NOW\(\)/);
         assert.deepEqual(params, ["open", ITEM_ID, LIST_ID]);
-        return { rows: [{ id: ITEM_ID, text: "Milk", status: "open" }] };
+        return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: null }] };
       }
     };
 
@@ -377,7 +407,7 @@ describe("external v1 API routes", () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      item: { id: ITEM_ID, name: "Milk", status: "open" }
+      item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
     });
     assert.equal(callCount, 3);
     assert.deepEqual(sseManager.calls, [
@@ -397,11 +427,11 @@ describe("external v1 API routes", () => {
         }
 
         if (callCount === 2) {
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk" }] };
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk", details: null }] };
         }
 
         if (callCount === 3) {
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done" }] };
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done", details: null }] };
         }
 
         assert.match(normalizeSql(sql), /INSERT INTO autocomplete_history/);
@@ -416,7 +446,7 @@ describe("external v1 API routes", () => {
     await waitForAsyncHandlers();
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      item: { id: ITEM_ID, name: "Milk", status: "done" }
+      item: { id: ITEM_ID, name: "Milk", status: "done", description: null }
     });
     assert.equal(callCount, 4);
     assert.ok(getEntries().some((entry) => entry.msg === "Failed to upsert autocomplete history"));
@@ -431,7 +461,7 @@ describe("external v1 API routes", () => {
         callCount += 1;
         return callCount === 1
           ? { rows: [{ id: LIST_ID }] }
-          : { rows: [{ id: ITEM_ID, text: "Milk", status: callCount === 2 ? "done" : "open", icon: "IconMilk" }] };
+          : { rows: [{ id: ITEM_ID, text: "Milk", status: callCount === 2 ? "done" : "open", icon: "IconMilk", details: null }] };
       }
     };
 
@@ -442,7 +472,7 @@ describe("external v1 API routes", () => {
     await waitForAsyncHandlers();
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      item: { id: ITEM_ID, name: "Milk", status: "open" }
+      item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
     });
     assert.equal(callCount, 3);
     assert.deepEqual(sseManager.calls, [
@@ -567,7 +597,7 @@ describe("external v1 API routes", () => {
         assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, updated_at = NOW\(\)/);
         assert.deepEqual(params, ["Oat milk", ITEM_ID, LIST_ID]);
         return {
-          rows: [{ id: ITEM_ID, text: "Oat milk", status: "open" }]
+          rows: [{ id: ITEM_ID, text: "Oat milk", status: "open", details: null }]
         };
       }
     };
@@ -579,12 +609,103 @@ describe("external v1 API routes", () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      item: { id: ITEM_ID, name: "Oat milk", status: "open" }
+      item: { id: ITEM_ID, name: "Oat milk", status: "open", description: null }
     });
     assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
       [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
     ]);
+  });
+
+  it("updates description when the description key is present in a patch", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: LIST_ID }] };
+        }
+
+        assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, details = \$2, updated_at = NOW\(\)/);
+        assert.deepEqual(params, ["Milk", "2%", ITEM_ID, LIST_ID]);
+        return {
+          rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: "2%" }]
+        };
+      }
+    };
+
+    const response = await request(createV1App(pool))
+      .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: " Milk ", description: " 2% " });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      item: { id: ITEM_ID, name: "Milk", status: "open", description: "2%" }
+    });
+    assert.equal(callCount, 2);
+  });
+
+  it("clears description when description is null in a patch", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: LIST_ID }] };
+        }
+
+        assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, details = \$2, updated_at = NOW\(\)/);
+        assert.deepEqual(params, ["Milk", null, ITEM_ID, LIST_ID]);
+        return {
+          rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: null }]
+        };
+      }
+    };
+
+    const response = await request(createV1App(pool))
+      .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: " Milk ", description: null });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
+    });
+    assert.equal(callCount, 2);
+  });
+
+  it("preserves description when the description key is absent from a patch", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: LIST_ID }] };
+        }
+
+        assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, updated_at = NOW\(\)/);
+        assert.doesNotMatch(normalizeSql(sql), /details =/);
+        assert.deepEqual(params, ["Milk", ITEM_ID, LIST_ID]);
+        return {
+          rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: "Keep chilled" }]
+        };
+      }
+    };
+
+    const response = await request(createV1App(pool))
+      .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: " Milk " });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      item: { id: ITEM_ID, name: "Milk", status: "open", description: "Keep chilled" }
+    });
+    assert.equal(callCount, 2);
   });
 
   it("deletes an existing item", async () => {
