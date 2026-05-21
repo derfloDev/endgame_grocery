@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
+import { upsertAutocompleteHistory } from "../db/historyUtils.js";
 import { logger as defaultLogger } from "../logger.js";
 import { createRequireApiKey } from "../middleware/auth.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
@@ -199,7 +200,7 @@ export function createV1Router({
 
       const currentResult = await pool.query(
         `
-          SELECT id, text, status
+          SELECT id, text, status, icon
           FROM entries
           WHERE id = $1 AND list_id = $2
           LIMIT 1
@@ -235,6 +236,17 @@ export function createV1Router({
           entryId: req.params.itemId
         }
       });
+
+      if (nextStatus === "done") {
+        void upsertAutocompleteHistory(pool, {
+          userId: req.user.sub,
+          listId: req.params.listId,
+          text: currentItem.text,
+          icon: currentItem.icon
+        }).catch((historyError) => {
+          logger.error({ err: historyError }, "Failed to upsert autocomplete history");
+        });
+      }
 
       res.json({
         item: serializeItem(updateResult.rows[0])

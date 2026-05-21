@@ -82,3 +82,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-05-21T11:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 implementation; all acceptance criteria met, 34/34 v1 tests + 157/157 backend tests + 311/311 full-suite green. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-21T11:06:59Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added v1 done-toggle autocomplete history upserts through a shared backend history utility. |
+| Files Changed | `README.md`, `backend/src/db/historyUtils.js`, `backend/src/routes/entries.js`, `backend/src/routes/v1.js`, `backend/src/v1.test.js`, `backend/src/openapi/v1.yaml`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/v1.test.js` failed before implementation as expected, then passed; `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `node --test src/v1.test.js src/entries.test.js src/docs.test.js src/jsdoc.test.js` passed after elevated rerun due initial sandbox `spawn EPERM`; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `feat(api): add v1 completed items to recently used` |
+| Next Role | review |
+
+---
+
+### T-002 — commit_task — 2026-05-21T11:16:04Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and committed the reviewed v1 recently-used history work. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Commit | `feat(api): add v1 completed items to recently used` |
+| Next Role | none |
+
+---
