@@ -72,6 +72,7 @@ export default function ListDetailPage(): ReactElement {
     loadMembers,
     members,
     recentlyUsed,
+    reloadHistory,
     addEntryByText,
     addRecentlyUsedEntry,
     dismissRecentlyUsedEntry,
@@ -101,8 +102,8 @@ export default function ListDetailPage(): ReactElement {
   });
 
   const handleEntryChange = useCallback(() => {
-    void loadEntries();
-  }, [loadEntries]);
+    void loadEntries().then((nextEntries) => reloadHistory(nextEntries));
+  }, [loadEntries, reloadHistory]);
 
   const handleMemberChange = useCallback(() => {
     void loadMembers({ isOwner: list?.is_owner ?? false });

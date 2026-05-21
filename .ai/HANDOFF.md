@@ -109,6 +109,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-003 — plan — 2026-05-21T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned T-003: fix real-time sync — await history upsert before SSE broadcast (backend) and re-fetch history on entry:updated SSE (frontend); ROADMAP.md, PLAN.md, TASKS.md updated. |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
 ### T-002 — commit_task — 2026-05-21T11:16:04Z
 
 | Field | Value |
@@ -117,6 +128,44 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Summary | Marked T-002 done and committed the reviewed v1 recently-used history work. |
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
 | Commit | `feat(api): add v1 completed items to recently used` |
+| Next Role | none |
+
+---
+
+### T-003 — review — 2026-05-21T16:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 implementation; all 7 acceptance criteria met, ordering guaranteed by test, 578/578 tests green. |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-05-21T13:47:22Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Awaited v1 done-toggle history upserts before SSE broadcast and refreshed recently-used history after frontend entry update events. |
+| Files Changed | `backend/src/routes/v1.js`, `backend/src/v1.test.js`, `frontend/src/pages/ListDetailPage/useListDetailData.ts`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage.test.tsx`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/v1.test.js` passed; `npm run test --workspace frontend -- ListDetailPage` passed; `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with existing Vite chunk-size warning after sequential rerun; `npm test` passed after sequential rerun. |
+| Commit | `fix(sync): refresh recently used after external toggles` |
+| Next Role | review |
+
+---
+
+### T-003 — commit_task — 2026-05-21T14:54:44Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-003 done and committed the reviewed real-time recently-used sync fix. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Commit | `fix(sync): refresh recently used after external toggles` |
 | Next Role | none |
 
 ---

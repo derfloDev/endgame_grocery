@@ -211,6 +211,114 @@ Replace the local `upsertAutocompleteHistory` definition with an import from `..
 
 ---
 
+---
+
+## T-003 — Real-time sync: "Zuletzt Verwendet" updates without page reload
+
+### Background
+
+Two independent defects prevent the "Zuletzt Verwendet" section from updating live after an external
+toggle (e.g. Home Assistant):
+
+1. **Race condition (backend `v1.js`):** `broadcastListEvent` fires *before* `upsertAutocompleteHistory`
+   is awaited. The browser receives the SSE notification while the history row may not yet be in the DB.
+
+2. **Frontend never re-fetches history on SSE:** `handleEntryChange` calls only `loadEntries()`.
+   `loadEntries` re-fetches the entries list but uses the in-memory `recentlyUsed` state unchanged —
+   it never calls `fetchRecentlyUsed`. So "Zuletzt Verwendet" can only be populated on initial load or
+   from a local state update (frontend-triggered toggle). An externally triggered toggle is invisible
+   until the page is reloaded.
+
+### Acceptance Criteria
+
+1. After a v1 API `open → done` toggle, the item appears in "Zuletzt Verwendet" in the open browser tab within the SSE round-trip (no manual reload needed).
+2. After a v1 API `done → open` toggle, the item disappears from "Zuletzt Verwendet" in the open browser tab within the SSE round-trip.
+3. Backend: `upsertAutocompleteHistory` completes (resolved or rejected) before `broadcastListEvent` is called.
+4. Frontend: on `entry:updated` SSE, the history API is re-fetched and `recentlyUsed` state is updated.
+5. Existing toggle tests continue to pass; new tests cover the awaited-before-broadcast order.
+6. New frontend test: `entry:updated` event triggers a history re-fetch that updates `recentlyUsed`.
+7. `npm run lint`, `npm run build`, and `npm test` all pass.
+
+### Implementation Steps
+
+#### Step 1 — Fix race condition in `backend/src/routes/v1.js`
+
+Replace fire-and-forget with an awaited call, placed *before* the broadcast:
+
+```js
+if (nextStatus === "done") {
+  await upsertAutocompleteHistory(pool, {
+    userId: req.user.sub,
+    listId: req.params.listId,
+    text: currentItem.text,
+    icon: currentItem.icon
+  }).catch((historyError) => {
+    logger.error({ err: historyError }, "Failed to upsert autocomplete history");
+  });
+}
+
+broadcastListEvent({ ... });   // ← now fires after history is committed
+res.json({ item: serializeItem(updateResult.rows[0]) });
+```
+
+Note: `.catch` keeps the handler non-throwing on history failure (existing contract).
+
+#### Step 2 — Expose `reloadHistory` from `useListDetailData.ts`
+
+Add a `reloadHistory` callback that fetches history and merges it with the current entries:
+
+```ts
+const reloadHistory = useCallback(async (): Promise<void> => {
+  try {
+    const historyResult = await fetchRecentlyUsed(listId, token);
+    if (isMountedRef.current) {
+      setRecentlyUsed((currentItems) =>
+        filterRecentlyUsedItems(historyResult?.history ?? currentItems, entries)
+      );
+    }
+  } catch {
+    // history reload is best-effort; silently ignore
+  }
+}, [listId, token, entries]);
+```
+
+Add `reloadHistory` to the returned object.
+
+#### Step 3 — Re-fetch history on `entry:updated` in `ListDetailPage.tsx`
+
+Update `handleEntryChange` to also reload history after entries are refreshed:
+
+```ts
+const handleEntryChange = useCallback(() => {
+  void loadEntries().then(() => reloadHistory());
+}, [loadEntries, reloadHistory]);
+```
+
+This ensures:
+- The entries list is updated first (so `filterRecentlyUsedItems` has fresh entries to filter against).
+- Then history is re-fetched from the server and merged with the updated entries list.
+
+#### Step 4 — Update tests (TDD: write before implementation)
+
+**Backend `v1.test.js`:**
+- Update "toggles an open item to done": assert the history upsert (call 4) happens before the SSE broadcast. Verify by checking call order in the mock (history INSERT before `sseManager.calls` is populated).
+- Add "broadcasts after history upsert completes when toggling to done" to lock in the ordering guarantee.
+
+**Frontend `ListDetailPage.test.tsx`:**
+- Add test: when `entry:updated` SSE fires and item is done, `fetchRecentlyUsed` is called and the updated history is reflected in the rendered "Zuletzt Verwendet" section.
+
+### Files to Change
+
+| File | Change |
+|------|--------|
+| `backend/src/routes/v1.js` | Await history upsert; move broadcast to after the await |
+| `backend/src/v1.test.js` | Lock in upsert-before-broadcast order; add ordering test |
+| `frontend/src/pages/ListDetailPage/useListDetailData.ts` | Add `reloadHistory` callback; expose in return value |
+| `frontend/src/pages/ListDetailPage/ListDetailPage.tsx` | Update `handleEntryChange` to call `reloadHistory` after `loadEntries` |
+| `frontend/src/pages/ListDetailPage.test.tsx` | Add test: `entry:updated` triggers history re-fetch |
+
+---
+
 ## Validation
 
 ```

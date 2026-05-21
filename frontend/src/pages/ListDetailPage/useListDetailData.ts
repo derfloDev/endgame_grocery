@@ -99,6 +99,23 @@ export function useListDetailData({
     [listId, token]
   );
 
+  const reloadHistory = useCallback(
+    async (entriesOverride?: DetailEntry[]): Promise<void> => {
+      try {
+        const historyResult = await fetchRecentlyUsed(listId, token);
+
+        if (isMountedRef.current) {
+          setRecentlyUsed((currentItems) =>
+            filterRecentlyUsedItems(historyResult?.history ?? currentItems, entriesOverride ?? entries)
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load recently used history.", error);
+      }
+    },
+    [entries, listId, token]
+  );
+
   const loadMembers = useCallback(
     async ({ isOwner = false, throwOnError = false }: LoadMembersOptions = {}): Promise<DetailMember[]> => {
       if (!isOwner) {
@@ -406,6 +423,7 @@ export function useListDetailData({
     loadMembers,
     members,
     recentlyUsed,
+    reloadHistory,
     setEntryError,
     setIsSharingLoading,
     setList,

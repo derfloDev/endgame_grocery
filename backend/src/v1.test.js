@@ -267,7 +267,8 @@ describe("external v1 API routes", () => {
   });
 
   it("toggles an open item to done", async () => {
-    const sseManager = createSseManagerSpy();
+    const order = [];
+    const sseManager = createSseManagerSpy(() => order.push("broadcast"));
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -291,6 +292,7 @@ describe("external v1 API routes", () => {
 
         assert.match(normalizeSql(sql), /INSERT INTO autocomplete_history/);
         assert.deepEqual(params, ["user-1", LIST_ID, "Milk", "IconMilk"]);
+        order.push("history");
         return { rows: [] };
       }
     };
@@ -307,6 +309,43 @@ describe("external v1 API routes", () => {
     assert.deepEqual(sseManager.calls, [
       [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
     ]);
+    assert.deepEqual(order, ["history", "broadcast"]);
+  });
+
+  it("broadcasts after history upsert completes when toggling to done", async () => {
+    const order = [];
+    const sseManager = createSseManagerSpy(() => order.push("broadcast"));
+    let callCount = 0;
+    const pool = {
+      async query(sql) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: LIST_ID }] };
+        }
+
+        if (callCount === 2) {
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk" }] };
+        }
+
+        if (callCount === 3) {
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done" }] };
+        }
+
+        assert.match(normalizeSql(sql), /INSERT INTO autocomplete_history/);
+        order.push("history:start");
+        await waitForAsyncHandlers();
+        order.push("history:done");
+        return { rows: [] };
+      }
+    };
+
+    const response = await request(createV1App(pool, { sseManager }))
+      .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
+      .set("X-Api-Key", "valid-api-key");
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(order, ["history:start", "history:done", "broadcast"]);
   });
 
   it("does not upsert autocomplete history when toggling a done item to open", async () => {
@@ -614,11 +653,12 @@ function createUnexpectedQueryPool() {
   };
 }
 
-function createSseManagerSpy() {
+function createSseManagerSpy(onBroadcast = () => undefined) {
   return {
     calls: [],
     broadcastToList(pool, listId, eventType, data) {
       void pool;
+      onBroadcast();
       this.calls.push([listId, eventType, data]);
       return Promise.resolve();
     }

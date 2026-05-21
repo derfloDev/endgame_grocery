@@ -42,6 +42,51 @@ Reviewed: 2026-05-21
 
 ---
 
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-21
+
+#### Findings
+
+- **nit** — `frontend/src/pages/ListDetailPage/useListDetailData.ts` `reloadHistory` catch block: uses `console.error` where the plan said to silently ignore. More observable than specified; not a defect.
+- **nit** — `reloadHistory` signature accepts `entriesOverride?: DetailEntry[]` (not in plan). This is a deliberate improvement over the plan: passing `nextEntries` from `loadEntries` avoids the stale-closure problem where `entries` in `reloadHistory`'s closure would still be the pre-update value. Correct and better.
+
+#### Verification
+
+##### Steps
+1. Inspected full `git diff` for all five changed files against plan spec.
+2. Verified `v1.js` handler ordering: `await upsertAutocompleteHistory(...)` → `broadcastListEvent` → `res.json`. ✅
+3. Verified `.catch` on the await preserves non-throwing history-failure contract. ✅
+4. Read "broadcasts after history upsert completes" test — pool mock yields via `await waitForAsyncHandlers()` mid-upsert; handler is suspended because it `await`s the history call; `order` must therefore be `["history:start","history:done","broadcast"]`. Logically correct. ✅
+5. Verified `reloadHistory(entriesOverride)` — uses `filterRecentlyUsedItems(freshHistory, entriesOverride ?? entries)` to merge history with the freshest entries snapshot. ✅
+6. Verified `handleEntryChange` chains `.then((nextEntries) => reloadHistory(nextEntries))` — fresh entries passed to avoid stale closure. ✅
+7. Confirmed `useListEvents` was already mocked in the test file (`vi.mock("../hooks/useListEvents", ...)`); `useListEventsMock` correctly captures registered handlers. ✅
+8. Ran `npm run lint` — clean.
+9. Ran `npm run build` — clean.
+10. Ran targeted tests: `ListDetailPage` (frontend) — **12/12 passed** (including new SSE re-fetch test).
+11. Ran targeted tests: `v1.test.js` (backend) — **35/35 passed** (including new ordering test).
+12. Ran full suite: **420/420 frontend + 158/158 backend = 578 total, 0 failed**.
+
+##### Findings
+- All acceptance criteria verified:
+  1. Backend history committed before SSE broadcast (AC3 → AC1) ✅
+  2. `reloadHistory` fetches fresh history on `entry:updated` (AC4 → AC2) ✅
+  3. Ordering test + updated toggle test enforce awaited-before-broadcast (AC5) ✅
+  4. New frontend test confirms history re-fetch on SSE event (AC6) ✅
+  5. lint ✓, build ✓, test ✓ (AC7) ✅
+
+##### Risks
+- None. Changes are narrowly scoped; existing tests all pass.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-002
 
 ### Review Round 1

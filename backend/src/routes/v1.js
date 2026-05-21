@@ -225,6 +225,17 @@ export function createV1Router({
         [nextStatus, req.params.itemId, req.params.listId]
       );
 
+      if (nextStatus === "done") {
+        await upsertAutocompleteHistory(pool, {
+          userId: req.user.sub,
+          listId: req.params.listId,
+          text: currentItem.text,
+          icon: currentItem.icon
+        }).catch((historyError) => {
+          logger.error({ err: historyError }, "Failed to upsert autocomplete history");
+        });
+      }
+
       broadcastListEvent({
         sseManager,
         logger,
@@ -236,17 +247,6 @@ export function createV1Router({
           entryId: req.params.itemId
         }
       });
-
-      if (nextStatus === "done") {
-        void upsertAutocompleteHistory(pool, {
-          userId: req.user.sub,
-          listId: req.params.listId,
-          text: currentItem.text,
-          icon: currentItem.icon
-        }).catch((historyError) => {
-          logger.error({ err: historyError }, "Failed to upsert autocomplete history");
-        });
-      }
 
       res.json({
         item: serializeItem(updateResult.rows[0])
