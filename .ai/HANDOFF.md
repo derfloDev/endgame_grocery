@@ -131,3 +131,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-05-22T15:22:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 logout divider addition; single-class JSX change is correct and complete, 423/423 tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-05-22T13:13:14Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the existing footer divider modifier to the Logout section so one thin line appears above the button. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.tsx |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass (14 tests); `npm run build` pass (existing Vite chunk-size warning); `npm test` pass (frontend 423 tests, backend 164 tests). |
+| Commit | `fix(settings): add logout divider` |
+| Next Role | review |
+
+---
+
+### T-003 — commit_task — 2026-05-22T13:25:09Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-003 done and committed the reviewed logout divider addition. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, frontend/src/components/InfoSheet/InfoSheet.tsx |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `fix(settings): add logout divider` |
+| Next Role | none |
+
+---

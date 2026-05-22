@@ -86,3 +86,41 @@ Reviewed: 2026-05-22
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-22
+
+#### Findings
+
+None.
+
+#### Verification
+
+##### Steps
+1. Read `InfoSheet.tsx` lines 163–168 — confirmed logout `<div>` now carries `${styles["info-sheet-section"]} ${styles["info-sheet-section--footer"]}`, matching the plan's "After" snippet exactly.
+2. Confirmed no CSS, translation, or test files were changed (scope: one JSX line only).
+3. Confirmed the meta/footer wrapper at line 169 still has the same `--footer` modifier — no regression to footer divider.
+4. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors).
+5. Ran `npm run build` — clean (pre-existing chunk-size warning, 0 errors).
+6. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 14/14 pass.
+7. Ran `npm test` (full suite) — 423/423 frontend pass.
+
+##### Findings
+- All acceptance criteria satisfied.
+- Change is minimal and surgical — exactly one class addition, no side-effects.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

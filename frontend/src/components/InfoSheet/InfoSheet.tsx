@@ -160,7 +160,7 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
           </>
         )}
       </div>
-      <div className={styles["info-sheet-section"]}>
+      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-section--footer"]}`}>
         <button className={`eg-btn eg-btn-danger ${styles["info-sheet-logout"]}`} type="button" onClick={handleLogout}>
           <Icon name="logOut" size={16} color="currentColor" />
           {t("settings.logOut")}
