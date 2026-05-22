@@ -1,20 +1,43 @@
 # ROADMAP
 
-Goal: Extend the v1 API `Item` response object with an optional `description` field that maps to the existing `details` column in the `entries` table.
+Goal: preserve entry details through the open ↔ recently-used transition.
 
 ## Priority 1
 
-Objective: Expose `description` (read + write) on the v1 API `Item` object.
+Objective: store and restore the `details` field in the autocomplete history so that
+details survive the round-trip from "offene Einträge" → "zuletzt verwendet" → "offene Einträge",
+including across page reloads.
 
-- `GET /api/v1/lists/:listId/items` — each item includes `description` (null when empty).
-- `POST /api/v1/lists/:listId/items` — accepts optional `description` in the request body; response includes `description`.
-- `PATCH /api/v1/lists/:listId/items/:itemId` — accepts optional `description` in the request body; response includes `description`.
-- `POST /api/v1/lists/:listId/items/:itemId/toggle` — response includes `description`.
-- OpenAPI spec (`v1.yaml`) updated to reflect the new field on `Item` and updated request bodies.
-- All tests updated/added to cover the new field.
+### Root cause
 
-### Constraints
+The `autocomplete_history` table has no `details` column. When an entry is
+marked done the backend calls `upsertAutocompleteHistory` without `details`;
+the GET `/history` endpoint returns only `text`, `icon`, and `use_count`.
+On a fresh page load the client therefore loses the details for every
+recently-used item.
 
-- The `details` column already exists in the DB (migration `1713906000000_add_details_to_entries.cjs`); no new migration needed.
-- `description` is always optional (nullable); existing items without details return `description: null`.
-- No change to authentication, list access, or status-toggle logic.
+### Scope
+
+Backend:
+- DB migration: add nullable `details text` column to `autocomplete_history`
+- `historyUtils.js` – `upsertAutocompleteHistory`: accept and persist `details`
+- `routes/entries.js` – PATCH (status → done): pass `entry.details` to `upsertAutocompleteHistory`
+- `routes/entries.js` – DELETE: pass `entry.details` to `upsertAutocompleteHistory` (requires fetching `details` from the DB before deletion)
+- `routes/history.js` – GET: include `details` in the response payload
+
+Frontend:
+- No changes needed; the frontend already handles `details` in the `Suggestion`
+  type and correctly passes it through `upsertRecentlyUsedItems` and
+  `addRecentlyUsedEntry`.
+
+### Acceptance criteria
+
+1. After marking an entry with details as done, the recently-used chip still
+   carries the same details value (even after a page reload).
+2. Clicking a recently-used chip that has details re-creates the entry in
+   "offene Einträge" with those details intact.
+3. Moving an entry back to "zuletzt verwendet" again (mark done a second time)
+   continues to preserve the details.
+4. Entries without details continue to work as before (no regression).
+5. All existing backend and frontend tests continue to pass; new tests cover the
+   new `details` persistence behaviour.

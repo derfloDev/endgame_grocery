@@ -6,40 +6,48 @@ Shared review log for the current cycle. Append a new task section when review s
 
 ### Review Round 1
 
-Status: **PASS_WITH_NOTES**
+Status: **PASS**
 
-Reviewed: 2026-05-21
+Reviewed: 2026-05-22
 
 #### Findings
 
-- **nit** — `backend/src/openapi/v1.yaml` lines 73, 142, 226–227: The file declares `openapi: 3.1.0` but uses `nullable: true`, which is an OpenAPI 3.0 keyword. In OAS 3.1 the idiomatic equivalent is `type: ["string", "null"]`. The plan explicitly specified `nullable: true` and most tooling accepts it, so this is advisory only.
+No blocking or major findings. All changes match the plan exactly.
+
+- **severity: nit** — `backend/src/entries.test.js` line 82: the `assert.deepEqual(params, ["list-1", "Milk", "🥛", null])` comment in the test for "creates an entry with an icon" implicitly documents 4 bind params for status-as-literal. Not wrong, just worth awareness. No fix required.
 
 #### Verification
 
 ##### Steps
-- Read `backend/src/routes/v1.js` — full route audit against plan steps 1a–1e.
-- Read `backend/src/openapi/v1.yaml` — spec audit against plan steps 2a–2c.
-- Read `backend/src/v1.test.js` — test coverage audit against plan steps 3a–3d.
-- Ran `npm run lint` — 0 errors, 1 pre-existing unrelated frontend warning.
-- Ran `npm run build` — passes (existing Vite chunk warning, unrelated).
-- Ran `npm test` — **162 tests, 0 failures**.
+
+1. Read all changed files: `backend/src/db/migrations/1778803200001_add_details_to_autocomplete_history.cjs`, `backend/src/db/historyUtils.js`, `backend/src/routes/entries.js`, `backend/src/routes/history.js`, `backend/src/routes/v1.js`, `backend/src/entries.test.js`, `backend/src/history.test.js`, `backend/src/db/migrations.test.js`, `backend/src/v1.test.js`.
+2. Ran targeted tests: `node --test src/entries.test.js src/history.test.js src/db/migrations.test.js src/v1.test.js` (from `backend/`).
+3. Ran `npm run lint` from the project root.
+4. Ran `npm run build` from the project root.
 
 ##### Findings
-- All acceptance criteria from the plan are fully satisfied.
-- `serializeItem` correctly maps `row.details ?? null` → `description` and is used by all four item-returning routes.
-- GET `SELECT` query includes `details`. ✓
-- POST INSERT includes `details`, params correctly trim + null-coalesce. ✓
-- Toggle SELECT includes `details`, RETURNING includes `details`. ✓
-- PATCH conditional branch on `'description' in (req.body ?? {})` works correctly; both SQL variants RETURN `details`. ✓
-- OpenAPI `Item` schema: `description` is optional (not in `required`) and `nullable: true`. ✓
-- OpenAPI POST + PATCH request bodies include optional `description`. ✓
-- 4 new tests cover: POST with description, PATCH update description, PATCH clear description to null, PATCH preserve description when key absent. All pass. ✓
+
+- **Tests**: 73/73 pass, 0 failures.
+- **Lint**: 0 errors; 1 pre-existing warning (`react-refresh/only-export-components` in `frontend/src/context/AuthContext.tsx`) — not introduced by this change.
+- **Build**: succeeds; 1 pre-existing Vite chunk-size warning — not introduced by this change.
+
+Code review findings:
+- Migration (`1778803200001_add_details_to_autocomplete_history.cjs`): correctly adds a nullable `details text` column and provides a matching `down` function. ✓
+- `historyUtils.js`: `details` defaults to `null`, is present in INSERT column list and in `DO UPDATE SET`. JSDoc updated. ✓
+- `routes/entries.js` PATCH: when status becomes `"done"`, `result.rows[0].details` is forwarded to `upsertAutocompleteHistory`. ✓
+- `routes/entries.js` DELETE: pre-delete SELECT now fetches `text, icon, details`; all three forwarded to `upsertAutocompleteHistory`. ✓
+- `routes/history.js` GET: `ah.details` added to SELECT; `details` included in the response mapping. ✓
+- `routes/v1.js` toggle-to-done: pre-toggle SELECT fetches `details`; forwarded to `upsertAutocompleteHistory`. ✓
+- All acceptance criteria are covered by tests.
 
 ##### Risks
-- None. No DB migration needed (uses pre-existing `entries.details` column). Serialization change is purely additive — consumers that ignore unknown fields are unaffected.
+
+- None identified. The migration is additive (nullable column, no default), so existing rows are unaffected.
 
 #### Open Questions
+
 - None.
 
 #### Verdict
-`PASS_WITH_NOTES`
+
+`PASS`

@@ -35,7 +35,7 @@ export function createHistoryRouter({
 
       const result = await pool.query(
         `
-          SELECT ah.text, ah.icon, ah.use_count
+          SELECT ah.text, ah.icon, ah.details, ah.use_count
           FROM autocomplete_history ah
           WHERE ah.user_id = $1
             AND ah.list_id = $2
@@ -53,9 +53,10 @@ export function createHistoryRouter({
       );
 
       res.json({
-        history: result.rows.map(({ text, icon, use_count: useCount }) => ({
+        history: result.rows.map(({ text, icon, details, use_count: useCount }) => ({
           text,
           icon,
+          details,
           useCount
         }))
       });

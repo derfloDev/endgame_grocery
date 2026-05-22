@@ -22,6 +22,9 @@ const pushTablesMigrationPath = path.resolve(
 const apiKeyMigrationPath = path.resolve(
   "src/db/migrations/1778803200000_add_api_key_to_users.cjs"
 );
+const autocompleteHistoryDetailsMigrationPath = path.resolve(
+  "src/db/migrations/1778803200001_add_details_to_autocomplete_history.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -516,5 +519,29 @@ describe("database migrations", () => {
 
     assert.doesNotThrow(() => migration.down(pgm));
     assert.deepEqual(calls, [["dropColumns", "users", ["api_key"]]]);
+  });
+
+  it("adds and removes the details column on autocomplete history", async () => {
+    const migration = await import(pathToFileURL(autocompleteHistoryDetailsMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "addColumns",
+        "autocomplete_history",
+        {
+          details: {
+            type: "text",
+            notNull: false
+          }
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [["dropColumns", "autocomplete_history", ["details"]]]);
   });
 });

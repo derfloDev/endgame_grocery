@@ -20,4 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | Add `description` field (read+write) to v1 API `Item` object | done | All item responses include `description` (string\|null); POST and PATCH accept optional `description`; OpenAPI spec updated; all tests pass | `node --test src/v1.test.js`; `npm run lint`; `npm run build`; `npm test` | none |
+| T-001 | Persist `details` in autocomplete history (backend: migration, historyUtils, entries route, history route, tests) | done | (1) Details survive page reload in recently-used; (2) details restored when re-added to open entries; (3) null-details entries unchanged; (4) all tests pass; (5) build passes | `node --test src/entries.test.js src/history.test.js src/db/migrations.test.js src/v1.test.js`; `npm run lint`; `npm run build`; `npm test` | none |

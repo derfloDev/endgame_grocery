@@ -23,56 +23,56 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
-### T-001 — plan — 2026-05-21T00:00:00Z
+### T-001 — plan — 2026-05-22T00:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Planned `description` field (read+write) on v1 API `Item` object, mapping to existing `entries.details` DB column. |
+| Summary | Planned backend-only fix to persist `details` in `autocomplete_history` so entry details survive the open ↔ recently-used round-trip including page reloads |
 | Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-05-21T16:19:05Z
+### T-001 — implement — 2026-05-22T04:54:28Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Added v1 API item `description` read/write support backed by `entries.details`, with OpenAPI docs and route tests updated. |
-| Files Changed | `backend/src/routes/v1.js`, `backend/src/openapi/v1.yaml`, `backend/src/v1.test.js`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Validation | `node --test src/v1.test.js` (pass); `npm run lint` (pass, existing frontend Fast Refresh warning); `npm run build` (pass, existing Vite chunk warning); `npm test` (pass) |
-| Commit | `feat(api): expose item descriptions in v1 API` |
+| Summary | Persisted autocomplete history details through schema, upsert call sites, history responses, and v1 done toggles so recently used entries can restore details after reload |
+| Files Changed | `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md`, `backend/src/db/historyUtils.js`, `backend/src/db/migrations/1778803200001_add_details_to_autocomplete_history.cjs`, `backend/src/db/migrations.test.js`, `backend/src/entries.test.js`, `backend/src/history.test.js`, `backend/src/routes/entries.js`, `backend/src/routes/history.js`, `backend/src/routes/v1.js`, `backend/src/v1.test.js` |
+| Validation | `node --test src/entries.test.js src/history.test.js src/db/migrations.test.js src/v1.test.js` PASS; `npm run lint` PASS with existing frontend Fast Refresh warning in `frontend/src/context/AuthContext.tsx`; `npm run build` PASS with Vite chunk-size warning; `npm test` PASS |
+| Commit | `feat(history): preserve details in recently used items` |
 | Next Role | review |
 
 ---
 
-### T-001 — review — 2026-05-21T17:00:00Z
+### T-001 — review — 2026-05-22T07:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed `description` field implementation on v1 API Item; all acceptance criteria satisfied, 162 tests pass, lint and build clean. |
-| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Verdict | PASS_WITH_NOTES |
+| Summary | Reviewed and verified the backend-only `details` persistence implementation; all 73 tests pass, lint and build clean, code matches plan exactly. |
+| Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-001 — commit_task — 2026-05-21T16:25:46Z
+### T-001 — commit_task — 2026-05-22T05:30:59Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Marked T-001 done and committed the reviewed v1 API description field changes. |
-| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Commit | `feat(api): expose item descriptions in v1 API` |
+| Summary | Committed T-001 after review approval |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `ROADMAP.md`, `backend/src/db/historyUtils.js`, `backend/src/db/migrations/1778803200001_add_details_to_autocomplete_history.cjs`, `backend/src/db/migrations.test.js`, `backend/src/entries.test.js`, `backend/src/history.test.js`, `backend/src/routes/entries.js`, `backend/src/routes/history.js`, `backend/src/routes/v1.js`, `backend/src/v1.test.js` |
+| Validation | Review-approved implementation; prior validation recorded in T-001 implement handoff |
+| Commit | `feat(history): preserve details in recently used items` |
 | Next Role | none |
 
 ---
 
-### Cycle closed — unversioned — 2026-05-21T16:33:07Z
+### Cycle closed — unversioned — 2026-05-22T05:56:26Z
 
 | Field | Value |
 |-------|-------|
