@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/derfloDev/endgame_grocery/compare/v1.2.0...v1.3.0) (2026-05-22)
+
+
+### Features
+
+* **history:** preserve details in recently used items ([485ec94](https://github.com/derfloDev/endgame_grocery/commit/485ec944634836adb8d90ac25568ec19bbd5cc9d))
+
 ## [1.2.0](https://github.com/derfloDev/endgame_grocery/compare/v1.1.0...v1.2.0) (2026-05-21)
 
 
