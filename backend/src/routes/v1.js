@@ -231,7 +231,8 @@ export function createV1Router({
           userId: req.user.sub,
           listId: req.params.listId,
           text: currentItem.text,
-          icon: currentItem.icon
+          icon: currentItem.icon,
+          details: currentItem.details
         }).catch((historyError) => {
           logger.error({ err: historyError }, "Failed to upsert autocomplete history");
         });

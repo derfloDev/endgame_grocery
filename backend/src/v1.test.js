@@ -311,17 +311,17 @@ describe("external v1 API routes", () => {
         if (callCount === 2) {
           assert.match(normalizeSql(sql), /SELECT id, text, status, icon, details FROM entries/);
           assert.deepEqual(params, [ITEM_ID, LIST_ID]);
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk", details: null }] };
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk", details: "2%" }] };
         }
 
         if (callCount === 3) {
           assert.match(normalizeSql(sql), /UPDATE entries SET status = \$1, updated_at = NOW\(\)/);
           assert.deepEqual(params, ["done", ITEM_ID, LIST_ID]);
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done", details: null }] };
+          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done", details: "2%" }] };
         }
 
         assert.match(normalizeSql(sql), /INSERT INTO autocomplete_history/);
-        assert.deepEqual(params, ["user-1", LIST_ID, "Milk", "IconMilk"]);
+        assert.deepEqual(params, ["user-1", LIST_ID, "Milk", "IconMilk", "2%"]);
         order.push("history");
         return { rows: [] };
       }
@@ -333,7 +333,7 @@ describe("external v1 API routes", () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      item: { id: ITEM_ID, name: "Milk", status: "done", description: null }
+      item: { id: ITEM_ID, name: "Milk", status: "done", description: "2%" }
     });
     assert.equal(callCount, 4);
     assert.deepEqual(sseManager.calls, [

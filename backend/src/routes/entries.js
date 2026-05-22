@@ -241,7 +241,8 @@ export function createEntryRouter({
           userId: req.user.sub,
           listId: req.params.id,
           text: result.rows[0].text,
-          icon: result.rows[0].icon
+          icon: result.rows[0].icon,
+          details: result.rows[0].details
         }).catch((historyError) => {
           logger.error({ err: historyError }, "Failed to upsert autocomplete history");
         });
@@ -271,7 +272,7 @@ export function createEntryRouter({
 
       const entryResult = await pool.query(
         `
-          SELECT text, icon
+          SELECT text, icon, details
           FROM entries
           WHERE id = $1 AND list_id = $2
           LIMIT 1
@@ -311,7 +312,8 @@ export function createEntryRouter({
         userId: req.user.sub,
         listId: req.params.id,
         text: entryResult.rows[0].text,
-        icon: entryResult.rows[0].icon
+        icon: entryResult.rows[0].icon,
+        details: entryResult.rows[0].details
       }).catch((historyError) => {
         logger.error({ err: historyError }, "Failed to upsert autocomplete history");
       });

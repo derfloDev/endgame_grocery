@@ -55,7 +55,7 @@ describe("history routes", () => {
           return { rows: [{ id: "list-1" }] };
         }
 
-        assert.match(sql, /SELECT ah\.text, ah\.icon, ah\.use_count/);
+        assert.match(sql, /SELECT ah\.text, ah\.icon, ah\.details, ah\.use_count/);
         assert.match(sql, /NOT EXISTS/);
         assert.match(sql, /e\.status\s*=\s*'open'/);
         assert.match(sql, /ORDER BY ah\.use_count DESC, ah\.last_used_at DESC/);
@@ -64,8 +64,8 @@ describe("history routes", () => {
 
         return {
           rows: [
-            { text: "Tomatoes", icon: "IconSalad", use_count: 8 },
-            { text: "Bread", icon: null, use_count: 4 }
+            { text: "Tomatoes", icon: "IconSalad", details: "Cherry tomatoes", use_count: 8 },
+            { text: "Bread", icon: null, details: null, use_count: 4 }
           ]
         };
       }
@@ -77,8 +77,8 @@ describe("history routes", () => {
     assert.equal(callCount, 2);
     assert.deepEqual(response.body, {
       history: [
-        { text: "Tomatoes", icon: "IconSalad", useCount: 8 },
-        { text: "Bread", icon: null, useCount: 4 }
+        { text: "Tomatoes", icon: "IconSalad", details: "Cherry tomatoes", useCount: 8 },
+        { text: "Bread", icon: null, details: null, useCount: 4 }
       ]
     });
   });

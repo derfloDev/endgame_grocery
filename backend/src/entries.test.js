@@ -315,9 +315,11 @@ describe("entry routes", () => {
 
         if (callCount === 4) {
           assert.match(sql, /INSERT INTO autocomplete_history/);
+          assert.match(sql, /text, icon, details, use_count/);
           assert.match(sql, /ON CONFLICT \(user_id, list_id, text\)/);
+          assert.match(sql, /details\s*=\s*EXCLUDED\.details/);
           assert.match(sql, /use_count\s*=\s*autocomplete_history\.use_count \+ 1/);
-          assert.deepEqual(params, ["user-1", "list-1", "Oat milk", null]);
+          assert.deepEqual(params, ["user-1", "list-1", "Oat milk", null, "Barista"]);
 
           return { rows: [] };
         }
@@ -386,7 +388,7 @@ describe("entry routes", () => {
         }
 
         assert.match(sql, /INSERT INTO autocomplete_history/);
-        assert.deepEqual(params, ["user-1", "list-1", "Oat milk", null]);
+        assert.deepEqual(params, ["user-1", "list-1", "Oat milk", null, null]);
 
         return { rows: [] };
       }
@@ -584,10 +586,10 @@ describe("entry routes", () => {
         }
 
         if (callCount === 2) {
-          assert.match(sql, /SELECT text, icon/);
+          assert.match(sql, /SELECT text, icon, details/);
           assert.deepEqual(params, ["entry-1", "list-1"]);
 
-          return { rows: [{ text: "Milk", icon: "🥛" }] };
+          return { rows: [{ text: "Milk", icon: "🥛", details: "2L" }] };
         }
 
         if (callCount === 3) {
@@ -598,7 +600,7 @@ describe("entry routes", () => {
         }
 
         assert.match(sql, /INSERT INTO autocomplete_history/);
-        assert.deepEqual(params, ["user-1", "list-1", "Milk", "🥛"]);
+        assert.deepEqual(params, ["user-1", "list-1", "Milk", "🥛", "2L"]);
 
         return { rows: [] };
       }
@@ -613,6 +615,43 @@ describe("entry routes", () => {
     assert.deepEqual(sseManager.calls, [
       ["list-1", "entry:deleted", { listId: "list-1", entryId: "entry-1" }]
     ]);
+  });
+
+  it("writes null details to autocomplete history when an entry without details is deleted", async () => {
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        if (callCount === 2) {
+          assert.match(sql, /SELECT text, icon, details/);
+          assert.deepEqual(params, ["entry-1", "list-1"]);
+
+          return { rows: [{ text: "Milk", icon: null, details: null }] };
+        }
+
+        if (callCount === 3) {
+          assert.match(sql, /DELETE FROM entries/);
+          assert.deepEqual(params, ["entry-1", "list-1"]);
+
+          return { rows: [{ id: "entry-1" }] };
+        }
+
+        assert.match(sql, /INSERT INTO autocomplete_history/);
+        assert.deepEqual(params, ["user-1", "list-1", "Milk", null, null]);
+
+        return { rows: [] };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool)).delete("/api/lists/list-1/entries/entry-1");
+
+    assert.equal(response.status, 204);
+    assert.equal(callCount, 4);
   });
 
   it("does not broadcast create events for invalid entry requests", async () => {
