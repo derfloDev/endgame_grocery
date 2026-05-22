@@ -42,3 +42,47 @@ Reviewed: 2026-05-22
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-22
+
+#### Findings
+
+- **nit** — `InfoSheet.module.css` line 5–7: The plan specifies `padding-top: var(--space-4)` on `.info-sheet-section--footer`, but the implementation omits it because the base `.info-sheet-section` class already provides it via `padding: var(--space-4) 0 1rem`. The rendered result is identical. Not a correctness issue.
+
+#### Verification
+
+##### Steps
+1. Read all changed files against the plan: `InfoSheet.tsx`, `InfoSheet.module.css`, `InfoSheet.test.tsx`.
+2. Confirmed `border-top` removed from `.info-sheet-section` (line 1–3 in CSS) — no double divider.
+3. Confirmed `.info-sheet-section--first` rule fully removed from CSS.
+4. Confirmed `.info-sheet-section--footer` added with `border-top` only.
+5. Confirmed `.info-sheet-meta` updated: no standalone `border-top`, added `padding-bottom: var(--space-2)`.
+6. Confirmed Language section JSX (line 109) no longer carries `info-sheet-section--first` class.
+7. Confirmed Logout section JSX (lines 163–168) contains only the danger button — no section-label div present.
+8. Confirmed Version + License + Donate grouped inside one `info-sheet-section--footer` wrapper (lines 169–190).
+9. New test `"renders logout text only on the logout button"` (lines 86–91) asserts `getAllByText("Log out")` returns exactly 1 element.
+10. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors).
+11. Ran `npm run build` — clean (pre-existing chunk-size warning, 0 errors).
+12. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 14/14 pass.
+13. Ran `npm test` (full frontend + backend) — 423/423 frontend, 164/164 backend pass.
+
+##### Findings
+- All acceptance criteria satisfied.
+- Full frontend suite passes (423/423); flaky `app.test.tsx` timeout did not recur this run.
+
+##### Risks
+- None introduced by this change.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

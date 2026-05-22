@@ -1,11 +1,9 @@
 .info-sheet-section {
   padding: var(--space-4) 0 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.info-sheet-section--first {
-  padding-top: 0;
-  border-top: 0;
+.info-sheet-section--footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .info-sheet-section-label {
@@ -37,6 +35,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding-bottom: var(--space-2);
 }
 
 .info-sheet-user-name {

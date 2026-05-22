@@ -83,6 +83,13 @@ describe("InfoSheet", () => {
     ).toBeTruthy();
   });
 
+  it("renders logout text only on the logout button", () => {
+    render(<InfoSheet open onClose={() => {}} />);
+
+    expect(screen.getAllByText("Log out")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Log out" })).toBeTruthy();
+  });
+
   it("renders the language switcher before the user identity block", () => {
     render(<InfoSheet open onClose={() => {}} />);
 

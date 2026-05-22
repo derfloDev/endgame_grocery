@@ -106,7 +106,7 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
 
   return (
     <BottomSheet open={open} onClose={onClose} title={t("settings.title")}>
-      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-section--first"]}`}>
+      <div className={styles["info-sheet-section"]}>
         <div className={styles["info-sheet-section-label"]}>{t("settings.language")}</div>
         <LanguageSwitcher />
       </div>
@@ -161,31 +161,32 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
         )}
       </div>
       <div className={styles["info-sheet-section"]}>
-        <div className={styles["info-sheet-section-label"]}>{t("settings.logOut")}</div>
         <button className={`eg-btn eg-btn-danger ${styles["info-sheet-logout"]}`} type="button" onClick={handleLogout}>
           <Icon name="logOut" size={16} color="currentColor" />
           {t("settings.logOut")}
         </button>
       </div>
-      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-meta"]}`}>
-        <span className={styles["info-sheet-label"]}>{t("settings.version")}</span>
-        <span className={styles["info-sheet-value"]}>v{appVersion}</span>
-      </div>
-      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-meta"]}`}>
-        <span className={styles["info-sheet-label"]}>{t("settings.license")}</span>
-        <a
-          className={styles["info-sheet-link"]}
-          href="https://www.gnu.org/licenses/gpl-3.0.html"
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          {t("settings.licenseLink")}
-        </a>
-      </div>
-      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-donate"]}`}>
-        <a href="https://www.buymeacoffee.com/derflodev" target="_blank" rel="noopener noreferrer">
-          <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt={t("settings.donate")} />
-        </a>
+      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-section--footer"]}`}>
+        <div className={styles["info-sheet-meta"]}>
+          <span className={styles["info-sheet-label"]}>{t("settings.version")}</span>
+          <span className={styles["info-sheet-value"]}>v{appVersion}</span>
+        </div>
+        <div className={styles["info-sheet-meta"]}>
+          <span className={styles["info-sheet-label"]}>{t("settings.license")}</span>
+          <a
+            className={styles["info-sheet-link"]}
+            href="https://www.gnu.org/licenses/gpl-3.0.html"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {t("settings.licenseLink")}
+          </a>
+        </div>
+        <div className={styles["info-sheet-donate"]}>
+          <a href="https://www.buymeacoffee.com/derflodev" target="_blank" rel="noopener noreferrer">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt={t("settings.donate")} />
+          </a>
+        </div>
       </div>
     </BottomSheet>
   );

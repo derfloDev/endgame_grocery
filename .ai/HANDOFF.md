@@ -71,3 +71,63 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — plan — 2026-05-22T08:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned fix for double-divider lines (border-top + section-label pseudo-elements) and erroneous logout section label introduced in T-001 |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-003 — plan — 2026-05-22T08:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned single-line fix: add `info-sheet-section--footer` modifier to Logout section div to show a top-divider above the button |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-002 — review — 2026-05-22T15:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 double-divider and logout-label fix; all acceptance criteria met, full frontend suite 423/423 pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-22T12:48:19Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed section border duplication, dropped the duplicate logout label, grouped footer metadata under one divider, and added logout text regression coverage. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.tsx, frontend/src/components/InfoSheet/InfoSheet.module.css, frontend/src/components/InfoSheet/InfoSheet.test.tsx |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass (14 tests); `npm run build` pass (existing Vite chunk-size warning); `npm run test --workspace frontend -- src/app.test.tsx -t "adds and edits entry details from the list detail sheet"` pass after sandbox `spawn EPERM` rerun; `npm test` pass on second full run (frontend 423 tests, backend 164 tests). First full `npm test` run hit the known app.test timeout before the targeted retry and successful full rerun. |
+| Commit | `fix(settings): remove duplicate InfoSheet dividers` |
+| Next Role | review |
+
+---
+
+### T-002 — commit_task — 2026-05-22T13:08:24Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and committed the reviewed InfoSheet divider correction. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, frontend/src/components/InfoSheet/InfoSheet.tsx, frontend/src/components/InfoSheet/InfoSheet.module.css, frontend/src/components/InfoSheet/InfoSheet.test.tsx |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `fix(settings): remove duplicate InfoSheet dividers` |
+| Next Role | none |
+
+---
