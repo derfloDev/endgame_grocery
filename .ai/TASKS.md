@@ -20,4 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
+| T-001 | InfoSheet redesign: reorder sections (Language first), add section labels + dividers, fix clipboard copy error handling | done | (1) Language switcher rendered first. (2) Each section has an all-caps label with decorative divider lines. (3) Sections separated by border-top dividers. (4) Clipboard errors caught silently; button remains usable. (5) New tests for section order and clipboard error path pass. (6) lint + build + test green. | `npm run lint` (pass; existing AuthContext Fast Refresh warning), `npm run test --workspace frontend -- InfoSheet` (pass; rerun outside sandbox after spawn EPERM), `npm run build` (pass; existing Vite chunk-size warning), `npm test` (pass: frontend 422, backend 164) | none |

@@ -18,6 +18,7 @@
   "app.brandSub": "GROCERY",
   "settings.title": "Info & Settings",
   "settings.open": "Settings",
+  "settings.account": "Account",
   "settings.language": "Language",
   "settings.languageLabel": "Language",
   "settings.version": "Version",
