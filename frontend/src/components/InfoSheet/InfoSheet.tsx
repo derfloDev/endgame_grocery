@@ -80,8 +80,12 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
       return;
     }
 
-    await navigator.clipboard.writeText(apiKey);
-    setCopySuccess(true);
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      setCopySuccess(true);
+    } catch {
+      // Clipboard writes can fail in insecure contexts or when permission is denied.
+    }
   }
 
   async function handleRegenerateApiKey() {
@@ -102,21 +106,19 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
 
   return (
     <BottomSheet open={open} onClose={onClose} title={t("settings.title")}>
+      <div className={styles["info-sheet-section"]}>
+        <div className={styles["info-sheet-section-label"]}>{t("settings.language")}</div>
+        <LanguageSwitcher />
+      </div>
       {showUserIdentity ? (
         <div className={styles["info-sheet-section"]}>
+          <div className={styles["info-sheet-section-label"]}>{t("settings.account")}</div>
           {user?.display_name ? <div className={styles["info-sheet-user-name"]}>{user.display_name}</div> : null}
           {user?.email ? <div className={styles["info-sheet-user-email"]}>{user.email}</div> : null}
         </div>
       ) : null}
       <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-api-key"]}`}>
-        <div className={styles["info-sheet-api-key-header"]}>
-          <span className={styles["info-sheet-label"]}>{t("settings.apiKey")}</span>
-          {copySuccess ? (
-            <span className={styles["info-sheet-api-key-status"]} aria-live="polite">
-              {t("settings.apiKeyCopied")}
-            </span>
-          ) : null}
-        </div>
+        <div className={styles["info-sheet-section-label"]}>{t("settings.apiKey")}</div>
         <p className={styles["info-sheet-api-key-hint"]}>{t("settings.apiKeyHint")}</p>
         {apiKey ? (
           <>
@@ -126,6 +128,11 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
                 {t("settings.apiKeyCopy")}
               </button>
             </div>
+            {copySuccess ? (
+              <span className={styles["info-sheet-api-key-status"]} aria-live="polite">
+                {t("settings.apiKeyCopied")}
+              </span>
+            ) : null}
             <button
               className={`eg-btn-ghost ${styles["info-sheet-api-key-action"]}`}
               type="button"
@@ -153,35 +160,33 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
           </>
         )}
       </div>
-      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-language"]}`}>
-        <span className={styles["info-sheet-label"]}>{t("settings.language")}</span>
-        <LanguageSwitcher />
-      </div>
-      <div className={styles["info-sheet-section"]}>
+      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-section--footer"]}`}>
         <button className={`eg-btn eg-btn-danger ${styles["info-sheet-logout"]}`} type="button" onClick={handleLogout}>
           <Icon name="logOut" size={16} color="currentColor" />
           {t("settings.logOut")}
         </button>
       </div>
-      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-meta"]}`}>
-        <span className={styles["info-sheet-label"]}>{t("settings.version")}</span>
-        <span className={styles["info-sheet-value"]}>v{appVersion}</span>
-      </div>
-      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-meta"]}`}>
-        <span className={styles["info-sheet-label"]}>{t("settings.license")}</span>
-        <a
-          className={styles["info-sheet-link"]}
-          href="https://www.gnu.org/licenses/gpl-3.0.html"
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          {t("settings.licenseLink")}
-        </a>
-      </div>
-      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-donate"]}`}>
-        <a href="https://www.buymeacoffee.com/derflodev" target="_blank" rel="noopener noreferrer">
-          <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt={t("settings.donate")} />
-        </a>
+      <div className={styles["info-sheet-section"]}>
+        <div className={styles["info-sheet-meta"]}>
+          <span className={styles["info-sheet-label"]}>{t("settings.version")}</span>
+          <span className={styles["info-sheet-value"]}>v{appVersion}</span>
+        </div>
+        <div className={styles["info-sheet-meta"]}>
+          <span className={styles["info-sheet-label"]}>{t("settings.license")}</span>
+          <a
+            className={styles["info-sheet-link"]}
+            href="https://www.gnu.org/licenses/gpl-3.0.html"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {t("settings.licenseLink")}
+          </a>
+        </div>
+        <div className={styles["info-sheet-donate"]}>
+          <a href="https://www.buymeacoffee.com/derflodev" target="_blank" rel="noopener noreferrer">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt={t("settings.donate")} />
+          </a>
+        </div>
       </div>
     </BottomSheet>
   );

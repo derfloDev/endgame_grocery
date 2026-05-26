@@ -1,5 +1,29 @@
 .info-sheet-section {
-  padding: 0 0 1rem;
+  padding: var(--space-4) 0 0;
+}
+
+.info-sheet-section--footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.info-sheet-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.info-sheet-section-label::before,
+.info-sheet-section-label::after {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  content: "";
 }
 
 .info-sheet-logout {
@@ -11,8 +35,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: var(--space-2);
 }
 
 .info-sheet-user-name {
@@ -27,21 +50,10 @@
   font-size: var(--text-sm);
 }
 
-.info-sheet-language {
-  display: grid;
-  gap: var(--space-2);
-}
-
 .info-sheet-api-key {
   display: grid;
   gap: var(--space-3);
-}
-
-.info-sheet-api-key-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  padding-bottom: var(--space-4);
 }
 
 .info-sheet-api-key-hint,
@@ -109,7 +121,6 @@
 .info-sheet-donate {
   display: flex;
   justify-content: center;
-  padding-top: 1rem;
 }
 
 .info-sheet-donate img {

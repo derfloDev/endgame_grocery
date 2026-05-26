@@ -1,43 +1,30 @@
 # ROADMAP
 
-Goal: preserve entry details through the open ↔ recently-used transition.
+Goal: Redesign the "Info & Settings" bottom sheet for better clarity and fix the broken API-key copy button.
 
 ## Priority 1
 
-Objective: store and restore the `details` field in the autocomplete history so that
-details survive the round-trip from "offene Einträge" → "zuletzt verwendet" → "offene Einträge",
-including across page reloads.
+Objective: Restructure and visually improve the InfoSheet bottom sheet.
 
-### Root cause
+**New section order (top to bottom):**
+1. Language toggle (always at top)
+2. User identity (display name + e-mail) — with section label
+3. API Key — with section label (label, hint, key value, Copy / Regenerate)
+4. Logout button
+5. Meta footer: Version | License | Donate
 
-The `autocomplete_history` table has no `details` column. When an entry is
-marked done the backend calls `upsertAutocompleteHistory` without `details`;
-the GET `/history` endpoint returns only `text`, `icon`, and `use_count`.
-On a fresh page load the client therefore loses the details for every
-recently-used item.
+**Visual style:**
+- Thin horizontal dividers between sections
+- Small all-caps section label above each group (e.g. "SPRACHE", "API KEY", "KONTO")
+- No cards / panels — flat list with dividers
 
-### Scope
+**Bug fix:**
+- `handleCopyApiKey` swallows clipboard errors silently (async without try/catch).
+  Add error handling so the button never appears to do nothing.
 
-Backend:
-- DB migration: add nullable `details text` column to `autocomplete_history`
-- `historyUtils.js` – `upsertAutocompleteHistory`: accept and persist `details`
-- `routes/entries.js` – PATCH (status → done): pass `entry.details` to `upsertAutocompleteHistory`
-- `routes/entries.js` – DELETE: pass `entry.details` to `upsertAutocompleteHistory` (requires fetching `details` from the DB before deletion)
-- `routes/history.js` – GET: include `details` in the response payload
-
-Frontend:
-- No changes needed; the frontend already handles `details` in the `Suggestion`
-  type and correctly passes it through `upsertRecentlyUsedItems` and
-  `addRecentlyUsedEntry`.
-
-### Acceptance criteria
-
-1. After marking an entry with details as done, the recently-used chip still
-   carries the same details value (even after a page reload).
-2. Clicking a recently-used chip that has details re-creates the entry in
-   "offene Einträge" with those details intact.
-3. Moving an entry back to "zuletzt verwendet" again (mark done a second time)
-   continues to preserve the details.
-4. Entries without details continue to work as before (no regression).
-5. All existing backend and frontend tests continue to pass; new tests cover the
-   new `details` persistence behaviour.
+**Acceptance criteria:**
+- Language toggle is rendered before all other sections.
+- Each section has a visible label header.
+- Sections are separated by a thin divider.
+- Clicking "Copy" writes the API key to the clipboard and shows "Copied!" feedback; clipboard errors do not leave the button in a silent broken state.
+- All existing unit tests pass; new/updated tests cover the changed section order and the clipboard error path.

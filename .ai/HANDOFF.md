@@ -23,56 +23,312 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
-### T-001 — plan — 2026-05-22T00:00:00Z
+### T-001 — plan — 2026-05-22T08:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Planned backend-only fix to persist `details` in `autocomplete_history` so entry details survive the open ↔ recently-used round-trip including page reloads |
-| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Summary | Planned InfoSheet redesign: new section order (Language first), all-caps section labels with decorative dividers, clipboard error handling fix, and two new tests |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-05-22T04:54:28Z
+### T-001 — implement — 2026-05-22T11:27:02Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Persisted autocomplete history details through schema, upsert call sites, history responses, and v1 done toggles so recently used entries can restore details after reload |
-| Files Changed | `README.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md`, `backend/src/db/historyUtils.js`, `backend/src/db/migrations/1778803200001_add_details_to_autocomplete_history.cjs`, `backend/src/db/migrations.test.js`, `backend/src/entries.test.js`, `backend/src/history.test.js`, `backend/src/routes/entries.js`, `backend/src/routes/history.js`, `backend/src/routes/v1.js`, `backend/src/v1.test.js` |
-| Validation | `node --test src/entries.test.js src/history.test.js src/db/migrations.test.js src/v1.test.js` PASS; `npm run lint` PASS with existing frontend Fast Refresh warning in `frontend/src/context/AuthContext.tsx`; `npm run build` PASS with Vite chunk-size warning; `npm test` PASS |
-| Commit | `feat(history): preserve details in recently used items` |
+| Summary | Reordered InfoSheet sections with labeled dividers, added account translations, and made API-key copy failures non-blocking with retry coverage. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.tsx, frontend/src/components/InfoSheet/InfoSheet.module.css, frontend/src/components/InfoSheet/InfoSheet.test.tsx, frontend/src/locales/en/translation.json, frontend/src/locales/de/translation.json |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass after sandbox `spawn EPERM` rerun outside sandbox; `npm run build` pass (existing Vite chunk-size warning); `npm test` pass (frontend 422 tests, backend 164 tests). |
+| Commit | `feat(settings): improve InfoSheet clarity and clipboard copy recovery` |
 | Next Role | review |
 
 ---
 
-### T-001 — review — 2026-05-22T07:00:00Z
+### T-001 — review — 2026-05-22T11:55:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed and verified the backend-only `details` persistence implementation; all 73 tests pass, lint and build clean, code matches plan exactly. |
+| Summary | Reviewed InfoSheet redesign implementation; all acceptance criteria met, pre-existing app.test.tsx flaky timeout confirmed as unrelated to this change. |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-001 — commit_task — 2026-05-22T05:30:59Z
+### T-001 — commit_task — 2026-05-22T12:18:48Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Committed T-001 after review approval |
-| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `ROADMAP.md`, `backend/src/db/historyUtils.js`, `backend/src/db/migrations/1778803200001_add_details_to_autocomplete_history.cjs`, `backend/src/db/migrations.test.js`, `backend/src/entries.test.js`, `backend/src/history.test.js`, `backend/src/routes/entries.js`, `backend/src/routes/history.js`, `backend/src/routes/v1.js`, `backend/src/v1.test.js` |
-| Validation | Review-approved implementation; prior validation recorded in T-001 implement handoff |
-| Commit | `feat(history): preserve details in recently used items` |
+| Summary | Marked T-001 done and committed the reviewed InfoSheet redesign. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, ROADMAP.md, .claude/settings.local.json, frontend/src/components/InfoSheet/InfoSheet.tsx, frontend/src/components/InfoSheet/InfoSheet.module.css, frontend/src/components/InfoSheet/InfoSheet.test.tsx, frontend/src/locales/en/translation.json, frontend/src/locales/de/translation.json |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `feat(settings): improve InfoSheet clarity and clipboard copy recovery` |
 | Next Role | none |
 
 ---
 
-### Cycle closed — unversioned — 2026-05-22T05:56:26Z
+### T-002 — plan — 2026-05-22T08:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned fix for double-divider lines (border-top + section-label pseudo-elements) and erroneous logout section label introduced in T-001 |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-003 — plan — 2026-05-22T08:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned single-line fix: add `info-sheet-section--footer` modifier to Logout section div to show a top-divider above the button |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-002 — review — 2026-05-22T15:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 double-divider and logout-label fix; all acceptance criteria met, full frontend suite 423/423 pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-22T12:48:19Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed section border duplication, dropped the duplicate logout label, grouped footer metadata under one divider, and added logout text regression coverage. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.tsx, frontend/src/components/InfoSheet/InfoSheet.module.css, frontend/src/components/InfoSheet/InfoSheet.test.tsx |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass (14 tests); `npm run build` pass (existing Vite chunk-size warning); `npm run test --workspace frontend -- src/app.test.tsx -t "adds and edits entry details from the list detail sheet"` pass after sandbox `spawn EPERM` rerun; `npm test` pass on second full run (frontend 423 tests, backend 164 tests). First full `npm test` run hit the known app.test timeout before the targeted retry and successful full rerun. |
+| Commit | `fix(settings): remove duplicate InfoSheet dividers` |
+| Next Role | review |
+
+---
+
+### T-002 — commit_task — 2026-05-22T13:08:24Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and committed the reviewed InfoSheet divider correction. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, frontend/src/components/InfoSheet/InfoSheet.tsx, frontend/src/components/InfoSheet/InfoSheet.module.css, frontend/src/components/InfoSheet/InfoSheet.test.tsx |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `fix(settings): remove duplicate InfoSheet dividers` |
+| Next Role | none |
+
+---
+
+### T-003 — review — 2026-05-22T15:22:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 logout divider addition; single-class JSX change is correct and complete, 423/423 tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-05-22T13:13:14Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added the existing footer divider modifier to the Logout section so one thin line appears above the button. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.tsx |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass (14 tests); `npm run build` pass (existing Vite chunk-size warning); `npm test` pass (frontend 423 tests, backend 164 tests). |
+| Commit | `fix(settings): add logout divider` |
+| Next Role | review |
+
+---
+
+### T-006 — plan — 2026-05-26T08:25:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned restoration of `padding-bottom: var(--space-4)` on `.info-sheet-api-key` — the T-005 rework that was not included in the final commit |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-005 — plan (rework) — 2026-05-26T08:20:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Refined T-005 scope: global padding-bottom removal stays, but `.info-sheet-api-key` must restore `padding-bottom: var(--space-4)` to keep the space below "Neu generieren"; task moved to changes_requested |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-005 — plan — 2026-05-26T08:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned removal of 1rem padding-bottom from `.info-sheet-section` to eliminate excessive spacing below username, language toggle, and logout sections |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-004 — plan — 2026-05-26T08:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned removal of `info-sheet-section--footer` from meta-footer wrapper to eliminate the divider line below the Logout button |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-003 — commit_task — 2026-05-22T13:25:09Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-003 done and committed the reviewed logout divider addition. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, frontend/src/components/InfoSheet/InfoSheet.tsx |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `fix(settings): add logout divider` |
+| Next Role | none |
+
+---
+
+### T-004 — implement — 2026-05-26T05:17:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed the footer divider modifier from the meta footer wrapper so the Logout button only has the divider above it. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.tsx |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass (14 tests); `npm run build` pass (existing Vite chunk-size warning); `npm test` pass (frontend 423 tests, backend 164 tests). |
+| Commit | `fix(settings): remove divider below logout` |
+| Next Role | review |
+
+---
+
+### T-004 — review — 2026-05-26T10:58:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 footer-divider removal; single class removal is correct and complete, 14/14 InfoSheet tests pass, build clean. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — commit_task — 2026-05-26T09:52:03Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-004 done and committed the reviewed removal of the divider below Logout. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, frontend/src/components/InfoSheet/InfoSheet.tsx |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `fix(settings): remove divider below logout` |
+| Next Role | none |
+
+---
+
+### T-005 — implement — 2026-05-26T10:12:22Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed bottom padding from InfoSheet sections while preserving their top spacing. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.module.css |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass (14 tests); `npm run build` pass (existing Vite chunk-size warning); `npm test` pass (frontend 423 tests, backend 164 tests). |
+| Commit | `fix(settings): tighten InfoSheet section spacing` |
+| Next Role | review |
+
+---
+
+### T-005 — review — 2026-05-26T12:20:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 bottom-padding removal; single CSS value change is correct, 423/423 tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — commit_task — 2026-05-26T10:30:56Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-005 done and committed the reviewed InfoSheet section spacing change. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, frontend/src/components/InfoSheet/InfoSheet.module.css |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `fix(settings): tighten InfoSheet section spacing` |
+| Next Role | none |
+
+---
+
+### T-006 — implement — 2026-05-26T11:08:17Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Restored API-key section bottom padding so the regenerate button keeps spacing above the Logout divider. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.module.css |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass (14 tests); `npm run build` pass (existing Vite chunk-size warning); targeted retries for earlier full-suite timeouts passed (`app.test.tsx` detail-sheet test and `AddItemSheet.test.tsx` icon-browser test); `npm test` pass (frontend 423 tests, backend 164 tests). |
+| Commit | `fix(settings): restore API key section spacing` |
+| Next Role | review |
+
+---
+
+### T-006 — review — 2026-05-26T13:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-006 API-key bottom-spacing restoration; single CSS property addition is correct, 423/423 tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — commit_task — 2026-05-26T11:22:26Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-006 done and committed the reviewed API-key section spacing restoration. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, frontend/src/components/InfoSheet/InfoSheet.module.css |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `fix(settings): restore API key section spacing` |
+| Next Role | none |
+
+---
+
+### Cycle closed — unversioned — 2026-05-26T11:27:45Z
 
 | Field | Value |
 |-------|-------|

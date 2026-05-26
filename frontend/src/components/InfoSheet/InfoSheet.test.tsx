@@ -83,6 +83,24 @@ describe("InfoSheet", () => {
     ).toBeTruthy();
   });
 
+  it("renders logout text only on the logout button", () => {
+    render(<InfoSheet open onClose={() => {}} />);
+
+    expect(screen.getAllByText("Log out")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Log out" })).toBeTruthy();
+  });
+
+  it("renders the language switcher before the user identity block", () => {
+    render(<InfoSheet open onClose={() => {}} />);
+
+    const languageSwitcher = screen.getByRole("group", { name: "Language" });
+    const userName = screen.getByText("Demo User");
+
+    expect(
+      languageSwitcher.compareDocumentPosition(userName) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
   it("does not render when closed", () => {
     render(<InfoSheet open={false} onClose={() => {}} />);
 
@@ -148,6 +166,30 @@ describe("InfoSheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Copy" }));
 
     expect(writeText).toHaveBeenCalledWith("api-key-1");
+    expect(screen.getByText("Copied!")).toBeTruthy();
+  });
+
+  it("keeps the copy action usable when clipboard write fails", async () => {
+    const writeText = vi.fn().mockRejectedValueOnce(new Error("permission denied")).mockResolvedValueOnce(undefined);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText }
+    });
+
+    render(<InfoSheet open onClose={() => {}} />);
+
+    await screen.findByText("api-key-1");
+    const copyButton = screen.getByRole("button", { name: "Copy" });
+
+    await userEvent.click(copyButton);
+
+    expect(writeText).toHaveBeenCalledWith("api-key-1");
+    expect(screen.queryByText("Copied!")).toBeNull();
+    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+
+    await userEvent.click(copyButton);
+
+    expect(writeText).toHaveBeenCalledTimes(2);
     expect(screen.getByText("Copied!")).toBeTruthy();
   });
 
