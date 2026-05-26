@@ -1,28 +1,18 @@
 # Plan
 
-Status: **ready_for_implement** (T-005 rework — additional constraint added after initial review)
+Status: **ready_for_implement**
 
-Goal: Remove excessive bottom padding from most InfoSheet sections, but preserve it below the API-Key section ("Neu generieren" button).
+Goal: Restore missing bottom spacing below the "Neu generieren" button in the API-key section.
 
 ## Background
 
-`.info-sheet-section` originally had `padding: var(--space-4) 0 1rem`. T-005 removed the bottom padding globally (`padding: var(--space-4) 0 0`). The user confirmed the space below "Neu generieren" (the Regenerate button in the API-key section) should be kept.
+T-005 set `.info-sheet-section { padding: var(--space-4) 0 0 }` (no bottom padding). The planned rework (add `padding-bottom` back to `.info-sheet-api-key` only) was not included in the T-005 commit. Result: no gap between the "Neu generieren" button and the divider line of the Logout section below it.
 
 ## Scope
 
-CSS only. No JSX, translation, or test changes.
+One CSS change only. No JSX, translation, or test changes.
 
 **File:** `frontend/src/components/InfoSheet/InfoSheet.module.css`
-
-### Change 1 — already in T-005 implementation, keep as-is
-```css
-.info-sheet-section {
-  padding: var(--space-4) 0 0;   /* bottom padding removed globally */
-}
-```
-
-### Change 2 — new, add to `.info-sheet-api-key`
-Restore the bottom spacing specifically for the API-key section:
 
 Before:
 ```css
@@ -43,8 +33,8 @@ After:
 
 ## Acceptance Criteria
 
-1. No visible bottom gap below the language toggle, username block, and logout button.
-2. Visible bottom gap (≈ 16 px) is preserved below the API-key section (after the "Neu generieren" / "Generate key" button).
+1. Visible bottom gap (≈ 16 px) between the "Neu generieren" / "Generate key" button and the divider line of the Logout section.
+2. No other spacing changes to any other section.
 3. `npm run lint`, `npm run build`, and `npm test` all pass.
 
 ## Validation

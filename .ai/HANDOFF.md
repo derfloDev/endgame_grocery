@@ -157,6 +157,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-006 — plan — 2026-05-26T08:25:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned restoration of `padding-bottom: var(--space-4)` on `.info-sheet-api-key` — the T-005 rework that was not included in the final commit |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
 ### T-005 — plan (rework) — 2026-05-26T08:20:00Z
 
 | Field | Value |
@@ -275,6 +286,44 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, frontend/src/components/InfoSheet/InfoSheet.module.css |
 | Validation | Review passed; commit_task performed no new validation. |
 | Commit | `fix(settings): tighten InfoSheet section spacing` |
+| Next Role | none |
+
+---
+
+### T-006 — implement — 2026-05-26T11:08:17Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Restored API-key section bottom padding so the regenerate button keeps spacing above the Logout divider. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.module.css |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass (14 tests); `npm run build` pass (existing Vite chunk-size warning); targeted retries for earlier full-suite timeouts passed (`app.test.tsx` detail-sheet test and `AddItemSheet.test.tsx` icon-browser test); `npm test` pass (frontend 423 tests, backend 164 tests). |
+| Commit | `fix(settings): restore API key section spacing` |
+| Next Role | review |
+
+---
+
+### T-006 — review — 2026-05-26T13:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-006 API-key bottom-spacing restoration; single CSS property addition is correct, 423/423 tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — commit_task — 2026-05-26T11:22:26Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-006 done and committed the reviewed API-key section spacing restoration. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, frontend/src/components/InfoSheet/InfoSheet.module.css |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `fix(settings): restore API key section spacing` |
 | Next Role | none |
 
 ---

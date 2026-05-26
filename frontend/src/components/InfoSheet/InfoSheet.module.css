@@ -53,6 +53,7 @@
 .info-sheet-api-key {
   display: grid;
   gap: var(--space-3);
+  padding-bottom: var(--space-4);
 }
 
 .info-sheet-api-key-hint,

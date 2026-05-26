@@ -199,3 +199,40 @@ None.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-26
+
+#### Findings
+
+None.
+
+#### Verification
+
+##### Steps
+1. Read `InfoSheet.module.css` `.info-sheet-api-key` rule — confirmed `padding-bottom: var(--space-4)` is present, matching the plan's "After" snippet exactly.
+2. Confirmed no other CSS rules were changed and no JSX, translation, or test files were modified (scope: one CSS property addition only).
+3. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors).
+4. Ran `npm run build` — clean (pre-existing chunk-size warning, 0 errors).
+5. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 14/14 pass.
+6. Ran `npm test` (full suite) — 423/423 pass; no flaky timeout this run.
+
+##### Findings
+- All acceptance criteria satisfied.
+- Change is minimal — exactly one CSS property added to one rule, no side-effects on other sections.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
