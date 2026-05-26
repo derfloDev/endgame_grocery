@@ -236,3 +236,40 @@ None.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-007
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-26
+
+#### Findings
+
+None.
+
+#### Verification
+
+##### Steps
+1. Read `.github/workflows/ci.yml` — confirmed `branches: [main]` is present under both `push:` (line 5) and `pull_request:` (line 7), matching the plan's "After" snippet exactly.
+2. Ran `git diff HEAD -- .github/workflows/ci.yml` from repo root — diff shows exactly 2 lines added (`branches: [main]` under each trigger), no other changes.
+3. Verified baseline at cycle-start commit `75f7c22` had bare `push:` / `pull_request:` with no branch filters — confirms the change is the implementer's work, not pre-existing.
+4. Confirmed no application code, test, translation, or other workflow files were modified (scope: one YAML file, two lines added).
+5. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors). Workflow YAML is not linted by the app suite; YAML structure verified visually.
+6. YAML structure is valid: indentation is consistent (2-space), `branches` is correctly nested under each trigger key.
+
+##### Findings
+- All acceptance criteria satisfied.
+- Change is minimal and correct — eliminates unnecessary double-runs on feature branch pushes and makes the `main` CI run explicit for release-please chaining.
+
+##### Risks
+- Feature branch pushes will no longer trigger CI directly; developers relying on push CI for branches other than `main` will need to open a PR instead. This is the intended behaviour per the plan.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
