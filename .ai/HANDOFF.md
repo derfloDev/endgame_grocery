@@ -157,6 +157,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-007 — plan — 2026-05-26T08:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned explicit `branches: [main]` filter on `push` and `pull_request` triggers in `ci.yml` to make main builds and the release-please chain reliable after PR merge |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
 ### T-006 — plan — 2026-05-26T08:25:00Z
 
 | Field | Value |
@@ -329,6 +340,53 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 ---
 
 ### Cycle closed — unversioned — 2026-05-26T11:27:45Z
+
+| Field | Value |
+|-------|-------|
+| Summary | All tasks done; cycle closed |
+| Version | unversioned |
+
+---
+
+### T-007 — implement — 2026-05-26T13:05:26Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added explicit `main` branch filters to CI `push` and `pull_request` triggers so main builds and the release-please workflow chain are targeted reliably. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .github/workflows/ci.yml |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); visual diff check confirmed only `branches: [main]` was added under the `push` and `pull_request` triggers in `.github/workflows/ci.yml`. |
+| Commit | `ci: run CI on main branch events` |
+| Next Role | review |
+
+---
+
+### T-007 — review — 2026-05-26T13:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-007 CI branch-filter addition; exact 2-line diff matches plan, YAML structure valid, lint passes. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-007 — commit_task — 2026-05-26T13:30:39Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-007 done and committed the reviewed CI branch filters. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, .github/workflows/ci.yml |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `ci: run CI on main branch events` |
+| Next Role | none |
+
+---
+
+### Cycle closed — unversioned — 2026-05-26T13:37:19Z
 
 | Field | Value |
 |-------|-------|
