@@ -157,6 +157,28 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-005 — plan (rework) — 2026-05-26T08:20:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Refined T-005 scope: global padding-bottom removal stays, but `.info-sheet-api-key` must restore `padding-bottom: var(--space-4)` to keep the space below "Neu generieren"; task moved to changes_requested |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-005 — plan — 2026-05-26T08:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned removal of 1rem padding-bottom from `.info-sheet-section` to eliminate excessive spacing below username, language toggle, and logout sections |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
 ### T-004 — plan — 2026-05-26T08:00:00Z
 
 | Field | Value |
@@ -215,6 +237,44 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, frontend/src/components/InfoSheet/InfoSheet.tsx |
 | Validation | Review passed; commit_task performed no new validation. |
 | Commit | `fix(settings): remove divider below logout` |
+| Next Role | none |
+
+---
+
+### T-005 — implement — 2026-05-26T10:12:22Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed bottom padding from InfoSheet sections while preserving their top spacing. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.module.css |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass (14 tests); `npm run build` pass (existing Vite chunk-size warning); `npm test` pass (frontend 423 tests, backend 164 tests). |
+| Commit | `fix(settings): tighten InfoSheet section spacing` |
+| Next Role | review |
+
+---
+
+### T-005 — review — 2026-05-26T12:20:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 bottom-padding removal; single CSS value change is correct, 423/423 tests pass. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — commit_task — 2026-05-26T10:30:56Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-005 done and committed the reviewed InfoSheet section spacing change. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, frontend/src/components/InfoSheet/InfoSheet.module.css |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `fix(settings): tighten InfoSheet section spacing` |
 | Next Role | none |
 
 ---

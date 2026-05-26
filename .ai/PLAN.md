@@ -1,37 +1,50 @@
 # Plan
 
-Status: **ready_for_implement**
+Status: **ready_for_implement** (T-005 rework — additional constraint added after initial review)
 
-Goal: Remove the divider line between the Logout button and the meta footer (Version / License / Donate).
+Goal: Remove excessive bottom padding from most InfoSheet sections, but preserve it below the API-Key section ("Neu generieren" button).
 
 ## Background
 
-After T-003 the Logout section has `info-sheet-section--footer` (→ `border-top` above the button) and the meta wrapper also has `info-sheet-section--footer` (→ `border-top` below the button). The user wants only the top divider above Logout; the line below it should be removed.
+`.info-sheet-section` originally had `padding: var(--space-4) 0 1rem`. T-005 removed the bottom padding globally (`padding: var(--space-4) 0 0`). The user confirmed the space below "Neu generieren" (the Regenerate button in the API-key section) should be kept.
 
 ## Scope
 
-One JSX change only. No CSS changes, no translation changes, no test changes.
+CSS only. No JSX, translation, or test changes.
 
-**File:** `frontend/src/components/InfoSheet/InfoSheet.tsx`
+**File:** `frontend/src/components/InfoSheet/InfoSheet.module.css`
 
-**Change:** Remove `info-sheet-section--footer` from the meta-footer wrapper `<div>`.
+### Change 1 — already in T-005 implementation, keep as-is
+```css
+.info-sheet-section {
+  padding: var(--space-4) 0 0;   /* bottom padding removed globally */
+}
+```
 
-Before (line ~169):
-```jsx
-<div className={`${styles["info-sheet-section"]} ${styles["info-sheet-section--footer"]}`}>
-  <div className={styles["info-sheet-meta"]}>   {/* Version */}
+### Change 2 — new, add to `.info-sheet-api-key`
+Restore the bottom spacing specifically for the API-key section:
+
+Before:
+```css
+.info-sheet-api-key {
+  display: grid;
+  gap: var(--space-3);
+}
 ```
 
 After:
-```jsx
-<div className={styles["info-sheet-section"]}>
-  <div className={styles["info-sheet-meta"]}>   {/* Version */}
+```css
+.info-sheet-api-key {
+  display: grid;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
 ```
 
 ## Acceptance Criteria
 
-1. No divider line between the Logout button and the Version row.
-2. The divider above the Logout button (from T-003) is still present.
+1. No visible bottom gap below the language toggle, username block, and logout button.
+2. Visible bottom gap (≈ 16 px) is preserved below the API-key section (after the "Neu generieren" / "Generate key" button).
 3. `npm run lint`, `npm run build`, and `npm test` all pass.
 
 ## Validation

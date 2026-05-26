@@ -162,3 +162,40 @@ None.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-26
+
+#### Findings
+
+None.
+
+#### Verification
+
+##### Steps
+1. Read `InfoSheet.module.css` lines 1–3 — confirmed `.info-sheet-section` now has `padding: var(--space-4) 0 0`, matching the plan's "After" snippet exactly.
+2. Confirmed no JSX, translation, or test files were changed (scope: one CSS value change only).
+3. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors).
+4. Ran `npm run build` — clean (pre-existing chunk-size warning, 0 errors).
+5. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 14/14 pass.
+6. Ran `npm test` (full suite) — 423/423 pass; flaky `app.test.tsx` timeout did not recur this run.
+
+##### Findings
+- All acceptance criteria satisfied.
+- Change is minimal — exactly one CSS shorthand value changed, no side-effects.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
