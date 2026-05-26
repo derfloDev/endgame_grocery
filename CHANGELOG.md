@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.0](https://github.com/derfloDev/endgame_grocery/compare/v1.3.0...v1.4.0) (2026-05-26)
+
+
+### Features
+
+* **settings:** improve InfoSheet clarity and clipboard copy recovery ([0e934da](https://github.com/derfloDev/endgame_grocery/commit/0e934da4645f2e1289f27c5fb69c87e7dd134b5a))
+
+
+### Bug Fixes
+
+* **settings:** add logout divider ([15b6e3b](https://github.com/derfloDev/endgame_grocery/commit/15b6e3b8a23d544506299c6a950652aa82d9a76d))
+* **settings:** remove divider below logout ([54567c5](https://github.com/derfloDev/endgame_grocery/commit/54567c5729485a5e6c144c53a84d1a4e2f8e5c0a))
+* **settings:** remove duplicate InfoSheet dividers ([cb99f11](https://github.com/derfloDev/endgame_grocery/commit/cb99f110ae2c6b008bed8e25ff27da4c55d0c150))
+* **settings:** restore API key section spacing ([a2f968e](https://github.com/derfloDev/endgame_grocery/commit/a2f968eff4180099eee8919aa45550de5f46733f))
+* **settings:** tighten InfoSheet section spacing ([1b71c02](https://github.com/derfloDev/endgame_grocery/commit/1b71c02bf784e39a67a976057b3c8ca05529a4b4))
+
 ## [1.3.0](https://github.com/derfloDev/endgame_grocery/compare/v1.2.0...v1.3.0) (2026-05-22)
 
 
