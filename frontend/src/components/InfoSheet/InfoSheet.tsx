@@ -166,7 +166,7 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
           {t("settings.logOut")}
         </button>
       </div>
-      <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-section--footer"]}`}>
+      <div className={styles["info-sheet-section"]}>
         <div className={styles["info-sheet-meta"]}>
           <span className={styles["info-sheet-label"]}>{t("settings.version")}</span>
           <span className={styles["info-sheet-value"]}>v{appVersion}</span>

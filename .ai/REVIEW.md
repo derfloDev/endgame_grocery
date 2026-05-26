@@ -124,3 +124,41 @@ None.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-26
+
+#### Findings
+
+None.
+
+#### Verification
+
+##### Steps
+1. Read `InfoSheet.tsx` lines 162–176 — confirmed meta-footer wrapper at line 169 now carries only `${styles["info-sheet-section"]}` (no `--footer` modifier), matching the plan's "After" snippet exactly.
+2. Confirmed Logout section at line 163 still carries both `info-sheet-section` and `info-sheet-section--footer` — top divider above Logout preserved.
+3. Confirmed no CSS, translation, or test files were changed (scope: one JSX class removal only).
+4. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors).
+5. Ran `npm run build` — clean (pre-existing chunk-size warning, 0 errors).
+6. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 14/14 pass.
+7. Ran full frontend suite — 422/423; the 1 failure is the pre-existing `app.test.tsx > adds and edits entry details from the list detail sheet` timeout (20 000 ms), confirmed pre-existing in T-001 review.
+
+##### Findings
+- All acceptance criteria satisfied.
+- Change is minimal — exactly one class removed from one div, no side-effects.
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

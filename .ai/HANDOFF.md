@@ -157,6 +157,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-004 — plan — 2026-05-26T08:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned removal of `info-sheet-section--footer` from meta-footer wrapper to eliminate the divider line below the Logout button |
+| Files Changed | .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
 ### T-003 — commit_task — 2026-05-22T13:25:09Z
 
 | Field | Value |
@@ -166,6 +177,44 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, frontend/src/components/InfoSheet/InfoSheet.tsx |
 | Validation | Review passed; commit_task performed no new validation. |
 | Commit | `fix(settings): add logout divider` |
+| Next Role | none |
+
+---
+
+### T-004 — implement — 2026-05-26T05:17:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed the footer divider modifier from the meta footer wrapper so the Logout button only has the divider above it. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/components/InfoSheet/InfoSheet.tsx |
+| Validation | `npm run lint` pass (existing AuthContext Fast Refresh warning); `npm run test --workspace frontend -- InfoSheet` pass (14 tests); `npm run build` pass (existing Vite chunk-size warning); `npm test` pass (frontend 423 tests, backend 164 tests). |
+| Commit | `fix(settings): remove divider below logout` |
+| Next Role | review |
+
+---
+
+### T-004 — review — 2026-05-26T10:58:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 footer-divider removal; single class removal is correct and complete, 14/14 InfoSheet tests pass, build clean. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — commit_task — 2026-05-26T09:52:03Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-004 done and committed the reviewed removal of the divider below Logout. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, .ai/PLAN.md, frontend/src/components/InfoSheet/InfoSheet.tsx |
+| Validation | Review passed; commit_task performed no new validation. |
+| Commit | `fix(settings): remove divider below logout` |
 | Next Role | none |
 
 ---
