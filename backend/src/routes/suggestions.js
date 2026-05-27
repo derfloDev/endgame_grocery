@@ -4,7 +4,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
 
 /**
- * Creates the authenticated autocomplete suggestions router.
+ * Creates the authenticated autocomplete suggestions router backed by list entries.
  *
  * @param {object} [options] Router dependencies.
  * @param {import("pg").Pool} [options.pool] Database pool.
@@ -42,18 +42,20 @@ export function createSuggestionsRouter({
 
       const result = await pool.query(
         `
-          SELECT text, icon, use_count
-          FROM autocomplete_history
-          WHERE user_id = $1
-            AND list_id = $2
+          SELECT text,
+            (array_agg(icon ORDER BY updated_at DESC NULLS LAST))[1] AS icon,
+            count(*) AS use_count
+          FROM entries
+          WHERE list_id = $1
             AND (
-              text ILIKE $3
-              OR similarity(text, $4) > 0.25
+              text ILIKE $2
+              OR similarity(text, $3) > 0.25
             )
-          ORDER BY use_count DESC, last_used_at DESC
+          GROUP BY text
+          ORDER BY use_count DESC, max(updated_at) DESC
           LIMIT 5
         `,
-        [req.user.sub, req.params.id, `%${query}%`, query]
+        [req.params.id, `%${query}%`, query]
       );
 
       res.json({

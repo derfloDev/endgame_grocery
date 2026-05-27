@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
-import { upsertAutocompleteHistory } from "../db/historyUtils.js";
 import { logger as defaultLogger } from "../logger.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -236,18 +235,6 @@ export function createEntryRouter({
           logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
         });
 
-      if (result.rows[0].status === "done") {
-        void upsertAutocompleteHistory(pool, {
-          userId: req.user.sub,
-          listId: req.params.id,
-          text: result.rows[0].text,
-          icon: result.rows[0].icon,
-          details: result.rows[0].details
-        }).catch((historyError) => {
-          logger.error({ err: historyError }, "Failed to upsert autocomplete history");
-        });
-      }
-
       res.json({
         entry: result.rows[0]
       });
@@ -267,21 +254,6 @@ export function createEntryRouter({
 
       if (!hasAccess) {
         res.status(403).json({ error: "You do not have access to this list." });
-        return;
-      }
-
-      const entryResult = await pool.query(
-        `
-          SELECT text, icon, details
-          FROM entries
-          WHERE id = $1 AND list_id = $2
-          LIMIT 1
-        `,
-        [req.params.entryId, req.params.id]
-      );
-
-      if (!entryResult.rows[0]) {
-        res.status(404).json({ error: "Entry not found." });
         return;
       }
 
@@ -307,16 +279,6 @@ export function createEntryRouter({
         .catch((broadcastError) => {
           logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
         });
-
-      void upsertAutocompleteHistory(pool, {
-        userId: req.user.sub,
-        listId: req.params.id,
-        text: entryResult.rows[0].text,
-        icon: entryResult.rows[0].icon,
-        details: entryResult.rows[0].details
-      }).catch((historyError) => {
-        logger.error({ err: historyError }, "Failed to upsert autocomplete history");
-      });
 
       res.status(204).send();
     } catch (error) {

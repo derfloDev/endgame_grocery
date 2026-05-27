@@ -68,12 +68,13 @@ describe("suggestion routes", () => {
           return { rows: [{ id: "list-1" }] };
         }
 
-        assert.match(sql, /SELECT text, icon, use_count/);
-        assert.match(sql, /text ILIKE \$3/);
-        assert.match(sql, /similarity\(text, \$4\) > 0\.25/);
-        assert.match(sql, /ORDER BY use_count DESC, last_used_at DESC/);
+        assert.match(sql, /FROM entries/);
+        assert.match(sql, /GROUP BY text/);
+        assert.match(sql, /text ILIKE \$2/);
+        assert.match(sql, /similarity\(text, \$3\) > 0\.25/);
+        assert.match(sql, /ORDER BY use_count DESC, max\(updated_at\) DESC/);
         assert.match(sql, /LIMIT 5/);
-        assert.deepEqual(params, ["user-1", "list-1", "%Schokollade%", "Schokollade"]);
+        assert.deepEqual(params, ["list-1", "%Schokollade%", "Schokollade"]);
 
         return {
           rows: [

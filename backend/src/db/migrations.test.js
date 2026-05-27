@@ -25,6 +25,9 @@ const apiKeyMigrationPath = path.resolve(
 const autocompleteHistoryDetailsMigrationPath = path.resolve(
   "src/db/migrations/1778803200001_add_details_to_autocomplete_history.cjs"
 );
+const dropAutocompleteHistoryMigrationPath = path.resolve(
+  "src/db/migrations/1778803200002_drop_autocomplete_history.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -543,5 +546,76 @@ describe("database migrations", () => {
 
     assert.doesNotThrow(() => migration.down(pgm));
     assert.deepEqual(calls, [["dropColumns", "autocomplete_history", ["details"]]]);
+  });
+
+  it("drops and restores the autocomplete_history table", async () => {
+    const migration = await import(pathToFileURL(dropAutocompleteHistoryMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [["dropTable", "autocomplete_history", { ifExists: true, cascade: true }]]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [
+      [
+        "createTable",
+        "autocomplete_history",
+        {
+          id: {
+            type: "uuid",
+            primaryKey: true,
+            default: { value: "gen_random_uuid()" }
+          },
+          user_id: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          list_id: {
+            type: "uuid",
+            notNull: true,
+            references: "lists(id)",
+            onDelete: "CASCADE"
+          },
+          text: {
+            type: "text",
+            notNull: true
+          },
+          icon: {
+            type: "text",
+            notNull: false
+          },
+          details: {
+            type: "text",
+            notNull: false
+          },
+          use_count: {
+            type: "integer",
+            notNull: true,
+            default: 1
+          },
+          last_used_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ],
+      [
+        "addConstraint",
+        "autocomplete_history",
+        "autocomplete_history_user_list_text_key",
+        { unique: ["user_id", "list_id", "text"] }
+      ],
+      [
+        "createIndex",
+        "autocomplete_history",
+        ["user_id", "list_id"],
+        { name: "autocomplete_history_user_list_idx" }
+      ]
+    ]);
   });
 });
