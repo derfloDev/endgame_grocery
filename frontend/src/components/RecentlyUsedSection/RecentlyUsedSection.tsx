@@ -2,19 +2,16 @@ import { useTranslation } from "react-i18next";
 import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../../data/iconRegistry";
 import type { Suggestion } from "../../types";
 import type { ReactElement } from "react";
-import Icon from "../ui/Icon/Icon";
 import styles from "./RecentlyUsedSection.module.css";
 
 interface RecentlyUsedSectionProps {
   items: Suggestion[];
   onAdd?: (text: string, iconName: string | null, details?: string) => void;
-  onDismiss?: (text: string) => void;
 }
 
 export default function RecentlyUsedSection({
   items,
-  onAdd,
-  onDismiss
+  onAdd
 }: RecentlyUsedSectionProps): ReactElement | null {
   const { t } = useTranslation();
 
@@ -50,15 +47,6 @@ export default function RecentlyUsedSection({
                   stroke={1.6}
                 />
                 <span className={styles["recently-used-chip-text"]}>{item.text}</span>
-              </button>
-
-              <button
-                aria-label={t("recent.dismiss", { name: item.text })}
-                className={styles["recently-used-chip-dismiss"]}
-                type="button"
-                onClick={() => onDismiss?.(item.text)}
-              >
-                <Icon color="var(--text-secondary)" name="x" size={14} />
               </button>
             </div>
           );

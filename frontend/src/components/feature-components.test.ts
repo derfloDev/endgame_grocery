@@ -28,7 +28,7 @@ const moduleClasses = {
   ListCardHome: ["list-card-home", "list-card-row", "list-card-menu-actions"],
   ListOptionsSheet: ["list-options-sheet", "list-option-row", "list-option-icon-share"],
   NewListSheet: ["new-list-form"],
-  RecentlyUsedSection: ["recently-used-section", "recently-used-grid", "recently-used-chip-dismiss"],
+  RecentlyUsedSection: ["recently-used-section", "recently-used-grid", "recently-used-chip"],
   RenameListSheet: ["rename-list-form"],
   ShareListSheet: ["share-list-form", "member-row", "share-invite-spinner"]
 } as const;

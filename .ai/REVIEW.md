@@ -57,3 +57,54 @@ None.
 #### Verdict
 
 `PASS`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-27
+
+#### Findings
+
+1. **nit** — `frontend/src/app.test.tsx` (lines ~1336–1382)
+   Two incidental test improvements outside strict T-002 scope: a test data string `"Y"` was corrected to `"Milk"` in the "adds and edits entry details" test, and `await userEvent.click(save button)` was replaced with `fireEvent.submit(form)` for more reliable form submission. Neither introduces a regression; both are improvements.
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps
+
+1. Read `.ai/PLAN.md` Phase 2 acceptance criteria.
+2. Read diffs for all changed files: `api/history.ts`, `RecentlyUsedSection.tsx`, `RecentlyUsedSection.module.css`, `ListDetailPage.tsx`, `useListDetailData.ts`, locale files, and all test files.
+3. Verified no residual references to `deleteFromHistory`, `dismissRecentlyUsedEntry`, `onDismiss`, `recent.dismiss`, or `recently-used-chip-dismiss` in any source file (`grep` across `frontend/src/`).
+4. Confirmed `Suggestion` type has `useCount?: number` as optional — history items without `useCount` are fully type-safe.
+5. Ran `npm run lint` — passes with same single pre-existing fast-refresh warning.
+6. Ran frontend tests (`npm run test --workspace frontend`) — **430/430 tests pass, 31 test files, zero failures**.
+   - Notable: the previously flaky `AuthContext > hydrates the current user when only a persisted token is available` test now passes, confirming it is a non-deterministic race condition, not a code defect.
+
+##### Findings
+
+- All acceptance criteria met:
+  1. ✅ `deleteFromHistory` export removed from `frontend/src/api/history.ts`.
+  2. ✅ Dismiss button absent from `RecentlyUsedSection` UI — JSX removed, `onDismiss` prop removed, CSS `.recently-used-chip-dismiss` styles removed, `position: relative` on cell removed (it was only needed for absolute-positioned overlay).
+  3. ✅ `dismissRecentlyUsedEntry` removed from `useListDetailData` return value and callback.
+  4. ✅ `ListDetailPage` no longer passes `onDismiss`.
+  5. ✅ All frontend tests pass (430/430).
+- `Icon` import correctly removed from `RecentlyUsedSection.tsx` — it was used only by the dismiss button.
+- `recent.dismiss` i18n keys removed from both `en` and `de` locale files.
+- `feature-components.test.ts` updated to check `recently-used-chip` instead of `recently-used-chip-dismiss`.
+
+##### Risks
+
+- No risks identified. The change is purely subtractive — no new behaviour introduced.
+
+#### Verdict
+
+`PASS`

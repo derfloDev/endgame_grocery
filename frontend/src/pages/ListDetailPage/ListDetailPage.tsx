@@ -75,7 +75,6 @@ export default function ListDetailPage(): ReactElement {
     reloadHistory,
     addEntryByText,
     addRecentlyUsedEntry,
-    dismissRecentlyUsedEntry,
     setEntryError,
     setList,
     setMembers,
@@ -287,7 +286,6 @@ export default function ListDetailPage(): ReactElement {
             <RecentlyUsedSection
               items={visibleRecentlyUsed}
               onAdd={(text, icon, details) => void addRecentlyUsedEntry(text, icon, details)}
-              onDismiss={dismissRecentlyUsedEntry}
             />
           </>
         ) : null}

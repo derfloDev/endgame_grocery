@@ -66,6 +66,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-002 — implement — 2026-05-27T14:00:23Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Committed reviewed T-002 frontend Recently Used dismiss control removal. |
+| Files Changed | .ai/HANDOFF.md, .ai/TASKS.md, frontend/src/api/history.ts, frontend/src/app.test.tsx, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx, frontend/src/components/feature-components.test.ts, frontend/src/locales/de/translation.json, frontend/src/locales/en/translation.json, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage/useListDetailData.ts |
+| Validation | Review PASS; `npm run test --workspace frontend -- RecentlyUsedSection ListDetailPage app.test feature-components` pass; `npm run lint` pass with existing frontend fast-refresh warning; `npm run build` pass with existing Vite chunk-size warning; `npm test` pass |
+| Commit | `<pending> feat(frontend): remove recently used dismiss controls` |
+| Next Role | none |
+
+---
+
 ### T-001 — implement — 2026-05-27T13:11:02Z
 
 | Field | Value |
@@ -76,3 +89,26 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Validation | Review PASS; `npm run lint` pass; `npm run build` pass; targeted T-001 backend tests pass; reviewer noted two unrelated pre-existing full-suite failures |
 | Commit | `<pending> feat(backend): derive history and suggestions from entries` |
 | Next Role | none |
+
+---
+
+### T-002 — implement — 2026-05-27T13:52:15Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Removed Recently Used dismiss controls and the frontend history deletion path. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, frontend/src/api/history.ts, frontend/src/app.test.tsx, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx, frontend/src/components/feature-components.test.ts, frontend/src/locales/de/translation.json, frontend/src/locales/en/translation.json, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage/useListDetailData.ts |
+| Validation | `npm run test --workspace frontend -- RecentlyUsedSection ListDetailPage app.test feature-components` pass; `npm run lint` pass with existing frontend fast-refresh warning; `npm run build` pass with existing Vite chunk-size warning; `npm test` pass |
+| Commit | `<pending> feat(frontend): remove recently used dismiss controls` |
+| Next Role | review |
+
+### T-002 — review — 2026-05-27T16:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 frontend refactor: all acceptance criteria met, 430/430 frontend tests pass (zero failures), lint passes; two incidental test improvements in app.test.tsx are non-regressions. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
