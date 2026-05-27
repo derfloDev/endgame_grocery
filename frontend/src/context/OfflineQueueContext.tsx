@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { OFFLINE_SYNC_COMPLETE_EVENT } from "../api/client";
 import {
@@ -21,67 +21,101 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState("");
   const [syncVersion, setSyncVersion] = useState(0);
+  const [failedMutationId, setFailedMutationId] = useState("");
+  const isSyncingRef = useRef(false);
 
-  useEffect(() => {
-    async function refreshQueuedCount(): Promise<void> {
-      const pendingMutations = await listOfflineMutations();
-      setQueuedCount(pendingMutations.length);
+  const refreshQueuedCount = useCallback(async (): Promise<void> => {
+    const pendingMutations = await listOfflineMutations();
+    setQueuedCount(pendingMutations.length);
+  }, []);
+
+  const drainQueue = useCallback(async (): Promise<void> => {
+    if (isSyncingRef.current) {
+      return;
     }
 
-    async function drainQueue(): Promise<void> {
+    isSyncingRef.current = true;
+
+    try {
       const pendingMutations = await listOfflineMutations();
 
       if (pendingMutations.length === 0) {
         setSyncError("");
+        setFailedMutationId("");
         return;
       }
 
       setIsSyncing(true);
       setSyncError("");
+      setFailedMutationId("");
 
       const idMap: IdMap = new Map();
+      let blockedByFailedMutation = false;
 
-      try {
-        for (const mutation of pendingMutations) {
-          const url = replaceTemporaryIds(mutation.url, idMap);
-          const payload = replaceTemporaryIds(mutation.payload, idMap);
-          const response = await fetch(url, {
-            method: mutation.method,
-            headers: {
-              ...(payload ? { "Content-Type": "application/json" } : {}),
-              ...(mutation.token ? { Authorization: `Bearer ${mutation.token}` } : {})
-            },
-            ...(payload ? { body: JSON.stringify(payload) } : {})
-          });
+      for (const mutation of pendingMutations) {
+        const url = replaceTemporaryIds(mutation.url, idMap);
+        const payload = replaceTemporaryIds(mutation.payload, idMap);
+        const response = await fetch(url, {
+          method: mutation.method,
+          headers: {
+            ...(payload ? { "Content-Type": "application/json" } : {}),
+            ...(mutation.token ? { Authorization: `Bearer ${mutation.token}` } : {})
+          },
+          ...(payload ? { body: JSON.stringify(payload) } : {})
+        });
 
-          if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error(getResponseError(data) ?? "Failed to sync queued changes.");
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          const responseError = getResponseError(data) ?? "Failed to sync queued changes.";
+
+          if (response.status >= 400 && response.status < 500) {
+            setSyncError(responseError);
+            setFailedMutationId(mutation.id);
+            blockedByFailedMutation = true;
+            break;
           }
 
-          const data = response.status === 204 ? null : await response.json().catch(() => ({}));
-          const createdId = extractCreatedId(mutation.queueMeta?.resourceType, data);
-
-          if (mutation.queueMeta?.tempId && createdId) {
-            idMap.set(mutation.queueMeta.tempId, createdId);
-          }
-
-          await removeOfflineMutation(mutation.id);
+          throw new Error(responseError);
         }
 
+        const data = response.status === 204 ? null : await response.json().catch(() => ({}));
+        const createdId = extractCreatedId(mutation.queueMeta?.resourceType, data);
+
+        if (mutation.queueMeta?.tempId && createdId) {
+          idMap.set(mutation.queueMeta.tempId, createdId);
+        }
+
+        await removeOfflineMutation(mutation.id);
+      }
+
+      if (!blockedByFailedMutation) {
         setSyncVersion((currentValue) => currentValue + 1);
 
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event(OFFLINE_SYNC_COMPLETE_EVENT));
         }
-      } catch (error) {
-        setSyncError(error instanceof Error ? error.message : "Failed to sync queued changes.");
-      } finally {
-        setIsSyncing(false);
-        await refreshQueuedCount();
       }
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : "Failed to sync queued changes.");
+    } finally {
+      isSyncingRef.current = false;
+      setIsSyncing(false);
+      await refreshQueuedCount();
+    }
+  }, [refreshQueuedCount]);
+
+  const discardFailedMutation = useCallback(async (): Promise<void> => {
+    if (!failedMutationId) {
+      return;
     }
 
+    await removeOfflineMutation(failedMutationId);
+    setFailedMutationId("");
+    setSyncError("");
+    void drainQueue();
+  }, [drainQueue, failedMutationId]);
+
+  useEffect(() => {
     void refreshQueuedCount();
 
     async function handleOnline(): Promise<void> {
@@ -95,11 +129,22 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
 
     function handleQueueChanged(): void {
       void refreshQueuedCount();
+
+      if (navigator.onLine) {
+        void drainQueue();
+      }
+    }
+
+    function handleVisibilityChange(): void {
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        void drainQueue();
+      }
     }
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
     window.addEventListener(OFFLINE_QUEUE_CHANGED_EVENT, handleQueueChanged);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     if (navigator.onLine) {
       void drainQueue();
@@ -109,8 +154,9 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener(OFFLINE_QUEUE_CHANGED_EVENT, handleQueueChanged);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [drainQueue, refreshQueuedCount]);
 
   return (
     <OfflineQueueContext.Provider
@@ -119,7 +165,9 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
         queuedCount,
         isSyncing,
         syncError,
-        syncVersion
+        syncVersion,
+        failedMutationId,
+        discardFailedMutation
       } satisfies OfflineQueueContextValue}
     >
       {children}

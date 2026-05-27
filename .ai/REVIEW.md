@@ -6,41 +6,47 @@ Shared review log for the current cycle. Append a new task section when review s
 
 ### Review Round 1
 
-Status: **PASS**
+Status: **complete**
 
-Reviewed: 2026-05-22
+Reviewed: 2026-05-27
 
 #### Findings
 
-- **nit** — `InfoSheet.tsx` line 164: The Logout section uses `{t("settings.logOut")}` as the `info-sheet-section-label` text and the button text. The section label and button carry the same string ("Log out"), creating minor visual redundancy. Not a correctness issue; every section having a label satisfies AC #2.
+No issues found.
 
 #### Verification
 
 ##### Steps
-1. Read all changed files against the plan: `InfoSheet.tsx`, `InfoSheet.module.css`, `InfoSheet.test.tsx`, `en/translation.json`, `de/translation.json`.
-2. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning in `AuthContext.tsx`, 0 errors).
-3. Ran `npm run build` — clean (1 pre-existing Vite chunk-size warning, 0 errors).
-4. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 13/13 pass.
-5. Ran `npm run test -w @endgame-grocery/frontend` — 421/422 pass; 1 failure in `app.test.tsx > adds and edits entry details from the list detail sheet` (timeout after 20 000 ms).
-6. Confirmed `app.test.tsx` failure is pre-existing by stashing implementation changes and re-running — same test fails on the baseline commit `75f7c22`.
-7. Ran `npm test` (backend suite) — 164/164 pass.
-8. Verified section order in JSX: Language (first, no top border) → Account → API Key → Logout → Meta (Version) → Meta (License) → Donate.
-9. Verified clipboard try/catch in `handleCopyApiKey` (lines 83–89).
-10. Verified new i18n keys: `settings.account` = "Account" / "Konto".
-11. Verified CSS: `.info-sheet-section` has `border-top`; `.info-sheet-section--first` removes it; `.info-sheet-section-label` with `::before`/`::after` flex lines present.
-12. Verified two new tests: `"renders the language switcher before the user identity block"` and `"keeps the copy action usable when clipboard write fails"`.
+
+1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Read `frontend/src/context/OfflineQueueContext.tsx` (full file) and `git diff HEAD` for the implementation diff.
+3. Read `frontend/src/context/OfflineQueueContext.test.tsx` (new test file).
+4. Verified all three plan requirements against code:
+   - `isSyncingRef` guard: set synchronously before `try`, cleared in `finally`, guard at top of `drainQueue()`. ✅
+   - `visibilitychange` listener: registered, checks `document.visibilityState === "visible" && navigator.onLine`, removed in cleanup. ✅
+   - `handleQueueChanged` extended: calls `drainQueue()` when `navigator.onLine`. ✅
+5. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.tsx` (unrelated).
+6. Ran `npm run build` — successful, no new warnings.
+7. Ran `npm test` — 164 tests, 0 failures.
 
 ##### Findings
-- All acceptance criteria satisfied.
-- Pre-existing `app.test.tsx` timeout is unrelated to this change (confirmed on baseline).
+
+- **Lint**: clean on all changed files; one pre-existing warning in `AuthContext.tsx` is unrelated to T-001.
+- **Build**: clean.
+- **Tests**: 3 new tests cover all acceptance criteria:
+  - `drains queued mutations when the page becomes visible while online` ✅
+  - `drains newly queued mutations when the queue changes while online` ✅
+  - `does not start a second drain while a drain is already running` ✅
+- **Race-condition analysis**: `isSyncingRef.current = true` is set synchronously before any `await`, so two synchronous callers cannot both pass the guard — the guard is sound.
+- **Early-return path**: when `pendingMutations.length === 0`, the function returns inside `try`, so `finally` still resets `isSyncingRef.current = false` and calls `refreshQueuedCount()`. Correct behaviour.
+- **Cleanup**: `document.removeEventListener("visibilitychange", handleVisibilityChange)` is present in the effect cleanup. No listener leak.
 
 ##### Risks
-- None introduced by this change.
 
-#### Open Questions
-- None.
+- Low: the redundant `refreshQueuedCount()` call (once from `handleQueueChanged`, once from `drainQueue`'s `finally`) is harmless; both resolve to the same state.
 
 #### Verdict
+
 `PASS`
 
 ---
@@ -49,227 +55,49 @@ Reviewed: 2026-05-22
 
 ### Review Round 1
 
-Status: **PASS**
+Status: **complete**
 
-Reviewed: 2026-05-22
+Reviewed: 2026-05-27
 
 #### Findings
 
-- **nit** — `InfoSheet.module.css` line 5–7: The plan specifies `padding-top: var(--space-4)` on `.info-sheet-section--footer`, but the implementation omits it because the base `.info-sheet-section` class already provides it via `padding: var(--space-4) 0 1rem`. The rendered result is identical. Not a correctness issue.
+No issues found.
 
 #### Verification
 
 ##### Steps
-1. Read all changed files against the plan: `InfoSheet.tsx`, `InfoSheet.module.css`, `InfoSheet.test.tsx`.
-2. Confirmed `border-top` removed from `.info-sheet-section` (line 1–3 in CSS) — no double divider.
-3. Confirmed `.info-sheet-section--first` rule fully removed from CSS.
-4. Confirmed `.info-sheet-section--footer` added with `border-top` only.
-5. Confirmed `.info-sheet-meta` updated: no standalone `border-top`, added `padding-bottom: var(--space-2)`.
-6. Confirmed Language section JSX (line 109) no longer carries `info-sheet-section--first` class.
-7. Confirmed Logout section JSX (lines 163–168) contains only the danger button — no section-label div present.
-8. Confirmed Version + License + Donate grouped inside one `info-sheet-section--footer` wrapper (lines 169–190).
-9. New test `"renders logout text only on the logout button"` (lines 86–91) asserts `getAllByText("Log out")` returns exactly 1 element.
-10. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors).
-11. Ran `npm run build` — clean (pre-existing chunk-size warning, 0 errors).
-12. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 14/14 pass.
-13. Ran `npm test` (full frontend + backend) — 423/423 frontend, 164/164 backend pass.
+
+1. Re-read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
+2. Read full `git diff HEAD` across all 5 changed source files and 2 new test files.
+3. Read complete `OfflineQueueContext.tsx`, `OfflineBanner.tsx`, `OfflineQueueContext.test.tsx`, `OfflineBanner.test.tsx`, `types.ts`, both locale files.
+4. Verified all plan acceptance criteria against the code:
+   - **4xx path**: `response.status >= 400 && response.status < 500` sets `syncError` + `failedMutationId(mutation.id)`, sets `blockedByFailedMutation = true`, breaks the loop. Mutation stays in queue. ✅
+   - **5xx / network error path**: falls through to `throw new Error(responseError)` → `catch` sets `syncError` only; `failedMutationId` unchanged (empty). ✅
+   - **`discardFailedMutation`**: guards on `failedMutationId`, removes mutation, clears both state fields, re-drains. ✅
+   - **`blockedByFailedMutation` flag**: correctly suppresses `setSyncVersion` / `OFFLINE_SYNC_COMPLETE_EVENT` when drain halted by 4xx. ✅
+   - **`failedMutationId` reset**: cleared at drain start (empty queue path and non-empty path). ✅
+   - **`useCallback` refactor**: `drainQueue` and `refreshQueuedCount` are stable refs (`[]` deps) — `useEffect([drainQueue, refreshQueuedCount])` runs exactly once. No re-mount loop risk. ✅
+   - **OfflineBanner**: Fragment wraps `<p>` + conditional discard `<button>`. Button label uses `t("offline.discard")`. ✅
+   - **Locale keys**: `"offline.discard"` present in both `en/translation.json` and `de/translation.json` with correct values. ✅
+   - **`OfflineQueueContextValue`**: `failedMutationId: string` and `discardFailedMutation: () => Promise<void>` added. ✅
+5. Ran `npm run lint` — 0 errors on changed files; 1 pre-existing warning in `AuthContext.tsx`.
+6. Ran `npm run build` — clean.
+7. Ran `npm test` — frontend: 6 `OfflineQueueContext` tests (3 T-001 + 3 T-002) ✅, 1 `OfflineBanner` test ✅, all other suites green. Backend: 164/164 pass.
 
 ##### Findings
-- All acceptance criteria satisfied.
-- Full frontend suite passes (423/423); flaky `app.test.tsx` timeout did not recur this run.
+
+- **Lint**: clean on all changed files.
+- **Build**: clean.
+- **Tests**: all new tests pass and cover every acceptance-criteria branch:
+  - `keeps a failed mutation in the queue and exposes it for discard after a 4xx response` ✅
+  - `keeps retry behavior for 5xx responses without exposing a failed mutation` ✅
+  - `discards the failed mutation, clears the error, and drains remaining queued mutations` ✅
+  - `renders the discard action for a non-retriable failed mutation` (OfflineBanner) ✅
 
 ##### Risks
-- None introduced by this change.
 
-#### Open Questions
-- None.
+- Low: `removeOfflineMutation` in the real store also fires `OFFLINE_QUEUE_CHANGED_EVENT`, which triggers `handleQueueChanged → drainQueue`. Combined with the explicit `void drainQueue()` in `discardFailedMutation`, two drain attempts race. The `isSyncingRef` guard ensures only one proceeds — this is the same guard proven correct in T-001.
 
 #### Verdict
-`PASS`
 
----
-
-## Task: T-003
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-05-22
-
-#### Findings
-
-None.
-
-#### Verification
-
-##### Steps
-1. Read `InfoSheet.tsx` lines 163–168 — confirmed logout `<div>` now carries `${styles["info-sheet-section"]} ${styles["info-sheet-section--footer"]}`, matching the plan's "After" snippet exactly.
-2. Confirmed no CSS, translation, or test files were changed (scope: one JSX line only).
-3. Confirmed the meta/footer wrapper at line 169 still has the same `--footer` modifier — no regression to footer divider.
-4. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors).
-5. Ran `npm run build` — clean (pre-existing chunk-size warning, 0 errors).
-6. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 14/14 pass.
-7. Ran `npm test` (full suite) — 423/423 frontend pass.
-
-##### Findings
-- All acceptance criteria satisfied.
-- Change is minimal and surgical — exactly one class addition, no side-effects.
-
-##### Risks
-- None.
-
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-004
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-05-26
-
-#### Findings
-
-None.
-
-#### Verification
-
-##### Steps
-1. Read `InfoSheet.tsx` lines 162–176 — confirmed meta-footer wrapper at line 169 now carries only `${styles["info-sheet-section"]}` (no `--footer` modifier), matching the plan's "After" snippet exactly.
-2. Confirmed Logout section at line 163 still carries both `info-sheet-section` and `info-sheet-section--footer` — top divider above Logout preserved.
-3. Confirmed no CSS, translation, or test files were changed (scope: one JSX class removal only).
-4. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors).
-5. Ran `npm run build` — clean (pre-existing chunk-size warning, 0 errors).
-6. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 14/14 pass.
-7. Ran full frontend suite — 422/423; the 1 failure is the pre-existing `app.test.tsx > adds and edits entry details from the list detail sheet` timeout (20 000 ms), confirmed pre-existing in T-001 review.
-
-##### Findings
-- All acceptance criteria satisfied.
-- Change is minimal — exactly one class removed from one div, no side-effects.
-
-##### Risks
-- None.
-
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-005
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-05-26
-
-#### Findings
-
-None.
-
-#### Verification
-
-##### Steps
-1. Read `InfoSheet.module.css` lines 1–3 — confirmed `.info-sheet-section` now has `padding: var(--space-4) 0 0`, matching the plan's "After" snippet exactly.
-2. Confirmed no JSX, translation, or test files were changed (scope: one CSS value change only).
-3. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors).
-4. Ran `npm run build` — clean (pre-existing chunk-size warning, 0 errors).
-5. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 14/14 pass.
-6. Ran `npm test` (full suite) — 423/423 pass; flaky `app.test.tsx` timeout did not recur this run.
-
-##### Findings
-- All acceptance criteria satisfied.
-- Change is minimal — exactly one CSS shorthand value changed, no side-effects.
-
-##### Risks
-- None.
-
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-006
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-05-26
-
-#### Findings
-
-None.
-
-#### Verification
-
-##### Steps
-1. Read `InfoSheet.module.css` `.info-sheet-api-key` rule — confirmed `padding-bottom: var(--space-4)` is present, matching the plan's "After" snippet exactly.
-2. Confirmed no other CSS rules were changed and no JSX, translation, or test files were modified (scope: one CSS property addition only).
-3. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors).
-4. Ran `npm run build` — clean (pre-existing chunk-size warning, 0 errors).
-5. Ran `npm run test -w @endgame-grocery/frontend -- InfoSheet` — 14/14 pass.
-6. Ran `npm test` (full suite) — 423/423 pass; no flaky timeout this run.
-
-##### Findings
-- All acceptance criteria satisfied.
-- Change is minimal — exactly one CSS property added to one rule, no side-effects on other sections.
-
-##### Risks
-- None.
-
-#### Open Questions
-- None.
-
-#### Verdict
-`PASS`
-
----
-
-## Task: T-007
-
-### Review Round 1
-
-Status: **PASS**
-
-Reviewed: 2026-05-26
-
-#### Findings
-
-None.
-
-#### Verification
-
-##### Steps
-1. Read `.github/workflows/ci.yml` — confirmed `branches: [main]` is present under both `push:` (line 5) and `pull_request:` (line 7), matching the plan's "After" snippet exactly.
-2. Ran `git diff HEAD -- .github/workflows/ci.yml` from repo root — diff shows exactly 2 lines added (`branches: [main]` under each trigger), no other changes.
-3. Verified baseline at cycle-start commit `75f7c22` had bare `push:` / `pull_request:` with no branch filters — confirms the change is the implementer's work, not pre-existing.
-4. Confirmed no application code, test, translation, or other workflow files were modified (scope: one YAML file, two lines added).
-5. Ran `npm run lint` — clean (1 pre-existing Fast Refresh warning, 0 errors). Workflow YAML is not linted by the app suite; YAML structure verified visually.
-6. YAML structure is valid: indentation is consistent (2-space), `branches` is correctly nested under each trigger key.
-
-##### Findings
-- All acceptance criteria satisfied.
-- Change is minimal and correct — eliminates unnecessary double-runs on feature branch pushes and makes the `main` CI run explicit for release-please chaining.
-
-##### Risks
-- Feature branch pushes will no longer trigger CI directly; developers relying on push CI for branches other than `main` will need to open a PR instead. This is the intended behaviour per the plan.
-
-#### Open Questions
-- None.
-
-#### Verdict
 `PASS`
