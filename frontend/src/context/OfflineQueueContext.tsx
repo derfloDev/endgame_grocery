@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { OFFLINE_SYNC_COMPLETE_EVENT } from "../api/client";
 import {
@@ -21,6 +21,7 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState("");
   const [syncVersion, setSyncVersion] = useState(0);
+  const isSyncingRef = useRef(false);
 
   useEffect(() => {
     async function refreshQueuedCount(): Promise<void> {
@@ -29,19 +30,25 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
     }
 
     async function drainQueue(): Promise<void> {
-      const pendingMutations = await listOfflineMutations();
-
-      if (pendingMutations.length === 0) {
-        setSyncError("");
+      if (isSyncingRef.current) {
         return;
       }
 
-      setIsSyncing(true);
-      setSyncError("");
-
-      const idMap: IdMap = new Map();
+      isSyncingRef.current = true;
 
       try {
+        const pendingMutations = await listOfflineMutations();
+
+        if (pendingMutations.length === 0) {
+          setSyncError("");
+          return;
+        }
+
+        setIsSyncing(true);
+        setSyncError("");
+
+        const idMap: IdMap = new Map();
+
         for (const mutation of pendingMutations) {
           const url = replaceTemporaryIds(mutation.url, idMap);
           const payload = replaceTemporaryIds(mutation.payload, idMap);
@@ -77,6 +84,7 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
       } catch (error) {
         setSyncError(error instanceof Error ? error.message : "Failed to sync queued changes.");
       } finally {
+        isSyncingRef.current = false;
         setIsSyncing(false);
         await refreshQueuedCount();
       }
@@ -95,11 +103,22 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
 
     function handleQueueChanged(): void {
       void refreshQueuedCount();
+
+      if (navigator.onLine) {
+        void drainQueue();
+      }
+    }
+
+    function handleVisibilityChange(): void {
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        void drainQueue();
+      }
     }
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
     window.addEventListener(OFFLINE_QUEUE_CHANGED_EVENT, handleQueueChanged);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     if (navigator.onLine) {
       void drainQueue();
@@ -109,6 +128,7 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener(OFFLINE_QUEUE_CHANGED_EVENT, handleQueueChanged);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 

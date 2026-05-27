@@ -22,3 +22,52 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | plan \| implement \| review \| none |
 
 ---
+
+### T-001, T-002 — plan — 2026-05-27T10:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned two PWA sync bug fixes: auto-drain on visibilitychange/queue-changed (T-001) and discard flow for non-retriable 4xx errors (T-002) |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-001 — implement — 2026-05-27T05:19:23Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added automatic offline queue draining when the app becomes visible or when queued mutations are added while online, with a ref guard to prevent concurrent drains |
+| Files Changed | `frontend/src/context/OfflineQueueContext.tsx`, `frontend/src/context/OfflineQueueContext.test.tsx`, `README.md`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- OfflineQueueContext.test.tsx` passed; `npm run lint` passed with existing `AuthContext.tsx` fast-refresh warning; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed |
+| Commit | `feat(sync): replay queued changes after idle` |
+| Next Role | review |
+
+---
+
+### T-001 — review — 2026-05-27T12:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-001 implementation — all three plan requirements verified correct, no findings; 164 tests pass |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-001 — implement — 2026-05-27T05:51:48Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-001 done and committed the reviewed offline queue auto-drain implementation |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reviewed prior validation from T-001 implementation and review handoffs |
+| Commit | `feat(sync): replay queued changes after idle` |
+| Next Role | none |
+
+---

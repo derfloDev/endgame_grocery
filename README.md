@@ -273,7 +273,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - History chips and autocomplete suggestions fall back to the cart icon when no specific saved icon is available, so list rows keep a consistent visual layout.
 - Sharing supports invite emails for existing and new users, direct invite-link acceptance after login, and revoking member access.
 - Shared lists support browser push opt-in, batched activity notifications, actor exclusion, and cooldown-based suppression to avoid notification spam.
-- Offline support caches successful reads and queues failed writes for replay after reconnect.
+- Offline support caches successful reads and queues failed writes for replay after reconnect, when the app becomes visible again, or when a new queued write is added while the browser is online.
 
 ### Icon Assignment
 
