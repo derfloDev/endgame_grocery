@@ -4,7 +4,7 @@ import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 
 export default function OfflineBanner(): ReactElement | null {
   const { t } = useTranslation();
-  const { isOffline, isSyncing, queuedCount, syncError } = useOfflineQueue();
+  const { discardFailedMutation, failedMutationId, isOffline, isSyncing, queuedCount, syncError } = useOfflineQueue();
 
   if (!isOffline && !isSyncing && !queuedCount && !syncError) {
     return null;
@@ -21,8 +21,15 @@ export default function OfflineBanner(): ReactElement | null {
   }
 
   return (
-    <p className={syncError ? "eg-error-banner" : "eg-offline-banner"}>
-      {syncError ? `${message} ${syncError}` : message}
-    </p>
+    <>
+      <p className={syncError ? "eg-error-banner" : "eg-offline-banner"}>
+        {syncError ? `${message} ${syncError}` : message}
+      </p>
+      {failedMutationId ? (
+        <button className="eg-btn-secondary" type="button" onClick={() => void discardFailedMutation()}>
+          {t("offline.discard")}
+        </button>
+      ) : null}
+    </>
   );
 }

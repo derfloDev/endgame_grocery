@@ -71,3 +71,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — review — 2026-05-27T12:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 implementation — all plan requirements verified correct, no findings; all tests pass |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-27T06:23:16Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added non-retriable 4xx sync failure handling with failed mutation discard support and localized banner action |
+| Files Changed | `frontend/src/context/OfflineQueueContext.tsx`, `frontend/src/context/OfflineQueueContext.test.tsx`, `frontend/src/components/OfflineBanner/OfflineBanner.tsx`, `frontend/src/components/OfflineBanner/OfflineBanner.test.tsx`, `frontend/src/types.ts`, `frontend/src/locales/en/translation.json`, `frontend/src/locales/de/translation.json`, `README.md`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- OfflineQueueContext.test.tsx OfflineBanner.test.tsx` passed; `npm run lint` passed with existing `AuthContext.tsx` fast-refresh warning; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed |
+| Commit | `feat(sync): discard blocked queued changes` |
+| Next Role | review |
+
+---
+
+### T-002 — implement — 2026-05-27T06:45:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done and committed the reviewed discard flow for blocked queued changes |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Reviewed prior validation from T-002 implementation and review handoffs |
+| Commit | `feat(sync): discard blocked queued changes` |
+| Next Role | none |
+
+---

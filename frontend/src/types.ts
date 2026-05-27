@@ -56,6 +56,8 @@ export interface OfflineQueueContextValue {
   isSyncing: boolean;
   syncError: string;
   syncVersion: number;
+  failedMutationId: string;
+  discardFailedMutation: () => Promise<void>;
 }
 
 // Autocomplete and suggestions

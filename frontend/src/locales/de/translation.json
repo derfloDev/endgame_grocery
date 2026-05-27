@@ -37,6 +37,7 @@
   "offline.queued": "Offline-Modus: {count, plural, one {# Änderung} other {# Änderungen}} warten auf Synchronisierung.",
   "offline.syncing": "{count, plural, one {# ausstehende Änderung} other {# ausstehende Änderungen}} werden synchronisiert...",
   "offline.waiting": "{count, plural, one {# ausstehende Änderung} other {# ausstehende Änderungen}} warten weiter auf Synchronisierung.",
+  "offline.discard": "Ausstehende Änderung verwerfen",
   "list.newList": "Neue Liste",
   "list.newListTitle": "Neue Liste",
   "list.newListPlaceholder": "Wochenendeinkauf",

@@ -1,4 +1,4 @@
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OfflineMutation } from "../types";
 import {
@@ -6,6 +6,7 @@ import {
   OFFLINE_QUEUE_CHANGED_EVENT,
   removeOfflineMutation
 } from "../api/offlineStore";
+import { useOfflineQueue } from "../hooks/useOfflineQueue";
 import { OfflineQueueProvider } from "./OfflineQueueContext";
 
 const offlineStoreMock = vi.hoisted(() => ({
@@ -24,6 +25,7 @@ let currentMutations: OfflineMutation[] = [];
 
 describe("OfflineQueueProvider", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     currentMutations = [];
     fetchMock.mockReset();
     fetchMock.mockResolvedValue(createResponse({ ok: true }));
@@ -124,12 +126,85 @@ describe("OfflineQueueProvider", () => {
       expect(removeOfflineMutationMock).toHaveBeenCalledWith("mutation-1");
     });
   });
+
+  it("keeps a failed mutation in the queue and exposes it for discard after a 4xx response", async () => {
+    currentMutations = [createMutation()];
+    fetchMock.mockResolvedValue(createResponse({ error: "Entry not found." }, 404));
+    setNavigatorOnline(true);
+
+    renderProvider(<OfflineQueueState />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("sync-error").textContent).toBe("Entry not found.");
+    });
+    expect(screen.getByTestId("failed-mutation-id").textContent).toBe("mutation-1");
+    expect(removeOfflineMutationMock).not.toHaveBeenCalled();
+    expect(currentMutations).toHaveLength(1);
+  });
+
+  it("keeps retry behavior for 5xx responses without exposing a failed mutation", async () => {
+    currentMutations = [createMutation()];
+    fetchMock.mockResolvedValue(createResponse({ error: "Server unavailable." }, 503));
+    setNavigatorOnline(true);
+
+    renderProvider(<OfflineQueueState />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("sync-error").textContent).toBe("Server unavailable.");
+    });
+    expect(screen.getByTestId("failed-mutation-id").textContent).toBe("");
+    expect(removeOfflineMutationMock).not.toHaveBeenCalled();
+    expect(currentMutations).toHaveLength(1);
+  });
+
+  it("discards the failed mutation, clears the error, and drains remaining queued mutations", async () => {
+    currentMutations = [
+      createMutation({ id: "mutation-1", url: "/api/entries/missing" }),
+      createMutation({ id: "mutation-2", url: "/api/lists" })
+    ];
+    fetchMock
+      .mockResolvedValueOnce(createResponse({ error: "Entry not found." }, 404))
+      .mockResolvedValueOnce(createResponse({ list: { id: "list-1" } }));
+    setNavigatorOnline(true);
+
+    renderProvider(<OfflineQueueState />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("failed-mutation-id").textContent).toBe("mutation-1");
+    });
+
+    await act(async () => {
+      await screen.getByRole("button", { name: "discard" }).click();
+    });
+
+    await waitFor(() => {
+      expect(removeOfflineMutationMock).toHaveBeenCalledWith("mutation-2");
+    });
+    expect(removeOfflineMutationMock).toHaveBeenCalledWith("mutation-1");
+    expect(screen.getByTestId("sync-error").textContent).toBe("");
+    expect(screen.getByTestId("failed-mutation-id").textContent).toBe("");
+    expect(currentMutations).toHaveLength(0);
+  });
 });
 
-function renderProvider() {
+function OfflineQueueState() {
+  const { discardFailedMutation, failedMutationId, syncError } = useOfflineQueue();
+
+  return (
+    <>
+      <div data-testid="failed-mutation-id">{failedMutationId}</div>
+      <div data-testid="sync-error">{syncError}</div>
+      <button onClick={() => void discardFailedMutation()} type="button">
+        discard
+      </button>
+    </>
+  );
+}
+
+function renderProvider(children = <div />) {
   return render(
     <OfflineQueueProvider>
-      <div />
+      {children}
     </OfflineQueueProvider>
   );
 }
