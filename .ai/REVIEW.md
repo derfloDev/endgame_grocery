@@ -77,6 +77,46 @@ Reviewed: 2026-05-28
 
 ---
 
+## Task: T-003 — New Icons (4)
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-28
+
+#### Findings
+- No issues found. All four icons are correctly authored and wired.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria for T-003.
+2. Ran `git diff HEAD` — confirmed exactly the 4 SVG files, `customIcons.ts`, `iconRegistry.ts`, and `iconRegistry.test.ts` changed; no unexpected files.
+3. Inspected all 4 SVG files — each has `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-linecap="round"`, `stroke-linejoin="round"`. All are stroke-based as required.
+4. Verified `customIcons.ts`: 4 new `*Svg` imports and 4 new `Custom*` exports added in correct alphabetical position.
+5. Verified `iconRegistry.ts`: 4 new imports from `customIcons.ts` and 4 entries added to `ICON_REGISTRY` object. `ICON_REGISTRY_KEYS` is derived from `Object.keys(ICON_REGISTRY)` — automatically includes the new icons.
+6. Inspected `iconRegistry.test.ts` diff: new icons added to the ICON_REGISTRY_KEYS list test, `formatIconName` assertions for all 4 (correct display names), and render tests at sizes 22 and 32 for all 4.
+7. Ran `npm run test -w @endgame-grocery/frontend -- --reporter=verbose --run src/data/iconRegistry.test.ts` — **142/142 pass**, including new tests for all 4 icons.
+8. Ran `npm run lint` — pass (0 errors; 1 pre-existing warning).
+
+##### Findings
+- `dishwasherTabs.svg`: 4 rounded rectangles with line/dot details — appropriate representation of dishwasher tabs. ✅
+- `herbs.svg`: Branching stem paths with tie detail at the base — recognisable herb bunch. ✅
+- `maultaschen.svg`: Three pasta-pocket shapes with fill line detail — clearly Maultaschen. ✅
+- `nutNougatCream.svg`: Jar shape with lid, label stripes, and label lines — accurate jar/cream representation. ✅
+- All 4 icons registered and exported consistently following existing naming conventions. ✅
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-007 — ListDetailPage TopBar Top-Padding Fix
 
 ### Review Round 1

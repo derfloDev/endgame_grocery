@@ -128,13 +128,17 @@ describe("resolveIconName", () => {
       "CustomCleaningCloth",
       "CustomConditioner",
       "CustomDetergent",
+      "CustomDishwasherTabs",
       "CustomDiapers",
       "CustomFabricSoftener",
       "CustomFoil",
       "CustomGlassesCleaner",
       "CustomHandSoap",
+      "CustomHerbs",
+      "CustomMaultaschen",
       "CustomMop",
       "CustomMouthwash",
+      "CustomNutNougatCream",
       "CustomPaperTowels",
       "CustomShampoo",
       "CustomShavingCream",
@@ -186,6 +190,7 @@ describe("formatIconName", () => {
     expect(formatIconName("CustomConditioner")).toBe("Conditioner");
     expect(formatIconName("CustomCream")).toBe("Cream");
     expect(formatIconName("CustomCan")).toBe("Can");
+    expect(formatIconName("CustomDishwasherTabs")).toBe("Dishwasher Tabs");
     expect(formatIconName("IconBowlChopsticks")).toBe("Bowl Chopsticks");
     expect(formatIconName("CustomCottonPads")).toBe("Cotton Pads");
     expect(formatIconName("CustomCottonSwabs")).toBe("Cotton Swabs");
@@ -204,6 +209,7 @@ describe("formatIconName", () => {
     expect(formatIconName("CustomGarlic")).toBe("Garlic");
     expect(formatIconName("CustomGlassesCleaner")).toBe("Glasses Cleaner");
     expect(formatIconName("CustomHandSoap")).toBe("Hand Soap");
+    expect(formatIconName("CustomHerbs")).toBe("Herbs");
     expect(formatIconName("CustomHummus")).toBe("Hummus");
     expect(formatIconName("CustomInterdentalSticks")).toBe("Interdental Sticks");
     expect(formatIconName("CustomJam")).toBe("Jam");
@@ -213,6 +219,8 @@ describe("formatIconName", () => {
     expect(formatIconName("CustomMango")).toBe("Mango");
     expect(formatIconName("CustomMop")).toBe("Mop");
     expect(formatIconName("CustomMouthwash")).toBe("Mouthwash");
+    expect(formatIconName("CustomMaultaschen")).toBe("Maultaschen");
+    expect(formatIconName("CustomNutNougatCream")).toBe("Nut Nougat Cream");
     expect(formatIconName("CustomOnion")).toBe("Onion");
     expect(formatIconName("CustomPaperTowels")).toBe("Paper Towels");
     expect(formatIconName("CustomPasta")).toBe("Pasta");
@@ -280,6 +288,8 @@ describe("custom icons", () => {
     ["CustomDentalFloss", 32],
     ["CustomDetergent", 22],
     ["CustomDetergent", 32],
+    ["CustomDishwasherTabs", 22],
+    ["CustomDishwasherTabs", 32],
     ["CustomDiapers", 22],
     ["CustomDiapers", 32],
     ["CustomELiquid", 22],
@@ -300,6 +310,8 @@ describe("custom icons", () => {
     ["CustomGlassesCleaner", 32],
     ["CustomHandSoap", 22],
     ["CustomHandSoap", 32],
+    ["CustomHerbs", 22],
+    ["CustomHerbs", 32],
     ["CustomHummus", 22],
     ["CustomHummus", 32],
     ["CustomInterdentalSticks", 22],
@@ -318,6 +330,10 @@ describe("custom icons", () => {
     ["CustomMop", 32],
     ["CustomMouthwash", 22],
     ["CustomMouthwash", 32],
+    ["CustomMaultaschen", 22],
+    ["CustomMaultaschen", 32],
+    ["CustomNutNougatCream", 22],
+    ["CustomNutNougatCream", 32],
     ["CustomOnion", 22],
     ["CustomOnion", 32],
     ["CustomPasta", 22],
