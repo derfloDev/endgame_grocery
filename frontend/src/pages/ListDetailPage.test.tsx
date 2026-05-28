@@ -31,7 +31,6 @@ vi.mock("../api/entries", () => ({
 }));
 
 vi.mock("../api/history", () => ({
-  deleteFromHistory: vi.fn(),
   fetchRecentlyUsed: vi.fn()
 }));
 
@@ -319,7 +318,7 @@ describe("ListDetailPage optimistic updates", () => {
     fetchRecentlyUsedMock
       .mockResolvedValueOnce({ history: [] })
       .mockResolvedValueOnce({
-        history: [{ text: "Milk", icon: "IconMilk", useCount: 1 }]
+        history: [{ text: "Milk", icon: "IconMilk" }]
       });
     fetchListMembersMock.mockResolvedValue({ members: [] });
     writeCachedResourceMock.mockResolvedValue(undefined);

@@ -880,7 +880,7 @@ describe("authentication shell", () => {
     expect(fetch.mock.calls.filter(([url]) => url === "/api/lists")).toHaveLength(3);
   });
 
-  it("shows recently used items, re-adds them, and dismisses them from list detail", async () => {
+  it("shows recently used items and re-adds them from list detail without dismiss controls", async () => {
     seedAuthSession("user-1");
     const queuedResponses = [
       {
@@ -901,8 +901,8 @@ describe("authentication shell", () => {
         ok: true,
         json: async () => ({
           history: [
-            { text: "Tomatoes", icon: "IconSalad", useCount: 7 },
-            { text: "Bread", icon: "IconBread", useCount: 4 }
+            { text: "Tomatoes", icon: "IconSalad" },
+            { text: "Bread", icon: "IconBread" }
           ]
         })
       },
@@ -931,9 +931,6 @@ describe("authentication shell", () => {
             created_at: "2026-04-21T00:02:00Z"
           }
         })
-      },
-      {
-        status: 204
       }
     ];
 
@@ -974,6 +971,7 @@ describe("authentication shell", () => {
     expect(screen.getByText("Milk")).toBeTruthy();
     expect(within(recentlyUsedSection).getByText("Tomatoes")).toBeTruthy();
     expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
+    expect(within(recentlyUsedSection).queryByRole("button", { name: "Dismiss Bread" })).toBeNull();
 
     await userEvent.click(within(recentlyUsedSection).getByRole("button", { name: "Tomatoes" }));
 
@@ -991,22 +989,12 @@ describe("authentication shell", () => {
     await waitFor(() => {
       expect(within(recentlyUsedSection).queryByText("Tomatoes")).toBeNull();
     });
-
-    await userEvent.click(within(recentlyUsedSection).getByRole("button", { name: "Dismiss Bread" }));
-
-    await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith(
-        "/api/lists/list-1/history",
-        expect.objectContaining({
-          body: JSON.stringify({ text: "Bread" }),
-          method: "DELETE"
-        })
-      );
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByRole("region", { name: "Recently Used" })).toBeNull();
-    });
+    expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
+    expect(
+      fetch.mock.calls.some(
+        ([url, options]) => url === "/api/lists/list-1/history" && (options as RequestInit | undefined)?.method === "DELETE"
+      )
+    ).toBe(false);
   });
 
   it("adds completed items to recently used and keeps newest history first", async () => {
@@ -1036,7 +1024,7 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          history: [{ text: "Bread", icon: "IconBread", useCount: 2 }]
+          history: [{ text: "Bread", icon: "IconBread" }]
         })
       })
       .mockResolvedValueOnce({
@@ -1336,14 +1324,14 @@ describe("authentication shell", () => {
       }
 
       if (url === "/api/lists/list-1/entries" && method === "POST") {
-        expect(JSON.parse(String(init.body))).toMatchObject({ text: "Y", details: "500 g" });
+        expect(JSON.parse(String(init.body))).toMatchObject({ text: "Milk", details: "500 g" });
 
         return {
           ok: true,
           json: async () => ({
             entry: {
               id: "entry-2",
-              text: "Y",
+              text: "Milk",
               status: "open",
               icon: null,
               details: "500 g",
@@ -1382,7 +1370,7 @@ describe("authentication shell", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
 
     const addDialog = await screen.findByRole("dialog", { name: "Add Item" });
-    fireEvent.change(within(addDialog).getByLabelText("Add item"), { target: { value: "Y" } });
+    fireEvent.change(within(addDialog).getByLabelText("Add item"), { target: { value: "Milk" } });
     fireEvent.change(within(addDialog).getByLabelText("Details (optional)"), { target: { value: "500 g" } });
     await userEvent.click(within(addDialog).getByRole("button", { name: "Add Item" }));
 
@@ -1392,7 +1380,7 @@ describe("authentication shell", () => {
       );
 
       expect(addCall).toBeTruthy();
-      expect(JSON.parse(String(addCall?.[1]?.body))).toMatchObject({ text: "Y", details: "500 g" });
+      expect(JSON.parse(String(addCall?.[1]?.body))).toMatchObject({ text: "Milk", details: "500 g" });
     });
     expect(await screen.findByText("500 g")).toBeTruthy();
 
@@ -1411,7 +1399,7 @@ describe("authentication shell", () => {
     expect((editDetailsInput as HTMLInputElement).value).toBe("2L");
 
     fireEvent.change(editDetailsInput, { target: { value: "3L" } });
-    await userEvent.click(within(editDialog).getByRole("button", { name: "Save Item" }));
+    fireEvent.submit(editDialog.querySelector("form") as HTMLFormElement);
 
     await waitFor(() => {
       const editCall = fetch.mock.calls.find(

@@ -278,7 +278,7 @@ describe("entry routes", () => {
     assert.equal(callCount, 2);
   });
 
-  it("writes autocomplete history when an entry is marked done", async () => {
+  it("marks an entry done without writing autocomplete history", async () => {
     const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
@@ -313,17 +313,6 @@ describe("entry routes", () => {
           };
         }
 
-        if (callCount === 4) {
-          assert.match(sql, /INSERT INTO autocomplete_history/);
-          assert.match(sql, /text, icon, details, use_count/);
-          assert.match(sql, /ON CONFLICT \(user_id, list_id, text\)/);
-          assert.match(sql, /details\s*=\s*EXCLUDED\.details/);
-          assert.match(sql, /use_count\s*=\s*autocomplete_history\.use_count \+ 1/);
-          assert.deepEqual(params, ["user-1", "list-1", "Oat milk", null, "Barista"]);
-
-          return { rows: [] };
-        }
-
         assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
@@ -339,7 +328,7 @@ describe("entry routes", () => {
     assert.equal(response.body.entry.text, "Oat milk");
     assert.equal(response.body.entry.status, "done");
     assert.equal(response.body.entry.details, "Barista");
-    assert.equal(callCount, 4);
+    assert.equal(callCount, 3);
     assert.deepEqual(sseManager.calls, [
       ["list-1", "entry:updated", { listId: "list-1", entryId: "entry-1" }]
     ]);
@@ -387,10 +376,7 @@ describe("entry routes", () => {
           };
         }
 
-        assert.match(sql, /INSERT INTO autocomplete_history/);
-        assert.deepEqual(params, ["user-1", "list-1", "Oat milk", null, null]);
-
-        return { rows: [] };
+        assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
 
@@ -403,7 +389,7 @@ describe("entry routes", () => {
 
     assert.equal(response.status, 200);
     assert.equal(response.body.entry.status, "done");
-    assert.equal(callCount, 5);
+    assert.equal(callCount, 4);
     assert.deepEqual(sseManager.calls, [
       ["list-1", "entry:updated", { listId: "list-1", entryId: "entry-1" }]
     ]);
@@ -574,7 +560,7 @@ describe("entry routes", () => {
     assert.equal(callCount, 2);
   });
 
-  it("writes autocomplete history when an entry is deleted", async () => {
+  it("deletes an entry without writing autocomplete history", async () => {
     const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
@@ -586,23 +572,13 @@ describe("entry routes", () => {
         }
 
         if (callCount === 2) {
-          assert.match(sql, /SELECT text, icon, details/);
-          assert.deepEqual(params, ["entry-1", "list-1"]);
-
-          return { rows: [{ text: "Milk", icon: "🥛", details: "2L" }] };
-        }
-
-        if (callCount === 3) {
           assert.match(sql, /DELETE FROM entries/);
           assert.deepEqual(params, ["entry-1", "list-1"]);
 
           return { rows: [{ id: "entry-1" }] };
         }
 
-        assert.match(sql, /INSERT INTO autocomplete_history/);
-        assert.deepEqual(params, ["user-1", "list-1", "Milk", "🥛", "2L"]);
-
-        return { rows: [] };
+        assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
 
@@ -611,13 +587,13 @@ describe("entry routes", () => {
     );
 
     assert.equal(response.status, 204);
-    assert.equal(callCount, 4);
+    assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
       ["list-1", "entry:deleted", { listId: "list-1", entryId: "entry-1" }]
     ]);
   });
 
-  it("writes null details to autocomplete history when an entry without details is deleted", async () => {
+  it("keeps delete responses successful for entries without details", async () => {
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -628,30 +604,20 @@ describe("entry routes", () => {
         }
 
         if (callCount === 2) {
-          assert.match(sql, /SELECT text, icon, details/);
-          assert.deepEqual(params, ["entry-1", "list-1"]);
-
-          return { rows: [{ text: "Milk", icon: null, details: null }] };
-        }
-
-        if (callCount === 3) {
           assert.match(sql, /DELETE FROM entries/);
           assert.deepEqual(params, ["entry-1", "list-1"]);
 
           return { rows: [{ id: "entry-1" }] };
         }
 
-        assert.match(sql, /INSERT INTO autocomplete_history/);
-        assert.deepEqual(params, ["user-1", "list-1", "Milk", null, null]);
-
-        return { rows: [] };
+        assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
 
     const response = await request(createAuthedApp(pool)).delete("/api/lists/list-1/entries/entry-1");
 
     assert.equal(response.status, 204);
-    assert.equal(callCount, 4);
+    assert.equal(callCount, 2);
   });
 
   it("does not broadcast create events for invalid entry requests", async () => {

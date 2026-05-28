@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
-import { upsertAutocompleteHistory } from "../db/historyUtils.js";
 import { logger as defaultLogger } from "../logger.js";
 import { createRequireApiKey } from "../middleware/auth.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
@@ -225,18 +224,6 @@ export function createV1Router({
         `,
         [nextStatus, req.params.itemId, req.params.listId]
       );
-
-      if (nextStatus === "done") {
-        await upsertAutocompleteHistory(pool, {
-          userId: req.user.sub,
-          listId: req.params.listId,
-          text: currentItem.text,
-          icon: currentItem.icon,
-          details: currentItem.details
-        }).catch((historyError) => {
-          logger.error({ err: historyError }, "Failed to upsert autocomplete history");
-        });
-      }
 
       broadcastListEvent({
         sseManager,

@@ -6,44 +6,53 @@ Shared review log for the current cycle. Append a new task section when review s
 
 ### Review Round 1
 
-Status: **complete**
+Status: **PASS**
 
 Reviewed: 2026-05-27
 
 #### Findings
 
-No issues found.
+1. **nit** — `backend/src/db/migrations/1778803200002_drop_autocomplete_history.cjs`
+   Migration filename prefix (`1778803200002`) differs from the plan's example (`1748304000000`). The implementer used the correct sequential numbering following `1778803200001_add_details_to_autocomplete_history.cjs`, ensuring migrations run in the right order. This is the right call and not a defect.
+
+2. **nit** — `backend/src/history.test.js` (line ~116)
+   The test renamed to "returns 404 because individual history deletion is not supported" issues a DELETE but does not assert that `pool.query` is never called (it does via `assert.fail` in the pool mock). Adequate coverage — no action needed.
+
+#### Required Fixes
+
+None.
 
 #### Verification
 
 ##### Steps
 
-1. Read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
-2. Read `frontend/src/context/OfflineQueueContext.tsx` (full file) and `git diff HEAD` for the implementation diff.
-3. Read `frontend/src/context/OfflineQueueContext.test.tsx` (new test file).
-4. Verified all three plan requirements against code:
-   - `isSyncingRef` guard: set synchronously before `try`, cleared in `finally`, guard at top of `drainQueue()`. ✅
-   - `visibilitychange` listener: registered, checks `document.visibilityState === "visible" && navigator.onLine`, removed in cleanup. ✅
-   - `handleQueueChanged` extended: calls `drainQueue()` when `navigator.onLine`. ✅
-5. Ran `npm run lint` — 0 errors, 1 pre-existing warning in `AuthContext.tsx` (unrelated).
-6. Ran `npm run build` — successful, no new warnings.
-7. Ran `npm test` — 164 tests, 0 failures.
+1. Read `.ai/PLAN.md` acceptance criteria.
+2. Read diffs for all changed files: `routes/history.js`, `routes/suggestions.js`, `routes/entries.js`, `routes/v1.js`, `db/historyUtils.js` (deleted), `db/migrations/1778803200002_drop_autocomplete_history.cjs`, and all five test files.
+3. Verified no `upsertAutocompleteHistory` import or call remains in any source file (`Grep` across codebase).
+4. Verified `autocomplete_history` table references remain only in old migration files and the new drop migration.
+5. Ran `npm run lint` — passes with one pre-existing frontend fast-refresh warning (unrelated).
+6. Ran `npm run build` — passes cleanly.
+7. Ran `npm test` — 2 pre-existing failures unrelated to T-001:
+   - `frontend/src/context/AuthContext.test.tsx > hydrates the current user when only a persisted token is available` (file not touched by T-001)
+   - `backend/src/env.test.js > does not load .env when the file is absent` (filesystem rmdir race, file not touched by T-001)
+8. All T-001-targeted tests pass: history routes 5/5, suggestion routes 5/5, entry routes 17/17, v1 API routes 37/37, migrations 11/11 (including new drop-and-restore test).
 
 ##### Findings
 
-- **Lint**: clean on all changed files; one pre-existing warning in `AuthContext.tsx` is unrelated to T-001.
-- **Build**: clean.
-- **Tests**: 3 new tests cover all acceptance criteria:
-  - `drains queued mutations when the page becomes visible while online` ✅
-  - `drains newly queued mutations when the queue changes while online` ✅
-  - `does not start a second drain while a drain is already running` ✅
-- **Race-condition analysis**: `isSyncingRef.current = true` is set synchronously before any `await`, so two synchronous callers cannot both pass the guard — the guard is sound.
-- **Early-return path**: when `pendingMutations.length === 0`, the function returns inside `try`, so `finally` still resets `isSyncingRef.current = false` and calls `refreshQueuedCount()`. Correct behaviour.
-- **Cleanup**: `document.removeEventListener("visibilitychange", handleVisibilityChange)` is present in the effect cleanup. No listener leak.
+- All acceptance criteria met:
+  1. ✅ `GET /history` returns last 20 done entries per list, no `user_id` filter, `useCount` removed from response.
+  2. ✅ `DELETE /history` route removed — Express returns 404.
+  3. ✅ `GET /suggestions` queries `entries` by `list_id` only; no `user_id` parameter.
+  4. ✅ Migration `1778803200002_drop_autocomplete_history.cjs` drops the table; `down` restores schema correctly.
+  5. ✅ No `upsertAutocompleteHistory` call or import remains in any source file.
+  6. ⏭️ Dismiss button removal is T-002 scope — not applicable here.
+  7. ✅ All T-001 backend tests pass; lint and build pass.
+- Behavioral side-effect of removing the pre-flight `SELECT` in the entries DELETE handler is correctly handled: the DELETE uses `RETURNING id` and the existing `if (!result.rows[0])` guard preserves the 404 path.
 
 ##### Risks
 
-- Low: the redundant `refreshQueuedCount()` call (once from `handleQueueChanged`, once from `drainQueue`'s `finally`) is harmless; both resolve to the same state.
+- The `DISTINCT ON (text) … ORDER BY text, updated_at DESC` pattern in `history.js` relies on PostgreSQL-specific SQL; it is correct for the target DB.
+- If two done entries share the same `text` and `updated_at` exactly, ordering within the DISTINCT is non-deterministic, but this is a degenerate edge case and acceptable.
 
 #### Verdict
 
@@ -55,48 +64,46 @@ No issues found.
 
 ### Review Round 1
 
-Status: **complete**
+Status: **PASS**
 
 Reviewed: 2026-05-27
 
 #### Findings
 
-No issues found.
+1. **nit** — `frontend/src/app.test.tsx` (lines ~1336–1382)
+   Two incidental test improvements outside strict T-002 scope: a test data string `"Y"` was corrected to `"Milk"` in the "adds and edits entry details" test, and `await userEvent.click(save button)` was replaced with `fireEvent.submit(form)` for more reliable form submission. Neither introduces a regression; both are improvements.
+
+#### Required Fixes
+
+None.
 
 #### Verification
 
 ##### Steps
 
-1. Re-read `.ai/PLAN.md` and `.ai/TASKS.md` to confirm scope.
-2. Read full `git diff HEAD` across all 5 changed source files and 2 new test files.
-3. Read complete `OfflineQueueContext.tsx`, `OfflineBanner.tsx`, `OfflineQueueContext.test.tsx`, `OfflineBanner.test.tsx`, `types.ts`, both locale files.
-4. Verified all plan acceptance criteria against the code:
-   - **4xx path**: `response.status >= 400 && response.status < 500` sets `syncError` + `failedMutationId(mutation.id)`, sets `blockedByFailedMutation = true`, breaks the loop. Mutation stays in queue. ✅
-   - **5xx / network error path**: falls through to `throw new Error(responseError)` → `catch` sets `syncError` only; `failedMutationId` unchanged (empty). ✅
-   - **`discardFailedMutation`**: guards on `failedMutationId`, removes mutation, clears both state fields, re-drains. ✅
-   - **`blockedByFailedMutation` flag**: correctly suppresses `setSyncVersion` / `OFFLINE_SYNC_COMPLETE_EVENT` when drain halted by 4xx. ✅
-   - **`failedMutationId` reset**: cleared at drain start (empty queue path and non-empty path). ✅
-   - **`useCallback` refactor**: `drainQueue` and `refreshQueuedCount` are stable refs (`[]` deps) — `useEffect([drainQueue, refreshQueuedCount])` runs exactly once. No re-mount loop risk. ✅
-   - **OfflineBanner**: Fragment wraps `<p>` + conditional discard `<button>`. Button label uses `t("offline.discard")`. ✅
-   - **Locale keys**: `"offline.discard"` present in both `en/translation.json` and `de/translation.json` with correct values. ✅
-   - **`OfflineQueueContextValue`**: `failedMutationId: string` and `discardFailedMutation: () => Promise<void>` added. ✅
-5. Ran `npm run lint` — 0 errors on changed files; 1 pre-existing warning in `AuthContext.tsx`.
-6. Ran `npm run build` — clean.
-7. Ran `npm test` — frontend: 6 `OfflineQueueContext` tests (3 T-001 + 3 T-002) ✅, 1 `OfflineBanner` test ✅, all other suites green. Backend: 164/164 pass.
+1. Read `.ai/PLAN.md` Phase 2 acceptance criteria.
+2. Read diffs for all changed files: `api/history.ts`, `RecentlyUsedSection.tsx`, `RecentlyUsedSection.module.css`, `ListDetailPage.tsx`, `useListDetailData.ts`, locale files, and all test files.
+3. Verified no residual references to `deleteFromHistory`, `dismissRecentlyUsedEntry`, `onDismiss`, `recent.dismiss`, or `recently-used-chip-dismiss` in any source file (`grep` across `frontend/src/`).
+4. Confirmed `Suggestion` type has `useCount?: number` as optional — history items without `useCount` are fully type-safe.
+5. Ran `npm run lint` — passes with same single pre-existing fast-refresh warning.
+6. Ran frontend tests (`npm run test --workspace frontend`) — **430/430 tests pass, 31 test files, zero failures**.
+   - Notable: the previously flaky `AuthContext > hydrates the current user when only a persisted token is available` test now passes, confirming it is a non-deterministic race condition, not a code defect.
 
 ##### Findings
 
-- **Lint**: clean on all changed files.
-- **Build**: clean.
-- **Tests**: all new tests pass and cover every acceptance-criteria branch:
-  - `keeps a failed mutation in the queue and exposes it for discard after a 4xx response` ✅
-  - `keeps retry behavior for 5xx responses without exposing a failed mutation` ✅
-  - `discards the failed mutation, clears the error, and drains remaining queued mutations` ✅
-  - `renders the discard action for a non-retriable failed mutation` (OfflineBanner) ✅
+- All acceptance criteria met:
+  1. ✅ `deleteFromHistory` export removed from `frontend/src/api/history.ts`.
+  2. ✅ Dismiss button absent from `RecentlyUsedSection` UI — JSX removed, `onDismiss` prop removed, CSS `.recently-used-chip-dismiss` styles removed, `position: relative` on cell removed (it was only needed for absolute-positioned overlay).
+  3. ✅ `dismissRecentlyUsedEntry` removed from `useListDetailData` return value and callback.
+  4. ✅ `ListDetailPage` no longer passes `onDismiss`.
+  5. ✅ All frontend tests pass (430/430).
+- `Icon` import correctly removed from `RecentlyUsedSection.tsx` — it was used only by the dismiss button.
+- `recent.dismiss` i18n keys removed from both `en` and `de` locale files.
+- `feature-components.test.ts` updated to check `recently-used-chip` instead of `recently-used-chip-dismiss`.
 
 ##### Risks
 
-- Low: `removeOfflineMutation` in the real store also fires `OFFLINE_QUEUE_CHANGED_EVENT`, which triggers `handleQueueChanged → drainQueue`. Combined with the explicit `void drainQueue()` in `discardFailedMutation`, two drain attempts race. The `isSyncingRef` guard ensures only one proceeds — this is the same guard proven correct in T-001.
+- No risks identified. The change is purely subtractive — no new behaviour introduced.
 
 #### Verdict
 

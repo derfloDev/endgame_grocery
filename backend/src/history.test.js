@@ -55,17 +55,18 @@ describe("history routes", () => {
           return { rows: [{ id: "list-1" }] };
         }
 
-        assert.match(sql, /SELECT ah\.text, ah\.icon, ah\.details, ah\.use_count/);
+        assert.match(sql, /FROM entries/);
+        assert.match(sql, /status = 'done'/);
         assert.match(sql, /NOT EXISTS/);
-        assert.match(sql, /e\.status\s*=\s*'open'/);
-        assert.match(sql, /ORDER BY ah\.use_count DESC, ah\.last_used_at DESC/);
+        assert.match(sql, /e2\.status\s*=\s*'open'/);
+        assert.match(sql, /ORDER BY updated_at DESC/);
         assert.match(sql, /LIMIT 20/);
-        assert.deepEqual(params, ["user-1", "list-1"]);
+        assert.deepEqual(params, ["list-1"]);
 
         return {
           rows: [
-            { text: "Tomatoes", icon: "IconSalad", details: "Cherry tomatoes", use_count: 8 },
-            { text: "Bread", icon: null, details: null, use_count: 4 }
+            { text: "Tomatoes", icon: "IconSalad", details: "Cherry tomatoes" },
+            { text: "Bread", icon: null, details: null }
           ]
         };
       }
@@ -77,8 +78,8 @@ describe("history routes", () => {
     assert.equal(callCount, 2);
     assert.deepEqual(response.body, {
       history: [
-        { text: "Tomatoes", icon: "IconSalad", details: "Cherry tomatoes", useCount: 8 },
-        { text: "Bread", icon: null, details: null, useCount: 4 }
+        { text: "Tomatoes", icon: "IconSalad", details: "Cherry tomatoes" },
+        { text: "Bread", icon: null, details: null }
       ]
     });
   });
@@ -104,28 +105,10 @@ describe("history routes", () => {
     assert.deepEqual(response.body, { history: [] });
   });
 
-  it("returns 400 when the history text is blank", async () => {
+  it("returns 404 because individual history deletion is not supported", async () => {
     const pool = {
       async query() {
-        assert.fail("pool.query should not be called for an invalid delete request");
-      }
-    };
-
-    const response = await request(createAuthedApp(pool))
-      .delete("/api/lists/list-1/history")
-      .send({ text: "   " });
-
-    assert.equal(response.status, 400);
-    assert.equal(response.body.error, "History text is required.");
-  });
-
-  it("returns 403 when deleting history from an inaccessible list", async () => {
-    const pool = {
-      async query(sql, params) {
-        assert.match(sql, /SELECT l.id/);
-        assert.deepEqual(params, ["list-1", "user-1"]);
-
-        return { rows: [] };
+        assert.fail("pool.query should not be called for a removed delete route");
       }
     };
 
@@ -133,35 +116,6 @@ describe("history routes", () => {
       .delete("/api/lists/list-1/history")
       .send({ text: "Milk" });
 
-    assert.equal(response.status, 403);
-    assert.equal(response.body.error, "You do not have access to this list.");
-  });
-
-  it("deletes a history record for an accessible list", async () => {
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
-
-        if (callCount === 1) {
-          assert.match(sql, /SELECT l.id/);
-          assert.deepEqual(params, ["list-1", "user-1"]);
-
-          return { rows: [{ id: "list-1" }] };
-        }
-
-        assert.match(sql, /DELETE FROM autocomplete_history/);
-        assert.deepEqual(params, ["user-1", "list-1", "Milk"]);
-
-        return { rowCount: 1, rows: [] };
-      }
-    };
-
-    const response = await request(createAuthedApp(pool))
-      .delete("/api/lists/list-1/history")
-      .send({ text: "Milk" });
-
-    assert.equal(response.status, 204);
-    assert.equal(callCount, 2);
+    assert.equal(response.status, 404);
   });
 });
