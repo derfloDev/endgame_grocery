@@ -59,6 +59,18 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-005 — review — 2026-05-28T16:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-005 push notification audit/fix; all 8 checklist items addressed, getMissingVapidConfigFields extracted cleanly, English body text fixed with proper plural, dev-only SW console.log gated correctly, 15/15 backend + 10/10 frontend tests pass, lint clean. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-008 — review — 2026-05-28T15:45:00Z
 
 | Field | Value |
@@ -280,6 +292,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `frontend/src/data/iconDatabase.ts`, `frontend/src/utils/cosineSimilarity.test.ts` |
 | Validation | Review passed; no additional validation run during commit_task. |
 | Commit | `feat(icons): suggest new custom grocery icons` |
+| Next Role | none |
+
+---
+
+### T-005 — implement — 2026-05-28T14:19:24Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Improved push notification observability, VAPID configuration warnings, subscription persistence logs, English batched notification text, and dev service-worker push diagnostics. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `README.md`, `backend/src/app.js`, `backend/src/app.test.js`, `backend/src/push.test.js`, `backend/src/pushWorker.test.js`, `backend/src/routes/push.js`, `backend/src/workers/pushWorker.js`, `frontend/src/sw/service-worker.js`, `frontend/src/vite-config.test.ts` |
+| Validation | `node --test src/pushWorker.test.js src/push.test.js src/app.test.js` failed before implementation after adding regression coverage, then passed after implementation; `npm run test --workspace frontend -- vite-config` failed before implementation, then passed after implementation; `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `feat(push): improve notification delivery diagnostics` |
+| Next Role | review |
+
+---
+
+### T-005 — implement — 2026-05-28T14:31:54Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-005 done after review approval and prepared the reviewed push notification diagnostics work for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `backend/src/app.js`, `backend/src/app.test.js`, `backend/src/push.test.js`, `backend/src/pushWorker.test.js`, `backend/src/routes/push.js`, `backend/src/workers/pushWorker.js`, `frontend/src/sw/service-worker.js`, `frontend/src/vite-config.test.ts` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `feat(push): improve notification delivery diagnostics` |
 | Next Role | none |
 
 ---

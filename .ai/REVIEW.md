@@ -77,6 +77,52 @@ Reviewed: 2026-05-28
 
 ---
 
+## Task: T-005 — Push Notifications Debug & Fix
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-28
+
+#### Findings
+- No issues found. All eight plan checklist items are addressed and thoroughly tested.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria and investigation checklist for T-005.
+2. Ran `git diff HEAD` — confirmed `backend/src/app.js`, `backend/src/workers/pushWorker.js`, `backend/src/routes/push.js`, `backend/src/pushWorker.test.js`, `backend/src/push.test.js`, `backend/src/app.test.js`, `frontend/src/sw/service-worker.js`, `frontend/src/vite-config.test.ts`, `README.md`. No unexpected files.
+3. **Checklist 1 — VAPID startup warning**: `getMissingVapidConfigFields()` extracted and called in both `app.js` and `processPendingPushJobs`; `app.js` logs `warn` when incomplete; `processPendingPushJobs` also logs `warn` and returns. ✅
+4. **Checklist 2 — Subscription persistence**: `push.js` now logs `info` on both subscribe and unsubscribe with `userId` and `endpoint`. ✅
+5. **Checklist 3 — Push-worker tick**: `logger.debug({ dueJobCount }, "Push worker tick loaded due jobs")` added. ✅
+6. **Checklist 4 — Recipient query**: Changed from `logger.debug` to `logger.info` for zero-recipients case. ✅
+7. **Checklist 5 — Subscription query**: New `logger.info` branch for zero-subscriptions case. ✅
+8. **Checklist 6 — `sendNotification` error paths**: Diff confirms no change to error handling — existing code was already correct; implementer verified without modifying. ✅
+9. **Checklist 7 — Service worker push handler**: `if (import.meta.env.DEV) { console.log(...) }` added; guarded so it never fires in production. ✅
+10. **Checklist 8 — `buildNotificationBody` language fix**: `"und"` → `"and"`, `"weitere Artikel"` → proper `"more item"` / `"more items"` with singular/plural handling. ✅
+11. **Extra logging added** (beyond plan): "Push job enqueued" (enqueue), "Push job fired" (per job), "Push recipients found", "Push subscriptions targeted", "Push notifications sent" — all provide a complete end-to-end trace. ✅
+12. **Tests** — `pushWorker.test.js`: `warn` method added to logger spy; new tests for VAPID early-return, zero-recipients, and zero-subscriptions; all existing log sequences updated to include new entries; English body text assertion updated. `push.test.js`: log assertions for subscribe/unsubscribe. `app.test.js`: startup VAPID warning test. `vite-config.test.ts`: service-worker `console.log` assertion.
+13. **README.md**: New bullet documents the warning behaviour for missing VAPID config and the push delivery log trace. ✅ (meets AGENTS.md documentation rules)
+14. Ran `cd C:/develop/endgame_grocery/backend && node --test src/pushWorker.test.js src/push.test.js src/app.test.js` — **15/15 pass**.
+15. Ran `npm run test -w @endgame-grocery/frontend -- --run src/vite-config.test.ts` — **10/10 pass**.
+16. Ran `npm run lint` — pass (0 errors; 1 pre-existing frontend warning).
+
+##### Findings
+- `getMissingVapidConfigFields` is a clean extraction that allows both `app.js` and `processPendingPushJobs` to produce structured log fields listing exactly which keys are absent. ✅
+- `buildNotificationBody` plural form (`"item"` vs `"items"`) is handled correctly. ✅
+- Dev-only `console.log` in service worker is properly gated on `import.meta.env.DEV`. ✅
+
+##### Risks
+- The `enqueuePushJob` function now accepts a `logger` parameter (defaulting to `defaultLogger`). Existing callers that don't pass `logger` are unaffected. ✅
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-008 — Icon Database Entries for New Icons
 
 ### Review Round 1

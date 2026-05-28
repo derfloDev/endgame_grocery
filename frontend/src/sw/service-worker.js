@@ -8,6 +8,10 @@ const precacheManifest = self.__WB_MANIFEST;
 precacheAndRoute(precacheManifest || []);
 
 self.addEventListener("push", (event) => {
+  if (import.meta.env.DEV) {
+    console.log("Push event received", { hasData: Boolean(event.data) });
+  }
+
   const payload = event.data?.json?.() ?? {
     title: "Endgame Grocery",
     body: "A shared list has new activity.",

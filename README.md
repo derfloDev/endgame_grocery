@@ -120,6 +120,7 @@ VAPID_CONTACT=mailto:you@example.com
 - `VAPID_PRIVATE_KEY` is a secret — treat it like a password and never commit it to version control.
 - `VAPID_CONTACT` must be a reachable `mailto:` address (or a URL). Push services use it to contact you if your endpoint misbehaves. Use a real address in production.
 - If `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, or `VAPID_CONTACT` are missing, the backend starts normally but the push worker logs a warning and skips delivery. Users can still use the app; they simply will not receive push notifications.
+- Push delivery logs include job enqueue/fire events, recipient and subscription counts, sent counts, and expired subscription cleanup so production notification issues can be traced from the backend logs.
 
 ### 8. Verify the setup
 
