@@ -27,6 +27,24 @@ Three isolated CSS/layout fixes on mobile.
 
 ---
 
+## T-007 — ListDetailPage TopBar Top-Padding Fix
+
+### Scope
+The shared `TopBar` component used on the List Detail page still has a top padding of `52px`. Apply the same fix as T-001 (which only touched `OverviewPage.module.css`).
+
+### Acceptance Criteria
+- `TopBar.module.css`: top padding changed from `52px` to `16px` (full rule: `padding: 16px 16px 12px`).
+- Lint and build pass.
+
+### Files to Change
+- `frontend/src/components/ui/TopBar/TopBar.module.css` — change `padding: 52px 16px 12px` → `padding: 16px 16px 12px`.
+
+### Validation
+- `npm run lint`
+- `npm run build`
+
+---
+
 ## T-002 — Enter-Key UX in AddItemSheet
 
 ### Scope

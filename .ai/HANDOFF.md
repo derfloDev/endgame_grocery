@@ -59,6 +59,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-007 — plan — 2026-05-28T00:01:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-007 to fix the ListDetailPage TopBar top-padding (52px → 16px), missed in T-001 which only fixed OverviewPage |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
 ### T-001 — implement — 2026-05-28T05:54:15Z
 
 | Field | Value |
@@ -68,6 +79,44 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `frontend/src/pages/OverviewPage/OverviewPage.module.css`, `frontend/src/components/ui/FAB/FAB.module.css`, `frontend/src/components/AddItemSheet/AddItemSheet.module.css` |
 | Validation | Review passed; no additional validation run during commit_task. |
 | Commit | `fix(ui): tighten mobile overview and picker spacing` |
+| Next Role | none |
+
+---
+
+### T-007 — implement — 2026-05-28T06:21:47Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Applied the planned ListDetailPage TopBar top-padding fix by reducing the shared TopBar top padding to 16px. |
+| Files Changed | `frontend/src/components/ui/TopBar/TopBar.module.css`, `.ai/TASKS.md` |
+| Validation | `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; first `npm run build` attempt timed out at 120s; rerun with longer timeout passed with existing Vite chunk-size warning. |
+| Commit | `fix(ui): tighten list detail topbar spacing` |
+| Next Role | review |
+
+---
+
+### T-007 — review — 2026-05-28T08:05:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-007 single-line TopBar CSS fix; change matches plan exactly; lint passes; build confirmed passing with change in working tree. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-007 — implement — 2026-05-28T06:26:24Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-007 done after review approval and prepared the reviewed TopBar spacing fix for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `frontend/src/components/ui/TopBar/TopBar.module.css` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `fix(ui): tighten list detail topbar spacing` |
 | Next Role | none |
 
 ---
