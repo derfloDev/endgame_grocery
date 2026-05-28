@@ -77,6 +77,48 @@ Reviewed: 2026-05-28
 
 ---
 
+## Task: T-004 — PWA Update Banner
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-28
+
+#### Findings
+- No issues found. Implementation is thorough and correctly handles all plan acceptance criteria.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria for T-004.
+2. Ran `git diff HEAD` — confirmed `register.ts`, `main.tsx`, `App.tsx`, `UpdateBanner.tsx`, `UpdateBanner.module.css`, `UpdateBanner.test.tsx`, `feature-components.test.ts`, `locales/de/translation.json`, `locales/en/translation.json`, `README.md`. No unexpected files.
+3. **`register.ts`**: `registerSW` replaced by `useRegisterSW` from `virtual:pwa-register/react`; exports `useServiceWorkerUpdate()` hook returning `{ needRefresh, updateServiceWorker, dismissUpdate }`; DEV guard: `needRefresh: import.meta.env.DEV ? false : needRefresh`. ✅
+4. **`main.tsx`**: `registerServiceWorker()` import and call removed, consistent with the hook-based approach. ✅
+5. **`UpdateBanner.tsx`**: Renders as `null` when `!needRefresh || dismissed`; action button calls `updateServiceWorker(true)`; dismiss button writes sessionStorage key, calls `dismissUpdate()`, and sets local state. ✅
+6. **`App.tsx`**: `UpdateBanner` rendered inside `ProtectedLayout` before `OfflineBanner`. ✅
+7. **Translations**: `update.bannerText` and `update.bannerAction` added in both `de` and `en`. ✅
+8. **`feature-components.test.ts`**: `UpdateBanner` added with expected CSS class names. ✅
+9. **`README.md`**: Documentation added in the correct section describing the update banner behaviour. ✅ (meets AGENTS.md documentation rules)
+10. Ran `npm run test -w @endgame-grocery/frontend -- --reporter=verbose --run src/components/UpdateBanner/UpdateBanner.test.tsx src/components/feature-components.test.ts` — **28/28 pass**.
+11. Ran `npm run lint` — pass (0 errors; 1 pre-existing warning).
+
+##### Findings
+- Banner hidden when `needRefresh` is false (no spurious render). ✅
+- `updateServiceWorker(true)` called correctly on reload action. ✅
+- Dismiss persists to `sessionStorage` so banner stays hidden across component remounts within the session. ✅
+- DEV guard properly suppresses the banner during local development. ✅
+
+##### Risks
+- `useServiceWorkerUpdate` is only called when `UpdateBanner` mounts inside `ProtectedLayout`. This means the SW is registered only for authenticated users, not for the login/register pages. This is intentional per the plan ("render it inside ProtectedLayout") and acceptable for this auth-required app; any user who has previously authenticated already has the SW running from a prior session.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-003 — New Icons (4)
 
 ### Review Round 1

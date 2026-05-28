@@ -7,10 +7,8 @@ import { AppConfigProvider } from "./context/AppConfigContext";
 import { AuthProvider } from "./context/AuthContext";
 import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
-import { registerServiceWorker } from "./sw/register";
 import { primeIconWorker } from "./workers/iconWorkerClient";
 
-registerServiceWorker();
 primeIconWorker();
 
 createRoot(document.getElementById("root")!).render(

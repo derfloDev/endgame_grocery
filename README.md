@@ -86,6 +86,8 @@ During local development, the frontend Vite server proxies `/api` requests to `h
 
 The Vite PWA plugin also enables the module service worker in dev mode, so localhost can exercise the same push-subscription flow as production. After updating the service worker code or switching branches, reload the page once before retesting push notifications so the browser picks up the latest dev worker.
 
+In production, the protected app shell shows a dismissible update banner when a new service worker version is waiting. Use the banner's reload action to activate the new version immediately; dismissing it hides the prompt for the current browser session.
+
 The frontend initializes i18next before React renders, detects English or German from local storage and the browser, and keeps the document `<html lang>` attribute aligned with the active language. Translation catalogs live in `frontend/src/locales/{en,de}/translation.json` and are delivered through Vite code splitting; JSON assets are included in the service worker precache patterns for offline-first locale support.
 
 ### 7. Generate VAPID keys for push notifications (optional)

@@ -159,6 +159,18 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-004 — review — 2026-05-28T13:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-004 PWA update banner; register.ts refactor correct, banner component covers all AC, dismiss persists to sessionStorage, DEV guard in place, i18n de+en added, README updated, 28/28 tests pass, lint clean. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
 ### T-003 — review — 2026-05-28T12:25:00Z
 
 | Field | Value |
@@ -193,6 +205,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `frontend/src/assets/icons/custom/dishwasherTabs.svg`, `frontend/src/assets/icons/custom/herbs.svg`, `frontend/src/assets/icons/custom/maultaschen.svg`, `frontend/src/assets/icons/custom/nutNougatCream.svg`, `frontend/src/data/customIcons.ts`, `frontend/src/data/iconRegistry.ts`, `frontend/src/data/iconRegistry.test.ts` |
 | Validation | Review passed; no additional validation run during commit_task. |
 | Commit | `feat(ui): add custom grocery icons` |
+| Next Role | none |
+
+---
+
+### T-004 — implement — 2026-05-28T11:21:49Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added a protected-app PWA update banner backed by the React service-worker registration hook, with reload, session dismiss, i18n, and documentation updates. |
+| Files Changed | `frontend/src/sw/register.ts`, `frontend/src/main.tsx`, `frontend/src/App.tsx`, `frontend/src/components/UpdateBanner/UpdateBanner.tsx`, `frontend/src/components/UpdateBanner/UpdateBanner.module.css`, `frontend/src/components/UpdateBanner/UpdateBanner.test.tsx`, `frontend/src/components/feature-components.test.ts`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `README.md`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- UpdateBanner` failed before implementation, then passed after implementation; `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `feat(pwa): prompt users to reload app updates` |
+| Next Role | review |
+
+---
+
+### T-004 — implement — 2026-05-28T11:25:53Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-004 done after review approval and prepared the reviewed PWA update banner for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `frontend/src/App.tsx`, `frontend/src/components/UpdateBanner/UpdateBanner.tsx`, `frontend/src/components/UpdateBanner/UpdateBanner.module.css`, `frontend/src/components/UpdateBanner/UpdateBanner.test.tsx`, `frontend/src/components/feature-components.test.ts`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/main.tsx`, `frontend/src/sw/register.ts` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `feat(pwa): prompt users to reload app updates` |
 | Next Role | none |
 
 ---

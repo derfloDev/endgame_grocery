@@ -16,7 +16,8 @@ const moduleComponents = [
   "NewListSheet",
   "RecentlyUsedSection",
   "RenameListSheet",
-  "ShareListSheet"
+  "ShareListSheet",
+  "UpdateBanner"
 ];
 
 const moduleClasses = {
@@ -30,7 +31,8 @@ const moduleClasses = {
   NewListSheet: ["new-list-form"],
   RecentlyUsedSection: ["recently-used-section", "recently-used-grid", "recently-used-chip"],
   RenameListSheet: ["rename-list-form"],
-  ShareListSheet: ["share-list-form", "member-row", "share-invite-spinner"]
+  ShareListSheet: ["share-list-form", "member-row", "share-invite-spinner"],
+  UpdateBanner: ["update-banner", "update-banner-actions", "update-banner-dismiss"]
 } as const;
 
 describe("feature component CSS module layout", () => {

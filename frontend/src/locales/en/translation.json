@@ -38,6 +38,8 @@
   "offline.syncing": "Syncing {count, plural, one {# queued change} other {# queued changes}}...",
   "offline.waiting": "{count, plural, one {# queued change} other {# queued changes}} still waiting to sync.",
   "offline.discard": "Discard queued change",
+  "update.bannerText": "New version available.",
+  "update.bannerAction": "Reload",
   "list.newList": "New list",
   "list.newListTitle": "New List",
   "list.newListPlaceholder": "Weekend groceries",

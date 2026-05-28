@@ -38,6 +38,8 @@
   "offline.syncing": "{count, plural, one {# ausstehende Änderung} other {# ausstehende Änderungen}} werden synchronisiert...",
   "offline.waiting": "{count, plural, one {# ausstehende Änderung} other {# ausstehende Änderungen}} warten weiter auf Synchronisierung.",
   "offline.discard": "Ausstehende Änderung verwerfen",
+  "update.bannerText": "Neue Version verfügbar.",
+  "update.bannerAction": "Neu laden",
   "list.newList": "Neue Liste",
   "list.newListTitle": "Neue Liste",
   "list.newListPlaceholder": "Wochenendeinkauf",
