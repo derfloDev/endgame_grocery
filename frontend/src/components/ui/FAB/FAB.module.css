@@ -1,7 +1,7 @@
 .fab {
   position: fixed;
   right: max(calc(50% - 195px), 16px);
-  bottom: 92px;
+  bottom: 16px;
   z-index: 90;
   width: 56px;
   height: 56px;

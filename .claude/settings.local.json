@@ -41,7 +41,10 @@
       "Bash(Format-Table FullName)",
       "Bash(xargs grep -l \"toggle\\\\|done.*open\")",
       "Bash(xargs grep -l \"toggle\")",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('settings', {}\\), indent=2\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('settings', {}\\), indent=2\\)\\)\")",
+      "Bash(xargs grep -l \"push\\\\|notif\")",
+      "Bash(xargs head -40)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")"
     ]
   }
 }
