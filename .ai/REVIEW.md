@@ -39,6 +39,44 @@ Reviewed: 2026-05-28
 
 ---
 
+## Task: T-002 — Enter-Key UX in AddItemSheet
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-28
+
+#### Findings
+- No issues found. Implementation is clean and exactly matches the plan.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria for T-002.
+2. Ran `git diff HEAD` — confirmed changes to `AddItemSheet.tsx` and `AddItemSheet.test.tsx`.
+3. Read `handleSubmit` in `AddItemSheet.tsx` — confirmed it guards `if (!trimmed) { return; }` (line 168), so Enter on empty text is a no-op.
+4. Read `handleInputKeyDown` — guards `event.key !== "Enter"`, calls `event.preventDefault()` and `void handleSubmit()`. Correct pattern.
+5. Confirmed `enterKeyHint="done"` and `onKeyDown={handleInputKeyDown}` added only to the title input; Details field is unchanged.
+6. Ran `npm run test -w @endgame-grocery/frontend -- --reporter=verbose --run src/components/AddItemSheet/AddItemSheet.test.tsx` — **16/16 pass**, including the new "submits the title input with Enter and exposes a done keyboard action" test.
+7. Ran full `npm test` — **431/431 pass across 31 test files**.
+8. `npm run lint` — pass (0 errors; 1 pre-existing warning).
+
+##### Findings
+- `AddItemSheet.tsx`: `KeyboardEvent` imported; `handleInputKeyDown` function added; `enterKeyHint="done"` and `onKeyDown` wired onto the title input only. ✅
+- `AddItemSheet.test.tsx`: New test fires `keyDown` with `"Enter"`, asserts `enterkeyhint` attribute is `"done"`, and asserts `onAdd` was called with the correct args. ✅
+- Empty-text guard confirmed present in `handleSubmit` — Enter with blank title is harmless. ✅
+
+##### Risks
+- None. Changes are isolated to the title input of a single component.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-007 — ListDetailPage TopBar Top-Padding Fix
 
 ### Review Round 1

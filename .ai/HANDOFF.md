@@ -120,3 +120,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — implement — 2026-05-28T08:56:21Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added Enter-to-submit behavior and a done keyboard hint to the AddItemSheet title input, with focused unit coverage. |
+| Files Changed | `frontend/src/components/AddItemSheet/AddItemSheet.tsx`, `frontend/src/components/AddItemSheet/AddItemSheet.test.tsx`, `.ai/TASKS.md` |
+| Validation | `npm run test --workspace frontend -- AddItemSheet` failed before implementation, then passed after implementation; `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `feat(ui): submit add item title with enter` |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-05-28T11:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 Enter-key UX; implementation matches plan exactly, empty-text guard confirmed, all 16 AddItemSheet tests pass including new Enter-submit test, full suite 431/431 green. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-05-28T09:27:59Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-002 done after review approval and prepared the reviewed Enter-key AddItemSheet UX change for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `frontend/src/components/AddItemSheet/AddItemSheet.tsx`, `frontend/src/components/AddItemSheet/AddItemSheet.test.tsx` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `feat(ui): submit add item title with enter` |
+| Next Role | none |
+
+---
