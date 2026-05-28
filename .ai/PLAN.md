@@ -126,6 +126,59 @@ Show a dismissible "New version available" banner when a new service worker is w
 
 ---
 
+## T-008 — Icon Database Entries for New Icons
+
+### Scope
+The four icons added in T-003 (`dishwasherTabs`, `nutNougatCream`, `maultaschen`, `herbs`) have no entries in `iconDatabase.ts` and are therefore never suggested when users type matching terms. Add the required `ICON_DB` entries including German and English synonyms.
+
+### Acceptance Criteria
+- Typing "spülmaschinentabs", "tabs", "finish tabs", "dishwasher tablet" etc. suggests `CustomDishwasherTabs`.
+- Typing "nutella", "nuss-nougat", "nuss nougat creme", "haselnussaufstrich", "chocolate spread" etc. suggests `CustomNutNougatCream`.
+- Typing "maultaschen", "maultasche", "schwäbische maultaschen", "pasta pockets" etc. suggests `CustomMaultaschen`.
+- Typing "kräuter", "petersilie", "basilikum", "rosmarin", "herb bunch" etc. suggests `CustomHerbs`.
+- The `"nutella"` and `"aufstrich"` tags are **removed from the existing `jam` entry** to avoid misdirecting "nutella" to the jam icon.
+- Existing icon database tests still pass; a new test verifies each of the four new exact-match terms resolves to the correct icon.
+
+### Files to Change
+- `frontend/src/data/iconDatabase.ts`
+  - Remove `"nutella"` and `"aufstrich"` from the `jam` entry's tags (keep `"marmelade"`, `"konfitüre"`, `"fruchtaufstrich"` etc.).
+  - Add four new `ICON_DB` entries (suggested placement: Household Cleaning section for dishwasherTabs; Spreads/Condiments section for nutNougatCream; Meals/Prepared Foods section for maultaschen; Produce/Herbs section for herbs):
+
+  ```ts
+  { label: "dishwasher tabs", icon: "CustomDishwasherTabs",
+    tags: ["spülmaschinentabs", "spülmaschinentab", "spuelmaschinentabs",
+           "geschirrspültabs", "geschirrspueltabs", "tabs", "finish tabs",
+           "dishwasher tablet", "dishwasher pod", "spülmittel tabs", "spuelmittel tabs"] },
+
+  { label: "nut nougat cream", icon: "CustomNutNougatCream",
+    tags: ["nutella", "nuss-nougat-creme", "nuss nougat creme", "nussnugatcreme",
+           "nuss nougat", "haselnussaufstrich", "hazelnut spread", "chocolate spread",
+           "schokocreme", "nougat aufstrich", "aufstrich", "kakaoaufstrich"] },
+
+  { label: "maultaschen", icon: "CustomMaultaschen",
+    tags: ["maultasche", "schwäbische maultaschen", "schwaebische maultaschen",
+           "pasta pockets", "nudeltaschen", "german pasta", "filled pasta",
+           "schwäbische küche", "schwäbische nudeln"] },
+
+  { label: "herbs", icon: "CustomHerbs",
+    tags: ["kräuter", "krauter", "kräuterbund", "kraeuter", "petersilie", "rosmarin",
+           "basilikum", "thymian", "schnittlauch", "minze", "dill", "koriander",
+           "fresh herbs", "herb bunch", "frische kräuter", "gewürzkräuter"] },
+  ```
+
+- `frontend/src/data/iconDatabase.test.ts` (create if it does not exist, or extend existing icon suggestion tests)
+  - Verify `EXACT_MATCH_MAP["spülmaschinentabs"] === "CustomDishwasherTabs"`.
+  - Verify `EXACT_MATCH_MAP["nutella"] === "CustomNutNougatCream"`.
+  - Verify `EXACT_MATCH_MAP["maultaschen"] === "CustomMaultaschen"`.
+  - Verify `EXACT_MATCH_MAP["petersilie"] === "CustomHerbs"`.
+  - Verify `EXACT_MATCH_MAP["nutella"] !== "CustomJam"` (regression guard).
+
+### Validation
+- `npm run lint`
+- `npm test -- iconDatabase`
+
+---
+
 ## T-005 — Push Notifications Debug & Fix
 
 ### Scope

@@ -59,6 +59,29 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-008 — review — 2026-05-28T15:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-008 icon DB entries; all 4 new entries present with correct tags and placements, "nutella"+"aufstrich" cleaned from jam and hummus, 13/13 tests pass including all plan-specified assertions, lint clean. |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-008 — plan — 2026-05-28T00:02:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-008 to wire the four T-003 icons into iconDatabase.ts with German/English synonyms, and clean up the misrouted "nutella" tag on the jam entry |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
 ### T-007 — plan — 2026-05-28T00:01:00Z
 
 | Field | Value |
@@ -231,6 +254,32 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `frontend/src/App.tsx`, `frontend/src/components/UpdateBanner/UpdateBanner.tsx`, `frontend/src/components/UpdateBanner/UpdateBanner.module.css`, `frontend/src/components/UpdateBanner/UpdateBanner.test.tsx`, `frontend/src/components/feature-components.test.ts`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/main.tsx`, `frontend/src/sw/register.ts` |
 | Validation | Review passed; no additional validation run during commit_task. |
 | Commit | `feat(pwa): prompt users to reload app updates` |
+| Next Role | none |
+
+---
+
+### T-008 — implement — 2026-05-28T13:06:12Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added exact-match icon database entries for the four new custom icons and corrected spread terms so Nutella-style searches no longer resolve to jam. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `frontend/src/data/iconDatabase.ts`, `frontend/src/utils/cosineSimilarity.test.ts` |
+| Validation | `npm run test --workspace frontend -- cosineSimilarity` failed before implementation after adding the regression test, then passed after implementation; `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `feat(icons): suggest new custom grocery icons` |
+| Next Role | review |
+
+---
+
+### T-008 — implement — 2026-05-28T13:38:48Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-008 done after review approval and prepared the reviewed icon database entries for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `frontend/src/data/iconDatabase.ts`, `frontend/src/utils/cosineSimilarity.test.ts` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `feat(icons): suggest new custom grocery icons` |
 | Next Role | none |
 
 ---

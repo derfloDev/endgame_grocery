@@ -77,6 +77,54 @@ Reviewed: 2026-05-28
 
 ---
 
+## Task: T-008 — Icon Database Entries for New Icons
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-28
+
+#### Findings
+- No issues found. One proactive improvement: `"aufstrich"` was also removed from the `hummus` entry (not mentioned in the plan), which is correct — it prevents a non-deterministic `EXACT_MATCH_MAP` since `"aufstrich"` now lives exclusively in `nutNougatCream`.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria for T-008.
+2. Ran `git diff HEAD` — confirmed only `iconDatabase.ts` and `cosineSimilarity.test.ts` changed (plus AI tracking files). No unexpected files.
+3. **`iconDatabase.ts` — jam entry**: `"nutella"` and `"aufstrich"` removed. ✅
+4. **`iconDatabase.ts` — hummus entry**: `"aufstrich"` also removed (proactive fix; avoids EXACT_MATCH_MAP collision). ✅
+5. **New entries placement and tags**:
+   - `herbs` — Produce section, all plan tags present. ✅
+   - `dishwasherTabs` — Household Cleaning section, all plan tags present. ✅
+   - `maultaschen` — Meals/Prepared Foods section (after pasta), all plan tags present. ✅
+   - `nutNougatCream` — end of ICON_DB (near hummus/spreads area), all plan tags including `"aufstrich"`. ✅
+6. **Tests** added to `cosineSimilarity.test.ts` (existing icon DB test file — correct placement):
+   - `EXACT_MATCH_MAP["spülmaschinentabs"] === "CustomDishwasherTabs"` ✅
+   - `EXACT_MATCH_MAP.nutella === "CustomNutNougatCream"` ✅
+   - `EXACT_MATCH_MAP.aufstrich === "CustomNutNougatCream"` ✅ (additional check)
+   - `EXACT_MATCH_MAP.maultaschen === "CustomMaultaschen"` ✅
+   - `EXACT_MATCH_MAP.petersilie === "CustomHerbs"` ✅
+   - `EXACT_MATCH_MAP.nutella !== "CustomJam"` regression guard ✅
+7. Ran `npm run test -w @endgame-grocery/frontend -- --run src/utils/cosineSimilarity.test.ts` — **13/13 pass**.
+8. Ran `npm run lint` — pass (0 errors; 1 pre-existing warning).
+
+##### Findings
+- All four new icon DB entries correctly placed in contextually appropriate sections. ✅
+- Tag sets are thorough (German + English + spelling variants) and match the plan. ✅
+- `"aufstrich"` cleaned from both `jam` and `hummus`, now unique to `nutNougatCream`. ✅
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`
+
+---
+
 ## Task: T-004 — PWA Update Banner
 
 ### Review Round 1
