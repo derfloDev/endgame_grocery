@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0](https://github.com/derfloDev/endgame_grocery/compare/v1.5.0...v1.6.0) (2026-05-28)
+
+
+### Features
+
+* **backend:** derive history and suggestions from entries ([2596b91](https://github.com/derfloDev/endgame_grocery/commit/2596b91d7ca16f35b7cb8dfba89846a13e9e8646))
+* **frontend:** remove recently used dismiss controls ([bd3bddf](https://github.com/derfloDev/endgame_grocery/commit/bd3bddf432af51f9145702d5669a966d943fce3d))
+
 ## [1.5.0](https://github.com/derfloDev/endgame_grocery/compare/v1.4.0...v1.5.0) (2026-05-27)
 
 
