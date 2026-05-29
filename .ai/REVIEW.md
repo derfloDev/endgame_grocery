@@ -432,3 +432,41 @@ Reviewed: 2026-05-29
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-012 — Fix Re-Add to Open Duplicating Item in Recently Used
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-29
+
+#### Findings
+- No issues found. The fix is a single-line guard that exactly matches the plan's specification. Existing tests preserved, new test covers the scenario precisely.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria for T-012.
+2. Ran `git diff HEAD --name-only` — confirmed: `recentlyUsedState.ts`, `recentlyUsedState.test.ts`, `README.md`. No unexpected files.
+3. **`recentlyUsedState.ts`**: `openTexts` set built from `openEntries.filter(e => e.status === "open").map(e => e.text)` before the loop; `|| openTexts.has(entry.text)` added to the skip condition. ✅
+4. The `.filter(e => e.status === "open")` on `openEntries` is redundant (callers already pass only open entries) but harmless and defensive. ✅
+5. **`recentlyUsedState.test.ts`**: New test "does not surface changed done entries when a matching entry is open" — entries has both `open` and `done` "Bread" with `is_changed: true`, `openEntries` has "Bread" as open; asserts `changedDoneTexts` does not contain "Bread" and `visibleRecentlyUsed` contains only "Tomatoes". ✅
+6. **`README.md`**: Updated to add "if the same item text is open again, Recently Used suppresses the older done entry." ✅
+7. Ran `npm run test -w @endgame-grocery/frontend -- --run src/pages/recentlyUsedState.test.ts` — **8/8 pass**.
+8. Ran `npm test` (full suite) — **455/455 pass across 33 test files**.
+9. Ran `npm run lint` — pass (0 errors; 1 pre-existing warning).
+
+##### Findings
+- The fix correctly uses `openEntries` (already filtered to open status at the call site in `ListDetailPage.tsx`) to build `openTexts`, then suppresses any `done+is_changed` entry whose text matches an open entry. ✅
+- The existing "surfaces changed done entries" test still passes, confirming no regression on the normal case where no matching open entry exists. ✅
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

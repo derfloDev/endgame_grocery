@@ -59,6 +59,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-012 — implement — 2026-05-29T12:39:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-012 done after review approval and prepared the reviewed recently-used duplicate suppression fix for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `README.md`, `frontend/src/pages/recentlyUsedState.test.ts`, `frontend/src/pages/recentlyUsedState.ts` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `fix(lists): suppress duplicate recently used entries` |
+| Next Role | none |
+
+---
+
 ### T-011 — implement — 2026-05-29T11:45:13Z
 
 | Field | Value |
@@ -500,3 +513,58 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Version | unversioned |
 
 ---
+
+### T-012 — plan — 2026-05-29T07:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned fix for re-add-to-open causing done+is_changed entry to appear in both open items and recently-used simultaneously; root cause is getRecentlyUsedDisplayState not filtering changedDoneItems against openEntries |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-012 — implement — 2026-05-29T12:27:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Suppressed changed done entries from Recently Used when an open entry with the same text exists, preventing duplicate open and recently-used display after re-add. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `README.md`, `frontend/src/pages/recentlyUsedState.test.ts`, `frontend/src/pages/recentlyUsedState.ts` |
+| Validation | `npm run test --workspace frontend -- recentlyUsedState` hit sandbox `spawn EPERM`, then failed before implementation after rerun with escalation, then passed after implementation; `npm run lint` passed with the existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with the existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `fix(lists): suppress duplicate recently used entries` |
+| Next Role | review |
+
+### T-013 — plan — 2026-05-29T07:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned restore of recently-used dismiss controls with server-side dismissed_history table; dismissals persist per-user, re-adding clears dismissal, changedDone badge hides dismiss button |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-013 — plan (rework) — 2026-05-29T07:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reworked T-013 plan: dismiss deletes done entries directly from the entries table (shared for all members), no dismissed_history table or migration needed |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-012 — review — 2026-05-29T14:37:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed fix for re-add-to-open duplicating item in recently-used: openTexts guard added before changedDoneItems loop in getRecentlyUsedDisplayState. |
+| Files Changed | frontend/src/pages/recentlyUsedState.ts, frontend/src/pages/recentlyUsedState.test.ts, README.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
