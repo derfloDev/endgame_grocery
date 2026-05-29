@@ -324,6 +324,142 @@ Response: 204
 
 ---
 
+## T-009 — Fix Entry Change Badges (T-006 rework)
+
+### Root Cause
+Two bugs prevent the per-entry change badges from working correctly after T-006.
+
+**Bug 1 — Badges cleared before the user sees them**
+In `useListDetailData.ts`, `markListViewed` is called immediately after entries are loaded, and on success it calls `clearChangedFlags(entries)`, wiping the `is_changed` flags before React has a chance to paint. The badges therefore never appear.
+
+Fix: remove the `clearChangedFlags` call after `markListViewed`. The server-side `last_viewed_at` has already been updated, so on the *next* load `is_changed` will come back as `false` from the API. This matches the user requirement: "badges disappear when I open the list the next time."
+
+**Bug 2 — Badge positioned inside the card instead of flush with the border**
+Current CSS: `top: 6px; right: 6px` — badge is inset.
+Required: badge sits at the top-right corner, overlapping the border edge ("bündig mit dem Rahmen"), using `top: 0; right: 0; transform: translate(50%, -50%)`. The card needs `overflow: visible` so the badge isn't clipped.
+
+### Acceptance Criteria
+- When opening a list that has `is_changed` entries, the NEW/EDITED/DONE badge is **visible** on the entry tile.
+- The badge is positioned at the top-right corner of the tile, centred on the border edge (translate 50%, -50%).
+- On the **next** open of the same list, the badges are gone (server-side `last_viewed_at` has been updated).
+- No `clearChangedFlags` call inside `markListViewed`'s `.then()`.
+- Existing EntryTile tests still pass.
+
+### Files to Change
+- `frontend/src/pages/ListDetailPage/useListDetailData.ts`
+  - In `loadListDetail`, remove the `.then(() => setEntries(clearChangedFlags(...)))` callback from the `markListViewed` call. Keep the fire-and-forget call itself so `last_viewed_at` is still updated.
+  - The `clearChangedFlags` helper can be left in file (used nowhere else, but harmless) or removed.
+- `frontend/src/components/EntryTile/EntryTile.module.css`
+  - Change `.entry-tile-change-badge`: `top: 6px; right: 6px` → `top: 0; right: 0; transform: translate(50%, -50%)`.
+  - Add `overflow: visible` to `.entry-tile` so the badge is not clipped by the card boundary.
+
+### Validation
+- `npm run lint`
+- `npm test -- EntryTile`
+
+---
+
+## T-010 — Fix badge corner radius, bottom-left corner, and self-done badge (T-009 rework)
+
+### Root Causes & New Requirement
+
+**Bug 1 — Badge top-right corner looks slightly clipped**
+`--radius-md: 12px`, tile `border: 1px solid`. `overflow: hidden` clips at inner radius = `12px - 1px = 11px`. Without an explicit `border-top-right-radius` on the badge, its square corner is clipped at 11px and the outer card corner is 12px — visible as a tiny mismatch.
+
+Fix: `border-top-right-radius: calc(var(--radius-md) - 1px)` on the badge to match the inner clip radius exactly.
+
+**Bug 2 — Badge bottom-left corner should be sharp (0 radius)**
+Currently `border-bottom-left-radius: 999px`. User wants `0`.
+
+**Bug 3 — Done+changed entries appear in "open items" instead of "recently used"**
+`visibleEntries = entries.filter(e => e.status === "open" || e.is_changed)` incorrectly pulls done+is_changed entries into the open section.
+
+Fix: `visibleEntries` = only `status === "open"`. Done+is_changed surface via `changedDoneTexts` in recently-used.
+
+**New: "Done" badge when the current user themselves completes an item**
+When the user moves an item from open → done in the current session, it should immediately appear in "recently used" with a "Done" badge.
+
+Fix: in `useListDetailData → toggleStatus`, set `is_changed: true` on the optimistic entry when `nextStatus === "done"`, and preserve it after the server response (spread server result first, then override `is_changed: true`).
+
+### Acceptance Criteria
+- Badge top-right corner is seamlessly flush with the outer card corner (no visible gap or clip artefact).
+- Badge bottom-left corner is sharp (`border-bottom-left-radius: 0`).
+- No `done` entry in the "open items" section.
+- Done entries with `is_changed: true` (from others, API, **or self in current session**) appear in "recently used" with a "Done" badge.
+- Same corner CSS applied to `recently-used-chip` badge.
+- Tests pass.
+
+### Files to Change
+
+#### 1. `frontend/src/components/EntryTile/EntryTile.module.css`
+- `.entry-tile`: ensure `overflow: hidden`.
+- `.entry-tile-change-badge`: set `border-radius: 0 calc(var(--radius-md) - 1px) 0 0` (top-left: 0, top-right: 11px, bottom-right: 0, bottom-left: 0). Remove any `transform`.
+
+#### 2. `frontend/src/pages/ListDetailPage/useListDetailData.ts` — `toggleStatus`
+- Optimistic entry when `nextStatus === "done"`: add `is_changed: true`.
+- Server-result update: spread `result.entry` first, then apply `...(nextStatus === "done" ? { is_changed: true } : {})` so the server's own-actor `is_changed: false` does not overwrite the local flag.
+
+#### 3. `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`
+- `visibleEntries`: `entries.filter(e => e.status === "open")` — remove `|| e.is_changed`.
+- Add `changedDoneTexts`: `new Set(entries.filter(e => e.status === "done" && e.is_changed).map(e => e.text))`.
+- Pass `changedDoneTexts` to `<RecentlyUsedSection>`.
+
+#### 4. `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`
+- Add `changedDoneTexts?: ReadonlySet<string>` prop.
+- Render `<span className={styles["recently-used-change-badge"]}>{t("entry.changeDone")}</span>` inside the chip when `changedDoneTexts?.has(item.text)`.
+
+#### 5. `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`
+- `.recently-used-chip`: add `position: relative; overflow: hidden`.
+- `.recently-used-change-badge`: `position: absolute; top: 0; right: 0; border-radius: 0 calc(var(--radius-md) - 1px) 0 0;` plus same colour/font tokens as `.entry-tile-change-badge`.
+
+### Validation
+- `npm run lint`
+- `npm test -- EntryTile RecentlyUsedSection ListDetailPage`
+
+---
+
+## T-011 — Badge corner radius precision and self-done badge
+
+### Scope
+Three remaining badge issues after T-010.
+
+### Issues
+
+**1 — Top-right corner has a visible clip artefact**
+`--radius-md: 12px`, `border: 1px`. CSS `overflow: hidden` clips at inner radius = `12px − 1px = 11px`. Without an explicit radius on the badge, its corner is clipped at 11px while the outer card corner is 12px — a visible mismatch.
+
+Fix: `border-top-right-radius: calc(var(--radius-md) - 1px)` on both `.entry-tile-change-badge` and `.recently-used-change-badge`.
+
+**2 — Bottom-left corner should have zero radius**
+Currently `border-bottom-left-radius: 999px` (or whatever T-010 left). Change to `0`.
+
+Fix: `border-radius: 0 calc(var(--radius-md) - 1px) 0 0` (shorthand: top-left 0, top-right 11px, bottom-right 0, bottom-left 0) on both badge classes.
+
+**3 — Self-done badge: no badge when user completes an item themselves**
+When the current user moves an item from open → done, it moves to "recently used" but shows no badge. User wants an immediate "Done" badge.
+
+Fix: in `useListDetailData → toggleStatus`, when `nextStatus === "done"`, add `is_changed: true` to the optimistic entry. After the server response, preserve `is_changed: true` (spread server result first, then apply `...(nextStatus === "done" ? { is_changed: true } : {})`).
+
+### Acceptance Criteria
+- No visible gap or clipping at the badge's top-right corner on either tile or recently-used chip.
+- Badge bottom-left corner is sharp (0 radius) on both tile and chip.
+- When the user completes an item, the "Done" badge appears on the chip in "recently used" in the same session.
+- Tests pass.
+
+### Files to Change
+- `frontend/src/components/EntryTile/EntryTile.module.css`
+  - `.entry-tile-change-badge`: `border-radius: 0 calc(var(--radius-md) - 1px) 0 0`.
+- `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`
+  - `.recently-used-change-badge`: `border-radius: 0 calc(var(--radius-md) - 1px) 0 0`.
+- `frontend/src/pages/ListDetailPage/useListDetailData.ts`
+  - `toggleStatus`: set `is_changed: true` on optimistic entry when `nextStatus === "done"`, and preserve after server response.
+
+### Validation
+- `npm run lint`
+- `npm test -- EntryTile RecentlyUsedSection ListDetailPage`
+
+---
+
 ## Validation Summary (full cycle)
 ```
 npm run lint

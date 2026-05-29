@@ -21,7 +21,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useListEvents } from "../../hooks/useListEvents";
 import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
-import { filterRecentlyUsedItems } from "../recentlyUsedState";
+import { getRecentlyUsedDisplayState } from "../recentlyUsedState";
 import styles from "./ListDetailPage.module.css";
 import { useListDetailData } from "./useListDetailData";
 import type { DetailEntry, DetailMember } from "./useListDetailData";
@@ -197,8 +197,8 @@ export default function ListDetailPage(): ReactElement {
   }
 
   const openEntries = entries.filter((entry) => entry.status === "open");
-  const visibleEntries = entries.filter((entry) => entry.status === "open" || entry.is_changed);
-  const visibleRecentlyUsed = filterRecentlyUsedItems(recentlyUsed, openEntries);
+  const visibleEntries = openEntries;
+  const { changedDoneTexts, visibleRecentlyUsed } = getRecentlyUsedDisplayState(recentlyUsed, entries, openEntries);
   const visibleMemberBadges = list?.is_owner ? members.filter((member) => !member.is_owner) : [];
   const shouldSuppressEntryError = entryError instanceof AuthExpiredError;
 
@@ -286,6 +286,7 @@ export default function ListDetailPage(): ReactElement {
             </section>
 
             <RecentlyUsedSection
+              changedDoneTexts={changedDoneTexts}
               items={visibleRecentlyUsed}
               onAdd={(text, icon, details) => void addRecentlyUsedEntry(text, icon, details)}
             />

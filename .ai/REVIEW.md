@@ -339,3 +339,49 @@ Reviewed: 2026-05-29
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-010 — Fix Badge Overflow and Done-Item Section
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-29
+
+#### Findings
+- No issues found. Both bugs are correctly fixed, the abstraction in `getRecentlyUsedDisplayState` is cleaner than the inline approach the plan specified, and all tests pass.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria for T-010.
+2. Ran `git diff HEAD --name-only` — confirmed exactly: `EntryTile.module.css`, `EntryTile.test.tsx`, `RecentlyUsedSection.module.css`, `RecentlyUsedSection.test.tsx`, `RecentlyUsedSection.tsx`, `ListDetailPage.tsx`, `ListDetailPage.test.tsx` (in `pages/`), `useListDetailData.ts`, `recentlyUsedState.ts`, `recentlyUsedState.test.ts`, `README.md`. No unexpected files.
+3. **`EntryTile.module.css`**: `.entry-tile` gains `overflow: hidden`; `.entry-tile-change-badge` changes to `top: 0; right: 0; border-radius: 0 0 0 999px`; no `transform: translate(50%, -50%)`. ✅
+4. **`RecentlyUsedSection.module.css`**: `.recently-used-chip` gains `position: relative; overflow: hidden`; new `.recently-used-change-badge` rule with identical positioning pattern. ✅
+5. **`RecentlyUsedSection.tsx`**: `changedDoneTexts?: ReadonlySet<string>` prop added; badge rendered conditionally via `isChangedDone`. ✅
+6. **`recentlyUsedState.ts`**: New `getRecentlyUsedDisplayState()` function computes `changedDoneTexts` (Set of done+is_changed entry texts) and `visibleRecentlyUsed` (changed-done items prepended, then filtered history excluding already-shown texts). `filterRecentlyUsedItems` preserved for backward compatibility. ✅
+7. **`ListDetailPage.tsx`**: `visibleEntries = openEntries` (only `status === "open"`); `getRecentlyUsedDisplayState` replaces direct `filterRecentlyUsedItems` call; `changedDoneTexts` passed to `RecentlyUsedSection`. ✅
+8. **`useListDetailData.ts`**: `.then(() => setEntries(clearChangedFlags(...)))` removed from `markListViewed` call — now fire-and-forget. `clearChangedFlags` helper deleted. ✅
+9. **`ListDetailPage.test.tsx`**: Changed badge test updated — asserts open section shows "New" but NOT "Bread" (done+changed); recently used section shows "Bread" and "Done" badge; after `markViewedRequest.resolve()` the badges remain (server-side, cleared on next load). ✅
+10. **`recentlyUsedState.test.ts`**: New test for `getRecentlyUsedDisplayState` — verifies "Bread" (done+is_changed) surfaces with details, "Milk" (open) excluded from recently used, "Tomatoes" (pure history) still present, no duplicate. ✅
+11. **CSS tests in `EntryTile.test.tsx` and `RecentlyUsedSection.test.tsx`**: Use `readFileSync` to assert CSS rule structure — `overflow: hidden` on parent, `top: 0; right: 0; border-radius: 0 0 0 999px` on badge, no translate rule. ✅
+12. **`README.md`**: Updated to clarify that `mark-viewed` "records the open so badges disappear on the next list load" (not immediately), and documents done+changed entries surfacing in Recently Used. ✅
+13. Ran `npm run test -w @endgame-grocery/frontend -- --run src/components/EntryTile/EntryTile.test.tsx src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx src/pages/recentlyUsedState.test.ts src/pages/ListDetailPage.test.tsx` — **33/33 pass**.
+14. Ran `npm test` (full suite) — **453/453 pass across 33 test files**.
+15. Ran `npm run lint` — pass (0 errors; 1 pre-existing warning).
+
+##### Findings
+- `getRecentlyUsedDisplayState` is a better abstraction than the inline `changedDoneTexts` computation the plan described; it's co-located with `filterRecentlyUsedItems` and independently tested. ✅
+- Changed done entries are prepended to `visibleRecentlyUsed`, ensuring they appear at the top of the recently used section for visibility. ✅
+- Deduplication is correct: if a changed-done entry text also appears in the user's history, it is shown once (as the changed-done version) and not duplicated from history. ✅
+- The `max-width: calc(100% - 12px)` on badges provides a soft truncation limit even with `overflow: hidden` on the parent; valid belt-and-suspenders defence. ✅
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

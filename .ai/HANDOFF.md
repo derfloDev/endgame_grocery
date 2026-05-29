@@ -83,6 +83,39 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-011 — plan — 2026-05-29T00:02:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-011 for badge corner radius precision (calc(--radius-md - 1px)), sharp bottom-left corner (0), and self-done badge when user completes an item themselves |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-010 — plan — 2026-05-29T00:01:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-010 to fix badge overflow (use overflow:hidden instead of translate), and move done+is_changed entries out of open section into recently-used with a Done badge |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-009 — plan — 2026-05-29T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added T-009 to fix two bugs in T-006 entry badges: (1) clearChangedFlags wipes badges before render, (2) badge positioned inside card instead of flush with border corner |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
 ### T-008 — plan — 2026-05-28T00:02:00Z
 
 | Field | Value |
@@ -357,4 +390,54 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `backend/src/db/migrations/1779979000000_add_last_updated_by_to_entries.cjs`, `backend/src/db/migrations/1779979000001_add_list_views.cjs`, `backend/src/db/migrations.test.js`, `backend/src/entries.test.js`, `backend/src/lists.test.js`, `backend/src/routes/entries.js`, `backend/src/routes/lists.js`, `frontend/src/api/lists.ts`, `frontend/src/app.test.tsx`, `frontend/src/components/EntryTile/EntryTile.module.css`, `frontend/src/components/EntryTile/EntryTile.test.tsx`, `frontend/src/components/EntryTile/EntryTile.tsx`, `frontend/src/components/ListCardHome/ListCardHome.module.css`, `frontend/src/components/ListCardHome/ListCardHome.test.tsx`, `frontend/src/components/ListCardHome/ListCardHome.tsx`, `frontend/src/components/feature-components.test.ts`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts`, `frontend/src/types.ts` |
 | Validation | Review passed; no additional validation run during commit_task. |
 | Commit | `feat(lists): show changed item badges` |
+| Next Role | none |
+
+---
+
+### T-009 — implement — 2026-05-29T05:29:14Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Fixed entry change badges so the current list-open keeps NEW/EDITED/DONE badges visible after mark-viewed succeeds, then lets the server clear them on the next load; repositioned the EntryTile badge onto the card border edge. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `README.md`, `frontend/src/components/EntryTile/EntryTile.module.css`, `frontend/src/components/EntryTile/EntryTile.test.tsx`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts` |
+| Validation | `npm run test --workspace frontend -- EntryTile ListDetailPage` hit sandbox `spawn EPERM` before implementation, then failed on the new CSS regression assertion after rerun with escalation, then passed after implementation; `npm run lint` passed with the existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with the existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `fix(lists): keep changed badges visible until next open` |
+| Next Role | review |
+
+---
+
+### T-010 — implement — 2026-05-29T06:01:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Kept entry change badges clipped inside tile corners and moved changed done entries out of Open Items into Recently Used with a Done badge. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `README.md`, `frontend/src/components/EntryTile/EntryTile.module.css`, `frontend/src/components/EntryTile/EntryTile.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/recentlyUsedState.test.ts`, `frontend/src/pages/recentlyUsedState.ts` |
+| Validation | `npm run test --workspace frontend -- EntryTile RecentlyUsedSection ListDetailPage recentlyUsedState` initially hit sandbox `spawn EPERM`, then passed after rerun with escalation; first post-edit focused run caught the ListDetailPage line-count guard, then passed after moving recently-used display assembly into `recentlyUsedState`; `npm run lint` passed with the existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with the existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `fix(lists): place done changed badges in recently used` |
+| Next Role | review |
+
+### T-010 — review — 2026-05-29T08:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed fix for badge overflow and done-item section placement: overflow:hidden corner-flush badge in EntryTile and RecentlyUsedSection, done+changed entries surfaced in recently used via getRecentlyUsedDisplayState, clearChangedFlags removed. Review covers combined T-009+T-010 working-tree state. |
+| Files Changed | frontend/src/components/EntryTile/EntryTile.module.css, frontend/src/components/EntryTile/EntryTile.test.tsx, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage/useListDetailData.ts, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/pages/recentlyUsedState.ts, frontend/src/pages/recentlyUsedState.test.ts, README.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement — commit_task T-009 first (T-009 changes included), then commit_task T-010 (remaining changes); or commit all as T-010 since review covered combined state |
+
+---
+
+### T-009 — implement — 2026-05-29T06:24:35Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-009 done after combined review approval and prepared the reviewed changed-badge visibility fix for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `README.md`, `frontend/src/components/EntryTile/EntryTile.module.css`, `frontend/src/components/EntryTile/EntryTile.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts`, `frontend/src/pages/recentlyUsedState.test.ts`, `frontend/src/pages/recentlyUsedState.ts` |
+| Validation | Combined review passed; no additional validation run during commit_task. |
+| Commit | `fix(lists): keep changed badges visible until next open` |
 | Next Role | none |

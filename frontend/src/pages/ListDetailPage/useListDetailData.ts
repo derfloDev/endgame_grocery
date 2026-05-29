@@ -371,15 +371,9 @@ export function useListDetailData({
         setEntries(nextEntries);
         setRecentlyUsed(filterRecentlyUsedItems(historyResult?.history ?? [], nextEntries));
 
-        void markListViewed(token, listId)
-          .then(() => {
-            if (isMountedRef.current) {
-              setEntries((currentEntries) => clearChangedFlags(currentEntries));
-            }
-          })
-          .catch((error) => {
-            console.error("Failed to mark list viewed.", error);
-          });
+        void markListViewed(token, listId).catch((error) => {
+          console.error("Failed to mark list viewed.", error);
+        });
 
         if (activeList.is_owner) {
           await loadMembers({
@@ -445,10 +439,6 @@ function sortEntries(entries: DetailEntry[]): DetailEntry[] {
 function normalizeEntryDetails(details: string): string | null {
   const trimmedDetails = details.trim();
   return trimmedDetails ? trimmedDetails : null;
-}
-
-function clearChangedFlags(entries: DetailEntry[]): DetailEntry[] {
-  return entries.map((entry) => (entry.is_changed ? { ...entry, is_changed: false } : entry));
 }
 
 function getErrorMessage(error: unknown): string {

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -318,18 +318,21 @@ describe("ListDetailPage optimistic updates", () => {
     renderListDetailPage();
 
     expect(await screen.findByText("Milk")).toBeTruthy();
-    expect(screen.getByText("New")).toBeTruthy();
-    expect(screen.getByText("Bread")).toBeTruthy();
-    expect(screen.getByText("Done")).toBeTruthy();
+    expect(within(getOpenItemsSection()).getByText("New")).toBeTruthy();
+    expect(within(getOpenItemsSection()).queryByText("Bread")).toBeNull();
+    const recentlyUsedSection = screen.getByRole("region", { name: "Recently Used" });
+    expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
+    expect(within(recentlyUsedSection).getByText("Done")).toBeTruthy();
     expect(markListViewed).toHaveBeenCalledWith("test-token", "list-1");
 
-    markViewedRequest.resolve();
-
-    await waitFor(() => {
-      expect(screen.queryByText("New")).toBeNull();
-      expect(screen.queryByText("Done")).toBeNull();
-      expect(screen.queryByText("Bread")).toBeNull();
+    await act(async () => {
+      markViewedRequest.resolve();
+      await markViewedRequest.promise;
     });
+
+    expect(within(getOpenItemsSection()).getByText("New")).toBeTruthy();
+    expect(within(recentlyUsedSection).getByText("Done")).toBeTruthy();
+    expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
   });
 
   it("re-fetches recently used history when an entry update SSE event arrives", async () => {

@@ -5,11 +5,13 @@ import type { ReactElement } from "react";
 import styles from "./RecentlyUsedSection.module.css";
 
 interface RecentlyUsedSectionProps {
+  changedDoneTexts?: ReadonlySet<string>;
   items: Suggestion[];
   onAdd?: (text: string, iconName: string | null, details?: string) => void;
 }
 
 export default function RecentlyUsedSection({
+  changedDoneTexts,
   items,
   onAdd
 }: RecentlyUsedSectionProps): ReactElement | null {
@@ -30,6 +32,7 @@ export default function RecentlyUsedSection({
         {items.map((item) => {
           const resolvedIconName = resolveIconName(item.icon) ?? FALLBACK_ICON_NAME;
           const ItemIcon = ICON_REGISTRY[resolvedIconName] ?? FALLBACK_ICON;
+          const isChangedDone = changedDoneTexts?.has(item.text) ?? false;
 
           return (
             <div key={item.text} className={styles["recently-used-cell"]} data-testid="recently-used-cell">
@@ -47,6 +50,9 @@ export default function RecentlyUsedSection({
                   stroke={1.6}
                 />
                 <span className={styles["recently-used-chip-text"]}>{item.text}</span>
+                {isChangedDone ? (
+                  <span className={styles["recently-used-change-badge"]}>{t("entry.changeDone")}</span>
+                ) : null}
               </button>
             </div>
           );
