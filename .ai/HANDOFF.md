@@ -59,6 +59,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-011 — implement — 2026-05-29T11:45:13Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-011 done after review approval and prepared the reviewed badge-radius and self-done badge fix for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `frontend/src/components/EntryTile/EntryTile.module.css`, `frontend/src/components/EntryTile/EntryTile.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `fix(lists): show done badges for completed items` |
+| Next Role | none |
+
+---
+
 ### T-005 — review — 2026-05-28T16:35:00Z
 
 | Field | Value |
@@ -454,3 +467,27 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Validation | Review passed; no additional validation run during commit_task. |
 | Commit | `fix(lists): place done changed badges in recently used` |
 | Next Role | none |
+
+---
+
+### T-011 — implement — 2026-05-29T09:49:12Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Tightened changed-badge corner radii to match clipped tile corners and kept a Done badge visible immediately when the current user completes an item. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `README.md`, `frontend/src/components/EntryTile/EntryTile.module.css`, `frontend/src/components/EntryTile/EntryTile.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts` |
+| Validation | `npm run test --workspace frontend -- EntryTile RecentlyUsedSection ListDetailPage` failed before implementation on the new badge-radius and self-done assertions, then passed after implementation; `npm run lint` passed with the existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with the existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `fix(lists): show done badges for completed items` |
+| Next Role | review |
+
+### T-011 — review — 2026-05-29T13:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed badge corner radius precision (calc(var(--radius-md) - 1px) top-right, 0 bottom-left) on EntryTile and RecentlyUsedSection, and self-done badge via is_changed:true in toggleStatus optimistic+server paths. |
+| Files Changed | frontend/src/components/EntryTile/EntryTile.module.css, frontend/src/components/EntryTile/EntryTile.test.tsx, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css, frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx, frontend/src/pages/ListDetailPage/useListDetailData.ts, frontend/src/pages/ListDetailPage.test.tsx, README.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |

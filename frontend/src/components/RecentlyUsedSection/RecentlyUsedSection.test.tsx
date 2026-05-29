@@ -62,7 +62,7 @@ describe("RecentlyUsedSection", () => {
 
     expect(cssSource).toMatch(/\.recently-used-chip\s*\{[^}]*position:\s*relative;[^}]*overflow:\s*hidden;/s);
     expect(cssSource).toMatch(
-      /\.recently-used-change-badge\s*\{[^}]*top:\s*0;[^}]*right:\s*0;[^}]*border-radius:\s*0 0 0 999px;/s
+      /\.recently-used-change-badge\s*\{[^}]*top:\s*0;[^}]*right:\s*0;[^}]*border-radius:\s*0 calc\(var\(--radius-md\) - 1px\) 0 0;/s
     );
   });
 });

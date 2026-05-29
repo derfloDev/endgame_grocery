@@ -179,6 +179,33 @@ describe("ListDetailPage optimistic updates", () => {
     expect(updateEntry).toHaveBeenCalledWith("list-1", "entry-1", "test-token", { status: "done" });
   });
 
+  it("shows a Done badge immediately when the current user completes an item", async () => {
+    mockListDetailData({
+      entries: [
+        {
+          id: "entry-1",
+          text: "Milk",
+          status: "open",
+          icon: "IconMilk",
+          created_at: "2026-04-21T00:00:00Z"
+        }
+      ]
+    });
+    updateEntryMock.mockReturnValue(new Promise(() => {}));
+
+    renderListDetailPage();
+
+    expect(await screen.findByText("Milk")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
+
+    await waitFor(() => {
+      expect(within(getOpenItemsSection()).queryByText("Milk")).toBeNull();
+      const recentlyUsedSection = screen.getByRole("region", { name: "Recently Used" });
+      expect(within(recentlyUsedSection).getByText("Milk")).toBeTruthy();
+      expect(within(recentlyUsedSection).getByText("Done")).toBeTruthy();
+    });
+  });
+
   it("reverts a toggled entry when updateEntry rejects", async () => {
     const updateRequest = createDeferred<Awaited<ReturnType<typeof updateEntry>>>();
     mockListDetailData({

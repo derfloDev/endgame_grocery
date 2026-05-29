@@ -385,3 +385,50 @@ Reviewed: 2026-05-29
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-011 — Badge Corner Radius Precision and Self-Done Badge
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-29
+
+#### Findings
+- No issues found. All three fixes are minimal and precise; the self-done badge logic correctly preserves `is_changed: true` across both the optimistic path and the server-result path (including offline-queued).
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria for T-011.
+2. Ran `git diff HEAD --name-only` — confirmed: `EntryTile.module.css`, `EntryTile.test.tsx`, `RecentlyUsedSection.module.css`, `RecentlyUsedSection.test.tsx`, `ListDetailPage.test.tsx`, `useListDetailData.ts`, `README.md`. No unexpected files.
+3. **`EntryTile.module.css`**: `.entry-tile-change-badge` border-radius changed from `0 0 0 999px` → `0 calc(var(--radius-md) - 1px) 0 0`. Top-right matches inner card corner (12px − 1px border = 11px); bottom-left is now 0. ✅
+4. **`RecentlyUsedSection.module.css`**: Same change applied to `.recently-used-change-badge` — `0 calc(var(--radius-md) - 1px) 0 0`. ✅
+5. **`useListDetailData.ts` — `toggleStatus`**:
+   - `isCompletingEntry = nextStatus === "done"` extracted for reuse. ✅
+   - Optimistic entry spreads `...(isCompletingEntry ? { is_changed: true } : {})`. ✅
+   - Server-result (non-queued) path: `{ ...(result.entry as DetailEntry), ...(isCompletingEntry ? { is_changed: true } : {}) }` — overrides server's `is_changed: false`. ✅
+   - Queued path: also adds `is_changed: true`. ✅
+   - Error-rollback reverts to original entry (no badge on failure). ✅
+   - All three existing `nextStatus === "done"` checks refactored to `isCompletingEntry`. ✅
+6. **CSS tests** (`EntryTile.test.tsx`, `RecentlyUsedSection.test.tsx`): regex assertions updated to match `calc(var(--radius-md) - 1px)`. ✅
+7. **`ListDetailPage.test.tsx`**: New test "shows a Done badge immediately when the current user completes an item" — `updateEntry` returns a never-resolving promise to freeze on the optimistic state; asserts Milk leaves open section and appears in recently used with "Done" badge. ✅
+8. **`README.md`**: Updated to add "including items completed locally in the current session". ✅
+9. Ran `npm run test -w @endgame-grocery/frontend -- --run src/components/EntryTile/EntryTile.test.tsx src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx src/pages/ListDetailPage.test.tsx` — **27/27 pass**.
+10. Ran `npm test` (full suite) — **454/454 pass across 33 test files**.
+11. Ran `npm run lint` — pass (0 errors; 1 pre-existing warning).
+
+##### Findings
+- `border-radius: 0 calc(var(--radius-md) - 1px) 0 0` correctly describes top-left:0, top-right:11px, bottom-right:0, bottom-left:0 — the badge aligns flush with the card's inner corner. ✅
+- The self-done `is_changed: true` override is applied after spreading `result.entry`, so the server's authoritative value for all other fields is respected while only this local UX state is preserved. ✅
+- Error rollback does not include the `is_changed: true` override — if the toggle fails the optimistic state is discarded, which is correct behaviour. ✅
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

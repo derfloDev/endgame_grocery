@@ -229,7 +229,13 @@ export function useListDetailData({
   const toggleStatus = useCallback(
     async (entry: DetailEntry): Promise<void> => {
       const nextStatus: Entry["status"] = entry.status === "open" ? "done" : "open";
-      const optimisticEntry: DetailEntry = { ...entry, status: nextStatus, is_pending_sync: true };
+      const isCompletingEntry = nextStatus === "done";
+      const optimisticEntry: DetailEntry = {
+        ...entry,
+        status: nextStatus,
+        is_pending_sync: true,
+        ...(isCompletingEntry ? { is_changed: true } : {})
+      };
 
       await updateEntries((currentEntries) =>
         sortEntries(
@@ -237,7 +243,7 @@ export function useListDetailData({
         )
       );
 
-      if (nextStatus === "done") {
+      if (isCompletingEntry) {
         setRecentlyUsed((currentItems) => upsertRecentlyUsedItems(currentItems, entry));
       }
 
@@ -251,14 +257,23 @@ export function useListDetailData({
               currentEntry.id === entry.id
                 ? {
                     ...currentEntry,
-                    ...(result?.queued ? { is_pending_sync: true, status: nextStatus } : (result.entry as DetailEntry))
+                    ...(result?.queued
+                      ? {
+                          is_pending_sync: true,
+                          status: nextStatus,
+                          ...(isCompletingEntry ? { is_changed: true } : {})
+                        }
+                      : {
+                          ...(result.entry as DetailEntry),
+                          ...(isCompletingEntry ? { is_changed: true } : {})
+                        })
                   }
                 : currentEntry
             )
           )
         );
 
-        if (nextStatus === "done" && !result?.queued) {
+        if (isCompletingEntry && !result?.queued) {
           setRecentlyUsed((currentItems) =>
             upsertRecentlyUsedItems(currentItems, result?.entry ?? entry)
           );
@@ -268,7 +283,7 @@ export function useListDetailData({
           sortEntries(currentEntries.map((currentEntry) => (currentEntry.id === entry.id ? entry : currentEntry)))
         );
 
-        if (nextStatus === "done") {
+        if (isCompletingEntry) {
           setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== entry.text));
         }
 

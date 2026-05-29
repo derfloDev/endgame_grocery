@@ -55,7 +55,7 @@ describe("EntryTile", () => {
 
     expect(cssSource).toMatch(/\.entry-tile\s*\{[^}]*overflow:\s*hidden;/s);
     expect(cssSource).toMatch(
-      /\.entry-tile-change-badge\s*\{[^}]*top:\s*0;[^}]*right:\s*0;[^}]*border-radius:\s*0 0 0 999px;/s
+      /\.entry-tile-change-badge\s*\{[^}]*top:\s*0;[^}]*right:\s*0;[^}]*border-radius:\s*0 calc\(var\(--radius-md\) - 1px\) 0 0;/s
     );
     expect(cssSource).not.toMatch(/transform:\s*translate\(50%,\s*-50%\);/);
   });
