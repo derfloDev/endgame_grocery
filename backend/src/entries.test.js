@@ -18,14 +18,18 @@ describe("entry routes", () => {
   it("returns entries with icon values for accessible lists", async () => {
     let callCount = 0;
     const pool = {
-      async query(sql) {
+      async query(sql, params) {
         callCount += 1;
 
         if (callCount === 1) {
           return { rows: [{ id: "list-1" }] };
         }
 
-        assert.match(sql, /SELECT id, list_id, text, status, icon, details, created_at, updated_at/);
+        assert.match(sql, /SELECT\s+e\.id,\s+e\.list_id,\s+e\.text,\s+e\.status,\s+e\.icon,\s+e\.details,\s+e\.created_at,\s+e\.updated_at,\s+e\.last_updated_by,/);
+        assert.match(sql, /LEFT JOIN list_views lv/);
+        assert.match(sql, /lv\.last_viewed_at IS NOT NULL/);
+        assert.match(sql, /AS is_changed/);
+        assert.deepEqual(params, ["list-1", "user-1"]);
 
         return {
           rows: [
@@ -35,7 +39,8 @@ describe("entry routes", () => {
               text: "Milk",
               status: "open",
               icon: "🥛",
-              details: "2L"
+              details: "2L",
+              is_changed: true
             },
             {
               id: "entry-2",
@@ -43,7 +48,8 @@ describe("entry routes", () => {
               text: "Bread",
               status: "done",
               icon: null,
-              details: null
+              details: null,
+              is_changed: false
             }
           ]
         };
@@ -55,8 +61,8 @@ describe("entry routes", () => {
     assert.equal(response.status, 200);
     assert.equal(response.body.entries.length, 2);
     assert.deepEqual(response.body.entries, [
-      { id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛", details: "2L" },
-      { id: "entry-2", list_id: "list-1", text: "Bread", status: "done", icon: null, details: null }
+      { id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛", details: "2L", is_changed: true },
+      { id: "entry-2", list_id: "list-1", text: "Bread", status: "done", icon: null, details: null, is_changed: false }
     ]);
   });
 
@@ -78,8 +84,8 @@ describe("entry routes", () => {
         }
 
         if (callCount === 3) {
-          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details\)/);
-          assert.deepEqual(params, ["list-1", "Milk", "🥛", null]);
+          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details, last_updated_by\)/);
+          assert.deepEqual(params, ["list-1", "Milk", "🥛", null, "user-1"]);
 
           return {
             rows: [
@@ -146,8 +152,8 @@ describe("entry routes", () => {
         }
 
         if (callCount === 3) {
-          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details\)/);
-          assert.deepEqual(params, ["list-1", "Milk", null, null]);
+          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details, last_updated_by\)/);
+          assert.deepEqual(params, ["list-1", "Milk", null, null, "user-1"]);
 
           return {
             rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: null, details: null }]
@@ -197,8 +203,8 @@ describe("entry routes", () => {
         }
 
         if (callCount === 3) {
-          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details\)/);
-          assert.deepEqual(params, ["list-1", "Milk", "🥛", "2L"]);
+          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details, last_updated_by\)/);
+          assert.deepEqual(params, ["list-1", "Milk", "🥛", "2L", "user-1"]);
 
           return {
             rows: [
@@ -297,7 +303,8 @@ describe("entry routes", () => {
 
         if (callCount === 3) {
           assert.match(sql, /UPDATE entries/);
-          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "entry-1", "list-1"]);
+          assert.match(sql, /last_updated_by = \$6/);
+          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "user-1", "entry-1", "list-1"]);
 
           return {
             rows: [
@@ -360,7 +367,7 @@ describe("entry routes", () => {
 
         if (callCount === 4) {
           assert.match(sql, /UPDATE entries/);
-          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "entry-1", "list-1"]);
+          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "user-1", "entry-1", "list-1"]);
 
           return {
             rows: [
@@ -407,7 +414,7 @@ describe("entry routes", () => {
 
         if (callCount === 2) {
           assert.match(sql, /UPDATE entries/);
-          assert.deepEqual(params, ["Oat milk", "open", null, false, null, "entry-1", "list-1"]);
+          assert.deepEqual(params, ["Oat milk", "open", null, false, null, "user-1", "entry-1", "list-1"]);
 
           return {
             rows: [{ id: "entry-1", list_id: "list-1", text: "Oat milk", status: "open", icon: null, details: null }]
@@ -441,7 +448,7 @@ describe("entry routes", () => {
         }
 
         assert.match(sql, /icon = COALESCE\(\$3, icon\)/);
-        assert.deepEqual(params, [null, null, "🥛", false, null, "entry-1", "list-1"]);
+        assert.deepEqual(params, [null, null, "🥛", false, null, "user-1", "entry-1", "list-1"]);
 
         return {
           rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛", details: null }]
@@ -471,7 +478,7 @@ describe("entry routes", () => {
         }
 
         assert.match(sql, /details = CASE WHEN \$4 THEN \$5 ELSE details END/);
-        assert.deepEqual(params, [null, "open", null, true, "1kg", "entry-1", "list-1"]);
+        assert.deepEqual(params, [null, "open", null, true, "1kg", "user-1", "entry-1", "list-1"]);
 
         return {
           rows: [{ id: "entry-1", list_id: "list-1", text: "Rice", status: "open", icon: null, details: "1kg" }]
@@ -501,7 +508,7 @@ describe("entry routes", () => {
           return { rows: [{ id: "list-1" }] };
         }
 
-        assert.deepEqual(params, ["Rice", "open", null, false, null, "entry-1", "list-1"]);
+        assert.deepEqual(params, ["Rice", "open", null, false, null, "user-1", "entry-1", "list-1"]);
 
         return {
           rows: [
@@ -540,7 +547,7 @@ describe("entry routes", () => {
           return { rows: [{ id: "list-1" }] };
         }
 
-        assert.deepEqual(params, [null, "open", null, true, null, "entry-1", "list-1"]);
+        assert.deepEqual(params, [null, "open", null, true, null, "user-1", "entry-1", "list-1"]);
 
         return {
           rows: [{ id: "entry-1", list_id: "list-1", text: "Rice", status: "open", icon: null, details: null }]

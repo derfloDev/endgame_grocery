@@ -5,6 +5,7 @@ import { enqueuePushJob, processPendingPushJobs, startPushWorker } from "./worke
 describe("push worker", () => {
   it("enqueues a new push job when none exists", async () => {
     const queries = [];
+    const loggerEntries = [];
     const pool = {
       async query(text, params) {
         queries.push([normalizeSql(text), params]);
@@ -22,6 +23,7 @@ describe("push worker", () => {
       listId: "list-1",
       actorUserId: "user-1",
       entryText: "Milk",
+      logger: createLoggerSpy(loggerEntries),
       now: new Date("2026-04-28T10:00:00Z")
     });
 
@@ -33,6 +35,57 @@ describe("push worker", () => {
       "user-1",
       new Date("2026-04-28T10:05:00.000Z"),
       ["Milk"]
+    ]);
+    assert.deepEqual(loggerEntries, [
+      {
+        level: "info",
+        message: "Push job enqueued",
+        fields: {
+          listId: "list-1",
+          actorUserId: "user-1",
+          fireAt: new Date("2026-04-28T10:05:00.000Z"),
+          itemCount: 1
+        }
+      }
+    ]);
+  });
+
+  it("logs and returns early when VAPID configuration is incomplete", async () => {
+    const loggerEntries = [];
+    let queryCalled = false;
+    let vapidConfigured = false;
+
+    await processPendingPushJobs({
+      pool: {
+        async query() {
+          queryCalled = true;
+          return { rows: [] };
+        }
+      },
+      config: {
+        vapidPublicKey: "",
+        vapidPrivateKey: "private-key",
+        vapidContact: ""
+      },
+      logger: createLoggerSpy(loggerEntries),
+      webpushLib: {
+        setVapidDetails() {
+          vapidConfigured = true;
+        },
+        async sendNotification() {}
+      }
+    });
+
+    assert.equal(queryCalled, false);
+    assert.equal(vapidConfigured, false);
+    assert.deepEqual(loggerEntries, [
+      {
+        level: "warn",
+        message: "Push worker skipped because VAPID configuration is incomplete",
+        fields: {
+          missingConfig: ["vapidPublicKey", "vapidContact"]
+        }
+      }
     ]);
   });
 
@@ -125,13 +178,56 @@ describe("push worker", () => {
       }
     });
     assert.equal(sentNotifications[0].payload.title, "Weekly groceries");
-    assert.equal(sentNotifications[0].payload.body, "Milk und 2 weitere Artikel");
+    assert.equal(sentNotifications[0].payload.body, "Milk and 2 more items");
     assert.equal(sentNotifications[0].payload.listId, "list-1");
     assert.deepEqual(deletedEndpoints, []);
     assert.ok(queries.some(([sql]) => /recipient\.user_id\s+<>\s+\$2/.test(sql)));
     assert.ok(queries.some(([sql]) => /DELETE FROM pending_push_jobs/.test(sql)));
     assert.ok(queries.some(([sql]) => /INSERT INTO push_cooldowns/.test(sql)));
     assert.deepEqual(loggerEntries, [
+      {
+        level: "debug",
+        message: "Push worker tick loaded due jobs",
+        fields: {
+          dueJobCount: 1
+        }
+      },
+      {
+        level: "info",
+        message: "Push job fired",
+        fields: {
+          jobId: "job-1",
+          listId: "list-1"
+        }
+      },
+      {
+        level: "info",
+        message: "Push recipients found",
+        fields: {
+          jobId: "job-1",
+          listId: "list-1",
+          recipientCount: 1
+        }
+      },
+      {
+        level: "info",
+        message: "Push subscriptions targeted",
+        fields: {
+          jobId: "job-1",
+          listId: "list-1",
+          subscriptionCount: 1
+        }
+      },
+      {
+        level: "info",
+        message: "Push notifications sent",
+        fields: {
+          jobId: "job-1",
+          listId: "list-1",
+          notificationsSent: 1,
+          subscriptionsExpired: 0
+        }
+      },
       {
         level: "info",
         message: "Push job processed",
@@ -200,10 +296,221 @@ describe("push worker", () => {
     assert.deepEqual(loggerEntries, [
       {
         level: "debug",
+        message: "Push worker tick loaded due jobs",
+        fields: {
+          dueJobCount: 1
+        }
+      },
+      {
+        level: "info",
+        message: "Push job fired",
+        fields: {
+          jobId: "job-2",
+          listId: "list-1"
+        }
+      },
+      {
+        level: "debug",
         message: "Push job skipped because cooldown is active",
         fields: {
           jobId: "job-2",
           listId: "list-1"
+        }
+      }
+    ]);
+  });
+
+  it("logs and deletes jobs when no recipients are available", async () => {
+    const loggerEntries = [];
+    let deletedJobId = null;
+    const pool = {
+      async query(text, params) {
+        if (text.includes("SELECT id, list_id, actor_user_id, items")) {
+          return {
+            rows: [
+              {
+                id: "job-no-recipients",
+                list_id: "list-1",
+                actor_user_id: "user-1",
+                items: ["Eggs"]
+              }
+            ]
+          };
+        }
+
+        if (text.includes("FROM push_cooldowns")) {
+          return { rows: [] };
+        }
+
+        if (text.includes("FROM lists l")) {
+          return { rows: [] };
+        }
+
+        if (text.includes("DELETE FROM pending_push_jobs")) {
+          deletedJobId = params[0];
+        }
+
+        return { rows: [] };
+      }
+    };
+
+    await processPendingPushJobs({
+      pool,
+      config: {
+        vapidPublicKey: "public-key",
+        vapidPrivateKey: "private-key",
+        vapidContact: "mailto:test@example.com"
+      },
+      logger: createLoggerSpy(loggerEntries),
+      webpushLib: {
+        setVapidDetails() {},
+        async sendNotification() {
+          throw new Error("No notification should be sent");
+        }
+      },
+      now: () => new Date("2026-04-28T10:00:00Z")
+    });
+
+    assert.equal(deletedJobId, "job-no-recipients");
+    assert.deepEqual(loggerEntries, [
+      {
+        level: "debug",
+        message: "Push worker tick loaded due jobs",
+        fields: {
+          dueJobCount: 1
+        }
+      },
+      {
+        level: "info",
+        message: "Push job fired",
+        fields: {
+          jobId: "job-no-recipients",
+          listId: "list-1"
+        }
+      },
+      {
+        level: "info",
+        message: "Push job skipped because no recipients are available",
+        fields: {
+          jobId: "job-no-recipients",
+          listId: "list-1"
+        }
+      }
+    ]);
+  });
+
+  it("logs when recipients have no push subscriptions", async () => {
+    const loggerEntries = [];
+    let sendCalled = false;
+    const pool = {
+      async query(text) {
+        if (text.includes("SELECT id, list_id, actor_user_id, items")) {
+          return {
+            rows: [
+              {
+                id: "job-no-subscriptions",
+                list_id: "list-1",
+                actor_user_id: "user-1",
+                items: ["Eggs"]
+              }
+            ]
+          };
+        }
+
+        if (text.includes("FROM push_cooldowns")) {
+          return { rows: [] };
+        }
+
+        if (text.includes("FROM lists l")) {
+          return {
+            rows: [
+              {
+                list_name: "Weekly groceries",
+                actor_name: "Demo User",
+                user_id: "user-2"
+              }
+            ]
+          };
+        }
+
+        if (text.includes("FROM push_subscriptions")) {
+          return { rows: [] };
+        }
+
+        return { rows: [] };
+      }
+    };
+
+    await processPendingPushJobs({
+      pool,
+      config: {
+        vapidPublicKey: "public-key",
+        vapidPrivateKey: "private-key",
+        vapidContact: "mailto:test@example.com"
+      },
+      logger: createLoggerSpy(loggerEntries),
+      webpushLib: {
+        setVapidDetails() {},
+        async sendNotification() {
+          sendCalled = true;
+        }
+      },
+      now: () => new Date("2026-04-28T10:00:00Z")
+    });
+
+    assert.equal(sendCalled, false);
+    assert.deepEqual(loggerEntries, [
+      {
+        level: "debug",
+        message: "Push worker tick loaded due jobs",
+        fields: {
+          dueJobCount: 1
+        }
+      },
+      {
+        level: "info",
+        message: "Push job fired",
+        fields: {
+          jobId: "job-no-subscriptions",
+          listId: "list-1"
+        }
+      },
+      {
+        level: "info",
+        message: "Push recipients found",
+        fields: {
+          jobId: "job-no-subscriptions",
+          listId: "list-1",
+          recipientCount: 1
+        }
+      },
+      {
+        level: "info",
+        message: "Push job has no subscriptions to notify",
+        fields: {
+          jobId: "job-no-subscriptions",
+          listId: "list-1",
+          recipientCount: 1
+        }
+      },
+      {
+        level: "info",
+        message: "Push notifications sent",
+        fields: {
+          jobId: "job-no-subscriptions",
+          listId: "list-1",
+          notificationsSent: 0,
+          subscriptionsExpired: 0
+        }
+      },
+      {
+        level: "info",
+        message: "Push job processed",
+        fields: {
+          jobId: "job-no-subscriptions",
+          listId: "list-1",
+          notificationsSent: 0,
+          subscriptionsExpired: 0
         }
       }
     ]);
@@ -300,10 +607,53 @@ describe("push worker", () => {
         }
       },
       {
+        level: "debug",
+        message: "Push worker tick loaded due jobs",
+        fields: {
+          dueJobCount: 1
+        }
+      },
+      {
+        level: "info",
+        message: "Push job fired",
+        fields: {
+          jobId: "job-3",
+          listId: "list-2"
+        }
+      },
+      {
+        level: "info",
+        message: "Push recipients found",
+        fields: {
+          jobId: "job-3",
+          listId: "list-2",
+          recipientCount: 1
+        }
+      },
+      {
+        level: "info",
+        message: "Push subscriptions targeted",
+        fields: {
+          jobId: "job-3",
+          listId: "list-2",
+          subscriptionCount: 1
+        }
+      },
+      {
         level: "info",
         message: "Push subscription expired",
         fields: {
           endpoint: "https://push.example.com/subscriptions/1234567890abcdefghijk"
+        }
+      },
+      {
+        level: "info",
+        message: "Push notifications sent",
+        fields: {
+          jobId: "job-3",
+          listId: "list-2",
+          notificationsSent: 0,
+          subscriptionsExpired: 1
         }
       },
       {
@@ -334,6 +684,9 @@ function createLoggerSpy(entries) {
     },
     error(fields, message) {
       entries.push({ level: "error", message, fields: fields ?? {} });
+    },
+    warn(fields, message) {
+      entries.push({ level: "warn", message, fields: fields ?? {} });
     }
   };
 }

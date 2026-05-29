@@ -63,6 +63,7 @@ describe("vite worker config", () => {
     expect(serviceWorkerSource).toMatch(/const precacheManifest = self\.__WB_MANIFEST/);
     expect(serviceWorkerSource).toMatch(/precacheAndRoute\(precacheManifest \|\| \[\]\)/);
     expect(serviceWorkerSource).toMatch(/addEventListener\(["']push["']/);
+    expect(serviceWorkerSource).toMatch(/console\.log\(["']Push event received["']/);
     expect(serviceWorkerSource).toMatch(/showNotification/);
     expect(serviceWorkerSource).toMatch(/addEventListener\(["']notificationclick["']/);
   });

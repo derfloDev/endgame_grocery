@@ -86,6 +86,8 @@ During local development, the frontend Vite server proxies `/api` requests to `h
 
 The Vite PWA plugin also enables the module service worker in dev mode, so localhost can exercise the same push-subscription flow as production. After updating the service worker code or switching branches, reload the page once before retesting push notifications so the browser picks up the latest dev worker.
 
+In production, the protected app shell shows a dismissible update banner when a new service worker version is waiting. Use the banner's reload action to activate the new version immediately; dismissing it hides the prompt for the current browser session.
+
 The frontend initializes i18next before React renders, detects English or German from local storage and the browser, and keeps the document `<html lang>` attribute aligned with the active language. Translation catalogs live in `frontend/src/locales/{en,de}/translation.json` and are delivered through Vite code splitting; JSON assets are included in the service worker precache patterns for offline-first locale support.
 
 ### 7. Generate VAPID keys for push notifications (optional)
@@ -118,6 +120,7 @@ VAPID_CONTACT=mailto:you@example.com
 - `VAPID_PRIVATE_KEY` is a secret — treat it like a password and never commit it to version control.
 - `VAPID_CONTACT` must be a reachable `mailto:` address (or a URL). Push services use it to contact you if your endpoint misbehaves. Use a real address in production.
 - If `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, or `VAPID_CONTACT` are missing, the backend starts normally but the push worker logs a warning and skips delivery. Users can still use the app; they simply will not receive push notifications.
+- Push delivery logs include job enqueue/fire events, recipient and subscription counts, sent counts, and expired subscription cleanup so production notification issues can be traced from the backend logs.
 
 ### 8. Verify the setup
 
@@ -264,6 +267,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - API documentation is available as Swagger UI at `GET /api/docs/`; `GET /api/docs` redirects there so relative Swagger UI assets load correctly. The raw OpenAPI 3.1 YAML is served from `GET /api/docs/openapi.yaml`.
 - When a browser still has a valid JWT but has lost the cached `endgame_grocery.auth_user` entry, the frontend rehydrates `display_name` and `email` from `GET /api/auth/me` so the Info & Settings sheet still shows the signed-in identity after reload.
 - Lists support create, rename, delete, ownership, and shared-access visibility.
+- Shared lists track each user's last viewed timestamp. `GET /api/lists` includes `changed_count`, `GET /api/lists/:id/entries` includes `is_changed`, and `POST /api/lists/:id/mark-viewed` records the open so badges disappear on the next list load; changes made by the current user are not counted. Changed done entries stay out of Open Items and appear in Recently Used with a Done badge, including items completed locally in the current session.
 - The overview refetches lists when list rename/delete SSE events arrive, and the list detail page refetches the active list's entries or members when matching entry/member SSE events arrive over `GET /api/events?token=<jwt>`.
 - The authenticated frontend keeps one shared SSE connection open while a JWT is present, then closes it again on logout so pages can subscribe to list-scoped events without creating their own connections.
 - The list detail view uses a sticky top bar, a more-options flyout for rename and sharing, a bottom-sheet add-item flow with an overlaid autocomplete suggestion dropdown that anchors to the input, an inline icon preview to the right of the field, a smoothly sliding icon browser, outside-tap dismissal, swipe-to-delete entry rows with optional detail text, and a recently used panel that updates immediately when items are completed and preserves optional details when re-adding history items.

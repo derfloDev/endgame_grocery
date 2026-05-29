@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "./recentlyUsedState";
+import { filterRecentlyUsedItems, getRecentlyUsedDisplayState, upsertRecentlyUsedItems } from "./recentlyUsedState";
 
 describe("recentlyUsedState", () => {
   it("prepends a new item and caps the list at 20", () => {
@@ -86,6 +86,27 @@ describe("recentlyUsedState", () => {
 
     expect(filterRecentlyUsedItems(historyItems, entries)).toEqual([
       { text: "Bread", icon: "IconBread", useCount: 2 }
+    ]);
+  });
+
+  it("surfaces changed done entries in recently used without duplicating history", () => {
+    const displayState = getRecentlyUsedDisplayState(
+      [
+        { text: "Bread", icon: "IconBread", useCount: 2 },
+        { text: "Tomatoes", icon: "IconSalad", useCount: 7 },
+        { text: "Milk", icon: "IconMilk", useCount: 1 }
+      ],
+      [
+        { text: "Milk", status: "open", icon: "IconMilk" },
+        { text: "Bread", status: "done", icon: "IconBread", details: "Sourdough", is_changed: true }
+      ],
+      [{ text: "Milk", status: "open" }]
+    );
+
+    expect(displayState.changedDoneTexts.has("Bread")).toBe(true);
+    expect(displayState.visibleRecentlyUsed).toEqual([
+      { text: "Bread", icon: "IconBread", details: "Sourdough" },
+      { text: "Tomatoes", icon: "IconSalad", useCount: 7 }
     ]);
   });
 });

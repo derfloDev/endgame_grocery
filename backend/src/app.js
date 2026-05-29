@@ -17,7 +17,7 @@ import sharingRoutes from "./routes/sharing.js";
 import { sseManager as defaultSseManager } from "./sseManager.js";
 import testRoutes from "./routes/testRouter.js";
 import v1Routes from "./routes/v1.js";
-import { startPushWorker } from "./workers/pushWorker.js";
+import { getMissingVapidConfigFields, startPushWorker } from "./workers/pushWorker.js";
 
 export function createApp(options = {}) {
   const app = express();
@@ -105,7 +105,21 @@ export function createApp(options = {}) {
   });
 
   if (shouldStartWorkers) {
-    startPushWorker(options);
+    const missingConfig = getMissingVapidConfigFields(config);
+
+    if (missingConfig.length) {
+      logger.warn(
+        { missingConfig },
+        "Push notifications disabled because VAPID configuration is incomplete"
+      );
+    }
+
+    startPushWorker({
+      ...options,
+      config,
+      logger,
+      pool
+    });
   }
 
   return app;

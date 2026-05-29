@@ -75,6 +75,15 @@ describe("icon registry and database", () => {
     expect(EXACT_MATCH_MAP.protein).toBe("BicepsFlexed");
   });
 
+  it("routes new custom icon database terms to their dedicated icons", () => {
+    expect(EXACT_MATCH_MAP["spülmaschinentabs"]).toBe("CustomDishwasherTabs");
+    expect(EXACT_MATCH_MAP.nutella).toBe("CustomNutNougatCream");
+    expect(EXACT_MATCH_MAP.aufstrich).toBe("CustomNutNougatCream");
+    expect(EXACT_MATCH_MAP.maultaschen).toBe("CustomMaultaschen");
+    expect(EXACT_MATCH_MAP.petersilie).toBe("CustomHerbs");
+    expect(EXACT_MATCH_MAP.nutella).not.toBe("CustomJam");
+  });
+
   it("includes all expanded T-006 icon entries in the exact match map", () => {
     const expectedMatches = {
       socken: "IconSock",

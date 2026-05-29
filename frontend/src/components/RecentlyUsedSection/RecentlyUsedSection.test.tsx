@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -40,5 +42,27 @@ describe("RecentlyUsedSection", () => {
     const icon = screen.getByRole("button", { name: "Bread" }).querySelector("[data-icon-name]");
     expect(icon).toBeTruthy();
     expect(icon?.getAttribute("data-icon-name")).toBe("IconShoppingCart");
+  });
+
+  it("renders changed done badges inside recently used chips", () => {
+    render(
+      <RecentlyUsedSection
+        changedDoneTexts={new Set(["Bread"])}
+        items={[{ text: "Bread", icon: "IconBread" }]}
+        onAdd={vi.fn()}
+      />
+    );
+
+    const chip = screen.getByRole("button", { name: "Bread" });
+    expect(within(chip).getByText("Done").className).toContain("recently-used-change-badge");
+  });
+
+  it("positions changed badges inside recently used chip corners", () => {
+    const cssSource = readFileSync(resolve(import.meta.dirname, "RecentlyUsedSection.module.css"), "utf8");
+
+    expect(cssSource).toMatch(/\.recently-used-chip\s*\{[^}]*position:\s*relative;[^}]*overflow:\s*hidden;/s);
+    expect(cssSource).toMatch(
+      /\.recently-used-change-badge\s*\{[^}]*top:\s*0;[^}]*right:\s*0;[^}]*border-radius:\s*0 calc\(var\(--radius-md\) - 1px\) 0 0;/s
+    );
   });
 });

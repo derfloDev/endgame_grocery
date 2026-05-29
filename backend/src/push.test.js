@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
 
@@ -11,6 +12,7 @@ function createAuthedApp(pool, options = {}) {
       ...options.config
     },
     startWorkers: false,
+    logger: options.logger,
     requireAuthMiddleware(req, _res, next) {
       req.user = { sub: "user-1" };
       next();
@@ -30,6 +32,7 @@ describe("push routes", () => {
   });
 
   it("stores a push subscription for the authenticated user", async () => {
+    const { logger, getEntries } = createLogCapture();
     let insertParams = null;
     const pool = {
       async query(text, params) {
@@ -39,7 +42,7 @@ describe("push routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).post("/api/push/subscribe").send({
+    const response = await request(createAuthedApp(pool, { logger })).post("/api/push/subscribe").send({
       endpoint: "https://push.example.com/subscriptions/1",
       keys: {
         p256dh: "p256dh-key",
@@ -55,9 +58,15 @@ describe("push routes", () => {
       "p256dh-key",
       "auth-key"
     ]);
+
+    const subscriptionLog = getEntries().find((entry) => entry.msg === "Push subscription saved");
+
+    assert.equal(subscriptionLog.userId, "user-1");
+    assert.equal(subscriptionLog.endpoint, "https://push.example.com/subscriptions/1");
   });
 
   it("removes a stored push subscription", async () => {
+    const { logger, getEntries } = createLogCapture();
     let deleteParams = null;
     const pool = {
       async query(text, params) {
@@ -67,11 +76,32 @@ describe("push routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool))
+    const response = await request(createAuthedApp(pool, { logger }))
       .delete("/api/push/subscribe")
       .send({ endpoint: "https://push.example.com/subscriptions/1" });
 
     assert.equal(response.status, 204);
     assert.deepEqual(deleteParams, ["user-1", "https://push.example.com/subscriptions/1"]);
+
+    const subscriptionLog = getEntries().find((entry) => entry.msg === "Push subscription removed");
+
+    assert.equal(subscriptionLog.userId, "user-1");
+    assert.equal(subscriptionLog.endpoint, "https://push.example.com/subscriptions/1");
   });
 });
+
+function createLogCapture() {
+  const lines = [];
+  const logger = pino({ level: "trace", base: null }, {
+    write(chunk) {
+      lines.push(chunk.trim());
+    }
+  });
+
+  return {
+    logger,
+    getEntries() {
+      return lines.filter(Boolean).map((line) => JSON.parse(line));
+    }
+  };
+}

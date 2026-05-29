@@ -16,21 +16,23 @@ const moduleComponents = [
   "NewListSheet",
   "RecentlyUsedSection",
   "RenameListSheet",
-  "ShareListSheet"
+  "ShareListSheet",
+  "UpdateBanner"
 ];
 
 const moduleClasses = {
   AddItemSheet: ["add-item-form", "add-item-form--browser-open", "add-item-icon-browser-grid--browser-open"],
   AutocompleteSuggestions: ["autocomplete-suggestions", "autocomplete-chip"],
-  EntryTile: ["entry-tile", "entry-tile--done", "entry-tile-chip"],
+  EntryTile: ["entry-tile", "entry-tile--done", "entry-tile-chip", "entry-tile-change-badge"],
   InfoSheet: ["info-sheet-section", "info-sheet-logout", "info-sheet-donate"],
   LanguageSwitcher: ["language-switcher", "language-switcher-button", "language-switcher-button-active"],
-  ListCardHome: ["list-card-home", "list-card-row", "list-card-menu-actions"],
+  ListCardHome: ["list-card-home", "list-card-row", "list-card-menu-actions", "list-card-change-badge"],
   ListOptionsSheet: ["list-options-sheet", "list-option-row", "list-option-icon-share"],
   NewListSheet: ["new-list-form"],
   RecentlyUsedSection: ["recently-used-section", "recently-used-grid", "recently-used-chip"],
   RenameListSheet: ["rename-list-form"],
-  ShareListSheet: ["share-list-form", "member-row", "share-invite-spinner"]
+  ShareListSheet: ["share-list-form", "member-row", "share-invite-spinner"],
+  UpdateBanner: ["update-banner", "update-banner-actions", "update-banner-dismiss"]
 } as const;
 
 describe("feature component CSS module layout", () => {

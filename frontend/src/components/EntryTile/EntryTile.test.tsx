@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../i18n";
@@ -35,6 +37,27 @@ describe("EntryTile", () => {
     render(<EntryTile entry={{ id: "entry-2c", text: "Bread", status: "open", icon: null }} />);
 
     expect(screen.queryByText("Whole grain")).toBeNull();
+  });
+
+  it("renders changed entry badges", () => {
+    render(
+      <EntryTile
+        changeKind="edited"
+        entry={{ id: "entry-2d", text: "Bread", status: "open", icon: null, is_changed: true }}
+      />
+    );
+
+    expect(screen.getByText("Edited").className).toContain("entry-tile-change-badge");
+  });
+
+  it("positions changed badges inside the tile corner", () => {
+    const cssSource = readFileSync(resolve(import.meta.dirname, "EntryTile.module.css"), "utf8");
+
+    expect(cssSource).toMatch(/\.entry-tile\s*\{[^}]*overflow:\s*hidden;/s);
+    expect(cssSource).toMatch(
+      /\.entry-tile-change-badge\s*\{[^}]*top:\s*0;[^}]*right:\s*0;[^}]*border-radius:\s*0 calc\(var\(--radius-md\) - 1px\) 0 0;/s
+    );
+    expect(cssSource).not.toMatch(/transform:\s*translate\(50%,\s*-50%\);/);
   });
 
   it("calls onToggle on a short tap", async () => {

@@ -198,6 +198,18 @@ describe("AddItemSheet", () => {
     expect(onAdd).toHaveBeenCalledWith("Reis", null, "500 g");
   });
 
+  it("submits the title input with Enter and exposes a done keyboard action", () => {
+    const onAdd = vi.fn();
+    render(<AddItemSheet listId="list-1" open onAdd={onAdd} onClose={vi.fn()} />);
+
+    const titleInput = screen.getByLabelText("Add item");
+    fireEvent.change(titleInput, { target: { value: "Reis" } });
+    fireEvent.keyDown(titleInput, { key: "Enter" });
+
+    expect(titleInput.getAttribute("enterkeyhint")).toBe("done");
+    expect(onAdd).toHaveBeenCalledWith("Reis", null, "");
+  });
+
   it("supports edit mode with prefilled text and icon state", async () => {
     const onAdd = vi.fn();
     const { container } = render(

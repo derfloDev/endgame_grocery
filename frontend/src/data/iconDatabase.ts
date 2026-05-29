@@ -61,6 +61,7 @@ export const ICON_DB: readonly IconDbEntry[] = [
   { label: "broccoli", icon: "IconLeaf", tags: ["brokkoli", "broccoli florets", "green vegetable", "gemüse", "gemuese"] },
   { label: "corn", icon: "IconLeaf2", tags: ["mais", "sweetcorn", "corn cob", "maiskolben", "popcorn mais"] },
   { label: "plant", icon: "IconPlant", tags: ["pflanze", "blume", "houseplant", "topfpflanze", "flower"] },
+  { label: "herbs", icon: "CustomHerbs", tags: ["kräuter", "krauter", "kräuterbund", "kraeuter", "petersilie", "rosmarin", "basilikum", "thymian", "schnittlauch", "minze", "dill", "koriander", "fresh herbs", "herb bunch", "frische kräuter", "gewürzkräuter"] },
   { label: "spinach", icon: "IconLeaf", tags: ["spinat", "babyspinat", "blattspinat", "spinach leaves", "leafy greens"] },
   { label: "pumpkin", icon: "IconSalad", tags: ["kürbis", "kuerbis", "hokkaido", "butternut", "pumpkins"] },
   { label: "wheat", icon: "IconWheat", tags: ["weizen", "grain", "getreide", "wheat flour", "weizenkorn"] },
@@ -142,6 +143,7 @@ export const ICON_DB: readonly IconDbEntry[] = [
   { label: "detergent", icon: "CustomDetergent", tags: ["waschmittel", "laundry detergent", "colorwaschmittel", "vollwaschmittel", "waschmittel pods", "waschpulver", "waschmittelkapseln", "laundry", "washing powder"] },
   { label: "fabric softener", icon: "CustomFabricSoftener", tags: ["weichspüler", "weichspueler", "wäschespüler", "waeschespueler", "wäscheweichspüler", "waescheweichspueler", "softener", "lenor", "fabric conditioner"] },
   { label: "dish soap", icon: "IconWash", tags: ["spülmittel", "spuelmittel", "dishwashing liquid", "dish detergent", "hand dish soap"] },
+  { label: "dishwasher tabs", icon: "CustomDishwasherTabs", tags: ["spülmaschinentabs", "spülmaschinentab", "spuelmaschinentabs", "geschirrspültabs", "geschirrspueltabs", "tabs", "finish tabs", "dishwasher tablet", "dishwasher pod", "spülmittel tabs", "spuelmittel tabs"] },
   { label: "soap", icon: "IconWash", tags: ["seife", "soap bar", "stückseife", "stueckseife", "body soap"] },
   { label: "hand soap", icon: "CustomHandSoap", tags: ["handseife", "liquid soap", "flüssigseife", "fluessigseife", "seifenspender", "soap dispenser"] },
   { label: "sponge", icon: "CustomSponge", tags: ["schwamm", "cleaning sponge", "spülschwamm", "spuelschwamm", "abwaschwamm", "dish sponge"] },
@@ -179,7 +181,7 @@ export const ICON_DB: readonly IconDbEntry[] = [
   { label: "ketchup", icon: "IconBottle", tags: ["ketchup", "tomatensauce", "tomatenmark", "tomato ketchup", "curry ketchup"] },
   { label: "mustard", icon: "IconBottle", tags: ["senf", "mittelscharfer senf", "dijon", "mustard sauce", "honey mustard"] },
   { label: "honey", icon: "IconBottle", tags: ["honig", "blütenhonig", "bluetenhonig", "waldhonig", "akazienhonig", "honey jar"] },
-  { label: "jam", icon: "CustomJam", tags: ["marmelade", "konfitüre", "konfituere", "erdbeermarmelade", "fruchtaufstrich", "fruit spread", "nutella", "aufstrich", "jelly"] },
+  { label: "jam", icon: "CustomJam", tags: ["marmelade", "konfitüre", "konfituere", "erdbeermarmelade", "fruchtaufstrich", "fruit spread", "jelly"] },
   { label: "mayonnaise", icon: "IconBottle", tags: ["mayo", "mayonnaise", "salatcreme", "remoulade", "aioli"] },
   { label: "pasta sauce", icon: "CustomPastaSauce", tags: ["pastasauce", "tomatensoße", "tomatensosse", "tomatensauce", "arrabiata", "bolognese", "bolognese sauce", "pesto", "nudelsauce"] },
 
@@ -192,6 +194,7 @@ export const ICON_DB: readonly IconDbEntry[] = [
   { label: "utensils", icon: "UtensilsCrossed", tags: ["küchenutensilien", "kuechenutensilien", "utensil set", "kitchen tools", "cooking tools"] },
   { label: "chef hat", icon: "IconChefHat", tags: ["kochmütze", "kochmuetze", "chef cap", "cook hat", "kitchen hat"] },
   { label: "pasta", icon: "CustomPasta", tags: ["nudeln", "spaghetti", "penne", "fusilli", "rigatoni", "tagliatelle", "linguine", "farfalle", "noodles"] },
+  { label: "maultaschen", icon: "CustomMaultaschen", tags: ["maultasche", "schwäbische maultaschen", "schwaebische maultaschen", "pasta pockets", "nudeltaschen", "german pasta", "filled pasta", "schwäbische küche", "schwäbische nudeln"] },
   { label: "rice", icon: "CustomRice", tags: ["reis", "basmati", "basmatireis", "langkornreis", "vollkornreis", "jasminreis", "risotto", "risotto rice", "rice bag"] },
   { label: "soup", icon: "IconSoup", tags: ["suppe", "brühe", "bruehe", "gemüsebrühe", "hühnerbrühe", "instantsuppe", "dosensuppe"] },
   { label: "pizza", icon: "IconPizza", tags: ["pizza", "pizzas", "margherita", "salami pizza", "pizzateig"] },
@@ -241,7 +244,8 @@ export const ICON_DB: readonly IconDbEntry[] = [
   { label: "cream tube", icon: "CustomCreamTube", tags: ["creme tube", "hautcreme", "gesichtscreme", "körpercreme", "koerpercreme", "lotion", "salbe", "cream tube", "face cream"] },
   { label: "cream jar", icon: "CustomCreamJar", tags: ["cremetiegel", "cremedose", "cremendose", "tiegel", "gesichtspflege", "feuchtigkeitscreme", "nachtcreme", "cream jar", "moisturizer"] },
   { label: "protein", icon: "BicepsFlexed", tags: ["eiweiß", "eiweiss", "protein powder", "fitness", "muscle", "krafttraining"] },
-  { label: "hummus", icon: "CustomHummus", tags: ["hummus", "humus", "kichererbsenpaste", "hummus dip", "aufstrich", "chickpea dip", "hummus paste"] }
+  { label: "hummus", icon: "CustomHummus", tags: ["hummus", "humus", "kichererbsenpaste", "hummus dip", "chickpea dip", "hummus paste"] },
+  { label: "nut nougat cream", icon: "CustomNutNougatCream", tags: ["nutella", "nuss-nougat-creme", "nuss nougat creme", "nussnugatcreme", "nuss nougat", "haselnussaufstrich", "hazelnut spread", "chocolate spread", "schokocreme", "nougat aufstrich", "aufstrich", "kakaoaufstrich"] }
 ];
 
 export const EXACT_MATCH_MAP = createExactMatchMap(ICON_DB);

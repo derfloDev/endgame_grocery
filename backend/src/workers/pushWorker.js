@@ -8,6 +8,7 @@ export async function enqueuePushJob({
   listId,
   actorUserId,
   entryText,
+  logger = defaultLogger,
   now = new Date()
 }) {
   const existingResult = await pool.query(
@@ -31,6 +32,10 @@ export async function enqueuePushJob({
       `,
       [listId, actorUserId, fireAt, [entryText]]
     );
+    logger.info(
+      { listId, actorUserId, fireAt, itemCount: 1 },
+      "Push job enqueued"
+    );
     return;
   }
 
@@ -46,6 +51,10 @@ export async function enqueuePushJob({
       WHERE id = $3
     `,
     [nextItems, fireAt, existingJob.id]
+  );
+  logger.info(
+    { listId, actorUserId, fireAt, itemCount: nextItems.length },
+    "Push job enqueued"
   );
 }
 
@@ -78,12 +87,17 @@ export async function processPendingPushJobs({
   now = () => new Date(),
   logger = defaultLogger
 } = {}) {
-  if (
-    !pool ||
-    !config.vapidPublicKey ||
-    !config.vapidPrivateKey ||
-    !config.vapidContact
-  ) {
+  if (!pool) {
+    return;
+  }
+
+  const missingConfig = getMissingVapidConfigFields(config);
+
+  if (missingConfig.length) {
+    logger.warn(
+      { missingConfig },
+      "Push worker skipped because VAPID configuration is incomplete"
+    );
     return;
   }
 
@@ -102,9 +116,17 @@ export async function processPendingPushJobs({
     `,
     [now()]
   );
+  logger.debug(
+    { dueJobCount: jobsResult.rows.length },
+    "Push worker tick loaded due jobs"
+  );
 
   for (const job of jobsResult.rows) {
     const currentTime = now();
+    logger.info(
+      { jobId: job.id, listId: job.list_id },
+      "Push job fired"
+    );
     const cooldownResult = await pool.query(
       `
         SELECT last_sent_at
@@ -154,12 +176,21 @@ export async function processPendingPushJobs({
 
     if (!recipientsResult.rows.length) {
       await deletePushJob(pool, job.id);
-      logger.debug(
+      logger.info(
         { jobId: job.id, listId: job.list_id },
         "Push job skipped because no recipients are available"
       );
       continue;
     }
+
+    logger.info(
+      {
+        jobId: job.id,
+        listId: job.list_id,
+        recipientCount: recipientsResult.rows.length
+      },
+      "Push recipients found"
+    );
 
     const subscriptionsResult = await pool.query(
       `
@@ -169,6 +200,26 @@ export async function processPendingPushJobs({
       `,
       [recipientsResult.rows.map((row) => row.user_id)]
     );
+
+    if (!subscriptionsResult.rows.length) {
+      logger.info(
+        {
+          jobId: job.id,
+          listId: job.list_id,
+          recipientCount: recipientsResult.rows.length
+        },
+        "Push job has no subscriptions to notify"
+      );
+    } else {
+      logger.info(
+        {
+          jobId: job.id,
+          listId: job.list_id,
+          subscriptionCount: subscriptionsResult.rows.length
+        },
+        "Push subscriptions targeted"
+      );
+    }
 
     const { list_name: listName, actor_name: actorName } = recipientsResult.rows[0];
     const items = normalizeJobItems(job.items);
@@ -214,6 +265,15 @@ export async function processPendingPushJobs({
       }
     }
 
+    logger.info(
+      {
+        jobId: job.id,
+        listId: job.list_id,
+        notificationsSent,
+        subscriptionsExpired
+      },
+      "Push notifications sent"
+    );
     await deletePushJob(pool, job.id);
     await pool.query(
       `
@@ -249,7 +309,20 @@ function buildNotificationBody({ actorName, items }) {
     return `${actorName} added ${items[0] ?? "an item"}`;
   }
 
-  return `${items[0]} und ${items.length - 1} weitere Artikel`;
+  const remainingItemCount = items.length - 1;
+  const itemLabel = remainingItemCount === 1 ? "item" : "items";
+
+  return `${items[0]} and ${remainingItemCount} more ${itemLabel}`;
+}
+
+export function getMissingVapidConfigFields(config = {}) {
+  return [
+    ["vapidPublicKey", config.vapidPublicKey],
+    ["vapidPrivateKey", config.vapidPrivateKey],
+    ["vapidContact", config.vapidContact]
+  ]
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
 }
 
 async function deletePushJob(pool, jobId) {

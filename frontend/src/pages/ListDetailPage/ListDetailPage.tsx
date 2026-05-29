@@ -21,7 +21,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useListEvents } from "../../hooks/useListEvents";
 import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
-import { filterRecentlyUsedItems } from "../recentlyUsedState";
+import { getRecentlyUsedDisplayState } from "../recentlyUsedState";
 import styles from "./ListDetailPage.module.css";
 import { useListDetailData } from "./useListDetailData";
 import type { DetailEntry, DetailMember } from "./useListDetailData";
@@ -197,7 +197,8 @@ export default function ListDetailPage(): ReactElement {
   }
 
   const openEntries = entries.filter((entry) => entry.status === "open");
-  const visibleRecentlyUsed = filterRecentlyUsedItems(recentlyUsed, openEntries);
+  const visibleEntries = openEntries;
+  const { changedDoneTexts, visibleRecentlyUsed } = getRecentlyUsedDisplayState(recentlyUsed, entries, openEntries);
   const visibleMemberBadges = list?.is_owner ? members.filter((member) => !member.is_owner) : [];
   const shouldSuppressEntryError = entryError instanceof AuthExpiredError;
 
@@ -267,13 +268,14 @@ export default function ListDetailPage(): ReactElement {
                 <span className="eg-chip-purple">{openEntries.length}</span>
               </div>
 
-              {openEntries.length === 0 ? (
+              {visibleEntries.length === 0 ? (
                 <EmptyState body={t("detail.noOpenItems")} title={t("detail.allClearTitle")} />
               ) : (
                 <div className={styles["entry-tile-grid"]} data-testid="entry-tile-grid">
-                  {openEntries.map((entry) => (
+                  {visibleEntries.map((entry) => (
                     <EntryTile
                       key={entry.id}
+                      changeKind={getChangeKind(entry)}
                       entry={{ ...entry, details: entry.details ?? undefined }}
                       onEdit={() => setEditingEntry(entry)}
                       onToggle={() => void toggleStatus(entry)}
@@ -284,6 +286,7 @@ export default function ListDetailPage(): ReactElement {
             </section>
 
             <RecentlyUsedSection
+              changedDoneTexts={changedDoneTexts}
               items={visibleRecentlyUsed}
               onAdd={(text, icon, details) => void addRecentlyUsedEntry(text, icon, details)}
             />
@@ -366,6 +369,25 @@ function getInitials(name: unknown): string {
   }
 
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
+}
+
+function getChangeKind(entry: DetailEntry): "new" | "edited" | "done" | undefined {
+  if (!entry.is_changed) {
+    return undefined;
+  }
+
+  if (entry.status === "done") {
+    return "done";
+  }
+
+  const createdAt = Date.parse(entry.created_at ?? "");
+  const updatedAt = Date.parse(entry.updated_at ?? "");
+
+  if (Number.isFinite(createdAt) && Number.isFinite(updatedAt) && updatedAt > createdAt) {
+    return "edited";
+  }
+
+  return "new";
 }
 
 function getErrorMessage(error: unknown): string {

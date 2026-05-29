@@ -1,11 +1,22 @@
-import { registerSW } from "virtual:pwa-register";
+import { useRegisterSW } from "virtual:pwa-register/react";
 
-export function registerServiceWorker(): void {
-  if (import.meta.env.DEV) {
-    return;
-  }
+export interface ServiceWorkerUpdateState {
+  dismissUpdate: () => void;
+  needRefresh: boolean;
+  updateServiceWorker: (reloadPage?: boolean) => Promise<void>;
+}
 
-  registerSW({
+export function useServiceWorkerUpdate(): ServiceWorkerUpdateState {
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker
+  } = useRegisterSW({
     immediate: true
   });
+
+  return {
+    dismissUpdate: () => setNeedRefresh(false),
+    needRefresh: import.meta.env.DEV ? false : needRefresh,
+    updateServiceWorker
+  };
 }

@@ -18,6 +18,18 @@ interface RenderAppOptions {
   registrationEnabled?: boolean;
 }
 
+function isMarkViewedRequest(input: RequestInfo | URL, init?: RequestInit): boolean {
+  return String(input).endsWith("/mark-viewed") && (init?.method ?? "GET") === "POST";
+}
+
+function createNoContentResponse(): Response {
+  return {
+    ok: true,
+    status: 204,
+    json: async () => ({})
+  } as Response;
+}
+
 function renderApp(
   initialEntries: ComponentProps<typeof MemoryRouter>["initialEntries"] = ["/"],
   { registrationEnabled = true }: RenderAppOptions = {}
@@ -245,6 +257,10 @@ describe("authentication shell", () => {
             ]
           })
         };
+      }
+
+      if (isMarkViewedRequest(input, init)) {
+        return createNoContentResponse();
       }
 
       throw new Error(`Unexpected fetch in test: ${method} ${url}`);
@@ -934,7 +950,7 @@ describe("authentication shell", () => {
       }
     ];
 
-    fetch.mockImplementation(async (input) => {
+    fetch.mockImplementation(async (input, init) => {
       const url = String(input);
 
       if (url.includes("/suggestions?")) {
@@ -944,6 +960,10 @@ describe("authentication shell", () => {
             suggestions: []
           })
         };
+      }
+
+      if (isMarkViewedRequest(input, init)) {
+        return createNoContentResponse();
       }
 
       const nextResponse = queuedResponses.shift();
@@ -1174,7 +1194,7 @@ describe("authentication shell", () => {
     let entryRequestCount = 0;
     let memberRequestCount = 0;
 
-    fetch.mockImplementation(async (input) => {
+    fetch.mockImplementation(async (input, init) => {
       const url = String(input);
 
       if (url === "/api/lists") {
@@ -1218,6 +1238,10 @@ describe("authentication shell", () => {
           ok: true,
           json: async () => ({ publicKey: "dGVzdA" })
         };
+      }
+
+      if (isMarkViewedRequest(input, init)) {
+        return createNoContentResponse();
       }
 
       throw new Error(`Unexpected fetch in test: ${url}`);
@@ -1359,6 +1383,10 @@ describe("authentication shell", () => {
         };
       }
 
+      if (isMarkViewedRequest(input, init)) {
+        return createNoContentResponse();
+      }
+
       throw new Error(`Unexpected fetch in test: ${method} ${url}`);
     });
 
@@ -1437,6 +1465,7 @@ describe("authentication shell", () => {
           history: []
         })
       })
+      .mockResolvedValueOnce(createNoContentResponse())
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -1527,6 +1556,7 @@ describe("authentication shell", () => {
         ok: true,
         json: async () => ({ history: [] })
       })
+      .mockResolvedValueOnce(createNoContentResponse())
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -1566,6 +1596,7 @@ describe("authentication shell", () => {
         ok: true,
         json: async () => ({ history: [] })
       })
+      .mockResolvedValueOnce(createNoContentResponse())
       .mockReturnValueOnce(deferredVapidResponse.promise);
 
     renderApp(["/lists/list-2"]);

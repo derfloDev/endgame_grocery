@@ -88,6 +88,27 @@ describe("createApp logging", () => {
 
     assert.equal(errorLog.err.message, "Database connection is not configured.");
   });
+
+  it("warns at startup when push VAPID configuration is incomplete", () => {
+    const { logger, getEntries } = createLogCapture();
+
+    createApp({
+      logger,
+      pool: null,
+      startWorkers: true,
+      config: {
+        vapidPublicKey: "",
+        vapidPrivateKey: "private-key",
+        vapidContact: ""
+      }
+    });
+
+    const warningLog = getEntries().find(
+      (entry) => entry.msg === "Push notifications disabled because VAPID configuration is incomplete"
+    );
+
+    assert.deepEqual(warningLog.missingConfig, ["vapidPublicKey", "vapidContact"]);
+  });
 });
 
 function createLogCapture() {

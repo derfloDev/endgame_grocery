@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../i18n";
 import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { fetchRecentlyUsed } from "../api/history";
-import { fetchLists } from "../api/lists";
+import { fetchLists, markListViewed } from "../api/lists";
 import { fetchListMembers } from "../api/sharing";
 import { writeCachedResource } from "../api/offlineStore";
 import { useListEvents } from "../hooks/useListEvents";
@@ -36,6 +36,7 @@ vi.mock("../api/history", () => ({
 
 vi.mock("../api/lists", () => ({
   fetchLists: vi.fn(),
+  markListViewed: vi.fn(),
   renameList: vi.fn()
 }));
 
@@ -75,6 +76,7 @@ const createEntryMock = vi.mocked(createEntry);
 const fetchEntriesMock = vi.mocked(fetchEntries);
 const fetchRecentlyUsedMock = vi.mocked(fetchRecentlyUsed);
 const fetchListsMock = vi.mocked(fetchLists);
+const markListViewedMock = vi.mocked(markListViewed);
 const fetchListMembersMock = vi.mocked(fetchListMembers);
 const useListEventsMock = vi.mocked(useListEvents);
 const updateEntryMock = vi.mocked(updateEntry);
@@ -118,6 +120,7 @@ function mockListDetailData({ entries = [], history = [] }: MockListDetailDataOp
   fetchEntriesMock.mockResolvedValue({ entries });
   fetchRecentlyUsedMock.mockResolvedValue({ history });
   fetchListMembersMock.mockResolvedValue({ members: [] });
+  markListViewedMock.mockResolvedValue(undefined);
   writeCachedResourceMock.mockResolvedValue(undefined);
 }
 
@@ -174,6 +177,33 @@ describe("ListDetailPage optimistic updates", () => {
       expect(within(getOpenItemsSection()).queryByText("Milk")).toBeNull();
     });
     expect(updateEntry).toHaveBeenCalledWith("list-1", "entry-1", "test-token", { status: "done" });
+  });
+
+  it("shows a Done badge immediately when the current user completes an item", async () => {
+    mockListDetailData({
+      entries: [
+        {
+          id: "entry-1",
+          text: "Milk",
+          status: "open",
+          icon: "IconMilk",
+          created_at: "2026-04-21T00:00:00Z"
+        }
+      ]
+    });
+    updateEntryMock.mockReturnValue(new Promise(() => {}));
+
+    renderListDetailPage();
+
+    expect(await screen.findByText("Milk")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
+
+    await waitFor(() => {
+      expect(within(getOpenItemsSection()).queryByText("Milk")).toBeNull();
+      const recentlyUsedSection = screen.getByRole("region", { name: "Recently Used" });
+      expect(within(recentlyUsedSection).getByText("Milk")).toBeTruthy();
+      expect(within(recentlyUsedSection).getByText("Done")).toBeTruthy();
+    });
   });
 
   it("reverts a toggled entry when updateEntry rejects", async () => {
@@ -286,6 +316,52 @@ describe("ListDetailPage optimistic updates", () => {
     expect(within(getOpenItemsSection()).getByTestId("entry-tile-grid")).toBeTruthy();
   });
 
+  it("renders changed entry badges and marks the list viewed", async () => {
+    const markViewedRequest = createDeferred<void>();
+    mockListDetailData({
+      entries: [
+        {
+          id: "entry-1",
+          text: "Milk",
+          status: "open",
+          icon: "IconMilk",
+          is_changed: true,
+          created_at: "2026-04-21T00:00:00Z",
+          updated_at: "2026-04-21T00:00:00Z"
+        },
+        {
+          id: "entry-2",
+          text: "Bread",
+          status: "done",
+          icon: "IconBread",
+          is_changed: true,
+          created_at: "2026-04-20T00:00:00Z",
+          updated_at: "2026-04-22T00:00:00Z"
+        }
+      ]
+    });
+    markListViewedMock.mockReturnValue(markViewedRequest.promise);
+
+    renderListDetailPage();
+
+    expect(await screen.findByText("Milk")).toBeTruthy();
+    expect(within(getOpenItemsSection()).getByText("New")).toBeTruthy();
+    expect(within(getOpenItemsSection()).queryByText("Bread")).toBeNull();
+    const recentlyUsedSection = screen.getByRole("region", { name: "Recently Used" });
+    expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
+    expect(within(recentlyUsedSection).getByText("Done")).toBeTruthy();
+    expect(markListViewed).toHaveBeenCalledWith("test-token", "list-1");
+
+    await act(async () => {
+      markViewedRequest.resolve();
+      await markViewedRequest.promise;
+    });
+
+    expect(within(getOpenItemsSection()).getByText("New")).toBeTruthy();
+    expect(within(recentlyUsedSection).getByText("Done")).toBeTruthy();
+    expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
+  });
+
   it("re-fetches recently used history when an entry update SSE event arrives", async () => {
     fetchListsMock.mockResolvedValue({
       lists: [
@@ -321,6 +397,7 @@ describe("ListDetailPage optimistic updates", () => {
         history: [{ text: "Milk", icon: "IconMilk" }]
       });
     fetchListMembersMock.mockResolvedValue({ members: [] });
+    markListViewedMock.mockResolvedValue(undefined);
     writeCachedResourceMock.mockResolvedValue(undefined);
 
     renderListDetailPage();

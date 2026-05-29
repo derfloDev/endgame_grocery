@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent, FocusEvent, FormEvent, ReactElement } from "react";
+import type { ChangeEvent, FocusEvent, FormEvent, KeyboardEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { formatIconName, ICON_REGISTRY, ICON_REGISTRY_KEYS, resolveIconName } from "../../data/iconRegistry";
@@ -129,6 +129,15 @@ export default function AddItemSheet({
     }
   }
 
+  function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    void handleSubmit();
+  }
+
   async function handleQuickAdd(suggestedText: string, suggestedIconName: string | null): Promise<void> {
     const trimmed = suggestedText.trim();
 
@@ -192,9 +201,11 @@ export default function AddItemSheet({
                 autoComplete="off"
                 autoFocus={!showIconBrowser}
                 className="eg-input"
+                enterKeyHint="done"
                 placeholder={t("item.addPlaceholder")}
                 value={text}
                 onFocus={handleInputFocus}
+                onKeyDown={handleInputKeyDown}
                 onChange={handleInputChange}
               />
               {showSuggestions && !isEditMode ? (

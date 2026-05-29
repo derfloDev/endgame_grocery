@@ -6,6 +6,10 @@ export interface Entry {
   icon?: string | null;
   details?: string;
   status: "open" | "done";
+  created_at?: string;
+  updated_at?: string;
+  last_updated_by?: string | null;
+  is_changed?: boolean;
   is_pending_sync?: boolean;
 }
 
@@ -13,6 +17,7 @@ export interface List {
   id: string;
   name?: string;
   is_owner?: boolean;
+  changed_count?: number;
 }
 
 export interface Member {

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
+import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
 
 /**
@@ -9,12 +10,14 @@ import { requireAuth } from "../middleware/auth.js";
  * @param {object} [options] Router dependencies.
  * @param {import("pg").Pool} [options.pool] Database pool.
  * @param {ReturnType<typeof getConfig>} [options.config] Runtime configuration.
+ * @param {typeof defaultLogger} [options.logger] Application logger.
  * @param {import("express").RequestHandler} [options.requireAuthMiddleware] Auth middleware.
  * @returns {import("express").Router} Configured push router.
  */
 export function createPushRouter({
   pool = getPool(),
   config = getConfig(),
+  logger = defaultLogger,
   requireAuthMiddleware = requireAuth
 } = {}) {
   const router = Router();
@@ -51,6 +54,10 @@ export function createPushRouter({
         [req.user.sub, endpoint, p256dh, auth]
       );
 
+      logger.info(
+        { userId: req.user.sub, endpoint },
+        "Push subscription saved"
+      );
       res.status(201).json({ message: "Push subscription saved." });
     } catch (error) {
       next(error);
@@ -79,6 +86,10 @@ export function createPushRouter({
         [req.user.sub, endpoint]
       );
 
+      logger.info(
+        { userId: req.user.sub, endpoint },
+        "Push subscription removed"
+      );
       res.status(204).send();
     } catch (error) {
       next(error);

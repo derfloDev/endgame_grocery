@@ -54,12 +54,29 @@ export function createEntryRouter({
 
       const result = await pool.query(
         `
-          SELECT id, list_id, text, status, icon, details, created_at, updated_at
-          FROM entries
-          WHERE list_id = $1
+          SELECT
+            e.id,
+            e.list_id,
+            e.text,
+            e.status,
+            e.icon,
+            e.details,
+            e.created_at,
+            e.updated_at,
+            e.last_updated_by,
+            (
+              lv.last_viewed_at IS NOT NULL
+              AND e.updated_at > lv.last_viewed_at
+              AND (e.last_updated_by IS NULL OR e.last_updated_by <> $2)
+            ) AS is_changed
+          FROM entries e
+          LEFT JOIN list_views lv
+            ON lv.list_id = e.list_id
+           AND lv.user_id = $2
+          WHERE e.list_id = $1
           ORDER BY status ASC, created_at ASC
         `,
-        [req.params.id]
+        [req.params.id, req.user.sub]
       );
 
       res.json({
@@ -110,11 +127,11 @@ export function createEntryRouter({
 
       const result = await pool.query(
         `
-          INSERT INTO entries (list_id, text, status, icon, details)
-          VALUES ($1, $2, 'open', $3, $4)
-          RETURNING id, list_id, text, status, icon, details, created_at, updated_at
+          INSERT INTO entries (list_id, text, status, icon, details, last_updated_by)
+          VALUES ($1, $2, 'open', $3, $4, $5)
+          RETURNING id, list_id, text, status, icon, details, created_at, updated_at, last_updated_by
         `,
-        [req.params.id, text.trim(), icon ?? null, normalizeDetails(details)]
+        [req.params.id, text.trim(), icon ?? null, normalizeDetails(details), req.user.sub]
       );
 
       void sseManager
@@ -206,9 +223,10 @@ export function createEntryRouter({
             status = COALESCE($2, status),
             icon = COALESCE($3, icon),
             details = CASE WHEN $4 THEN $5 ELSE details END,
+            last_updated_by = $6,
             updated_at = NOW()
-          WHERE id = $6 AND list_id = $7
-          RETURNING id, list_id, text, status, icon, details, created_at, updated_at
+          WHERE id = $7 AND list_id = $8
+          RETURNING id, list_id, text, status, icon, details, created_at, updated_at, last_updated_by
         `,
         [
           text?.trim() || null,
@@ -216,6 +234,7 @@ export function createEntryRouter({
           icon ?? null,
           hasDetails,
           hasDetails ? normalizeDetails(details) : null,
+          req.user.sub,
           req.params.entryId,
           req.params.id
         ]

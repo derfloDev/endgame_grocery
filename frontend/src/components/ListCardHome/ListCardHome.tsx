@@ -9,6 +9,7 @@ interface HomeList extends List {
   name: string;
   owner_name?: string;
   is_pending_sync?: boolean;
+  changed_count?: number;
 }
 
 interface ListCardHomeProps {
@@ -23,6 +24,7 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListC
   const [menuOpen, setMenuOpen] = useState(false);
   const [renamingMode, setRenamingMode] = useState(false);
   const [renameValue, setRenameValue] = useState(list.name);
+  const changedCount = list.changed_count ?? 0;
 
   function closeMenu(): void {
     setMenuOpen(false);
@@ -64,6 +66,14 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListC
             {list.is_pending_sync ? <span className="eg-chip-queued">{t("common.queued")}</span> : null}
           </div>
         </div>
+        {changedCount > 0 ? (
+          <span
+            aria-label={t("list.changedCount", { count: changedCount })}
+            className={styles["list-card-change-badge"]}
+          >
+            {changedCount}
+          </span>
+        ) : null}
         {list.is_owner ? (
           <button
             aria-label={t("list.actionsFor", { name: list.name })}

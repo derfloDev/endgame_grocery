@@ -28,6 +28,12 @@ const autocompleteHistoryDetailsMigrationPath = path.resolve(
 const dropAutocompleteHistoryMigrationPath = path.resolve(
   "src/db/migrations/1778803200002_drop_autocomplete_history.cjs"
 );
+const lastUpdatedByMigrationPath = path.resolve(
+  "src/db/migrations/1779979000000_add_last_updated_by_to_entries.cjs"
+);
+const listViewsMigrationPath = path.resolve(
+  "src/db/migrations/1779979000001_add_list_views.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -617,5 +623,74 @@ describe("database migrations", () => {
         { name: "autocomplete_history_user_list_idx" }
       ]
     ]);
+  });
+
+  it("adds and removes the last_updated_by column on entries", async () => {
+    const migration = await import(pathToFileURL(lastUpdatedByMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "addColumns",
+        "entries",
+        {
+          last_updated_by: {
+            type: "uuid",
+            notNull: false,
+            references: "users(id)",
+            onDelete: "SET NULL"
+          }
+        }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [["dropColumns", "entries", ["last_updated_by"]]]);
+  });
+
+  it("creates and removes per-user list view tracking", async () => {
+    const migration = await import(pathToFileURL(listViewsMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      [
+        "createTable",
+        "list_views",
+        {
+          user_id: {
+            type: "uuid",
+            notNull: true,
+            references: "users(id)",
+            onDelete: "CASCADE"
+          },
+          list_id: {
+            type: "uuid",
+            notNull: true,
+            references: "lists(id)",
+            onDelete: "CASCADE"
+          },
+          last_viewed_at: {
+            type: "timestamptz",
+            notNull: true,
+            default: { value: "CURRENT_TIMESTAMP" }
+          }
+        }
+      ],
+      [
+        "addConstraint",
+        "list_views",
+        "list_views_pkey",
+        { primaryKey: ["user_id", "list_id"] }
+      ]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [["dropTable", "list_views", { ifExists: true, cascade: true }]]);
   });
 });
