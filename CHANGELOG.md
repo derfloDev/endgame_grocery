@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.7.0](https://github.com/derfloDev/endgame_grocery/compare/v1.6.0...v1.7.0) (2026-05-29)
+
+
+### Features
+
+* **icons:** suggest new custom grocery icons ([ba7b42c](https://github.com/derfloDev/endgame_grocery/commit/ba7b42c7d1f97f7e1dc1dbe9fe85eb1f43f739c6))
+* **lists:** show changed item badges ([7a394ac](https://github.com/derfloDev/endgame_grocery/commit/7a394acfd1153997fd957ad1a687bbbf24c2522b))
+* **push:** improve notification delivery diagnostics ([63a77a5](https://github.com/derfloDev/endgame_grocery/commit/63a77a5c375b5252f6bc9c9a2f19338a89238e40))
+* **pwa:** prompt users to reload app updates ([545c809](https://github.com/derfloDev/endgame_grocery/commit/545c809560c079f9bb27cc252cac7d8e15ff8e6d))
+* **ui:** add custom grocery icons ([d6f3cca](https://github.com/derfloDev/endgame_grocery/commit/d6f3cca2be4f496bf2e5a047e5416a82e8362cdf))
+* **ui:** submit add item title with enter ([34ba57c](https://github.com/derfloDev/endgame_grocery/commit/34ba57c8699c974084851aa4648b88772b047e8b))
+
+
+### Bug Fixes
+
+* **lists:** keep changed badges visible until next open ([c25282b](https://github.com/derfloDev/endgame_grocery/commit/c25282ba2a58b4de350af3b86425d3a5bf5c0d38))
+* **lists:** place done changed badges in recently used ([fca80ba](https://github.com/derfloDev/endgame_grocery/commit/fca80bac32b011df3e5cef345bcb651e12bdb5f3))
+* **lists:** show done badges for completed items ([f7f544f](https://github.com/derfloDev/endgame_grocery/commit/f7f544f6ef1b8b5e1afb4ba351b2cd4704a7bec5))
+* **ui:** tighten list detail topbar spacing ([73a2dd6](https://github.com/derfloDev/endgame_grocery/commit/73a2dd6335c6ead4492f3910d4a871f9d572c23d))
+* **ui:** tighten mobile overview and picker spacing ([67c9c13](https://github.com/derfloDev/endgame_grocery/commit/67c9c1396836a3cbd037a3ffff49e60048787137))
+
 ## [1.6.0](https://github.com/derfloDev/endgame_grocery/compare/v1.5.0...v1.6.0) (2026-05-28)
 
 
