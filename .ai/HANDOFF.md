@@ -441,3 +441,16 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Validation | Combined review passed; no additional validation run during commit_task. |
 | Commit | `fix(lists): keep changed badges visible until next open` |
 | Next Role | none |
+
+---
+
+### T-010 — implement — 2026-05-29T06:39:48Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-010 done after combined review approval; implementation files were already included in the preceding combined T-009 commit, leaving task metadata to close. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `fix(lists): place done changed badges in recently used` |
+| Next Role | none |
