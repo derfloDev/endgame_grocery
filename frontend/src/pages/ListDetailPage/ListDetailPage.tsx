@@ -197,6 +197,7 @@ export default function ListDetailPage(): ReactElement {
   }
 
   const openEntries = entries.filter((entry) => entry.status === "open");
+  const visibleEntries = entries.filter((entry) => entry.status === "open" || entry.is_changed);
   const visibleRecentlyUsed = filterRecentlyUsedItems(recentlyUsed, openEntries);
   const visibleMemberBadges = list?.is_owner ? members.filter((member) => !member.is_owner) : [];
   const shouldSuppressEntryError = entryError instanceof AuthExpiredError;
@@ -267,13 +268,14 @@ export default function ListDetailPage(): ReactElement {
                 <span className="eg-chip-purple">{openEntries.length}</span>
               </div>
 
-              {openEntries.length === 0 ? (
+              {visibleEntries.length === 0 ? (
                 <EmptyState body={t("detail.noOpenItems")} title={t("detail.allClearTitle")} />
               ) : (
                 <div className={styles["entry-tile-grid"]} data-testid="entry-tile-grid">
-                  {openEntries.map((entry) => (
+                  {visibleEntries.map((entry) => (
                     <EntryTile
                       key={entry.id}
+                      changeKind={getChangeKind(entry)}
                       entry={{ ...entry, details: entry.details ?? undefined }}
                       onEdit={() => setEditingEntry(entry)}
                       onToggle={() => void toggleStatus(entry)}
@@ -366,6 +368,25 @@ function getInitials(name: unknown): string {
   }
 
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
+}
+
+function getChangeKind(entry: DetailEntry): "new" | "edited" | "done" | undefined {
+  if (!entry.is_changed) {
+    return undefined;
+  }
+
+  if (entry.status === "done") {
+    return "done";
+  }
+
+  const createdAt = Date.parse(entry.created_at ?? "");
+  const updatedAt = Date.parse(entry.updated_at ?? "");
+
+  if (Number.isFinite(createdAt) && Number.isFinite(updatedAt) && updatedAt > createdAt) {
+    return "edited";
+  }
+
+  return "new";
 }
 
 function getErrorMessage(error: unknown): string {

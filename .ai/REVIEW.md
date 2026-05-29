@@ -283,3 +283,59 @@ Reviewed: 2026-05-28
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-006 — Changed Badges
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-29
+
+#### Findings
+- No issues found. The implementation is thorough and correctly handles all plan acceptance criteria. One intentional deviation from the plan (noted below) improves UX.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria for T-006.
+2. Ran `git diff HEAD` — confirmed all expected files changed and no unexpected files.
+3. **Migrations**:
+   - `1779979000000_add_last_updated_by_to_entries.cjs`: Adds `last_updated_by uuid REFERENCES users(id) ON DELETE SET NULL`. ✅
+   - `1779979000001_add_list_views.cjs`: Creates `list_views (user_id, list_id, last_viewed_at)` with composite PK and `ON DELETE CASCADE` for both FKs. ✅
+4. **`backend/src/routes/entries.js`**:
+   - GET: `LEFT JOIN list_views lv` and `is_changed` computed as `lv.last_viewed_at IS NOT NULL AND e.updated_at > lv.last_viewed_at AND (e.last_updated_by IS NULL OR e.last_updated_by <> $2)`. Passes authenticated `userId` as `$2`. ✅
+   - POST/PATCH: Both set `last_updated_by = req.user.sub`. ✅
+5. **`backend/src/routes/lists.js`**:
+   - GET: LATERAL subquery counts entries where `last_viewed_at IS NOT NULL AND updated_at > lv.last_viewed_at AND (last_updated_by IS NULL OR last_updated_by <> $1)`. ✅
+   - New `POST /:id/mark-viewed` endpoint: Checks list access, then UPSERTs into `list_views` with `ON CONFLICT (user_id, list_id) DO UPDATE SET last_viewed_at = CURRENT_TIMESTAMP`. Returns 204. ✅
+6. **`frontend/src/types.ts`**: `Entry` gets optional `created_at`, `updated_at`, `last_updated_by`, `is_changed`; `List` gets optional `changed_count`. ✅
+7. **`frontend/src/api/lists.ts`**: `markListViewed()` calls `POST /api/lists/:id/mark-viewed` with `queueable: false`. ✅
+8. **`frontend/src/components/EntryTile/EntryTile.tsx`**: `changeKind` prop accepted; `entry-tile-change-badge` span rendered with `getChangeLabel()` helper returning localised strings for `"new"`, `"edited"`, `"done"`. ✅
+9. **`frontend/src/components/ListCardHome/ListCardHome.tsx`**: `changed_count` prop renders inline `.list-card-change-badge` span with `aria-label` using `list.changedCount` i18n key. ✅
+10. **`frontend/src/pages/ListDetailPage/ListDetailPage.tsx`**: `getChangeKind()` maps `is_changed + status` to `"new" | "edited" | "done"`; done entries with `is_changed` are included in `visibleEntries`; `changeKind` passed to `EntryTile`. ✅
+11. **`frontend/src/pages/ListDetailPage/useListDetailData.ts`**: Calls `markListViewed()` after entries load, then clears change flags. ✅
+12. **CSS**: `.entry-tile-change-badge` positioned absolutely at top-right; `.list-card-change-badge` inline. ✅
+13. **i18n**: `list.changedCount` (plural form), `entry.changeNew/changeEdited/changeDone` in both `de` and `en`. ✅
+14. **Tests**: `migrations.test.js` — 2 new tests covering `up`/`down` for both migrations. `entries.test.js` — `is_changed` field and `last_updated_by` SQL assertions. `lists.test.js` — `changed_count` parsing, SQL shape assertion, `mark-viewed` endpoint test. `app.test.tsx` — `isMarkViewedRequest`/`createNoContentResponse` helpers; 4 existing E2E tests updated to mock the new `/mark-viewed` call. `EntryTile.test.tsx` — badge rendering tests. `ListCardHome.test.tsx` — new file covering badge display.
+15. Ran `cd C:/develop/endgame_grocery/backend && node --test src/db/migrations.test.js src/entries.test.js src/lists.test.js` — **38/38 pass**.
+16. Ran `npm run test -w @endgame-grocery/frontend -- --run src/components/EntryTile/EntryTile.test.tsx src/components/ListCardHome/ListCardHome.test.tsx` — **10/10 pass**.
+17. Ran `npm run test -w @endgame-grocery/frontend -- --run src/app.test.tsx` — **37/37 pass**.
+18. Ran `npm test` (full suite) — **449/449 pass across 33 test files**.
+19. Ran `npm run lint` — pass (0 errors; 1 pre-existing warning).
+
+##### Findings
+- `is_changed` uses `lv.last_viewed_at IS NOT NULL AND ...` rather than the plan's `COALESCE(lv.last_viewed_at, '-infinity')`. This means users who have never opened a list do not see all its entries flagged — a deliberate UX improvement over the plan baseline. ✅ (deviation accepted: better UX, same intent)
+- `changed_count` in the GET /api/lists response comes back as a string from Postgres; the test correctly uses `Number()` to parse it. ✅
+- `markListViewed()` uses `queueable: false`, which is correct — view-tracking side-effects should not be retried offline. ✅
+- Done entries with `is_changed` appear in `visibleEntries` so the badge is visible before the item scrolls away. ✅
+
+##### Risks
+- The `is_changed` flag is cleared client-side via `clearChangedFlags()` immediately after `markListViewed` succeeds. A race condition is theoretically possible if the server receives the mark-viewed before the entry query returns, but in practice entries are fetched first and mark-viewed is called after, so the risk is negligible.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

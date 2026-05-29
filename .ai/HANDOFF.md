@@ -321,3 +321,40 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-006 — implement — 2026-05-29T04:29:39Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added per-user list view tracking, changed-count and changed-entry API fields, mark-viewed clearing, and overview/detail badges for unseen list changes while excluding the current user's own updates. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `README.md`, `backend/src/db/migrations/1779979000000_add_last_updated_by_to_entries.cjs`, `backend/src/db/migrations/1779979000001_add_list_views.cjs`, `backend/src/db/migrations.test.js`, `backend/src/entries.test.js`, `backend/src/lists.test.js`, `backend/src/routes/entries.js`, `backend/src/routes/lists.js`, `frontend/src/api/lists.ts`, `frontend/src/app.test.tsx`, `frontend/src/components/EntryTile/EntryTile.module.css`, `frontend/src/components/EntryTile/EntryTile.test.tsx`, `frontend/src/components/EntryTile/EntryTile.tsx`, `frontend/src/components/ListCardHome/ListCardHome.module.css`, `frontend/src/components/ListCardHome/ListCardHome.test.tsx`, `frontend/src/components/ListCardHome/ListCardHome.tsx`, `frontend/src/components/feature-components.test.ts`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts`, `frontend/src/types.ts` |
+| Validation | `node --test src/db/migrations.test.js src/entries.test.js src/lists.test.js` and `npm run test --workspace frontend -- EntryTile ListCardHome ListDetailPage` initially hit sandbox `spawn EPERM`, then passed after rerun with escalation; `npm run test --workspace frontend -- app` passed; `npm run lint` passed with the existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with the existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `feat(lists): show changed item badges` |
+| Next Role | review |
+
+---
+
+### T-006 — review — 2026-05-29T05:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed Changed Badges feature: server-side list_views tracking, is_changed on entries, changed_count on lists, badge UI in EntryTile and ListCardHome, mark-viewed endpoint, i18n, and full test coverage. |
+| Files Changed | backend/src/db/migrations/1779979000000_add_last_updated_by_to_entries.cjs, backend/src/db/migrations/1779979000001_add_list_views.cjs, backend/src/routes/entries.js, backend/src/routes/lists.js, backend/src/db/migrations.test.js, backend/src/entries.test.js, backend/src/lists.test.js, frontend/src/types.ts, frontend/src/api/lists.ts, frontend/src/components/EntryTile/EntryTile.tsx, frontend/src/components/EntryTile/EntryTile.module.css, frontend/src/components/EntryTile/EntryTile.test.tsx, frontend/src/components/ListCardHome/ListCardHome.tsx, frontend/src/components/ListCardHome/ListCardHome.module.css, frontend/src/components/ListCardHome/ListCardHome.test.tsx, frontend/src/components/feature-components.test.ts, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage/useListDetailData.ts, frontend/src/app.test.tsx, frontend/src/locales/de/translation.json, frontend/src/locales/en/translation.json |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-05-29T05:11:14Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-006 done after review approval and prepared the reviewed changed-badges implementation for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `backend/src/db/migrations/1779979000000_add_last_updated_by_to_entries.cjs`, `backend/src/db/migrations/1779979000001_add_list_views.cjs`, `backend/src/db/migrations.test.js`, `backend/src/entries.test.js`, `backend/src/lists.test.js`, `backend/src/routes/entries.js`, `backend/src/routes/lists.js`, `frontend/src/api/lists.ts`, `frontend/src/app.test.tsx`, `frontend/src/components/EntryTile/EntryTile.module.css`, `frontend/src/components/EntryTile/EntryTile.test.tsx`, `frontend/src/components/EntryTile/EntryTile.tsx`, `frontend/src/components/ListCardHome/ListCardHome.module.css`, `frontend/src/components/ListCardHome/ListCardHome.test.tsx`, `frontend/src/components/ListCardHome/ListCardHome.tsx`, `frontend/src/components/feature-components.test.ts`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts`, `frontend/src/types.ts` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `feat(lists): show changed item badges` |
+| Next Role | none |

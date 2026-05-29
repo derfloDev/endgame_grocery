@@ -28,6 +28,20 @@
   flex: 1;
 }
 
+.list-card-change-badge {
+  min-width: 28px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 999px;
+  background: rgba(0, 229, 255, 0.12);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 7px 8px;
+  text-align: center;
+}
+
 .list-card-name {
   margin-bottom: var(--space-2);
   color: var(--text-primary);

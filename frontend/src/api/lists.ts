@@ -6,6 +6,7 @@ const LISTS_CACHE_KEY = createCacheKey("lists");
 interface ListRequestOptions {
   method?: string;
   payload?: unknown;
+  queueable?: boolean;
   queueMeta?: QueueMeta | null;
 }
 
@@ -36,7 +37,7 @@ function sendListRequest(path: string, token: string, options: ListRequestOption
     payload: options.payload,
     cacheKey: method === "GET" ? LISTS_CACHE_KEY : "",
     offlineFallbackMessage: "Offline list data is unavailable.",
-    queueable: method !== "GET",
+    queueable: options.queueable ?? method !== "GET",
     queueMeta: options.queueMeta ?? null
   });
 }
@@ -71,4 +72,11 @@ export function deleteList(token: string, listId: string): Promise<unknown> {
   return sendListRequest(`/${listId}`, token, {
     method: "DELETE"
   });
+}
+
+export function markListViewed(token: string, listId: string): Promise<void> {
+  return sendListRequest(`/${listId}/mark-viewed`, token, {
+    method: "POST",
+    queueable: false
+  }) as Promise<void>;
 }

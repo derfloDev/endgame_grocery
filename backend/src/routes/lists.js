@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { logger as defaultLogger } from "../logger.js";
+import { ensureListAccess } from "../middleware/listAccess.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
@@ -38,12 +39,24 @@ export function createListRouter({
             l.name,
             l.owner_id,
             owner.display_name AS owner_name,
-            (l.owner_id = $1) AS is_owner
+            (l.owner_id = $1) AS is_owner,
+            COALESCE(changes.changed_count, 0)::int AS changed_count
           FROM lists l
           JOIN users owner ON owner.id = l.owner_id
           LEFT JOIN list_members lm
             ON lm.list_id = l.id
            AND lm.user_id = $1
+          LEFT JOIN list_views lv
+            ON lv.list_id = l.id
+           AND lv.user_id = $1
+          LEFT JOIN LATERAL (
+            SELECT COUNT(*) AS changed_count
+            FROM entries e
+            WHERE e.list_id = l.id
+              AND lv.last_viewed_at IS NOT NULL
+              AND e.updated_at > lv.last_viewed_at
+              AND (e.last_updated_by IS NULL OR e.last_updated_by <> $1)
+          ) changes ON true
           WHERE l.owner_id = $1 OR lm.user_id = $1
           ORDER BY l.created_at ASC
         `,
@@ -56,7 +69,8 @@ export function createListRouter({
           name: row.name,
           owner_id: row.owner_id,
           owner_name: row.owner_name,
-          is_owner: row.is_owner
+          is_owner: row.is_owner,
+          changed_count: Number(row.changed_count ?? 0)
         }))
       });
     } catch (error) {
@@ -93,6 +107,36 @@ export function createListRouter({
           is_owner: true
         }
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/:id/mark-viewed", async (req, res, next) => {
+    if (!pool) {
+      next(new Error("Database connection is not configured."));
+      return;
+    }
+
+    try {
+      const hasAccess = await ensureListAccess(pool, req.params.id, req.user.sub);
+
+      if (!hasAccess) {
+        res.status(403).json({ error: "You do not have access to this list." });
+        return;
+      }
+
+      await pool.query(
+        `
+          INSERT INTO list_views (user_id, list_id, last_viewed_at)
+          VALUES ($1, $2, NOW())
+          ON CONFLICT (user_id, list_id)
+          DO UPDATE SET last_viewed_at = EXCLUDED.last_viewed_at
+        `,
+        [req.user.sub, req.params.id]
+      );
+
+      res.status(204).send();
     } catch (error) {
       next(error);
     }

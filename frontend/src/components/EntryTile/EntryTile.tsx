@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../../data/iconRegistry";
 import { useLongPress } from "../../hooks/useLongPress";
 import type { Entry } from "../../types";
@@ -7,16 +8,18 @@ import styles from "./EntryTile.module.css";
 
 interface EntryTileProps {
   entry: Entry;
+  changeKind?: "new" | "edited" | "done";
   onEdit?: () => void;
   onToggle?: () => void;
 }
 
-export default function EntryTile({ entry, onEdit, onToggle }: EntryTileProps): ReactElement {
+export default function EntryTile({ entry, changeKind, onEdit, onToggle }: EntryTileProps): ReactElement {
   const { t } = useTranslation();
   const resolvedIconName = resolveIconName(entry.icon);
   const displayIconName = resolvedIconName ?? FALLBACK_ICON_NAME;
   const EntryIcon = ICON_REGISTRY[displayIconName] ?? FALLBACK_ICON;
   const { pressing, longPressHandlers } = useLongPress(() => onEdit?.(), 500);
+  const changeLabel = changeKind ? getChangeLabel(changeKind, t) : "";
 
   return (
     <button
@@ -51,7 +54,22 @@ export default function EntryTile({ entry, onEdit, onToggle }: EntryTileProps): 
       />
       <p className={styles["entry-tile-text"]}>{entry.text}</p>
       {entry.details ? <p className={styles["entry-tile-details"]}>{entry.details}</p> : null}
+      {entry.is_changed && changeLabel ? (
+        <span className={styles["entry-tile-change-badge"]}>{changeLabel}</span>
+      ) : null}
       {entry.is_pending_sync ? <span className={`eg-chip-queued ${styles["entry-tile-chip"]}`}>{t("common.queued")}</span> : null}
     </button>
   );
+}
+
+function getChangeLabel(changeKind: NonNullable<EntryTileProps["changeKind"]>, t: TFunction): string {
+  if (changeKind === "done") {
+    return t("entry.changeDone");
+  }
+
+  if (changeKind === "edited") {
+    return t("entry.changeEdited");
+  }
+
+  return t("entry.changeNew");
 }

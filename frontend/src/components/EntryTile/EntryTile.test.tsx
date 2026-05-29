@@ -37,6 +37,17 @@ describe("EntryTile", () => {
     expect(screen.queryByText("Whole grain")).toBeNull();
   });
 
+  it("renders changed entry badges", () => {
+    render(
+      <EntryTile
+        changeKind="edited"
+        entry={{ id: "entry-2d", text: "Bread", status: "open", icon: null, is_changed: true }}
+      />
+    );
+
+    expect(screen.getByText("Edited").className).toContain("entry-tile-change-badge");
+  });
+
   it("calls onToggle on a short tap", async () => {
     const onToggle = vi.fn();
     render(<EntryTile entry={{ id: "entry-3", text: "Coffee", status: "open", icon: "IconMilk" }} onToggle={onToggle} />);
