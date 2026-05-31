@@ -470,3 +470,55 @@ Reviewed: 2026-05-29
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-013 — Restore Dismiss Controls on Recently-Used Chips
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-05-31
+
+#### Findings
+- No issues found. Implementation matches the plan specification exactly and all acceptance criteria are met.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria for T-013.
+2. Read `.ai/HANDOFF.md` for the T-013 implement entry — confirmed files changed match expected scope.
+3. Ran `git diff HEAD` on all T-013 files to verify each change.
+4. **`backend/src/routes/history.js`**: `DELETE /` handler added; checks list access, validates `req.body.text` (returns 400 on empty), then `DELETE FROM entries WHERE list_id=$1 AND text=$2 AND status='done'`; returns 204. Open entries with the same text are unaffected. ✅
+5. **`backend/src/history.test.js`**: Former `returns 404 because individual history deletion is not supported` test replaced with three new DELETE tests: deletes done entries (204), idempotent on missing item (204), SQL does not match open entries. ✅
+6. **`frontend/src/api/history.ts`**: `deleteFromHistory(listId, text, token)` added — `DELETE /api/lists/:id/history` with `{ text }` payload. ✅
+7. **`frontend/src/pages/ListDetailPage/useListDetailData.ts`**: `dismissRecentlyUsedEntry` added — optimistically removes item from `recentlyUsed` state, then fire-and-forget `deleteFromHistory` with `console.error` on failure. Returned from hook. ✅
+8. **`frontend/src/pages/ListDetailPage/ListDetailPage.tsx`**: `dismissRecentlyUsedEntry` destructured and passed as `onDismiss` to `<RecentlyUsedSection>`. ✅
+9. **`frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`**: `onDismiss?: (text: string) => void` prop added; dismiss `<button>` rendered as sibling to `.recently-used-chip` inside `.recently-used-cell` when `onDismiss && !isChangedDone`. Button uses `t("recent.dismiss", { name: item.text })` as aria-label. ✅
+10. **`frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`**: `.recently-used-cell` has `position: relative`; `.recently-used-chip-dismiss` is `position: absolute; top: 4px; right: 4px; width: 20px; height: 20px` with hover/focus styling. ✅
+11. **i18n**: `"recent.dismiss": "Dismiss {name}"` (en), `"recent.dismiss": "{name} ausblenden"` (de). ✅
+12. **`README.md`**: Updated to document dismiss-chips behavior. ✅
+13. **Tests**:
+    - `RecentlyUsedSection.test.tsx`: dismiss button present and calls `onDismiss("Bread")`; hidden when `changedDone` badge active. ✅
+    - `ListDetailPage.test.tsx`: "dismisses a recently used entry optimistically" test. ✅
+    - `app.test.tsx`: E2E — dismiss button present, click fires DELETE request, recently-used section disappears when all items dismissed. ✅
+14. Ran `cd C:/develop/endgame_grocery/backend && node --test src/history.test.js` — **7/7 pass**.
+15. Ran `npm run test -w @endgame-grocery/frontend -- --run src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx src/pages/ListDetailPage.test.tsx` — **20/20 pass**.
+16. Ran `npm run test -w @endgame-grocery/frontend -- --run src/app.test.tsx` — **37/37 pass**.
+17. Ran `npm test` (full suite) — **457/457 pass across 33 test files**.
+18. Ran `npm run lint` — pass (0 errors; 1 pre-existing warning).
+
+##### Findings
+- `dismissRecentlyUsedEntry` is fire-and-forget (no rollback on API failure); this matches the plan specification exactly and is acceptable for removing stale history. ✅
+- DELETE endpoint is scoped to `status = 'done'` — open entries with the same text are never touched. ✅
+- Dismiss button suppressed when `changedDone` badge is active — dismissal not appropriate until badge is acknowledged. ✅
+- All three backend DELETE tests cover the idempotency contract and open-entry safety guard. ✅
+
+##### Risks
+- If `deleteFromHistory` fails silently, the item stays removed from the client's in-memory recently-used list but persists in the DB until reload. Consistent with the plan's fire-and-forget design; acceptable.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

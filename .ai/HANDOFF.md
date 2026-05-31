@@ -568,3 +568,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
+
+---
+
+### T-013 — implement — 2026-05-29T13:23:50Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Restored recently-used chip dismiss controls backed by a shared DELETE history endpoint that removes matching completed entries while preserving open entries. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `README.md`, `backend/src/history.test.js`, `backend/src/routes/history.js`, `frontend/src/api/history.ts`, `frontend/src/app.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts` |
+| Validation | `node --test src/history.test.js` passed; `npm run test --workspace frontend -- RecentlyUsedSection ListDetailPage app` hit sandbox `spawn EPERM`, then passed after escalation; `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `fix(lists): restore recently used dismiss controls` |
+| Next Role | review |
+
+---
+
+### T-013 — review — 2026-05-31T14:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed restore of recently-used chip dismiss controls: DELETE history endpoint, optimistic client removal, × button hidden during changedDone badge, i18n de+en, README updated; all acceptance criteria met. |
+| Files Changed | `backend/src/routes/history.js`, `backend/src/history.test.js`, `frontend/src/api/history.ts`, `frontend/src/pages/ListDetailPage/useListDetailData.ts`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/app.test.tsx`, `frontend/src/pages/ListDetailPage.test.tsx`, `README.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-013 — implement — 2026-05-31T12:44:10Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-013 done after review approval and prepared the reviewed recently-used dismiss controls for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `backend/src/history.test.js`, `backend/src/routes/history.js`, `frontend/src/api/history.ts`, `frontend/src/app.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `fix(lists): restore recently used dismiss controls` |
+| Next Role | none |

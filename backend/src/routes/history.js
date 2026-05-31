@@ -68,6 +68,43 @@ export function createHistoryRouter({
     }
   });
 
+  router.delete("/", async (req, res, next) => {
+    if (!pool) {
+      next(new Error("Database connection is not configured."));
+      return;
+    }
+
+    try {
+      const hasAccess = await ensureListAccess(pool, req.params.id, req.user.sub);
+
+      if (!hasAccess) {
+        res.status(403).json({ error: "You do not have access to this list." });
+        return;
+      }
+
+      const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+
+      if (!text) {
+        res.status(400).json({ error: "History item text is required." });
+        return;
+      }
+
+      await pool.query(
+        `
+          DELETE FROM entries
+          WHERE list_id = $1
+            AND text = $2
+            AND status = 'done'
+        `,
+        [req.params.id, text]
+      );
+
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }
 

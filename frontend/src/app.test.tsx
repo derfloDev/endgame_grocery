@@ -896,7 +896,7 @@ describe("authentication shell", () => {
     expect(fetch.mock.calls.filter(([url]) => url === "/api/lists")).toHaveLength(3);
   });
 
-  it("shows recently used items and re-adds them from list detail without dismiss controls", async () => {
+  it("shows recently used items, re-adds them, and dismisses history from list detail", async () => {
     seedAuthSession("user-1");
     const queuedResponses = [
       {
@@ -947,6 +947,11 @@ describe("authentication shell", () => {
             created_at: "2026-04-21T00:02:00Z"
           }
         })
+      },
+      {
+        ok: true,
+        status: 204,
+        json: async () => ({})
       }
     ];
 
@@ -991,7 +996,7 @@ describe("authentication shell", () => {
     expect(screen.getByText("Milk")).toBeTruthy();
     expect(within(recentlyUsedSection).getByText("Tomatoes")).toBeTruthy();
     expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
-    expect(within(recentlyUsedSection).queryByRole("button", { name: "Dismiss Bread" })).toBeNull();
+    expect(within(recentlyUsedSection).getByRole("button", { name: "Dismiss Bread" })).toBeTruthy();
 
     await userEvent.click(within(recentlyUsedSection).getByRole("button", { name: "Tomatoes" }));
 
@@ -1010,11 +1015,19 @@ describe("authentication shell", () => {
       expect(within(recentlyUsedSection).queryByText("Tomatoes")).toBeNull();
     });
     expect(within(recentlyUsedSection).getByText("Bread")).toBeTruthy();
-    expect(
-      fetch.mock.calls.some(
-        ([url, options]) => url === "/api/lists/list-1/history" && (options as RequestInit | undefined)?.method === "DELETE"
-      )
-    ).toBe(false);
+
+    await userEvent.click(within(recentlyUsedSection).getByRole("button", { name: "Dismiss Bread" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/lists/list-1/history",
+        expect.objectContaining({
+          body: JSON.stringify({ text: "Bread" }),
+          method: "DELETE"
+        })
+      );
+      expect(screen.queryByRole("region", { name: "Recently Used" })).toBeNull();
+    });
   });
 
   it("adds completed items to recently used and keeps newest history first", async () => {
