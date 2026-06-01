@@ -657,3 +657,12 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Validation | Review passed; no additional validation run during commit_task. |
 | Commit | `fix(lists): sync recently used dismissals` |
 | Next Role | none |
+
+### Cycle closed — unversioned — 2026-06-01T06:05:34Z
+
+| Field | Value |
+|-------|-------|
+| Summary | All tasks done; cycle closed |
+| Version | unversioned |
+
+---
