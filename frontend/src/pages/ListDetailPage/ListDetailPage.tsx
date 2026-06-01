@@ -101,17 +101,16 @@ export default function ListDetailPage(): ReactElement {
     token
   });
 
-  const handleEntryChange = useCallback(() => {
-    void loadEntries().then((nextEntries) => reloadHistory(nextEntries));
-  }, [loadEntries, reloadHistory]);
+  const handleEntryChange = useCallback(() => void loadEntries().then((nextEntries) => reloadHistory(nextEntries)), [loadEntries, reloadHistory]);
 
-  const handleMemberChange = useCallback(() => {
-    void loadMembers({ isOwner: list?.is_owner ?? false });
-  }, [list?.is_owner, loadMembers]);
+  const handleMemberChange = useCallback(() => void loadMembers({ isOwner: list?.is_owner ?? false }), [list?.is_owner, loadMembers]);
+
+  const handleHistoryChange = useCallback(() => void reloadHistory(), [reloadHistory]);
 
   useListEvents("entry:created", listId, handleEntryChange);
   useListEvents("entry:updated", listId, handleEntryChange);
   useListEvents("entry:deleted", listId, handleEntryChange);
+  useListEvents("history:updated", listId, handleHistoryChange);
   useListEvents("member:added", listId, handleMemberChange);
   useListEvents("member:removed", listId, handleMemberChange);
 

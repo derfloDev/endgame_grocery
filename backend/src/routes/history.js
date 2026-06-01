@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
+import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
+import { sseManager as defaultSseManager } from "../sseManager.js";
 
 /**
  * Creates the authenticated recently used history router backed by completed entries.
@@ -9,11 +11,15 @@ import { ensureListAccess } from "../middleware/listAccess.js";
  * @param {object} [options] Router dependencies.
  * @param {import("pg").Pool} [options.pool] Database pool.
  * @param {import("express").RequestHandler} [options.requireAuthMiddleware] Auth middleware.
+ * @param {typeof defaultLogger} [options.logger] Application logger.
+ * @param {typeof defaultSseManager} [options.sseManager] SSE broadcaster.
  * @returns {import("express").Router} Configured history router.
  */
 export function createHistoryRouter({
   pool = getPool(),
-  requireAuthMiddleware = requireAuth
+  requireAuthMiddleware = requireAuth,
+  logger = defaultLogger,
+  sseManager = defaultSseManager
 } = {}) {
   const router = Router({ mergeParams: true });
 
@@ -89,7 +95,7 @@ export function createHistoryRouter({
         return;
       }
 
-      await pool.query(
+      const result = await pool.query(
         `
           DELETE FROM entries
           WHERE list_id = $1
@@ -98,6 +104,14 @@ export function createHistoryRouter({
         `,
         [req.params.id, text]
       );
+
+      if (result.rowCount > 0) {
+        void sseManager
+          .broadcastToList(pool, req.params.id, "history:updated", { listId: req.params.id })
+          .catch((broadcastError) => {
+            logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+          });
+      }
 
       res.status(204).send();
     } catch (error) {

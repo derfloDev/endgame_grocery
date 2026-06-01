@@ -522,3 +522,47 @@ Reviewed: 2026-05-31
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-014 — Real-time sync for history dismissal
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-06-01
+
+#### Findings
+- No issues found. Implementation exactly matches the plan and is consistent with the SSE broadcast pattern used across all other mutating routes.
+
+#### Verification
+##### Steps
+1. Read `.ai/PLAN.md` acceptance criteria for T-014.
+2. Read `.ai/HANDOFF.md` T-014 implement entry — files changed match expected scope.
+3. Ran `git diff HEAD` on all T-014 files to verify each change.
+4. **`backend/src/routes/history.js`**: `logger` and `sseManager` imports added; both added to `createHistoryRouter` options with production defaults; DELETE handler now captures `result` from the DELETE query; `result.rowCount > 0` guard added before broadcasting `history:updated` — no broadcast for no-op deletes; error logged via `logger.error({ err }, "...")` matching codebase pattern. ✅
+5. **`backend/src/history.test.js`**: `createAuthedApp` extended with optional `options` to inject `sseManager`; `createSseManagerSpy()` helper added at bottom (same shape as `entries.test.js`); "deletes all done entries" test asserts `sseManager.calls` contains `["list-1", "history:updated", { listId: "list-1" }]`; "returns 204 when item does not exist" asserts `sseManager.calls` is empty (rowCount 0 → no broadcast). ✅
+6. **`frontend/src/context/EventSourceContext.tsx`**: `"history:updated"` added to both `SseEventType` union and `EVENT_TYPES` array. ✅
+7. **`frontend/src/pages/ListDetailPage/ListDetailPage.tsx`**: `handleHistoryChange = useCallback(() => void reloadHistory(), [reloadHistory])` added; `useListEvents("history:updated", listId, handleHistoryChange)` registered alongside the existing entry/member listeners. ✅
+8. **`frontend/src/app.test.tsx`** (SSE integration test): History responses array set up with "Tomatoes" for initial calls, empty array as last; `historyRequestCount` tracker added; after capturing baseline, emits `"history:updated"`; asserts history endpoint called +1 time and "Tomatoes" disappears from screen. ✅
+9. **`README.md`**: SSE documentation updated to include `history:updated`; recently-used panel description updated to note chip dismissal affects "every connected list member". ✅
+10. Ran `cd C:/develop/endgame_grocery/backend && node --test src/history.test.js` — **7/7 pass**.
+11. Ran `npm run test -w @endgame-grocery/frontend -- --run src/app.test.tsx` — **37/37 pass**.
+12. Ran `npm test` (full suite) — **457/457 pass across 33 test files**.
+13. Ran `npm run lint` — pass (0 errors; 1 pre-existing warning).
+
+##### Findings
+- SSE broadcast is correctly guarded by `rowCount > 0`: no-op deletes (non-existent item) do not produce spurious events. ✅
+- Fire-and-forget broadcast with `.catch(logger.error)` is consistent with `entries.js` and `lists.js` error handling pattern. ✅
+- `createSseManagerSpy` in `history.test.js` matches the spy pattern in `entries.test.js` exactly. ✅
+- `handleHistoryChange` correctly reuses the existing `reloadHistory` hook — no new fetch abstraction needed. ✅
+
+##### Risks
+- None.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS`

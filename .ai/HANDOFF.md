@@ -597,6 +597,17 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-014 — plan — 2026-05-31T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned real-time SSE broadcast for history dismissal: add `history:updated` event to backend DELETE history handler and frontend ListDetailPage listener so User B sees dismissed chips disappear without a reload. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
 ### T-013 — implement — 2026-05-31T12:44:10Z
 
 | Field | Value |
@@ -606,4 +617,43 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `backend/src/history.test.js`, `backend/src/routes/history.js`, `frontend/src/api/history.ts`, `frontend/src/app.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts` |
 | Validation | Review passed; no additional validation run during commit_task. |
 | Commit | `fix(lists): restore recently used dismiss controls` |
+| Next Role | none |
+
+---
+
+### T-014 — implement — 2026-05-31T13:11:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added real-time SSE sync for recently-used history dismissals so connected list members refresh dismissed chips without reloading. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `README.md`, `backend/src/history.test.js`, `backend/src/routes/history.js`, `frontend/src/app.test.tsx`, `frontend/src/context/EventSourceContext.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx` |
+| Validation | `node --test src/history.test.js` passed; `npm run test --workspace frontend -- app` passed; `npm run test --workspace frontend -- ListDetailPage` passed; `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `fix(lists): sync recently used dismissals` |
+| Next Role | review |
+
+---
+
+### T-014 — review — 2026-06-01T14:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed real-time SSE sync for history dismissal: `history:updated` broadcast on rowCount>0, no-op guard verified by test, `history:updated` added to EventSourceContext, handleHistoryChange wired in ListDetailPage, E2E integration test confirms reloadHistory fires and chip disappears. |
+| Files Changed | `backend/src/routes/history.js`, `backend/src/history.test.js`, `frontend/src/context/EventSourceContext.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/app.test.tsx`, `README.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-014 — implement — 2026-06-01T05:50:43Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-014 done after review approval and prepared the reviewed recently-used dismissal SSE sync for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `README.md`, `backend/src/history.test.js`, `backend/src/routes/history.js`, `frontend/src/app.test.tsx`, `frontend/src/context/EventSourceContext.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `fix(lists): sync recently used dismissals` |
 | Next Role | none |

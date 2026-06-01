@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import request from "supertest";
 import { createApp } from "./app.js";
 
-function createAuthedApp(pool) {
+function createAuthedApp(pool, options = {}) {
   return createApp({
     pool,
+    sseManager: options.sseManager ?? createSseManagerSpy(),
     requireAuthMiddleware(req, _res, next) {
       req.user = { sub: "user-1" };
       next();
@@ -106,6 +107,7 @@ describe("history routes", () => {
   });
 
   it("deletes all done entries with the requested text", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query(sql, params) {
@@ -126,15 +128,19 @@ describe("history routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool))
+    const response = await request(createAuthedApp(pool, { sseManager }))
       .delete("/api/lists/list-1/history")
       .send({ text: "Milk" });
 
     assert.equal(response.status, 204);
     assert.equal(callCount, 2);
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "history:updated", { listId: "list-1" }]
+    ]);
   });
 
   it("returns 204 when the requested history item does not exist", async () => {
+    const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
       async query() {
@@ -148,12 +154,13 @@ describe("history routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool))
+    const response = await request(createAuthedApp(pool, { sseManager }))
       .delete("/api/lists/list-1/history")
       .send({ text: "Missing item" });
 
     assert.equal(response.status, 204);
     assert.equal(callCount, 2);
+    assert.deepEqual(sseManager.calls, []);
   });
 
   it("does not delete open entries with the same text", async () => {
@@ -179,3 +186,14 @@ describe("history routes", () => {
     assert.doesNotMatch(deleteSql, /status <> 'open'/);
   });
 });
+
+function createSseManagerSpy() {
+  return {
+    calls: [],
+    broadcastToList(pool, listId, eventType, data) {
+      void pool;
+      this.calls.push([listId, eventType, data]);
+      return Promise.resolve();
+    }
+  };
+}

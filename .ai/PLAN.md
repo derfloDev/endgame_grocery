@@ -626,6 +626,67 @@ Return it from the hook.
 
 ---
 
+## T-014 — Real-time sync for history dismissal
+
+### Root Cause
+`DELETE /api/lists/:id/history` (called when User A taps "×" on a recently-used chip) deletes done entries from the DB but never broadcasts an SSE event. `createHistoryRouter` receives `sseManager` via `routerOptions` but ignores it. All other mutating routes (`entries.js`, `lists.js`, `v1.js`) broadcast correctly.
+
+**Consequence**: User B's recently-used section is only updated after a manual page reload.
+
+### Acceptance Criteria
+- When User A dismisses a recently-used chip, User B sees the chip disappear from their recently-used section within the normal SSE delivery window (no reload required).
+- A new `history:updated` SSE event is emitted from the backend DELETE handler.
+- The frontend `ListDetailPage` listens for `history:updated` and calls `reloadHistory()` to refresh the recently-used section.
+- Existing tests still pass; new tests cover the broadcast and client reaction.
+
+### Files to Change
+
+#### Backend
+
+- **`backend/src/routes/history.js`**
+  - Add `sseManager` to the destructured options of `createHistoryRouter` (it is already present in `routerOptions` passed from `app.js`).
+  - After the DELETE query succeeds, call:
+    ```js
+    void sseManager
+      .broadcastToList(pool, req.params.id, "history:updated", { listId: req.params.id })
+      .catch((err) => logger.error({ err }, "Failed to broadcast SSE event"));
+    ```
+  - Add `logger` import (or receive via options — follow the pattern used in `entries.js`).
+
+- **`backend/src/history.test.js`**
+  - Add a test using the `createSseManagerSpy` pattern (same as `entries.test.js`):
+    - `DELETE` with a valid text → `sseManager.calls` contains `["list-1", "history:updated", { listId: "list-1" }]`.
+  - Verify the existing test for "does not broadcast when entry is missing" still holds (no SSE when no rows matched).
+
+#### Frontend
+
+- **`frontend/src/context/EventSourceContext.tsx`**
+  - Add `"history:updated"` to the `SseEventType` union.
+  - Add `"history:updated"` to the `EVENT_TYPES` array.
+
+- **`frontend/src/pages/ListDetailPage/ListDetailPage.tsx`**
+  - Add a `handleHistoryChange` callback (memoised with `useCallback`):
+    ```ts
+    const handleHistoryChange = useCallback(() => {
+      void reloadHistory();
+    }, [reloadHistory]);
+    ```
+  - Register: `useListEvents("history:updated", listId, handleHistoryChange);`
+
+- **`frontend/src/app.test.tsx`**
+  - In the existing SSE integration test (the one that already covers `entry:created`, `entry:updated`, `entry:deleted`, `member:added`, `member:removed`):
+    - Emit `"history:updated"` and assert that `fetchRecentlyUsed` is called again (i.e. the history endpoint is hit one additional time).
+  - The mock fetch setup for that test already handles recently-used responses; no new mock data is required.
+
+### Validation
+- `node --test src/history.test.js` — all history tests pass, including new SSE broadcast assertion
+- `npm run test --workspace frontend -- app` — integration test covering `history:updated` passes
+- `npm run lint`
+- `npm run build`
+- `npm test`
+
+---
+
 ## Validation Summary (full cycle)
 ```
 npm run lint

@@ -1204,7 +1204,15 @@ describe("authentication shell", () => {
         }
       ]
     ];
+    const historyResponses = [
+      [{ text: "Tomatoes", icon: "IconSalad" }],
+      [{ text: "Tomatoes", icon: "IconSalad" }],
+      [{ text: "Tomatoes", icon: "IconSalad" }],
+      [{ text: "Tomatoes", icon: "IconSalad" }],
+      []
+    ];
     let entryRequestCount = 0;
+    let historyRequestCount = 0;
     let memberRequestCount = 0;
 
     fetch.mockImplementation(async (input, init) => {
@@ -1230,9 +1238,12 @@ describe("authentication shell", () => {
       }
 
       if (url === "/api/lists/list-1/history") {
+        const history = historyResponses[Math.min(historyRequestCount, historyResponses.length - 1)];
+        historyRequestCount += 1;
+
         return {
           ok: true,
-          json: async () => ({ history: [] })
+          json: async () => ({ history })
         };
       }
 
@@ -1264,6 +1275,7 @@ describe("authentication shell", () => {
 
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
     expect(await screen.findByText("Milk")).toBeTruthy();
+    expect(await screen.findByText("Tomatoes")).toBeTruthy();
     await waitFor(() => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
@@ -1292,6 +1304,16 @@ describe("authentication shell", () => {
       expect(screen.queryByText("Alex")).toBeNull();
     });
     expect(screen.getByText(/SQUAD \(1\)/)).toBeTruthy();
+
+    const historyRequestsBeforeHistoryEvent = fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1/history")
+      .length;
+    MockEventSource.instances[0].emit("history:updated", { listId: "list-1" });
+    await waitFor(() => {
+      expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1/history")).toHaveLength(
+        historyRequestsBeforeHistoryEvent + 1
+      );
+      expect(screen.queryByText("Tomatoes")).toBeNull();
+    });
 
     expect(fetch.mock.calls.filter(([url]) => url === "/api/lists")).toHaveLength(1);
     expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1/entries")).toHaveLength(4);
