@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.1](https://github.com/derfloDev/endgame_grocery/compare/v1.7.0...v1.7.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* **lists:** restore recently used dismiss controls ([f7c7027](https://github.com/derfloDev/endgame_grocery/commit/f7c7027e903c2cbcf3528ad398297ee57d066f42))
+* **lists:** sync recently used dismissals ([80f401e](https://github.com/derfloDev/endgame_grocery/commit/80f401eb45967638b000ab64cca7daa150cf44e8))
+
 ## [1.7.0](https://github.com/derfloDev/endgame_grocery/compare/v1.6.0...v1.7.0) (2026-05-29)
 
 
