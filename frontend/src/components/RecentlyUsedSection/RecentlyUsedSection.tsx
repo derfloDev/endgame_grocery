@@ -8,12 +8,14 @@ interface RecentlyUsedSectionProps {
   changedDoneTexts?: ReadonlySet<string>;
   items: Suggestion[];
   onAdd?: (text: string, iconName: string | null, details?: string) => void;
+  onDismiss?: (text: string) => void;
 }
 
 export default function RecentlyUsedSection({
   changedDoneTexts,
   items,
-  onAdd
+  onAdd,
+  onDismiss
 }: RecentlyUsedSectionProps): ReactElement | null {
   const { t } = useTranslation();
 
@@ -54,6 +56,16 @@ export default function RecentlyUsedSection({
                   <span className={styles["recently-used-change-badge"]}>{t("entry.changeDone")}</span>
                 ) : null}
               </button>
+              {onDismiss && !isChangedDone ? (
+                <button
+                  aria-label={t("recent.dismiss", { name: item.text })}
+                  className={styles["recently-used-chip-dismiss"]}
+                  type="button"
+                  onClick={() => onDismiss(item.text)}
+                >
+                  &times;
+                </button>
+              ) : null}
             </div>
           );
         })}

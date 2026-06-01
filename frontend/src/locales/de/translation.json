@@ -101,6 +101,7 @@
   "entry.changeDone": "Erledigt",
   "entry.edit": "{name} bearbeiten",
   "recent.sectionLabel": "Zuletzt verwendet",
+  "recent.dismiss": "{name} ausblenden",
   "error.title": "Etwas ist schiefgelaufen",
   "error.message": "Versuche es gleich erneut.",
   "error.retry": "Erneut versuchen",

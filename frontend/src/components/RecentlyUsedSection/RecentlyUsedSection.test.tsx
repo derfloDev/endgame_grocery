@@ -10,8 +10,9 @@ describe("RecentlyUsedSection", () => {
     cleanup();
   });
 
-  it("renders the item count and triggers add actions without a dismiss control", async () => {
+  it("renders the item count, triggers add actions, and exposes dismiss controls", async () => {
     const onAdd = vi.fn();
+    const onDismiss = vi.fn();
 
     render(
       <RecentlyUsedSection
@@ -20,6 +21,7 @@ describe("RecentlyUsedSection", () => {
           { text: "Bread", icon: "IconBread" }
         ]}
         onAdd={onAdd}
+        onDismiss={onDismiss}
       />
     );
 
@@ -32,7 +34,10 @@ describe("RecentlyUsedSection", () => {
     await userEvent.click(within(section).getByRole("button", { name: "Tomatoes" }));
     expect(onAdd).toHaveBeenCalledWith("Tomatoes", "IconSalad", "Cherry tomatoes");
     expect(onAdd).toHaveBeenCalledTimes(1);
-    expect(within(section).queryByRole("button", { name: "Dismiss Bread" })).toBeNull();
+
+    await userEvent.click(within(section).getByRole("button", { name: "Dismiss Bread" }));
+    expect(onDismiss).toHaveBeenCalledWith("Bread");
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
   it("renders the fallback icon when an item has no saved icon", () => {
@@ -55,6 +60,19 @@ describe("RecentlyUsedSection", () => {
 
     const chip = screen.getByRole("button", { name: "Bread" });
     expect(within(chip).getByText("Done").className).toContain("recently-used-change-badge");
+  });
+
+  it("hides dismiss controls while changed done badges are visible", () => {
+    render(
+      <RecentlyUsedSection
+        changedDoneTexts={new Set(["Bread"])}
+        items={[{ text: "Bread", icon: "IconBread" }]}
+        onAdd={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: "Dismiss Bread" })).toBeNull();
   });
 
   it("positions changed badges inside recently used chip corners", () => {

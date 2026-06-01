@@ -109,4 +109,23 @@ describe("recentlyUsedState", () => {
       { text: "Tomatoes", icon: "IconSalad", useCount: 7 }
     ]);
   });
+
+  it("does not surface changed done entries when a matching entry is open", () => {
+    const displayState = getRecentlyUsedDisplayState(
+      [
+        { text: "Bread", icon: "IconBread", useCount: 2 },
+        { text: "Tomatoes", icon: "IconSalad", useCount: 7 }
+      ],
+      [
+        { text: "Bread", status: "open", icon: "IconBread", is_changed: true },
+        { text: "Bread", status: "done", icon: "IconBread", details: "Sourdough", is_changed: true }
+      ],
+      [{ text: "Bread", status: "open" }]
+    );
+
+    expect(displayState.changedDoneTexts.has("Bread")).toBe(false);
+    expect(displayState.visibleRecentlyUsed).toEqual([
+      { text: "Tomatoes", icon: "IconSalad", useCount: 7 }
+    ]);
+  });
 });

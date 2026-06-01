@@ -59,6 +59,19 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
+### T-012 — implement — 2026-05-29T12:39:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-012 done after review approval and prepared the reviewed recently-used duplicate suppression fix for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `README.md`, `frontend/src/pages/recentlyUsedState.test.ts`, `frontend/src/pages/recentlyUsedState.ts` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `fix(lists): suppress duplicate recently used entries` |
+| Next Role | none |
+
+---
+
 ### T-011 — implement — 2026-05-29T11:45:13Z
 
 | Field | Value |
@@ -493,6 +506,159 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | implement |
 
 ### Cycle closed — unversioned — 2026-05-29T11:55:41Z
+
+| Field | Value |
+|-------|-------|
+| Summary | All tasks done; cycle closed |
+| Version | unversioned |
+
+---
+
+### T-012 — plan — 2026-05-29T07:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned fix for re-add-to-open causing done+is_changed entry to appear in both open items and recently-used simultaneously; root cause is getRecentlyUsedDisplayState not filtering changedDoneItems against openEntries |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-012 — implement — 2026-05-29T12:27:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Suppressed changed done entries from Recently Used when an open entry with the same text exists, preventing duplicate open and recently-used display after re-add. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `README.md`, `frontend/src/pages/recentlyUsedState.test.ts`, `frontend/src/pages/recentlyUsedState.ts` |
+| Validation | `npm run test --workspace frontend -- recentlyUsedState` hit sandbox `spawn EPERM`, then failed before implementation after rerun with escalation, then passed after implementation; `npm run lint` passed with the existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with the existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `fix(lists): suppress duplicate recently used entries` |
+| Next Role | review |
+
+### T-013 — plan — 2026-05-29T07:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned restore of recently-used dismiss controls with server-side dismissed_history table; dismissals persist per-user, re-adding clears dismissal, changedDone badge hides dismiss button |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-013 — plan (rework) — 2026-05-29T07:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reworked T-013 plan: dismiss deletes done entries directly from the entries table (shared for all members), no dismissed_history table or migration needed |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-012 — review — 2026-05-29T14:37:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed fix for re-add-to-open duplicating item in recently-used: openTexts guard added before changedDoneItems loop in getRecentlyUsedDisplayState. |
+| Files Changed | frontend/src/pages/recentlyUsedState.ts, frontend/src/pages/recentlyUsedState.test.ts, README.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-013 — implement — 2026-05-29T13:23:50Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Restored recently-used chip dismiss controls backed by a shared DELETE history endpoint that removes matching completed entries while preserving open entries. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `README.md`, `backend/src/history.test.js`, `backend/src/routes/history.js`, `frontend/src/api/history.ts`, `frontend/src/app.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts` |
+| Validation | `node --test src/history.test.js` passed; `npm run test --workspace frontend -- RecentlyUsedSection ListDetailPage app` hit sandbox `spawn EPERM`, then passed after escalation; `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `fix(lists): restore recently used dismiss controls` |
+| Next Role | review |
+
+---
+
+### T-013 — review — 2026-05-31T14:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed restore of recently-used chip dismiss controls: DELETE history endpoint, optimistic client removal, × button hidden during changedDone badge, i18n de+en, README updated; all acceptance criteria met. |
+| Files Changed | `backend/src/routes/history.js`, `backend/src/history.test.js`, `frontend/src/api/history.ts`, `frontend/src/pages/ListDetailPage/useListDetailData.ts`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/app.test.tsx`, `frontend/src/pages/ListDetailPage.test.tsx`, `README.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-014 — plan — 2026-05-31T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Planned real-time SSE broadcast for history dismissal: add `history:updated` event to backend DELETE history handler and frontend ListDetailPage listener so User B sees dismissed chips disappear without a reload. |
+| Files Changed | `.ai/PLAN.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Next Role | implement |
+
+---
+
+### T-013 — implement — 2026-05-31T12:44:10Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-013 done after review approval and prepared the reviewed recently-used dismiss controls for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/REVIEW.md`, `README.md`, `backend/src/history.test.js`, `backend/src/routes/history.js`, `frontend/src/api/history.ts`, `frontend/src/app.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx`, `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`, `frontend/src/locales/de/translation.json`, `frontend/src/locales/en/translation.json`, `frontend/src/pages/ListDetailPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/useListDetailData.ts` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `fix(lists): restore recently used dismiss controls` |
+| Next Role | none |
+
+---
+
+### T-014 — implement — 2026-05-31T13:11:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added real-time SSE sync for recently-used history dismissals so connected list members refresh dismissed chips without reloading. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `README.md`, `backend/src/history.test.js`, `backend/src/routes/history.js`, `frontend/src/app.test.tsx`, `frontend/src/context/EventSourceContext.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx` |
+| Validation | `node --test src/history.test.js` passed; `npm run test --workspace frontend -- app` passed; `npm run test --workspace frontend -- ListDetailPage` passed; `npm run lint` passed with existing `react-refresh/only-export-components` warning in `frontend/src/context/AuthContext.tsx`; `npm run build` passed with existing Vite chunk-size warning; `npm test` passed. |
+| Commit | `fix(lists): sync recently used dismissals` |
+| Next Role | review |
+
+---
+
+### T-014 — review — 2026-06-01T14:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed real-time SSE sync for history dismissal: `history:updated` broadcast on rowCount>0, no-op guard verified by test, `history:updated` added to EventSourceContext, handleHistoryChange wired in ListDetailPage, E2E integration test confirms reloadHistory fires and chip disappears. |
+| Files Changed | `backend/src/routes/history.js`, `backend/src/history.test.js`, `frontend/src/context/EventSourceContext.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/app.test.tsx`, `README.md` |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-014 — implement — 2026-06-01T05:50:43Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked T-014 done after review approval and prepared the reviewed recently-used dismissal SSE sync for commit. |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `README.md`, `backend/src/history.test.js`, `backend/src/routes/history.js`, `frontend/src/app.test.tsx`, `frontend/src/context/EventSourceContext.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx` |
+| Validation | Review passed; no additional validation run during commit_task. |
+| Commit | `fix(lists): sync recently used dismissals` |
+| Next Role | none |
+
+### Cycle closed — unversioned — 2026-06-01T06:05:34Z
 
 | Field | Value |
 |-------|-------|

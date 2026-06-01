@@ -101,6 +101,7 @@
   "entry.changeDone": "Done",
   "entry.edit": "Edit {name}",
   "recent.sectionLabel": "Recently Used",
+  "recent.dismiss": "Dismiss {name}",
   "error.title": "Mission Failed",
   "error.message": "Something went wrong. Try again.",
   "error.retry": "Retry",

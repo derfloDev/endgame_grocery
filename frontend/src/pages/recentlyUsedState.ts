@@ -43,9 +43,10 @@ export function getRecentlyUsedDisplayState(
 ): RecentlyUsedDisplayState {
   const changedDoneTexts = new Set<string>();
   const changedDoneItems: Suggestion[] = [];
+  const openTexts = new Set(openEntries.filter((entry) => entry.status === "open").map((entry) => entry.text));
 
   for (const entry of entries) {
-    if (entry.status !== "done" || !entry.is_changed || changedDoneTexts.has(entry.text)) {
+    if (entry.status !== "done" || !entry.is_changed || changedDoneTexts.has(entry.text) || openTexts.has(entry.text)) {
       continue;
     }
 

@@ -460,6 +460,233 @@ Fix: in `useListDetailData → toggleStatus`, when `nextStatus === "done"`, add 
 
 ---
 
+## T-012 — Fix re-add to open duplicating item in recently-used section
+
+### Root Cause
+
+When user B re-adds a done item (from recently used) back to open, the backend creates a new `open` entry. User A then fetches entries and sees:
+- The new `open` entry with `is_changed: true` and `changeKind = "new"` → correctly shown in "open items" with a **Neu** badge.
+- The old `done` entry still has `is_changed: true` → `getRecentlyUsedDisplayState` includes it in `changedDoneItems` → **also** surfaces in "recently used" with an **Erledigt** badge.
+
+The `filterRecentlyUsedItems` call on `historyItems` correctly skips open texts, but `changedDoneItems` is built from `entries` (server state) and bypasses that filter entirely.
+
+### Fix
+
+In `getRecentlyUsedDisplayState` (`frontend/src/pages/recentlyUsedState.ts`), build a set of open texts from `openEntries` **before** the loop and skip any `done+is_changed` entry whose text is already open:
+
+```ts
+const openTexts = new Set(openEntries.filter(e => e.status === "open").map(e => e.text));
+
+for (const entry of entries) {
+  if (
+    entry.status !== "done" ||
+    !entry.is_changed ||
+    changedDoneTexts.has(entry.text) ||
+    openTexts.has(entry.text)   // ← new guard
+  ) {
+    continue;
+  }
+  // ...
+}
+```
+
+This ensures that when a done+is_changed entry has been superseded by a new open entry, it is suppressed from the recently-used section.
+
+### Acceptance Criteria
+- Re-adding a recently-used item to open shows it **only** in "open items" — not also in "recently used".
+- The open entry correctly shows a **Neu** badge (server-side `is_changed: true`).
+- Done+is_changed items that have no matching open entry still appear in "recently used" with the **Erledigt** badge as before.
+- Existing `recentlyUsedState` tests pass; a new test covers the re-add scenario.
+
+### Files to Change
+- `frontend/src/pages/recentlyUsedState.ts`
+  - In `getRecentlyUsedDisplayState`: derive `openTexts` from `openEntries` before the loop; add `|| openTexts.has(entry.text)` to the skip condition inside the loop.
+- `frontend/src/pages/recentlyUsedState.test.ts` (extend or create)
+  - Add test: when `entries` contains a `done+is_changed` entry AND `openEntries` contains an entry with the same text, `visibleRecentlyUsed` does **not** include that text.
+  - Retain existing test: when `entries` contains a `done+is_changed` entry and `openEntries` does **not** contain a matching open entry, `visibleRecentlyUsed` **does** include it with the Erledigt badge.
+
+### Validation
+- `npm run lint`
+- `npm test -- recentlyUsedState`
+
+---
+
+## T-013 — Restore dismiss controls on recently-used chips
+
+### Scope
+Re-add the × dismiss button to each recently-used chip. Tapping × deletes all `done` entries with that text from the `entries` table — since history is derived from done entries, the item disappears for all list members. No new table or migration required.
+
+### Acceptance Criteria
+- A small × button is visible on each recently-used chip.
+- Tapping × removes the item from the list immediately (optimistic) and deletes all `done` entries with that text from the DB.
+- The item is gone for all list members on the next history load.
+- The × button is **hidden** when the chip shows a `changedDone` badge (the badge is communicating a relevant change; dismissing is not appropriate until the badge is acknowledged).
+- `recent.dismiss` i18n key present in de + en.
+- Lint, build, and tests pass.
+
+### Backend Implementation
+
+#### History DELETE endpoint
+File: `backend/src/routes/history.js`
+```
+DELETE /api/lists/:id/history
+Auth: required + list access
+Body: { text: string }
+Effect:
+  DELETE FROM entries
+  WHERE list_id = $list_id AND text = $text AND status = 'done'
+Response: 204
+```
+Deletes **all** done entries with that text (there may be duplicates from repeated add/complete cycles). Open entries with the same text are unaffected.
+
+### Frontend Implementation
+
+#### API (`frontend/src/api/history.ts`)
+Restore `deleteFromHistory`:
+```ts
+export function deleteFromHistory(listId: string, text: string, token: string): Promise<unknown> {
+  return sendJsonRequest(`/api/lists/${listId}/history`, {
+    method: "DELETE",
+    token,
+    payload: { text }
+  });
+}
+```
+
+#### `useListDetailData` (`frontend/src/pages/ListDetailPage/useListDetailData.ts`)
+Restore `dismissRecentlyUsedEntry`:
+```ts
+const dismissRecentlyUsedEntry = useCallback(
+  (text: string): void => {
+    setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
+    void deleteFromHistory(listId, text, token).catch((error) => {
+      console.error("Failed to delete recently used history item.", error);
+    });
+  },
+  [listId, token]
+);
+```
+Return it from the hook.
+
+#### `ListDetailPage` (`frontend/src/pages/ListDetailPage/ListDetailPage.tsx`)
+- Destructure `dismissRecentlyUsedEntry` from `useListDetailData`.
+- Pass `onDismiss={dismissRecentlyUsedEntry}` to `<RecentlyUsedSection>`.
+
+#### `RecentlyUsedSection` (`frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.tsx`)
+- Add `onDismiss?: (text: string) => void` to props.
+- Restore dismiss `<button>` as a sibling to `.recently-used-chip` inside `.recently-used-cell`.
+- **Do not render** the dismiss button when `isChangedDone` is true.
+
+#### CSS (`frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.module.css`)
+- `.recently-used-cell`: restore `position: relative`.
+- Restore `.recently-used-chip-dismiss`:
+  ```css
+  .recently-used-chip-dismiss {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    display: inline-grid;
+    place-items: center;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: background var(--duration-micro), transform var(--duration-micro);
+  }
+  .recently-used-chip-dismiss:hover,
+  .recently-used-chip-dismiss:focus-visible {
+    background: rgba(255, 69, 96, 0.12);
+    outline: none;
+    transform: translateY(-1px);
+  }
+  ```
+
+#### i18n
+- `frontend/src/locales/de/translation.json` — restore `"recent.dismiss": "{name} ausblenden"`.
+- `frontend/src/locales/en/translation.json` — restore `"recent.dismiss": "Dismiss {name}"`.
+
+### Tests
+- `backend/src/routes/history.test.js` (or existing history tests):
+  - DELETE removes all done entries with that text; GET no longer returns the item.
+  - DELETE with a non-existent text returns 204 (idempotent).
+  - DELETE does not remove open entries with the same text.
+- `frontend/src/components/RecentlyUsedSection/RecentlyUsedSection.test.tsx`:
+  - Dismiss button is rendered and calls `onDismiss` with the correct text.
+  - Dismiss button is **not rendered** when `changedDoneTexts` contains the item's text.
+
+### Validation
+- `npm run lint`
+- `npm run build`
+- `npm test`
+
+---
+
+## T-014 — Real-time sync for history dismissal
+
+### Root Cause
+`DELETE /api/lists/:id/history` (called when User A taps "×" on a recently-used chip) deletes done entries from the DB but never broadcasts an SSE event. `createHistoryRouter` receives `sseManager` via `routerOptions` but ignores it. All other mutating routes (`entries.js`, `lists.js`, `v1.js`) broadcast correctly.
+
+**Consequence**: User B's recently-used section is only updated after a manual page reload.
+
+### Acceptance Criteria
+- When User A dismisses a recently-used chip, User B sees the chip disappear from their recently-used section within the normal SSE delivery window (no reload required).
+- A new `history:updated` SSE event is emitted from the backend DELETE handler.
+- The frontend `ListDetailPage` listens for `history:updated` and calls `reloadHistory()` to refresh the recently-used section.
+- Existing tests still pass; new tests cover the broadcast and client reaction.
+
+### Files to Change
+
+#### Backend
+
+- **`backend/src/routes/history.js`**
+  - Add `sseManager` to the destructured options of `createHistoryRouter` (it is already present in `routerOptions` passed from `app.js`).
+  - After the DELETE query succeeds, call:
+    ```js
+    void sseManager
+      .broadcastToList(pool, req.params.id, "history:updated", { listId: req.params.id })
+      .catch((err) => logger.error({ err }, "Failed to broadcast SSE event"));
+    ```
+  - Add `logger` import (or receive via options — follow the pattern used in `entries.js`).
+
+- **`backend/src/history.test.js`**
+  - Add a test using the `createSseManagerSpy` pattern (same as `entries.test.js`):
+    - `DELETE` with a valid text → `sseManager.calls` contains `["list-1", "history:updated", { listId: "list-1" }]`.
+  - Verify the existing test for "does not broadcast when entry is missing" still holds (no SSE when no rows matched).
+
+#### Frontend
+
+- **`frontend/src/context/EventSourceContext.tsx`**
+  - Add `"history:updated"` to the `SseEventType` union.
+  - Add `"history:updated"` to the `EVENT_TYPES` array.
+
+- **`frontend/src/pages/ListDetailPage/ListDetailPage.tsx`**
+  - Add a `handleHistoryChange` callback (memoised with `useCallback`):
+    ```ts
+    const handleHistoryChange = useCallback(() => {
+      void reloadHistory();
+    }, [reloadHistory]);
+    ```
+  - Register: `useListEvents("history:updated", listId, handleHistoryChange);`
+
+- **`frontend/src/app.test.tsx`**
+  - In the existing SSE integration test (the one that already covers `entry:created`, `entry:updated`, `entry:deleted`, `member:added`, `member:removed`):
+    - Emit `"history:updated"` and assert that `fetchRecentlyUsed` is called again (i.e. the history endpoint is hit one additional time).
+  - The mock fetch setup for that test already handles recently-used responses; no new mock data is required.
+
+### Validation
+- `node --test src/history.test.js` — all history tests pass, including new SSE broadcast assertion
+- `npm run test --workspace frontend -- app` — integration test covering `history:updated` passes
+- `npm run lint`
+- `npm run build`
+- `npm test`
+
+---
+
 ## Validation Summary (full cycle)
 ```
 npm run lint

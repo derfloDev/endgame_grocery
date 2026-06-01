@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import request from "supertest";
 import { createApp } from "./app.js";
 
-function createAuthedApp(pool) {
+function createAuthedApp(pool, options = {}) {
   return createApp({
     pool,
+    sseManager: options.sseManager ?? createSseManagerSpy(),
     requireAuthMiddleware(req, _res, next) {
       req.user = { sub: "user-1" };
       next();
@@ -105,17 +106,94 @@ describe("history routes", () => {
     assert.deepEqual(response.body, { history: [] });
   });
 
-  it("returns 404 because individual history deletion is not supported", async () => {
+  it("deletes all done entries with the requested text", async () => {
+    const sseManager = createSseManagerSpy();
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          assert.match(sql, /SELECT l.id/);
+          assert.deepEqual(params, ["list-1", "user-1"]);
+
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        assert.match(sql, /DELETE FROM entries/);
+        assert.match(sql, /status = 'done'/);
+        assert.deepEqual(params, ["list-1", "Milk"]);
+
+        return { rowCount: 2, rows: [] };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool, { sseManager }))
+      .delete("/api/lists/list-1/history")
+      .send({ text: "Milk" });
+
+    assert.equal(response.status, 204);
+    assert.equal(callCount, 2);
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "history:updated", { listId: "list-1" }]
+    ]);
+  });
+
+  it("returns 204 when the requested history item does not exist", async () => {
+    const sseManager = createSseManagerSpy();
+    let callCount = 0;
     const pool = {
       async query() {
-        assert.fail("pool.query should not be called for a removed delete route");
+        callCount += 1;
+
+        if (callCount === 1) {
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        return { rowCount: 0, rows: [] };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool, { sseManager }))
+      .delete("/api/lists/list-1/history")
+      .send({ text: "Missing item" });
+
+    assert.equal(response.status, 204);
+    assert.equal(callCount, 2);
+    assert.deepEqual(sseManager.calls, []);
+  });
+
+  it("does not delete open entries with the same text", async () => {
+    let deleteSql = "";
+    const pool = {
+      async query(sql) {
+        if (!deleteSql) {
+          deleteSql = sql;
+          return { rows: [{ id: "list-1" }] };
+        }
+
+        deleteSql = sql;
+        return { rowCount: 1, rows: [] };
       }
     };
 
     const response = await request(createAuthedApp(pool))
       .delete("/api/lists/list-1/history")
-      .send({ text: "Milk" });
+      .send({ text: "Bread" });
 
-    assert.equal(response.status, 404);
+    assert.equal(response.status, 204);
+    assert.match(deleteSql, /status = 'done'/);
+    assert.doesNotMatch(deleteSql, /status <> 'open'/);
   });
 });
+
+function createSseManagerSpy() {
+  return {
+    calls: [],
+    broadcastToList(pool, listId, eventType, data) {
+      void pool;
+      this.calls.push([listId, eventType, data]);
+      return Promise.resolve();
+    }
+  };
+}

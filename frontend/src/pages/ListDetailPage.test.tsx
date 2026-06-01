@@ -6,7 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../i18n";
 import { createEntry, fetchEntries, updateEntry } from "../api/entries";
-import { fetchRecentlyUsed } from "../api/history";
+import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
 import { fetchLists, markListViewed } from "../api/lists";
 import { fetchListMembers } from "../api/sharing";
 import { writeCachedResource } from "../api/offlineStore";
@@ -31,6 +31,7 @@ vi.mock("../api/entries", () => ({
 }));
 
 vi.mock("../api/history", () => ({
+  deleteFromHistory: vi.fn(),
   fetchRecentlyUsed: vi.fn()
 }));
 
@@ -73,6 +74,7 @@ vi.mock("../hooks/usePushNotifications", () => ({
 }));
 
 const createEntryMock = vi.mocked(createEntry);
+const deleteFromHistoryMock = vi.mocked(deleteFromHistory);
 const fetchEntriesMock = vi.mocked(fetchEntries);
 const fetchRecentlyUsedMock = vi.mocked(fetchRecentlyUsed);
 const fetchListsMock = vi.mocked(fetchLists);
@@ -122,6 +124,7 @@ function mockListDetailData({ entries = [], history = [] }: MockListDetailDataOp
   fetchListMembersMock.mockResolvedValue({ members: [] });
   markListViewedMock.mockResolvedValue(undefined);
   writeCachedResourceMock.mockResolvedValue(undefined);
+  deleteFromHistoryMock.mockResolvedValue(null);
 }
 
 function getOpenItemsSection() {
@@ -314,6 +317,29 @@ describe("ListDetailPage optimistic updates", () => {
 
     expect(await screen.findByTestId("entry-tile-entry-1")).toBeTruthy();
     expect(within(getOpenItemsSection()).getByTestId("entry-tile-grid")).toBeTruthy();
+  });
+
+  it("dismisses a recently used entry optimistically", async () => {
+    mockListDetailData({
+      entries: [],
+      history: [
+        {
+          text: "Bread",
+          icon: "IconBread",
+          last_used_at: "2026-04-21T00:00:00Z"
+        }
+      ]
+    });
+
+    renderListDetailPage();
+
+    const recentlyUsedSection = await screen.findByRole("region", { name: "Recently Used" });
+    await userEvent.click(within(recentlyUsedSection).getByRole("button", { name: "Dismiss Bread" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("region", { name: "Recently Used" })).toBeNull();
+    });
+    expect(deleteFromHistory).toHaveBeenCalledWith("list-1", "Bread", "test-token");
   });
 
   it("renders changed entry badges and marks the list viewed", async () => {

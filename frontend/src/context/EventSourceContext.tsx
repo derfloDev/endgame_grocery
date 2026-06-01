@@ -7,6 +7,7 @@ export type SseEventType =
   | "entry:created"
   | "entry:updated"
   | "entry:deleted"
+  | "history:updated"
   | "list:updated"
   | "list:deleted"
   | "member:added"
@@ -25,6 +26,7 @@ const EVENT_TYPES: SseEventType[] = [
   "entry:created",
   "entry:updated",
   "entry:deleted",
+  "history:updated",
   "list:updated",
   "list:deleted",
   "member:added",

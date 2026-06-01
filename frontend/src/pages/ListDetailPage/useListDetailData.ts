@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createTemporaryId } from "../../api/client";
 import { createEntry, fetchEntries, updateEntry } from "../../api/entries";
-import { fetchRecentlyUsed } from "../../api/history";
+import { deleteFromHistory, fetchRecentlyUsed } from "../../api/history";
 import { fetchLists, markListViewed } from "../../api/lists";
 import { writeCachedResource } from "../../api/offlineStore";
 import { fetchListMembers } from "../../api/sharing";
@@ -350,6 +350,16 @@ export function useListDetailData({
     [addEntryByText, recentlyUsed]
   );
 
+  const dismissRecentlyUsedEntry = useCallback(
+    (text: string): void => {
+      setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
+      void deleteFromHistory(listId, text, token).catch((error) => {
+        console.error("Failed to delete recently used history item.", error);
+      });
+    },
+    [listId, token]
+  );
+
   useEffect(() => {
     async function loadListDetail(): Promise<void> {
       setEntryError(null);
@@ -421,6 +431,7 @@ export function useListDetailData({
   return {
     addEntryByText,
     addRecentlyUsedEntry,
+    dismissRecentlyUsedEntry,
     entries,
     entryError,
     isLoading,
