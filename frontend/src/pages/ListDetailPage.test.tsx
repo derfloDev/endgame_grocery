@@ -209,6 +209,83 @@ describe("ListDetailPage optimistic updates", () => {
     });
   });
 
+  it("preserves the Done badge after an SSE-triggered entry reload", async () => {
+    fetchListsMock.mockResolvedValue({
+      lists: [
+        { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List
+      ]
+    });
+    fetchEntriesMock
+      .mockResolvedValueOnce({
+        entries: [
+          {
+            id: "entry-1",
+            text: "Milk",
+            status: "open",
+            icon: "IconMilk",
+            created_at: "2026-04-21T00:00:00Z"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        entries: [
+          {
+            id: "entry-1",
+            text: "Milk",
+            status: "done",
+            icon: "IconMilk",
+            is_changed: false,
+            created_at: "2026-04-21T00:00:00Z"
+          }
+        ]
+      });
+    fetchRecentlyUsedMock
+      .mockResolvedValueOnce({ history: [] })
+      .mockResolvedValueOnce({
+        history: [{ text: "Milk", icon: "IconMilk" }]
+      });
+    fetchListMembersMock.mockResolvedValue({ members: [] });
+    markListViewedMock.mockResolvedValue(undefined);
+    writeCachedResourceMock.mockResolvedValue(undefined);
+    updateEntryMock.mockResolvedValue({
+      entry: {
+        id: "entry-1",
+        text: "Milk",
+        status: "done",
+        icon: "IconMilk",
+        is_changed: false,
+        created_at: "2026-04-21T00:00:00Z"
+      } as Entry
+    });
+
+    renderListDetailPage();
+
+    expect(await screen.findByText("Milk")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Mark Milk done" }));
+
+    await waitFor(() => {
+      const recentlyUsedSection = screen.getByRole("region", { name: "Recently Used" });
+      expect(within(recentlyUsedSection).getByText("Milk")).toBeTruthy();
+      expect(within(recentlyUsedSection).getByText("Done")).toBeTruthy();
+    });
+
+    const entryUpdatedHandler = useListEventsMock.mock.calls.find(([eventType]) => eventType === "entry:updated")?.[2];
+
+    if (!entryUpdatedHandler) {
+      throw new Error("Expected entry:updated handler to be registered.");
+    }
+
+    entryUpdatedHandler({ listId: "list-1", entryId: "entry-1" });
+
+    await waitFor(() => {
+      expect(fetchEntries).toHaveBeenCalledTimes(2);
+      expect(fetchRecentlyUsed).toHaveBeenCalledTimes(2);
+      const recentlyUsedSection = screen.getByRole("region", { name: "Recently Used" });
+      expect(within(recentlyUsedSection).getByText("Milk")).toBeTruthy();
+      expect(within(recentlyUsedSection).getByText("Done")).toBeTruthy();
+    });
+  });
+
   it("reverts a toggled entry when updateEntry rejects", async () => {
     const updateRequest = createDeferred<Awaited<ReturnType<typeof updateEntry>>>();
     mockListDetailData({

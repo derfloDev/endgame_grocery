@@ -1,71 +1,34 @@
 # ROADMAP
 
-Goal: Deliver a set of client-quality improvements covering UI polish, UX fixes, new icons, PWA update flow, push notification reliability, and a new "changed badges" feature for shared lists.
+Goal: Fix the "done" badge disappearing immediately in the recently-used section after the current user toggles an entry from open to done.
 
-## Priority 1 — Styling Fixes
+## Priority 1
 
-Objective: Fix three visual issues reported on mobile.
+Objective: Persist the "done" badge on recently-used items for the user who performed the toggle, until they navigate away from the list or reload the page.
 
-- `overview-topbar` top padding: reduce from `52px` to `16px`.
-- FAB (`+` button): change `bottom` to `16px` to match the `16px` right margin on narrow screens.
-- AddItemSheet icon-browser grid: add `min-height` so at least two icon rows are always visible even when the on-screen keyboard is open.
+**Bug description:**
+When User A toggles an entry from "open" to "done":
+1. `toggleStatus` optimistically sets `is_changed: true` on the entry in local state.
+2. An SSE event (`entry:updated`) fires on User A's client, triggering `handleEntryChange` → `loadEntries()`.
+3. `loadEntries()` replaces local entries with fresh server data. The server returns `is_changed: false` for User A — because `is_changed` is a server-side flag that only marks changes as "unseen" for *other* users (User A is the author of the change, so the server does not flag it for them).
+4. `getRecentlyUsedDisplayState` sees `is_changed: false` → `changedDoneTexts` is empty → the "done" badge disappears immediately for User A.
 
-## Priority 2 — Enter-Key UX in AddItemSheet
+User B (a different client) correctly sees the badge because the server returns `is_changed: true` for them.
 
-Objective: Pressing Enter in the title input should submit the item, not advance focus to the Details field.
+**Acceptance criteria:**
+- After User A toggles an entry to "done", its chip in the recently-used section shows the "done" badge.
+- The badge remains visible for User A even after server reloads triggered by SSE events during the same page session.
+- The badge is gone after User A navigates away from the list detail page and back (full list reload clears local state).
+- The badge is gone after a browser page reload.
+- No regression: entries toggled to "done" by User B are not incorrectly badged on User A's view (only locally-performed toggles are tracked).
 
-- Add `onKeyDown` handler on the title `<input>` that calls `handleSubmit` and prevents default when `key === "Enter"`.
-- Add `enterKeyHint="done"` on the title input for correct mobile keyboard hint.
-- No change to the Details field behaviour.
+**Constraints:**
+- Track locally-changed entries by entry ID to avoid false positives.
+- The local tracking set must be cleared when `loadListDetail` (the initial `useEffect`) re-runs — i.e., on listId/token/syncVersion change, which is equivalent to navigating away and back.
+- The fix lives in `useListDetailData.ts`; `getRecentlyUsedDisplayState` in `recentlyUsedState.ts` does not need to change.
+- Solution: add a `locallyDoneIdsRef` (`useRef<Set<string>>`) inside `useListDetailData`. When `toggleStatus` marks an entry as done, add its ID to the ref. When `loadEntries` merges server data, force `is_changed: true` for any entry whose ID is in `locallyDoneIdsRef`. Clear the ref at the start of `loadListDetail`.
 
-## Priority 3 — New Icons (4)
-
-Objective: Add four new custom SVG icons to the icon registry.
-
-- **Spülmaschinentabs** — illustration of several dishwasher tabs.
-- **Nuss-Nougat-Creme** (Nutella) — illustration of a glass jar for nut-nougat cream.
-- **Maultaschen** — illustration of three Maultaschen (German pasta pockets).
-- **Kräuter** (Petersilie / Rosmarin / Basilikum) — illustration of a herb bunch.
-
-Each icon: SVG in `frontend/src/assets/icons/custom/`, wrapped as a React component in `customIcons.tsx`, registered in `iconRegistry.ts`.
-
-## Priority 4 — PWA Update Banner
-
-Objective: When a new app version is deployed, the PWA should prompt the user to reload instead of requiring logout/login.
-
-- Change `frontend/src/sw/register.ts` to use `useRegisterSW` from `virtual:pwa-register/react` with an `onNeedRefresh` callback.
-- Add an `UpdateBanner` component (dismissible toast/banner) that appears when a new SW version is waiting.
-- Clicking the banner calls `updateServiceWorker(true)` to skip waiting and reload.
-- Wire into `App.tsx` (or the protected layout) so the banner is visible on all logged-in pages.
-- i18n keys for the banner text (de + en).
-
-## Priority 5 — Push Notifications Debug & Fix
-
-Objective: Investigate why push notifications are never delivered and fix the root cause.
-
-- Systematically audit the push notification pipeline:
-  1. `usePushNotifications.ts`: verify the subscription is saved with the correct token and that the VAPID public key fetch succeeds.
-  2. Backend `routes/push.js`: verify the subscription INSERT is reaching the DB.
-  3. Backend `pushWorker.js`: add structured logging for each step (job found, cooldown check, recipients, subscriptions, `webpushLib.sendNotification` result/error).
-  4. Service-worker push handler: verify the SW receives the push event.
-- Fix any confirmed bug found during audit.
-- The `buildNotificationBody` mixing German strings will also be fixed (move to a locale-neutral format or consistent language).
-
-## Priority 6 — Changed Badges
-
-Objective: Show how many items have changed in a shared list (by other users or via API) since the current user last opened it. Inside the list, flag individual changed items. Badges clear on next open.
-
-### Backend
-- **Migration A**: Add `last_updated_by uuid REFERENCES users(id)` (nullable) to `entries`.
-- **Migration B**: Add `list_views` table: `(user_id uuid, list_id uuid, last_viewed_at timestamptz, PRIMARY KEY (user_id, list_id))`.
-- **Entries routes**: Set `last_updated_by = req.user.sub` on INSERT and UPDATE. For API-key requests, leave NULL.
-- **Lists route** (`GET /api/lists`): include `changed_count` per list — count of entries where `updated_at > last_viewed_at AND (last_updated_by IS NULL OR last_updated_by <> current_user_id)`. Use `0` when no `list_views` row exists.
-- **Entries route** (`GET /api/lists/:id/entries`): include `is_changed boolean` per entry using the same condition.
-- **New endpoint**: `POST /api/lists/:id/mark-viewed` — upserts `list_views` with `last_viewed_at = NOW()`. Requires auth + list access.
-
-### Frontend
-- **OverviewPage / ListCardHome**: show a numeric badge when `changed_count > 0`.
-- **ListDetailPage / EntryTile**: show a small badge (`NEW` / `EDITED` / `DONE`) on entries where `is_changed = true`. Call `mark-viewed` on mount (when list data is first loaded).
-- **Types**: extend `List` with `changed_count?: number`, extend entry type with `is_changed?: boolean`.
-- **i18n**: add keys for badge labels (de + en).
-- **Clearing**: after `mark-viewed` is called, refetch or clear `is_changed` flags locally so badges disappear without a full reload.
+**Files to change:**
+- `frontend/src/pages/ListDetailPage/useListDetailData.ts` — add `locallyDoneIdsRef`, populate in `toggleStatus`, apply in `loadEntries`, clear in `loadListDetail`
+- `frontend/src/pages/ListDetailPage.test.tsx` — add/update tests covering badge-persistence after SSE-triggered reload
+- `frontend/src/pages/recentlyUsedState.test.ts` — verify no regression in display-state logic (likely no changes needed here)

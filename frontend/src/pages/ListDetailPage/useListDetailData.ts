@@ -63,6 +63,7 @@ export function useListDetailData({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSharingLoading, setIsSharingLoading] = useState<boolean>(false);
   const isMountedRef = useRef<boolean>(false);
+  const locallyDoneIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -76,7 +77,13 @@ export function useListDetailData({
     async ({ historyItems = null, throwOnError = false }: LoadEntriesOptions = {}): Promise<DetailEntry[]> => {
       try {
         const entriesResult = await fetchEntries(listId, token);
-        const nextEntries = (entriesResult.entries ?? []) as DetailEntry[];
+        const nextEntries = (entriesResult.entries ?? []).map((entry) => {
+          const detailEntry = entry as DetailEntry;
+
+          return locallyDoneIdsRef.current.has(detailEntry.id) && detailEntry.status === "done"
+            ? { ...detailEntry, is_changed: true }
+            : detailEntry;
+        });
 
         if (isMountedRef.current) {
           setEntries(nextEntries);
@@ -237,6 +244,10 @@ export function useListDetailData({
         ...(isCompletingEntry ? { is_changed: true } : {})
       };
 
+      if (isCompletingEntry) {
+        locallyDoneIdsRef.current.add(entry.id);
+      }
+
       await updateEntries((currentEntries) =>
         sortEntries(
           currentEntries.map((currentEntry) => (currentEntry.id === entry.id ? optimisticEntry : currentEntry))
@@ -284,6 +295,7 @@ export function useListDetailData({
         );
 
         if (isCompletingEntry) {
+          locallyDoneIdsRef.current.delete(entry.id);
           setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== entry.text));
         }
 
@@ -365,6 +377,7 @@ export function useListDetailData({
       setEntryError(null);
       setIsLoading(true);
       setRecentlyUsed([]);
+      locallyDoneIdsRef.current = new Set();
       onLoadStart?.();
 
       try {
