@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2](https://github.com/derfloDev/endgame_grocery/compare/v1.7.1...v1.7.2) (2026-06-03)
+
+
+### Bug Fixes
+
+* **frontend:** keep done badges after entry reloads ([4684a3f](https://github.com/derfloDev/endgame_grocery/commit/4684a3f2dc1418def53b88318320d60634ba211a))
+
 ## [1.7.1](https://github.com/derfloDev/endgame_grocery/compare/v1.7.0...v1.7.1) (2026-06-01)
 
 
