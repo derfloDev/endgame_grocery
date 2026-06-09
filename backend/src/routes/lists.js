@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { getPool } from "../db/client.js";
+import { getConfig } from "../env.js";
 import { logger as defaultLogger } from "../logger.js";
+import createMailer from "../mail/mailer.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
@@ -11,14 +13,18 @@ import { sseManager as defaultSseManager } from "../sseManager.js";
  * @param {object} [options] Router dependencies.
  * @param {import("pg").Pool} [options.pool] Database pool.
  * @param {import("express").RequestHandler} [options.requireAuthMiddleware] Auth middleware.
+ * @param {ReturnType<typeof getConfig>} [options.config] Runtime configuration.
  * @param {typeof defaultLogger} [options.logger] Application logger.
+ * @param {ReturnType<typeof createMailer>} [options.mailer] Mail delivery adapter.
  * @param {typeof defaultSseManager} [options.sseManager] SSE broadcaster.
  * @returns {import("express").Router} Configured list router.
  */
 export function createListRouter({
   pool = getPool(),
   requireAuthMiddleware = requireAuth,
+  config = getConfig(),
   logger = defaultLogger,
+  mailer = createMailer({ config }),
   sseManager = defaultSseManager
 } = {}) {
   const router = Router();
@@ -200,6 +206,70 @@ export function createListRouter({
     }
   });
 
+  router.delete("/:id/leave", async (req, res, next) => {
+    if (!pool) {
+      next(new Error("Database connection is not configured."));
+      return;
+    }
+
+    try {
+      const listResult = await pool.query(
+        `
+          SELECT
+            l.id,
+            l.name,
+            l.owner_id,
+            owner.display_name AS owner_display_name,
+            owner.email AS owner_email
+          FROM lists l
+          JOIN users owner ON owner.id = l.owner_id
+          WHERE l.id = $1
+          LIMIT 1
+        `,
+        [req.params.id]
+      );
+      const list = listResult.rows[0];
+
+      if (list?.owner_id === req.user.sub) {
+        res.status(403).json({ error: "The list owner cannot leave their own list." });
+        return;
+      }
+
+      const deleteResult = await pool.query(
+        `
+          DELETE FROM list_members lm
+          USING users member
+          WHERE lm.list_id = $1
+            AND lm.user_id = $2
+            AND member.id = lm.user_id
+          RETURNING lm.user_id, member.display_name
+        `,
+        [req.params.id, req.user.sub]
+      );
+      const member = deleteResult.rows[0];
+
+      if (!list || !member) {
+        res.status(404).json({ error: "You do not have access to this list." });
+        return;
+      }
+
+      void sseManager
+        .broadcastToList(pool, req.params.id, "member:removed", {
+          listId: req.params.id,
+          userId: req.user.sub
+        })
+        .catch((broadcastError) => {
+          logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+        });
+
+      await sendMemberLeftEmail({ list, mailer, member });
+
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.delete("/:id", async (req, res, next) => {
     if (!pool) {
       next(new Error("Database connection is not configured."));
@@ -233,6 +303,30 @@ export function createListRouter({
   });
 
   return router;
+}
+
+/**
+ * Sends an email to a list owner when a shared member leaves.
+ *
+ * @param {object} options Member-left email options.
+ * @param {{ name: string, owner_display_name: string, owner_email: string }} options.list List row.
+ * @param {ReturnType<typeof createMailer>} options.mailer Mail delivery adapter.
+ * @param {{ display_name: string }} options.member Leaving member row.
+ * @returns {Promise<void>} Resolves when the mailer accepts the message.
+ */
+async function sendMemberLeftEmail({ list, mailer, member }) {
+  await mailer.send({
+    to: list.owner_email,
+    subject: `${member.display_name} left ${list.name}`,
+    template: "member-left",
+    context: {
+      heading: "A member left your list",
+      intro: `Hi ${list.owner_display_name},`,
+      body: `${member.display_name} left the shared list "${list.name}".`,
+      listName: list.name,
+      memberName: member.display_name
+    }
+  });
 }
 
 export default createListRouter;
