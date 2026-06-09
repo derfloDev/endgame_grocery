@@ -129,3 +129,50 @@ No blockers or majors found.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-06-09
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `OverviewPage.tsx:205` | `event.target.value as OverviewSortMode` — type cast without runtime guard. The controlled `<select>` with fixed `<option>` values makes an invalid value impossible in practice. Not a real risk. | No |
+
+No blockers or majors found.
+
+#### Verification
+
+##### Steps
+1. Read `.ai/PLAN.md` T-004 scope and acceptance criteria.
+2. Inspected `git diff HEAD` for all changed files.
+3. Verified `overviewSort.ts` — pure `sortLists<T extends List>(lists, mode)` function with `comparePresentValues` helper treating `undefined` as sorted-last. All three modes (`created_asc`, `name_asc`, `activity_desc`) implemented correctly.
+4. Verified `isOverviewSortMode` type guard used for localStorage validation — invalid/absent values fall back to `DEFAULT_OVERVIEW_SORT = "created_asc"`.
+5. Verified `useState` lazy initializer reads localStorage on mount; `handleSortChange` writes on every change — correct persistence pattern.
+6. Verified `<select>` is inside `overview-actions` which is inside `overview-brand` — satisfies plan placement requirement.
+7. Verified `<label className="visually-hidden" htmlFor="overview-sort">` — `visually-hidden` class confirmed in `frontend/src/styles/shared.css`.
+8. Verified `sortedLists` is applied before the list map render (line 232).
+9. Verified `List` type gains `created_at?: string` and `last_activity?: string` — optional fields safe for offline cached data.
+10. Verified i18n: `overview.sortLabel`, `overview.sortCreatedAsc`, `overview.sortNameAsc`, `overview.sortActivityDesc` present in EN + DE with correct values.
+11. Verified `overviewSort.test.ts` — 3 unit tests covering all three sort modes including missing-field (undefined) case.
+12. Verified `OverviewPage.test.tsx` — 3 integration tests: immediate reorder + localStorage write, restore valid preference, fallback for invalid preference.
+13. Ran `npm test --workspace=frontend` — 469/469 pass (37 test files).
+14. Ran `npm run lint` — 0 errors.
+15. Ran `npm run build` — success.
+
+##### Findings
+- All six acceptance criteria satisfied: sort control with 3 options, immediate reorder, localStorage persistence under `"overview_sort"`, page-reload restore, offline safety (undefined → sorted last, no crash), i18n EN + DE.
+- Responsive CSS added: `overview-brand` stacks vertically and sort control wraps at ≤ 480px.
+
+##### Risks
+- None.
+
+#### Verdict
+`PASS`

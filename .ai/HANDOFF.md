@@ -147,3 +147,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — review — 2026-06-09T07:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed overview list sorting; all acceptance criteria met, 469 frontend + 174 backend tests pass, lint and build clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-06-09T10:53:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added overview list sorting by creation date, name, or latest activity with local preference persistence, accessible English/German controls, and safe handling of cached lists without timestamps |
+| Files Changed | `README.md`, `frontend/src/types.ts`, `frontend/src/pages/OverviewPage/OverviewPage.tsx`, `frontend/src/pages/OverviewPage/OverviewPage.module.css`, `frontend/src/pages/OverviewPage/OverviewPage.test.tsx`, `frontend/src/pages/OverviewPage/overviewSort.ts`, `frontend/src/pages/OverviewPage/overviewSort.test.ts`, `frontend/src/locales/en/translation.json`, `frontend/src/locales/de/translation.json`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Focused sorting tests (pass, 7 tests); `npm run lint` (pass, 1 pre-existing warning); `npm run build` (pass, existing chunk-size warning); `npm test` (pass, 469 frontend and 174 backend tests) |
+| Commit | `feat(overview): add persisted list sorting` |
+| Next Role | review |
+
+---
+
+### T-004 — implement commit_task — 2026-06-09T11:00:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed overview sorting task done and created its approved task commit |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Review verdict PASS; implementation validation recorded in prior handoff |
+| Commit | `feat(overview): add persisted list sorting` |
+| Next Role | none |
+
+---

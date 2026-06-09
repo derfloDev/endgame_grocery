@@ -18,6 +18,8 @@ export interface List {
   name?: string;
   is_owner?: boolean;
   changed_count?: number;
+  created_at?: string;
+  last_activity?: string;
 }
 
 export interface Member {

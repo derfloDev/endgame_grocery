@@ -42,6 +42,7 @@ const writeCachedResourceMock = vi.mocked(writeCachedResource);
 describe("OverviewPage leave list", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     fetchListsMock.mockResolvedValue({
       lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }]
     });
@@ -84,3 +85,91 @@ describe("OverviewPage leave list", () => {
     expect(writeCachedResourceMock).toHaveBeenCalledWith("lists", { lists: [] });
   });
 });
+
+describe("OverviewPage sorting", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    fetchListsMock.mockResolvedValue({
+      lists: [
+        {
+          id: "list-b",
+          name: "Bananas",
+          is_owner: true,
+          created_at: "2026-02-01T00:00:00.000Z",
+          last_activity: "2026-04-01T00:00:00.000Z"
+        },
+        {
+          id: "list-a",
+          name: "Apples",
+          is_owner: true,
+          created_at: "2026-01-01T00:00:00.000Z",
+          last_activity: "2026-03-01T00:00:00.000Z"
+        }
+      ]
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("renders the sort control and persists immediate reordering", async () => {
+    renderOverviewPage();
+
+    const sortSelect = await screen.findByRole("combobox", { name: "Sort lists" });
+    expect(getRenderedListNames()).toEqual(["Apples", "Bananas"]);
+
+    await userEvent.selectOptions(sortSelect, "activity_desc");
+
+    expect(getRenderedListNames()).toEqual(["Bananas", "Apples"]);
+    expect(window.localStorage.getItem("overview_sort")).toBe("activity_desc");
+  });
+
+  it("restores a valid persisted sort preference", async () => {
+    window.localStorage.setItem("overview_sort", "name_asc");
+
+    renderOverviewPage();
+
+    const sortSelect = await screen.findByRole<HTMLSelectElement>("combobox", { name: "Sort lists" });
+
+    expect(sortSelect.value).toBe("name_asc");
+    await screen.findByText("Apples");
+    expect(getRenderedListNames()).toEqual(["Apples", "Bananas"]);
+  });
+
+  it("falls back to oldest first for an invalid persisted preference", async () => {
+    window.localStorage.setItem("overview_sort", "invalid");
+
+    renderOverviewPage();
+
+    const sortSelect = await screen.findByRole<HTMLSelectElement>("combobox", { name: "Sort lists" });
+
+    expect(sortSelect.value).toBe("created_asc");
+    await screen.findByText("Apples");
+    expect(getRenderedListNames()).toEqual(["Apples", "Bananas"]);
+  });
+});
+
+function renderOverviewPage() {
+  return render(
+    <MemoryRouter
+      future={{
+        v7_relativeSplatPath: true,
+        v7_startTransition: true
+      }}
+      initialEntries={["/"]}
+    >
+      <Routes>
+        <Route element={<OverviewPage />} path="/" />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+function getRenderedListNames(): string[] {
+  return screen
+    .getAllByRole("article")
+    .map((article) => article.textContent ?? "")
+    .map((text) => (text.includes("Apples") ? "Apples" : "Bananas"));
+}

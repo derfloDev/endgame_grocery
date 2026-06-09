@@ -20,8 +20,15 @@ import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 import type { List } from "../../types";
 import { leaveSharedList } from "../leaveListAction";
 import styles from "./OverviewPage.module.css";
+import {
+  DEFAULT_OVERVIEW_SORT,
+  isOverviewSortMode,
+  sortLists
+} from "./overviewSort";
+import type { OverviewSortMode } from "./overviewSort";
 
 const LISTS_CACHE_KEY = "lists";
+const OVERVIEW_SORT_KEY = "overview_sort";
 
 interface OverviewList extends List {
   name: string;
@@ -39,6 +46,10 @@ export default function OverviewPage(): ReactElement {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showInfo, setShowInfo] = useState<boolean>(false);
   const [showNew, setShowNew] = useState<boolean>(false);
+  const [sortMode, setSortMode] = useState<OverviewSortMode>(() => {
+    const storedSort = window.localStorage.getItem(OVERVIEW_SORT_KEY);
+    return isOverviewSortMode(storedSort) ? storedSort : DEFAULT_OVERVIEW_SORT;
+  });
   const isMountedRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -166,7 +177,13 @@ export default function OverviewPage(): ReactElement {
     });
   }
 
+  function handleSortChange(nextSortMode: OverviewSortMode): void {
+    setSortMode(nextSortMode);
+    window.localStorage.setItem(OVERVIEW_SORT_KEY, nextSortMode);
+  }
+
   const shouldSuppressError = error instanceof AuthExpiredError;
+  const sortedLists = sortLists(lists, sortMode);
 
   return (
     <div>
@@ -177,6 +194,21 @@ export default function OverviewPage(): ReactElement {
             <div className={styles["overview-brand-sub"]}>{t("app.brandSub")}</div>
           </div>
           <div className={styles["overview-actions"]}>
+            <div className={styles["overview-sort-control"]}>
+              <label className="visually-hidden" htmlFor="overview-sort">
+                {t("overview.sortLabel")}
+              </label>
+              <select
+                id="overview-sort"
+                className={styles["overview-sort-select"]}
+                value={sortMode}
+                onChange={(event) => handleSortChange(event.target.value as OverviewSortMode)}
+              >
+                <option value="created_asc">{t("overview.sortCreatedAsc")}</option>
+                <option value="name_asc">{t("overview.sortNameAsc")}</option>
+                <option value="activity_desc">{t("overview.sortActivityDesc")}</option>
+              </select>
+            </div>
             <img alt={t("app.brandName")} className={styles["overview-logo"]} src={logo} />
             <button aria-label={t("settings.open")} className="eg-icon-btn" type="button" onClick={() => setShowInfo(true)}>
               <Icon name="settings" color="var(--text-secondary)" size={18} />
@@ -197,7 +229,7 @@ export default function OverviewPage(): ReactElement {
           />
         ) : null}
         {!isLoading && !error
-          ? lists.map((list) => (
+          ? sortedLists.map((list) => (
               <ListCardHome
                 key={list.id}
                 list={list}
