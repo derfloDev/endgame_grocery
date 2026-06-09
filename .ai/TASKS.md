@@ -20,4 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | Persist "done" badge in recently-used section after SSE-triggered entry reload | done | Badge visible on recently-used chip after User A toggles entry to done AND after subsequent SSE-triggered loadEntries; badge gone on navigation or page reload | `npm run lint`; `npm run build`; `npm test`; `npm run test --workspace frontend -- ListDetailPage.test.tsx` | none |
+| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
