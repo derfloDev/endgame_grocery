@@ -83,3 +83,49 @@ No blockers or majors found.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-06-09
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `frontend/src/api/sharing.ts` `leaveList` | `queueable: true` means the DELETE is enqueued when offline — consistent with the app's offline-first patterns, but plan doesn't specify offline behaviour. No fix required. | No |
+
+No blockers or majors found.
+
+#### Verification
+
+##### Steps
+1. Read `.ai/PLAN.md` T-003 scope and acceptance criteria.
+2. Inspected `git diff HEAD` for all 14 changed/new files.
+3. Verified `leaveList` API calls `DELETE /api/lists/:id/leave` with auth header — confirmed by `sharing.test.ts`.
+4. Verified `ListCardHome` — `onLeave` prop added; menu button condition `list.is_owner || onLeave`; non-owner menu shows only "Leave list"; owner menu shows Rename/Delete unchanged.
+5. Verified `ListOptionsSheet` — early-return changed from `!open || !isOwner` to `!open`; `onLeaveSelect` prop added; non-owner sees Leave row (icon + label + desc); owner sees Rename/Share unchanged.
+6. Verified `OverviewPage` — `handleLeave` wired through `leaveSharedList` utility; `onLeave` passed as `undefined` for owner cards; optimistic removal via `updateLists` filter; cache written via `writeCachedResource`.
+7. Verified `ListDetailPage` — TopBar actions condition changed from `list?.is_owner` to `list` (correct — non-owners need the ⋮ button); `onLeaveSelect` passed to `ListOptionsSheet`; `navigate("/")` on success.
+8. Verified `leaveListAction.ts` shared utility encapsulates `window.confirm` guard + API call + callbacks — clean deduplication used by both OverviewPage and ListDetailPage.
+9. Verified `getInitials`/`getChangeKind`/`getErrorMessage` extracted to `listDetailUtils.ts` — pure refactor, logic unchanged.
+10. Verified i18n: `list.leaveList`, `list.leaveListDesc`, `list.leaveConfirm` present in EN + DE with correct values matching the plan.
+11. Ran `npm test --workspace=frontend` — 463/463 pass (36 test files).
+12. Ran `npm test` (full suite) — 174/174 backend pass.
+13. Ran `npm run lint` — 0 errors.
+14. Ran `npm run build` — success.
+
+##### Findings
+- All six acceptance criteria satisfied: non-owner card menu, non-owner options sheet, confirm guard, optimistic overview removal, detail-page navigation to "/", correct API endpoint.
+- Integration tests cover both paths (overview list removal, detail-page navigation).
+
+##### Risks
+- None. The shared `leaveSharedList` utility avoids duplication and is straightforward.
+
+#### Verdict
+`PASS`

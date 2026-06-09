@@ -18,6 +18,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useListEvents } from "../../hooks/useListEvents";
 import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 import type { List } from "../../types";
+import { leaveSharedList } from "../leaveListAction";
 import styles from "./OverviewPage.module.css";
 
 const LISTS_CACHE_KEY = "lists";
@@ -155,6 +156,16 @@ export default function OverviewPage(): ReactElement {
     }
   }
 
+  async function handleLeave(listId: string): Promise<void> {
+    await leaveSharedList({
+      confirmMessage: t("list.leaveConfirm"),
+      listId,
+      token,
+      onError: setError,
+      onSuccess: () => updateLists((currentLists) => currentLists.filter((list) => list.id !== listId))
+    });
+  }
+
   const shouldSuppressError = error instanceof AuthExpiredError;
 
   return (
@@ -191,6 +202,7 @@ export default function OverviewPage(): ReactElement {
                 key={list.id}
                 list={list}
                 onDelete={() => void handleDelete(list.id)}
+                onLeave={list.is_owner ? undefined : () => void handleLeave(list.id)}
                 onOpen={() => navigate(`/lists/${list.id}`)}
                 onRename={(name) => void submitRename(list.id, name)}
               />

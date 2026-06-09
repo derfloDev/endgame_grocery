@@ -109,3 +109,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — review — 2026-06-09T07:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed frontend leave-list UI; all acceptance criteria met, 463 frontend + 174 backend tests pass, lint and build clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-06-09T09:56:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added confirmed leave-list actions for shared-list overview cards and detail options, including API wiring, state removal, navigation, and English/German copy |
+| Files Changed | `README.md`, `frontend/src/api/sharing.ts`, `frontend/src/api/sharing.test.ts`, `frontend/src/components/ListCardHome/ListCardHome.tsx`, `frontend/src/components/ListCardHome/ListCardHome.test.tsx`, `frontend/src/components/ListOptionsSheet/ListOptionsSheet.tsx`, `frontend/src/components/ListOptionsSheet/ListOptionsSheet.module.css`, `frontend/src/components/ListOptionsSheet/ListOptionsSheet.test.tsx`, `frontend/src/locales/en/translation.json`, `frontend/src/locales/de/translation.json`, `frontend/src/pages/leaveListAction.ts`, `frontend/src/pages/OverviewPage/OverviewPage.tsx`, `frontend/src/pages/OverviewPage/OverviewPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/listDetailUtils.ts`, `frontend/src/pages/ListDetailPage.test.tsx`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Focused frontend tests (pass, 23 tests); `npm run lint` (pass, 1 pre-existing warning); `npm run build` (pass, existing chunk-size warning); `npm test` (pass, 463 frontend and 174 backend tests) |
+| Commit | `feat(lists): let members leave shared lists` |
+| Next Role | review |
+
+---
+
+### T-003 — implement commit_task — 2026-06-09T10:10:21Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed shared-list leave UI task done and created its approved task commit |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Review verdict PASS; implementation validation recorded in prior handoff |
+| Commit | `feat(lists): let members leave shared lists` |
+| Next Role | none |
+
+---

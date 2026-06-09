@@ -58,6 +58,14 @@ export function revokeListMember(listId: string, memberId: string, token: string
   });
 }
 
+export function leaveList(listId: string, token: string): Promise<unknown> {
+  return sendJsonRequest(`/api/lists/${listId}/leave`, {
+    method: "DELETE",
+    token,
+    queueable: true
+  });
+}
+
 export function acceptInvite(token: string, authToken: string): Promise<InviteAcceptResponse> {
   return sendJsonRequest(`/api/invites/${encodeURIComponent(token)}`, {
     method: "GET",

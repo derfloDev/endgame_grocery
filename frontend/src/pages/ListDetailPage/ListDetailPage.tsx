@@ -22,7 +22,9 @@ import { useListEvents } from "../../hooks/useListEvents";
 import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { getRecentlyUsedDisplayState } from "../recentlyUsedState";
+import { leaveSharedList } from "../leaveListAction";
 import styles from "./ListDetailPage.module.css";
+import { getChangeKind, getErrorMessage, getInitials } from "./listDetailUtils";
 import { useListDetailData } from "./useListDetailData";
 import type { DetailEntry, DetailMember } from "./useListDetailData";
 
@@ -181,6 +183,16 @@ export default function ListDetailPage(): ReactElement {
     }
   }
 
+  async function handleLeave(): Promise<void> {
+    await leaveSharedList({
+      confirmMessage: t("list.leaveConfirm"),
+      listId,
+      token,
+      onError: (error) => setEntryError(getErrorMessage(error)),
+      onSuccess: () => navigate("/")
+    });
+  }
+
   async function handlePushToggle(): Promise<void> {
     try {
       setEntryError("");
@@ -206,7 +218,7 @@ export default function ListDetailPage(): ReactElement {
     <div>
       <TopBar
         actions={
-          list?.is_owner
+          list
             ? [
                 {
                   ariaLabel: t("list.optionsAction"),
@@ -328,6 +340,7 @@ export default function ListDetailPage(): ReactElement {
         isOwner={list?.is_owner ?? false}
         open={showOptions}
         onClose={() => setShowOptions(false)}
+        onLeaveSelect={() => void handleLeave()}
         onRenameSelect={() => setShowRename(true)}
         onShareSelect={() => setShowShare(true)}
       />
@@ -352,45 +365,4 @@ export default function ListDetailPage(): ReactElement {
       />
     </div>
   );
-}
-
-function getInitials(name: unknown): string {
-  if (typeof name !== "string") {
-    return "?";
-  }
-
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
-
-  if (!parts.length) {
-    return "?";
-  }
-
-  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
-}
-
-function getChangeKind(entry: DetailEntry): "new" | "edited" | "done" | undefined {
-  if (!entry.is_changed) {
-    return undefined;
-  }
-
-  if (entry.status === "done") {
-    return "done";
-  }
-
-  const createdAt = Date.parse(entry.created_at ?? "");
-  const updatedAt = Date.parse(entry.updated_at ?? "");
-
-  if (Number.isFinite(createdAt) && Number.isFinite(updatedAt) && updatedAt > createdAt) {
-    return "edited";
-  }
-
-  return "new";
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -8,7 +8,7 @@ import "../i18n";
 import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
 import { fetchLists, markListViewed } from "../api/lists";
-import { fetchListMembers } from "../api/sharing";
+import { fetchListMembers, leaveList } from "../api/sharing";
 import { writeCachedResource } from "../api/offlineStore";
 import { useListEvents } from "../hooks/useListEvents";
 import ListDetailPage from "./ListDetailPage/ListDetailPage";
@@ -43,6 +43,7 @@ vi.mock("../api/lists", () => ({
 
 vi.mock("../api/sharing", () => ({
   fetchListMembers: vi.fn(),
+  leaveList: vi.fn(),
   revokeListMember: vi.fn(),
   shareListWithMember: vi.fn()
 }));
@@ -80,6 +81,7 @@ const fetchRecentlyUsedMock = vi.mocked(fetchRecentlyUsed);
 const fetchListsMock = vi.mocked(fetchLists);
 const markListViewedMock = vi.mocked(markListViewed);
 const fetchListMembersMock = vi.mocked(fetchListMembers);
+const leaveListMock = vi.mocked(leaveList);
 const useListEventsMock = vi.mocked(useListEvents);
 const updateEntryMock = vi.mocked(updateEntry);
 const writeCachedResourceMock = vi.mocked(writeCachedResource);
@@ -95,6 +97,7 @@ function renderListDetailPage() {
     >
       <Routes>
         <Route element={<ListDetailPage />} path="/lists/:id" />
+        <Route element={<div>Overview landing</div>} path="/" />
       </Routes>
     </MemoryRouter>
   );
@@ -519,6 +522,24 @@ describe("ListDetailPage optimistic updates", () => {
       expect(screen.getByRole("region", { name: "Recently Used" })).toBeTruthy();
     });
     expect(screen.getByRole("button", { name: "Milk" })).toBeTruthy();
+  });
+
+  it("lets a shared member confirm leaving and returns to the overview", async () => {
+    mockListDetailData();
+    leaveListMock.mockResolvedValue(undefined);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderListDetailPage();
+
+    await screen.findByText("Weekly groceries");
+    await userEvent.click(screen.getByRole("button", { name: "List options" }));
+    await userEvent.click(screen.getByRole("button", { name: /Leave list/ }));
+
+    await waitFor(() => {
+      expect(leaveListMock).toHaveBeenCalledWith("list-1", "test-token");
+      expect(screen.getByText("Overview landing")).toBeTruthy();
+    });
+    expect(window.confirm).toHaveBeenCalledWith("Leave this shared list?");
   });
 });
 

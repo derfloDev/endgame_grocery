@@ -41,6 +41,10 @@
   background: rgba(0, 229, 255, 0.12);
 }
 
+.list-option-icon-leave {
+  background: rgba(255, 90, 110, 0.12);
+}
+
 .list-option-text {
   min-width: 0;
   flex: 1;
