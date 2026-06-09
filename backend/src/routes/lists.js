@@ -46,7 +46,9 @@ export function createListRouter({
             l.owner_id,
             owner.display_name AS owner_name,
             (l.owner_id = $1) AS is_owner,
-            COALESCE(changes.changed_count, 0)::int AS changed_count
+            COALESCE(changes.changed_count, 0)::int AS changed_count,
+            l.created_at,
+            activity.last_activity
           FROM lists l
           JOIN users owner ON owner.id = l.owner_id
           LEFT JOIN list_members lm
@@ -63,6 +65,11 @@ export function createListRouter({
               AND e.updated_at > lv.last_viewed_at
               AND (e.last_updated_by IS NULL OR e.last_updated_by <> $1)
           ) changes ON true
+          LEFT JOIN LATERAL (
+            SELECT GREATEST(COALESCE(MAX(e.updated_at), l.created_at), l.created_at) AS last_activity
+            FROM entries e
+            WHERE e.list_id = l.id
+          ) activity ON true
           WHERE l.owner_id = $1 OR lm.user_id = $1
           ORDER BY l.created_at ASC
         `,
@@ -76,7 +83,9 @@ export function createListRouter({
           owner_id: row.owner_id,
           owner_name: row.owner_name,
           is_owner: row.is_owner,
-          changed_count: Number(row.changed_count ?? 0)
+          changed_count: Number(row.changed_count ?? 0),
+          created_at: row.created_at,
+          last_activity: row.last_activity
         }))
       });
     } catch (error) {

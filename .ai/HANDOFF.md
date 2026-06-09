@@ -71,3 +71,41 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — implement — 2026-06-09T08:55:45Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Exposed list creation and latest-activity timestamps from GET /api/lists with a creation-time fallback for lists without entries |
+| Files Changed | `README.md`, `backend/src/routes/lists.js`, `backend/src/lists.test.js`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `node --test src/lists.test.js` (pass, 11 tests); `npm run lint` (pass, 1 pre-existing warning); `npm run build` (pass, existing chunk-size warning); `npm test` (pass, 458 frontend and 174 backend tests) |
+| Commit | `feat(lists): expose list activity timestamps` |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-06-09T06:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed GET /api/lists created_at + last_activity implementation; all acceptance criteria met, 174/174 tests pass, lint and build clean |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement commit_task — 2026-06-09T09:18:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed list activity timestamp task done and created its approved task commit |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | Review verdict PASS; implementation validation recorded in prior handoff |
+| Commit | `feat(lists): expose list activity timestamps` |
+| Next Role | none |
+
+---

@@ -27,7 +27,9 @@ describe("list routes", () => {
               owner_id: "user-1",
               owner_name: "Demo User",
               is_owner: true,
-              changed_count: "2"
+              changed_count: "2",
+              created_at: new Date("2026-04-21T00:00:00.000Z"),
+              last_activity: new Date("2026-04-23T00:00:00.000Z")
             },
             {
               id: "list-2",
@@ -35,7 +37,9 @@ describe("list routes", () => {
               owner_id: "user-2",
               owner_name: "Alex",
               is_owner: false,
-              changed_count: "0"
+              changed_count: "0",
+              created_at: new Date("2026-04-22T00:00:00.000Z"),
+              last_activity: new Date("2026-04-22T00:00:00.000Z")
             }
           ]
         };
@@ -49,6 +53,10 @@ describe("list routes", () => {
     assert.equal(response.body.lists[1].is_owner, false);
     assert.equal(response.body.lists[0].changed_count, 2);
     assert.equal(response.body.lists[1].changed_count, 0);
+    assert.equal(response.body.lists[0].created_at, "2026-04-21T00:00:00.000Z");
+    assert.equal(response.body.lists[0].last_activity, "2026-04-23T00:00:00.000Z");
+    assert.equal(response.body.lists[1].created_at, "2026-04-22T00:00:00.000Z");
+    assert.equal(response.body.lists[1].last_activity, response.body.lists[1].created_at);
   });
 
   it("computes changed counts from list views and entries", async () => {
@@ -58,6 +66,9 @@ describe("list routes", () => {
         assert.match(sql, /changed_count/);
         assert.match(sql, /lv\.last_viewed_at IS NOT NULL/);
         assert.match(sql, /e\.last_updated_by IS NULL OR e\.last_updated_by <> \$1/);
+        assert.match(sql, /l\.created_at/);
+        assert.match(sql, /MAX\(e\.updated_at\)/);
+        assert.match(sql, /last_activity/);
         assert.deepEqual(params, ["user-1"]);
         return { rows: [] };
       }

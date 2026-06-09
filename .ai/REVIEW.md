@@ -42,3 +42,44 @@ No blockers or majors found.
 
 #### Verdict
 `PASS`
+
+---
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **PASS**
+
+Reviewed: 2026-06-09
+
+#### Findings
+
+| # | Severity | File / Line | Description | Required Fix |
+|---|----------|-------------|-------------|--------------|
+| 1 | nit | `backend/src/routes/lists.js:69` | `GREATEST(COALESCE(MAX(e.updated_at), l.created_at), l.created_at)` — the outer `GREATEST(..., l.created_at)` is redundant when entries exist and `updated_at >= created_at`, but it acts as a defensive guard against data inconsistency. Plan's example used the simpler `COALESCE` form; the extra `GREATEST` is harmless and arguably safer. | No |
+
+No blockers or majors found.
+
+#### Verification
+
+##### Steps
+1. Read `.ai/PLAN.md` T-002 scope and acceptance criteria.
+2. Inspected `git diff HEAD` for `backend/src/routes/lists.js` and `backend/src/lists.test.js`.
+3. Verified `l.created_at` and `activity.last_activity` are added to the SELECT and result row mapping (lines 50–51, 87–88).
+4. Verified the lateral join subquery is correct and handles the no-entries fallback via `COALESCE`.
+5. Confirmed `created_at` / `last_activity` are returned as Date objects, serialised to ISO strings by `res.json()` — test assertions on ISO strings confirm this (lines 53–56 of test diff).
+6. Ran `node --test backend/src/lists.test.js` — 11/11 pass.
+7. Ran `npm run lint` — 0 errors.
+8. Ran `npm run build` — success.
+9. Ran `npm test` (full suite) — 174/174 pass.
+
+##### Findings
+- All acceptance criteria met: `created_at` and `last_activity` present as ISO strings; fallback to `created_at` when no entries verified by list-2 test case.
+- SQL assertions in tests confirm the query contains `l.created_at`, `MAX(e.updated_at)`, and `last_activity`.
+
+##### Risks
+- None. The lateral join follows the same pattern as the existing `changes` lateral join in the same query.
+
+#### Verdict
+`PASS`
