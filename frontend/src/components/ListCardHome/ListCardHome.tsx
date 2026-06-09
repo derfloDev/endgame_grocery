@@ -17,9 +17,10 @@ interface ListCardHomeProps {
   onOpen?: () => void;
   onRename?: (name: string) => void;
   onDelete?: () => void;
+  onLeave?: () => void;
 }
 
-export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListCardHomeProps): ReactElement {
+export default function ListCardHome({ list, onOpen, onRename, onDelete, onLeave }: ListCardHomeProps): ReactElement {
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [renamingMode, setRenamingMode] = useState(false);
@@ -74,7 +75,7 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListC
             {changedCount}
           </span>
         ) : null}
-        {list.is_owner ? (
+        {list.is_owner || onLeave ? (
           <button
             aria-label={t("list.actionsFor", { name: list.name })}
             className="eg-icon-btn"
@@ -93,26 +94,41 @@ export default function ListCardHome({ list, onOpen, onRename, onDelete }: ListC
 
       {menuOpen && !renamingMode ? (
         <div className={styles["list-card-menu"]} onClick={(event) => event.stopPropagation()}>
-          <button
-            className={`eg-btn-ghost ${styles["list-card-menu-btn"]}`}
-            type="button"
-            onClick={() => {
-              setRenamingMode(true);
-              setRenameValue(list.name);
-            }}
-          >
-            {t("common.rename")}
-          </button>
-          <button
-            className={`eg-btn-danger ${styles["list-card-menu-btn"]}`}
-            type="button"
-            onClick={() => {
-              closeMenu();
-              onDelete?.();
-            }}
-          >
-            {t("common.delete")}
-          </button>
+          {list.is_owner ? (
+            <>
+              <button
+                className={`eg-btn-ghost ${styles["list-card-menu-btn"]}`}
+                type="button"
+                onClick={() => {
+                  setRenamingMode(true);
+                  setRenameValue(list.name);
+                }}
+              >
+                {t("common.rename")}
+              </button>
+              <button
+                className={`eg-btn-danger ${styles["list-card-menu-btn"]}`}
+                type="button"
+                onClick={() => {
+                  closeMenu();
+                  onDelete?.();
+                }}
+              >
+                {t("common.delete")}
+              </button>
+            </>
+          ) : (
+            <button
+              className={`eg-btn-danger ${styles["list-card-menu-btn"]}`}
+              type="button"
+              onClick={() => {
+                closeMenu();
+                onLeave?.();
+              }}
+            >
+              {t("list.leaveList")}
+            </button>
+          )}
         </div>
       ) : null}
 

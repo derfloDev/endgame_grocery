@@ -5,6 +5,7 @@ import { createApp } from "./app.js";
 
 function createAuthedApp(pool, options = {}) {
   return createApp({
+    mailer: options.mailer,
     pool,
     sseManager: options.sseManager ?? createSseManagerSpy(),
     requireAuthMiddleware(req, _res, next) {
@@ -26,7 +27,9 @@ describe("list routes", () => {
               owner_id: "user-1",
               owner_name: "Demo User",
               is_owner: true,
-              changed_count: "2"
+              changed_count: "2",
+              created_at: new Date("2026-04-21T00:00:00.000Z"),
+              last_activity: new Date("2026-04-23T00:00:00.000Z")
             },
             {
               id: "list-2",
@@ -34,7 +37,9 @@ describe("list routes", () => {
               owner_id: "user-2",
               owner_name: "Alex",
               is_owner: false,
-              changed_count: "0"
+              changed_count: "0",
+              created_at: new Date("2026-04-22T00:00:00.000Z"),
+              last_activity: new Date("2026-04-22T00:00:00.000Z")
             }
           ]
         };
@@ -48,6 +53,10 @@ describe("list routes", () => {
     assert.equal(response.body.lists[1].is_owner, false);
     assert.equal(response.body.lists[0].changed_count, 2);
     assert.equal(response.body.lists[1].changed_count, 0);
+    assert.equal(response.body.lists[0].created_at, "2026-04-21T00:00:00.000Z");
+    assert.equal(response.body.lists[0].last_activity, "2026-04-23T00:00:00.000Z");
+    assert.equal(response.body.lists[1].created_at, "2026-04-22T00:00:00.000Z");
+    assert.equal(response.body.lists[1].last_activity, response.body.lists[1].created_at);
   });
 
   it("computes changed counts from list views and entries", async () => {
@@ -57,6 +66,9 @@ describe("list routes", () => {
         assert.match(sql, /changed_count/);
         assert.match(sql, /lv\.last_viewed_at IS NOT NULL/);
         assert.match(sql, /e\.last_updated_by IS NULL OR e\.last_updated_by <> \$1/);
+        assert.match(sql, /l\.created_at/);
+        assert.match(sql, /MAX\(e\.updated_at\)/);
+        assert.match(sql, /last_activity/);
         assert.deepEqual(params, ["user-1"]);
         return { rows: [] };
       }
@@ -192,6 +204,129 @@ describe("list routes", () => {
     const response = await request(createAuthedApp(pool, { sseManager })).delete("/api/lists/list-1");
 
     assert.equal(response.status, 403);
+    assert.deepEqual(sseManager.calls, []);
+  });
+
+  it("lets a shared member leave and notifies the owner", async () => {
+    const sseManager = createSseManagerSpy();
+    const sentMessages = [];
+    let callCount = 0;
+    const pool = {
+      async query(sql, params) {
+        callCount += 1;
+
+        if (callCount === 1) {
+          assert.match(sql, /JOIN users owner/);
+          assert.deepEqual(params, ["list-1"]);
+          return {
+            rows: [
+              {
+                id: "list-1",
+                name: "Weekly groceries",
+                owner_id: "user-2",
+                owner_display_name: "Alex",
+                owner_email: "alex@example.com"
+              }
+            ]
+          };
+        }
+
+        assert.match(sql, /DELETE FROM list_members/);
+        assert.deepEqual(params, ["list-1", "user-1"]);
+        return {
+          rows: [{ user_id: "user-1", display_name: "Demo User" }]
+        };
+      }
+    };
+
+    const response = await request(
+      createAuthedApp(pool, {
+        mailer: {
+          async send(message) {
+            sentMessages.push(message);
+          }
+        },
+        sseManager
+      })
+    ).delete("/api/lists/list-1/leave");
+
+    assert.equal(response.status, 204);
+    assert.equal(callCount, 2);
+    assert.deepEqual(sseManager.calls, [
+      ["list-1", "member:removed", { listId: "list-1", userId: "user-1" }]
+    ]);
+    assert.deepEqual(sentMessages, [
+      {
+        to: "alex@example.com",
+        subject: "Demo User left Weekly groceries",
+        template: "member-left",
+        context: {
+          heading: "A member left your list",
+          intro: "Hi Alex,",
+          body: "Demo User left the shared list \"Weekly groceries\".",
+          listName: "Weekly groceries",
+          memberName: "Demo User"
+        }
+      }
+    ]);
+  });
+
+  it("rejects an owner leaving their own list", async () => {
+    const sseManager = createSseManagerSpy();
+    const pool = {
+      async query() {
+        return {
+          rows: [
+            {
+              id: "list-1",
+              name: "Weekly groceries",
+              owner_id: "user-1",
+              owner_display_name: "Demo User",
+              owner_email: "demo@example.com"
+            }
+          ]
+        };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool, { sseManager })).delete(
+      "/api/lists/list-1/leave"
+    );
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(sseManager.calls, []);
+  });
+
+  it("returns not found when a non-member tries to leave", async () => {
+    const sseManager = createSseManagerSpy();
+    let callCount = 0;
+    const pool = {
+      async query() {
+        callCount += 1;
+
+        if (callCount === 1) {
+          return {
+            rows: [
+              {
+                id: "list-1",
+                name: "Weekly groceries",
+                owner_id: "user-2",
+                owner_display_name: "Alex",
+                owner_email: "alex@example.com"
+              }
+            ]
+          };
+        }
+
+        return { rows: [] };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool, { sseManager })).delete(
+      "/api/lists/list-1/leave"
+    );
+
+    assert.equal(response.status, 404);
     assert.deepEqual(sseManager.calls, []);
   });
 });

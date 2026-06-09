@@ -1,34 +1,40 @@
 # ROADMAP
 
-Goal: Fix the "done" badge disappearing immediately in the recently-used section after the current user toggles an entry from open to done.
+Goal: Deliver two user-facing improvements to list management: leave-shared-list and list sorting.
 
-## Priority 1
+## Priority 1 — Leave shared list (Unfollow)
 
-Objective: Persist the "done" badge on recently-used items for the user who performed the toggle, until they navigate away from the list or reload the page.
+Objective: Let a non-owner member remove themselves from a list shared with them.
 
-**Bug description:**
-When User A toggles an entry from "open" to "done":
-1. `toggleStatus` optimistically sets `is_changed: true` on the entry in local state.
-2. An SSE event (`entry:updated`) fires on User A's client, triggering `handleEntryChange` → `loadEntries()`.
-3. `loadEntries()` replaces local entries with fresh server data. The server returns `is_changed: false` for User A — because `is_changed` is a server-side flag that only marks changes as "unseen" for *other* users (User A is the author of the change, so the server does not flag it for them).
-4. `getRecentlyUsedDisplayState` sees `is_changed: false` → `changedDoneTexts` is empty → the "done" badge disappears immediately for User A.
+- A member (non-owner) can leave a shared list from both the ListCard in the overview and from the list detail page (via list options).
+- The list immediately disappears from their overview and they lose access.
+- The list owner receives an e-mail notification that the member left (consistent with the existing revoke-notification flow).
+- Owners cannot use the "leave" action on their own lists (they must delete the list instead).
 
-User B (a different client) correctly sees the badge because the server returns `is_changed: true` for them.
+### Acceptance Criteria
+- `DELETE /api/lists/:id/leave` endpoint removes the calling user from `list_members` (403 if they are the owner, 404 if they are not a member).
+- An e-mail is sent to the list owner after a successful leave.
+- An SSE `member:removed` event is broadcast to remaining list members.
+- The ListCard for non-owner lists exposes a menu button that opens a "Leave list" bottom sheet with a confirmation action.
+- The list detail page exposes a "Leave list" option in the list options sheet for non-owners.
+- Both entry points optimistically remove the list from the UI on confirmation.
+- i18n keys added for DE and EN.
+- Tests cover the new backend endpoint and the frontend interaction.
 
-**Acceptance criteria:**
-- After User A toggles an entry to "done", its chip in the recently-used section shows the "done" badge.
-- The badge remains visible for User A even after server reloads triggered by SSE events during the same page session.
-- The badge is gone after User A navigates away from the list detail page and back (full list reload clears local state).
-- The badge is gone after a browser page reload.
-- No regression: entries toggled to "done" by User B are not incorrectly badged on User A's view (only locally-performed toggles are tracked).
+## Priority 2 — List sorting on the overview page
 
-**Constraints:**
-- Track locally-changed entries by entry ID to avoid false positives.
-- The local tracking set must be cleared when `loadListDetail` (the initial `useEffect`) re-runs — i.e., on listId/token/syncVersion change, which is equivalent to navigating away and back.
-- The fix lives in `useListDetailData.ts`; `getRecentlyUsedDisplayState` in `recentlyUsedState.ts` does not need to change.
-- Solution: add a `locallyDoneIdsRef` (`useRef<Set<string>>`) inside `useListDetailData`. When `toggleStatus` marks an entry as done, add its ID to the ref. When `loadEntries` merges server data, force `is_changed: true` for any entry whose ID is in `locallyDoneIdsRef`. Clear the ref at the start of `loadListDetail`.
+Objective: Let the user sort their list overview by name, creation date, or date of last change.
 
-**Files to change:**
-- `frontend/src/pages/ListDetailPage/useListDetailData.ts` — add `locallyDoneIdsRef`, populate in `toggleStatus`, apply in `loadEntries`, clear in `loadListDetail`
-- `frontend/src/pages/ListDetailPage.test.tsx` — add/update tests covering badge-persistence after SSE-triggered reload
-- `frontend/src/pages/recentlyUsedState.test.ts` — verify no regression in display-state logic (likely no changes needed here)
+- A compact sort control appears in the overview header (dropdown or segmented control).
+- Sort options: Name (A→Z), Creation date (oldest first), Last change (newest first).
+- Default sort when no preference is stored: Creation date ascending (preserves existing behaviour).
+- The chosen sort preference is persisted in localStorage and restored on next visit.
+- "Last change" is defined as the most recent `entries.updated_at` within the list; if the list has no entries, the list's own `created_at` is used as fallback.
+
+### Acceptance Criteria
+- Backend `GET /api/lists` response includes `created_at` and `last_activity` (max entry `updated_at`, falling back to list `created_at`) for each list.
+- Frontend sorts the already-fetched list array client-side using these fields.
+- Sort state is stored in `localStorage` key `overview_sort` and rehydrated on mount.
+- Sort control is rendered in the overview header and is accessible (label + aria).
+- i18n keys added for DE and EN.
+- Tests cover sort logic and the sort-control render/interaction.
