@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.8.0](https://github.com/derfloDev/endgame_grocery/compare/v1.7.2...v1.8.0) (2026-06-09)
+
+
+### Features
+
+* **lists:** expose list activity timestamps ([56d8ac3](https://github.com/derfloDev/endgame_grocery/commit/56d8ac3d7e6527dc73144b9f2a81bce317946d01))
+* **lists:** let members leave shared lists ([c73b828](https://github.com/derfloDev/endgame_grocery/commit/c73b8288ada1866878f1d47038d28daeb6363ef0))
+* **lists:** let shared members leave lists ([1817bc5](https://github.com/derfloDev/endgame_grocery/commit/1817bc52295fd0e30cc05823a64ab57656ba7cc6))
+* **overview:** add persisted list sorting ([6a8f88a](https://github.com/derfloDev/endgame_grocery/commit/6a8f88a08aecc699e5b862aaec4e6a5fbc0d6976))
+
 ## [1.7.2](https://github.com/derfloDev/endgame_grocery/compare/v1.7.1...v1.7.2) (2026-06-03)
 
 
