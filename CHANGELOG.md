@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.0](https://github.com/derfloDev/endgame_grocery/compare/v1.8.0...v1.9.0) (2026-06-15)
+
+
+### Features
+
+* **list-detail:** filter open items with search ([d3236cd](https://github.com/derfloDev/endgame_grocery/commit/d3236cd7bc34c34c31d8b23b85e061b500524f33))
+
+
+### Bug Fixes
+
+* **entry-tile:** prevent toggles while scrolling ([6adde31](https://github.com/derfloDev/endgame_grocery/commit/6adde31d95b5b1bd831a781709aa4531cbb695de))
+
 ## [1.8.0](https://github.com/derfloDev/endgame_grocery/compare/v1.7.2...v1.8.0) (2026-06-09)
 
 
