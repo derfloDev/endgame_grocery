@@ -50,6 +50,7 @@ export default function ListDetailPage(): ReactElement {
   const [shareError, setShareError] = useState<string>("");
   const [shareNotice, setShareNotice] = useState<string>("");
   const [isShareSubmitting, setIsShareSubmitting] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [showAddItem, setShowAddItem] = useState<boolean>(false);
   const [editingEntry, setEditingEntry] = useState<DetailEntry | null>(null);
   const [showOptions, setShowOptions] = useState<boolean>(false);
@@ -209,7 +210,14 @@ export default function ListDetailPage(): ReactElement {
   }
 
   const openEntries = entries.filter((entry) => entry.status === "open");
-  const visibleEntries = openEntries;
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const visibleEntries = normalizedSearchQuery
+    ? openEntries.filter(
+        (entry) =>
+          entry.text.toLowerCase().includes(normalizedSearchQuery) ||
+          (entry.details ?? "").toLowerCase().includes(normalizedSearchQuery)
+      )
+    : openEntries;
   const { changedDoneTexts, visibleRecentlyUsed } = getRecentlyUsedDisplayState(recentlyUsed, entries, openEntries);
   const visibleMemberBadges = list?.is_owner ? members.filter((member) => !member.is_owner) : [];
   const shouldSuppressEntryError = entryError instanceof AuthExpiredError;
@@ -280,8 +288,21 @@ export default function ListDetailPage(): ReactElement {
                 <span className="eg-chip-purple">{openEntries.length}</span>
               </div>
 
+              <input
+                aria-label={t("detail.searchPlaceholder")}
+                className={styles["detail-search"]}
+                placeholder={t("detail.searchPlaceholder")}
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+
               {visibleEntries.length === 0 ? (
-                <EmptyState body={t("detail.noOpenItems")} title={t("detail.allClearTitle")} />
+                normalizedSearchQuery ? (
+                  <EmptyState body={t("detail.noSearchResults")} title={t("detail.noSearchResultsTitle")} />
+                ) : (
+                  <EmptyState body={t("detail.noOpenItems")} title={t("detail.allClearTitle")} />
+                )
               ) : (
                 <div className={styles["entry-tile-grid"]} data-testid="entry-tile-grid">
                   {visibleEntries.map((entry) => (

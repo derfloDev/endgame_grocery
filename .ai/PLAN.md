@@ -1,153 +1,216 @@
 # Plan
 
-Status: **ready**
+Status: **ready_for_implement**
 
-Goal: Deliver two features — "leave shared list" and "list sorting on overview page" — as defined in `ROADMAP.md`.
+Goal: Zwei UX-Verbesserungen auf der Einkauflisten-Detailseite — Suchfunktion (T-001) und Swipe-Fix (T-002).
 
 ---
 
-## T-001 — Backend: Leave shared list endpoint
+## T-001 — Suchfunktion (Filter) auf der ListDetailPage
 
 ### Scope
-Add `DELETE /api/lists/:id/leave` to the lists router.  
-A non-owner member calls this to remove themselves from `list_members`.  
-The list owner receives an e-mail notification.  
-An SSE `member:removed` event is broadcast to all remaining list members.
+Eine immer sichtbare Suchleiste direkt unter der Abschnittsüberschrift „OPEN ITEMS" filtert die offenen Einträge nach Name und Details. Der „Zuletzt verwendet"-Bereich bleibt ungefiltert.
 
-### Rules
-- Respond **403** when the calling user owns the list (owners must delete the list instead).
-- Respond **404** when the calling user is not a member of the list.
-- Respond **204** on success.
-- Reuse `sendRevocationEmail` pattern from `sharing.js` but email the **owner** (not the leaving member).  
-  Add a new Handlebars template `member-left.hbs` for "a member left your list" copy.
-- The route lives in `createListRouter` (not `createSharingRouter`) because it is a self-service action that does not require list ownership.
+### Acceptance Criteria
+- Suchleiste ist ohne Interaktion sichtbar (kein Toggle-Button nötig).
+- Eingabe filtert `openEntries` case-insensitiv per Enthält-Suche auf `entry.text` und `entry.details`.
+- Bei leerem Suchergebnis erscheint ein eigener `EmptyState` mit Suche-spezifischem Text.
+- Suchfeld kann per nativen Clear-Button (type="search") geleert werden.
+- i18n-Schlüssel sind in `en` und `de` hinterlegt.
+- Bestehende Tests bleiben grün.
+- `pageSource.split(/\r?\n/).length < 400` bleibt erfüllt.
 
-### Files to change
+### Files to Change
+
 | File | Change |
 |------|--------|
-| `backend/src/routes/lists.js` | Add `router.delete("/:id/leave", ...)` handler; inject `mailer` and `sseManager` dependencies already present on `createListRouter` (add `mailer` param if missing) |
-| `backend/src/mail/templates/member-left.hbs` | **New** — "a member has left your list" owner notification template (reuse `{{> base ...}}` pattern) |
-| `backend/src/lists.test.js` | Add tests: 204 success, 403 owner attempt, 404 not-a-member, SSE broadcast called, mailer called |
+| `frontend/src/pages/ListDetailPage/ListDetailPage.tsx` | `searchQuery` State; `visibleEntries` gefiltert; Such-Input-Element + bedingter EmptyState |
+| `frontend/src/pages/ListDetailPage/ListDetailPage.module.css` | Stile für `.detail-search` (Input-Wrapper + Input) |
+| `frontend/src/locales/en/translation.json` | Neue Schlüssel: `detail.searchPlaceholder`, `detail.noSearchResultsTitle`, `detail.noSearchResults` |
+| `frontend/src/locales/de/translation.json` | Gleiche Schlüssel auf Deutsch |
+| `frontend/src/pages/ListDetailPage.test.tsx` | Neue Tests: Filter-Logik, Such-EmptyState, Löschen des Suchbegriffs |
 
----
+### Implementation Notes
 
-## T-002 — Backend: Expose `created_at` and `last_activity` on list response
+**State & Filter-Logik** (in `ListDetailPage.tsx`):
+```ts
+const [searchQuery, setSearchQuery] = useState<string>("");
 
-### Scope
-Extend `GET /api/lists` to return two additional fields per list:
-- `created_at` — the list's own `created_at` timestamp.
-- `last_activity` — `GREATEST(MAX(e.updated_at), l.created_at)` across all entries of the list (falls back to `l.created_at` when the list has no entries).
+const filteredEntries = searchQuery.trim()
+  ? openEntries.filter((e) =>
+      e.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (e.details ?? "").toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  : openEntries;
 
-These fields enable client-side sorting in T-004.
-
-### SQL change
-Replace the current `ORDER BY l.created_at ASC` query with a version that also exposes these fields via a `LEFT JOIN LATERAL` or a correlated subquery — either approach is acceptable.
-
-```sql
--- Example lateral addition (alongside the existing changes lateral join)
-LEFT JOIN LATERAL (
-  SELECT COALESCE(MAX(e.updated_at), l.created_at) AS last_activity
-  FROM entries e
-  WHERE e.list_id = l.id
-) activity ON true
+const visibleEntries = filteredEntries; // ersetzt bisherige Zeile
 ```
 
-Return `l.created_at` and `activity.last_activity` in the result row mapping.
+**Such-Input** (innerhalb `<section className="entry-section">`):
+- `<input type="search">` mit `placeholder={t("detail.searchPlaceholder")}` und `aria-label`
+- `value={searchQuery}` + `onChange={(e) => setSearchQuery(e.target.value)}`
+- Platzierung: nach dem `<div className="entry-section-header">`, vor dem Grid
 
-### Files to change
-| File | Change |
-|------|--------|
-| `backend/src/routes/lists.js` | Add `l.created_at` and `activity.last_activity` to SELECT + lateral join; include both in the JSON response map |
-| `backend/src/lists.test.js` | Add / update tests asserting `created_at` and `last_activity` are present in the response |
-
----
-
-## T-003 — Frontend: Leave shared list UI
-
-### Scope
-Expose a "Leave list" action for non-owner lists:
-1. **ListCard (Overview):** Non-owner lists gain a `⋮` menu button (same pattern as owner cards). The menu contains a single "Leave list" action; a `window.confirm` guard precedes the API call. On confirm, optimistically remove the list from state.
-2. **ListOptionsSheet (Detail page):** Extend the sheet to render for non-owners too (currently `if (!open || !isOwner) return null`). Non-owners see only "Leave list"; owners continue to see Rename + Share.
-3. After leaving from the detail page, navigate back to `/` (overview).
-4. The `leaveList` API call is `DELETE /api/lists/:id/leave`.
-
-### Design notes
-- `ListCardHome` already has `onDelete`; add a parallel `onLeave?: () => void` prop.
-- `ListOptionsSheet` receives an `onLeaveSelect?: () => void` prop and renders the leave row only when `!isOwner`.
-- `OverviewPage`: call `leaveList(token, list.id)`, then `updateLists` to filter out the list on success.
-- `ListDetailPage`: call `leaveList(token, listId)`, then `navigate("/")` on success. Wire through `showOptions` → `ListOptionsSheet` leave callback.
-
-### i18n keys to add (EN + DE)
-| Key | EN | DE |
-|-----|----|----|
-| `list.leaveList` | Leave list | Liste verlassen |
-| `list.leaveListDesc` | Remove yourself from this shared list | Dich selbst aus dieser geteilten Liste entfernen |
-| `list.leaveConfirm` | Leave this shared list? | Diese geteilte Liste verlassen? |
-
-### Files to change
-| File | Change |
-|------|--------|
-| `frontend/src/api/sharing.ts` | Add `leaveList(listId, token)` → `DELETE /api/lists/:id/leave` |
-| `frontend/src/components/ListCardHome/ListCardHome.tsx` | Add `onLeave` prop; render `⋮` button + "Leave list" menu row for `!is_owner` cards |
-| `frontend/src/components/ListCardHome/ListCardHome.test.tsx` | Test: non-owner card shows menu button; clicking Leave triggers `onLeave` |
-| `frontend/src/components/ListOptionsSheet/ListOptionsSheet.tsx` | Remove early-return guard on `!isOwner`; add `onLeaveSelect` prop; render leave row when `!isOwner` |
-| `frontend/src/pages/OverviewPage/OverviewPage.tsx` | Add `handleLeave(listId)` handler; pass `onLeave` to `ListCardHome` |
-| `frontend/src/pages/ListDetailPage/ListDetailPage.tsx` | Add `handleLeave()` handler; pass `onLeaveSelect` to `ListOptionsSheet`; navigate on success |
-| `frontend/src/locales/en/translation.json` | Add `list.leaveList`, `list.leaveListDesc`, `list.leaveConfirm` |
-| `frontend/src/locales/de/translation.json` | Add DE equivalents |
-
----
-
-## T-004 — Frontend: List sorting on overview page
-
-### Scope
-Add a sort control to the overview header. Sorting is client-side; the sort preference is persisted in `localStorage` under key `overview_sort`.
-
-### Sort options
-| Value | Label | Sort key |
-|-------|-------|----------|
-| `created_asc` | Creation date (oldest first) *(default)* | `created_at` ascending |
-| `name_asc` | Name (A → Z) | `name` ascending, locale-aware |
-| `activity_desc` | Last change (newest first) | `last_activity` descending |
-
-### Implementation notes
-- Read `localStorage.getItem("overview_sort")` on mount; fall back to `"created_asc"` if absent or invalid.
-- Write to `localStorage` on every sort change.
-- Implement a pure `sortLists(lists, mode)` function (testable in isolation) in `OverviewPage.tsx` or a co-located utility.
-- Render a `<select>` element (or equivalent) in `overview-brand` div with an accessible `<label>` visually hidden.
-- Apply `sortLists` before rendering the list map.
-- The `List` type gains `created_at?: string` and `last_activity?: string`; `OverviewList` inherits them.
-- Offline cached data may lack the new fields — treat `undefined` as `""` (sorts to bottom) rather than crashing.
-
-### i18n keys to add (EN + DE)
-| Key | EN | DE |
-|-----|----|----|
-| `overview.sortLabel` | Sort lists | Listen sortieren |
-| `overview.sortCreatedAsc` | Oldest first | Älteste zuerst |
-| `overview.sortNameAsc` | Name (A–Z) | Name (A–Z) |
-| `overview.sortActivityDesc` | Recently changed | Zuletzt geändert |
-
-### Files to change
-| File | Change |
-|------|--------|
-| `frontend/src/types.ts` | Add `created_at?: string` and `last_activity?: string` to `List` interface |
-| `frontend/src/pages/OverviewPage/OverviewPage.tsx` | Add `sortMode` state + `sortLists` function; add sort `<select>` in header; apply sort before render |
-| `frontend/src/pages/OverviewPage/OverviewPage.module.css` | Add styles for sort control row in overview header |
-| `frontend/src/locales/en/translation.json` | Add `overview.sort*` keys |
-| `frontend/src/locales/de/translation.json` | Add DE equivalents |
-| `frontend/src/pages/OverviewPage/OverviewPage.test.tsx` | **New** — tests for `sortLists` logic (all three modes) and sort select render/interaction |
-
----
-
-## Validation (all tasks)
-
-```
-npm run lint
-npm run build
-npm test
+**Bedingter EmptyState**:
+```tsx
+{filteredEntries.length === 0 ? (
+  searchQuery.trim()
+    ? <EmptyState body={t("detail.noSearchResults")} title={t("detail.noSearchResultsTitle")} />
+    : <EmptyState body={t("detail.noOpenItems")} title={t("detail.allClearTitle")} />
+) : (
+  <div className={styles["entry-tile-grid"]} ...>…</div>
+)}
 ```
 
-## Task order
+**i18n-Schlüssel**:
+```json
+// en
+"detail.searchPlaceholder": "Search items…",
+"detail.noSearchResultsTitle": "No matches",
+"detail.noSearchResults": "No items match your search."
 
-T-001 and T-002 are independent backend tasks (both touch `lists.js` in separate sections).  
-T-003 and T-004 are independent frontend tasks (both touch `OverviewPage.tsx` and translation files — implementer should pick one at a time to avoid merge conflicts or implement them sequentially in a single session).
+// de
+"detail.searchPlaceholder": "Artikel suchen…",
+"detail.noSearchResultsTitle": "Keine Treffer",
+"detail.noSearchResults": "Kein Artikel entspricht deiner Suche."
+```
+
+**CSS** (`.detail-search` in `ListDetailPage.module.css`):
+```css
+.detail-search {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(139, 43, 226, 0.25);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.875rem;
+}
+.detail-search:focus {
+  outline: none;
+  border-color: rgba(0, 229, 255, 0.4);
+}
+```
+
+**Neue Tests** in `frontend/src/pages/ListDetailPage.test.tsx`:
+1. Suchfeld ist sichtbar wenn Einträge geladen sind.
+2. Filtert Einträge nach Name (case-insensitiv).
+3. Filtert Einträge nach Details.
+4. Zeigt Such-EmptyState wenn keine Treffer.
+5. Zeigt alle Einträge wieder nach Leeren des Suchfelds.
+
+---
+
+## T-002 — Swipe-Fix: Vertikales Scrollen öffnet keine EntryTiles mehr
+
+### Scope
+Im `useLongPress`-Hook wird ein `onTouchMove`-Handler ergänzt, der die vertikale Verschiebung trackt. Bei ≥ 8 px Verschiebung wird der Timer abgebrochen und ein Flag gesetzt, das das nachfolgende synthetische `click`-Event blockiert.
+
+### Acceptance Criteria
+- Vertikales Wischen (δY ≥ 8 px) löst weder `onToggle` noch `onLongPress` aus.
+- Kurzes Antippen (`touchStart` + `touchEnd` ohne Bewegung) löst `onToggle` wie bisher aus.
+- Langes Drücken (≥ 500 ms ohne Bewegung) löst `onLongPress` wie bisher aus.
+- Horizontale Bewegung (δX groß, δY < 8 px) blockiert Toggle nicht.
+- Bestehende Tests in `useLongPress.test.tsx` bleiben grün.
+
+### Files to Change
+
+| File | Change |
+|------|--------|
+| `frontend/src/hooks/useLongPress.ts` | `touchStartYRef` + `scrollBlockedRef` Refs; `onTouchStart` nimmt `React.TouchEvent`; neuer `onTouchMove(event: React.TouchEvent)`; `handleClick` prüft `scrollBlockedRef`; `cancel()` setzt beide Refs zurück |
+| `frontend/src/hooks/useLongPress.test.tsx` | Neue Tests: Scroll-Abbruch, Scroll-blockiert-Click |
+
+### Implementation Notes
+
+**Neue Refs**:
+```ts
+const touchStartYRef = useRef<number | null>(null);
+const scrollBlockedRef = useRef(false);
+```
+
+**Geänderte `start`-Signatur** (nur für Touch-Pfad):
+```ts
+function startTouch(event: React.TouchEvent): void {
+  touchStartYRef.current = event.touches[0]?.clientY ?? null;
+  scrollBlockedRef.current = false;
+  start(); // bestehende Timer-Logik bleibt unverändert
+}
+```
+
+**Neuer `onTouchMove`-Handler**:
+```ts
+function handleTouchMove(event: React.TouchEvent): void {
+  if (touchStartYRef.current === null) return;
+  const deltaY = Math.abs((event.touches[0]?.clientY ?? touchStartYRef.current) - touchStartYRef.current);
+  if (deltaY >= 8) {
+    scrollBlockedRef.current = true;
+    cancel();
+  }
+}
+```
+
+**Erweiterter `handleClick`**:
+```ts
+function handleClick(event: MouseEvent): void {
+  if (longPressedRef.current || scrollBlockedRef.current) {
+    event.preventDefault();
+    event.stopPropagation();
+    longPressedRef.current = false;
+    scrollBlockedRef.current = false;
+  }
+}
+```
+
+**Erweitertes `cancel()`**:
+```ts
+function cancel(): void {
+  setPressing(false);
+  touchStartYRef.current = null;
+  if (timerRef.current !== null) {
+    window.clearTimeout(timerRef.current);
+  }
+  timerRef.current = null;
+}
+```
+
+**Aktualisiertes Interface**:
+```ts
+interface LongPressHandlers {
+  onMouseDown: () => void;
+  onMouseUp: () => void;
+  onMouseLeave: () => void;
+  onTouchStart: (event: React.TouchEvent) => void;  // war () => void
+  onTouchEnd: () => void;
+  onTouchCancel: () => void;
+  onTouchMove: (event: React.TouchEvent) => void;   // NEU
+  onClick: (event: MouseEvent) => void;
+}
+```
+
+**Rückgabe**:
+```ts
+longPressHandlers: {
+  onMouseDown: start,
+  onMouseLeave: cancel,
+  onMouseUp: cancel,
+  onTouchCancel: cancel,
+  onTouchEnd: cancel,
+  onTouchStart: startTouch,   // geändert
+  onTouchMove: handleTouchMove, // neu
+  onClick: handleClick
+}
+```
+
+**Neue Tests** in `useLongPress.test.tsx`:
+1. Vertikales Wischen (δY ≥ 8 px) nach touchStart ruft `onLongPress` nicht auf.
+2. Vertikales Wischen gefolgt von einem Click-Event ruft `onToggle`/`onClick` nicht auf.
+3. Kurze Bewegung (δY < 8 px) blockiert Toggle nicht.
+
+---
+
+## Validation
+- `npm run lint`
+- `npm run build`
+- `npm test`

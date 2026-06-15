@@ -399,6 +399,89 @@ describe("ListDetailPage optimistic updates", () => {
     expect(within(getOpenItemsSection()).getByTestId("entry-tile-grid")).toBeTruthy();
   });
 
+  it("shows a search field above open entries", async () => {
+    mockListDetailData({
+      entries: [
+        {
+          id: "entry-1",
+          text: "Milk",
+          status: "open",
+          icon: "IconMilk"
+        }
+      ]
+    });
+
+    renderListDetailPage();
+
+    expect(await screen.findByRole("searchbox", { name: "Search items…" })).toBeTruthy();
+  });
+
+  it("filters open entries by name case-insensitively", async () => {
+    mockListDetailData({
+      entries: [
+        { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk" },
+        { id: "entry-2", text: "Bread", status: "open", icon: "IconBread" }
+      ]
+    });
+
+    renderListDetailPage();
+
+    await userEvent.type(await screen.findByRole("searchbox", { name: "Search items…" }), "MIL");
+
+    expect(within(getOpenItemsSection()).getByText("Milk")).toBeTruthy();
+    expect(within(getOpenItemsSection()).queryByText("Bread")).toBeNull();
+  });
+
+  it("filters open entries by details", async () => {
+    mockListDetailData({
+      entries: [
+        { id: "entry-1", text: "Tomatoes", details: "Cherry variety", status: "open", icon: "IconSalad" },
+        { id: "entry-2", text: "Bread", details: "Whole grain", status: "open", icon: "IconBread" }
+      ]
+    });
+
+    renderListDetailPage();
+
+    await userEvent.type(await screen.findByRole("searchbox", { name: "Search items…" }), "cherry");
+
+    expect(within(getOpenItemsSection()).getByText("Tomatoes")).toBeTruthy();
+    expect(within(getOpenItemsSection()).queryByText("Bread")).toBeNull();
+  });
+
+  it("shows a search-specific empty state when no open entries match", async () => {
+    mockListDetailData({
+      entries: [{ id: "entry-1", text: "Milk", status: "open", icon: "IconMilk" }]
+    });
+
+    renderListDetailPage();
+
+    await userEvent.type(await screen.findByRole("searchbox", { name: "Search items…" }), "bread");
+
+    expect(within(getOpenItemsSection()).getByText("No matches")).toBeTruthy();
+    expect(within(getOpenItemsSection()).getByText("No items match your search.")).toBeTruthy();
+    expect(within(getOpenItemsSection()).queryByText("All clear")).toBeNull();
+  });
+
+  it("shows all open entries again after clearing the search field", async () => {
+    mockListDetailData({
+      entries: [
+        { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk" },
+        { id: "entry-2", text: "Bread", status: "open", icon: "IconBread" }
+      ]
+    });
+
+    renderListDetailPage();
+
+    const searchField = await screen.findByRole("searchbox", { name: "Search items…" });
+    await userEvent.type(searchField, "milk");
+    expect(within(getOpenItemsSection()).queryByText("Bread")).toBeNull();
+
+    await userEvent.clear(searchField);
+
+    expect(within(getOpenItemsSection()).getByText("Milk")).toBeTruthy();
+    expect(within(getOpenItemsSection()).getByText("Bread")).toBeTruthy();
+  });
+
   it("dismisses a recently used entry optimistically", async () => {
     mockListDetailData({
       entries: [],

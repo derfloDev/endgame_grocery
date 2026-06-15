@@ -23,170 +23,107 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
-### T-001..T-004 — plan — 2026-06-09T00:00:00Z
+### T-001 — plan — 2026-06-15T00:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Planned two features (leave shared list + list sorting) as 4 tasks: T-001 backend leave endpoint, T-002 backend list fields, T-003 frontend leave UI, T-004 frontend sort UI |
-| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Summary | Suchfunktion geplant: immer sichtbare Suchleiste auf ListDetailPage filtert offene Einträge nach Name und Details, mit eigenem EmptyState und i18n. |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-06-09T05:55:34Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Added self-service shared-list leave endpoint with owner protection, member removal SSE broadcast, and owner email notification |
-| Files Changed | `README.md`, `backend/src/routes/lists.js`, `backend/src/lists.test.js`, `backend/src/mail/templates/member-left.hbs`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Validation | `node --test src/lists.test.js` (pass, 11 tests); `npm run lint` (pass, 1 pre-existing warning); `npm run build` (pass, existing chunk-size warning); `npm test` (pass, 458 frontend and 174 backend tests) |
-| Commit | `feat(lists): let shared members leave lists` |
-| Next Role | review |
-
----
-
-### T-001 — review — 2026-06-09T06:30:00Z
+### T-002 — plan — 2026-06-15T00:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed DELETE /api/lists/:id/leave implementation; all acceptance criteria met, 174/174 tests pass, lint and build clean |
+| Summary | Swipe-Fix geplant: useLongPress-Hook erhält onTouchMove-Handler, der bei δY ≥ 8 px den Timer abbricht und den nachfolgenden Click blockiert. |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-001 — implement — 2026-06-15T14:07:28Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added an always-visible open-item search that filters names and details, restores all items when cleared, and shows a localized no-results state. |
+| Files Changed | README.md, frontend/src/locales/de/translation.json, frontend/src/locales/en/translation.json, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/pages/ListDetailPage/ListDetailPage.module.css, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` passed with one existing Fast Refresh warning; `npm run build` passed with the existing large-chunk warning; `npm test` passed (474 frontend tests, 174 backend tests); targeted ListDetailPage suite passed (22 tests); `git diff --check` passed; ListDetailPage.tsx has 389 lines. |
+| Commit | `feat(list-detail): filter open items with search` |
+| Next Role | review |
+
+---
+
+### T-001 — review — 2026-06-15T17:31:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-001 search feature: all acceptance criteria met, 474 tests pass, lint clean, build succeeds, 389 lines < 400. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement commit_task — 2026-06-09T06:09:34Z
+### T-001 — commit_task — 2026-06-15T16:06:52Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Marked the reviewed shared-list leave endpoint task done and created its approved task commit |
-| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Validation | Review verdict PASS; implementation validation recorded in prior handoff |
-| Commit | `feat(lists): let shared members leave lists` |
+| Summary | Marked the reviewed open-item search task done and created its approved Conventional Commit. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Review verdict PASS; implementation validation recorded in the preceding handoff. |
+| Commit | `feat(list-detail): filter open items with search` |
 | Next Role | none |
 
 ---
 
-### T-002 — implement — 2026-06-09T08:55:45Z
+### T-002 — implement — 2026-06-15T16:12:53Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Exposed list creation and latest-activity timestamps from GET /api/lists with a creation-time fallback for lists without entries |
-| Files Changed | `README.md`, `backend/src/routes/lists.js`, `backend/src/lists.test.js`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Validation | `node --test src/lists.test.js` (pass, 11 tests); `npm run lint` (pass, 1 pre-existing warning); `npm run build` (pass, existing chunk-size warning); `npm test` (pass, 458 frontend and 174 backend tests) |
-| Commit | `feat(lists): expose list activity timestamps` |
+| Summary | Prevented vertical touch scrolling from triggering EntryTile long presses or synthetic clicks while preserving taps, stationary holds, and horizontal movement. |
+| Files Changed | README.md, frontend/src/hooks/useLongPress.test.tsx, frontend/src/hooks/useLongPress.ts, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` passed with one existing Fast Refresh warning; targeted useLongPress and EntryTile tests passed (19 tests); `npm run build` passed with the existing large-chunk warning; `npm test` passed (480 frontend tests, 174 backend tests); `git diff --check` passed. |
+| Commit | `fix(entry-tile): prevent toggles while scrolling` |
 | Next Role | review |
 
 ---
 
-### T-002 — review — 2026-06-09T06:45:00Z
+### T-002 — review — 2026-06-15T18:57:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed GET /api/lists created_at + last_activity implementation; all acceptance criteria met, 174/174 tests pass, lint and build clean |
+| Summary | Reviewed T-002 swipe-fix: all acceptance criteria met, 480 tests pass (6 new hook tests), lint clean, build succeeds, EntryTile wires onTouchMove automatically via handler spread. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
 | Verdict | PASS |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-002 — implement commit_task — 2026-06-09T09:18:25Z
+### T-002 — commit_task — 2026-06-15T17:20:55Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Marked the reviewed list activity timestamp task done and created its approved task commit |
-| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Validation | Review verdict PASS; implementation validation recorded in prior handoff |
-| Commit | `feat(lists): expose list activity timestamps` |
+| Summary | Marked the reviewed scroll-safe EntryTile task done and created its approved Conventional Commit. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Review verdict PASS; implementation validation recorded in the preceding handoff. |
+| Commit | `fix(entry-tile): prevent toggles while scrolling` |
 | Next Role | none |
 
 ---
 
-### T-003 — review — 2026-06-09T07:10:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Reviewed frontend leave-list UI; all acceptance criteria met, 463 frontend + 174 backend tests pass, lint and build clean |
-| Verdict | PASS |
-| Blocking Findings | none |
-| Next Role | implement |
-
----
-
-### T-003 — implement — 2026-06-09T09:56:55Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Added confirmed leave-list actions for shared-list overview cards and detail options, including API wiring, state removal, navigation, and English/German copy |
-| Files Changed | `README.md`, `frontend/src/api/sharing.ts`, `frontend/src/api/sharing.test.ts`, `frontend/src/components/ListCardHome/ListCardHome.tsx`, `frontend/src/components/ListCardHome/ListCardHome.test.tsx`, `frontend/src/components/ListOptionsSheet/ListOptionsSheet.tsx`, `frontend/src/components/ListOptionsSheet/ListOptionsSheet.module.css`, `frontend/src/components/ListOptionsSheet/ListOptionsSheet.test.tsx`, `frontend/src/locales/en/translation.json`, `frontend/src/locales/de/translation.json`, `frontend/src/pages/leaveListAction.ts`, `frontend/src/pages/OverviewPage/OverviewPage.tsx`, `frontend/src/pages/OverviewPage/OverviewPage.test.tsx`, `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `frontend/src/pages/ListDetailPage/listDetailUtils.ts`, `frontend/src/pages/ListDetailPage.test.tsx`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Validation | Focused frontend tests (pass, 23 tests); `npm run lint` (pass, 1 pre-existing warning); `npm run build` (pass, existing chunk-size warning); `npm test` (pass, 463 frontend and 174 backend tests) |
-| Commit | `feat(lists): let members leave shared lists` |
-| Next Role | review |
-
----
-
-### T-003 — implement commit_task — 2026-06-09T10:10:21Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Marked the reviewed shared-list leave UI task done and created its approved task commit |
-| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Validation | Review verdict PASS; implementation validation recorded in prior handoff |
-| Commit | `feat(lists): let members leave shared lists` |
-| Next Role | none |
-
----
-
-### T-004 — review — 2026-06-09T07:30:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Reviewed overview list sorting; all acceptance criteria met, 469 frontend + 174 backend tests pass, lint and build clean |
-| Verdict | PASS |
-| Blocking Findings | none |
-| Next Role | implement |
-
----
-
-### T-004 — implement — 2026-06-09T10:53:37Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Added overview list sorting by creation date, name, or latest activity with local preference persistence, accessible English/German controls, and safe handling of cached lists without timestamps |
-| Files Changed | `README.md`, `frontend/src/types.ts`, `frontend/src/pages/OverviewPage/OverviewPage.tsx`, `frontend/src/pages/OverviewPage/OverviewPage.module.css`, `frontend/src/pages/OverviewPage/OverviewPage.test.tsx`, `frontend/src/pages/OverviewPage/overviewSort.ts`, `frontend/src/pages/OverviewPage/overviewSort.test.ts`, `frontend/src/locales/en/translation.json`, `frontend/src/locales/de/translation.json`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Validation | Focused sorting tests (pass, 7 tests); `npm run lint` (pass, 1 pre-existing warning); `npm run build` (pass, existing chunk-size warning); `npm test` (pass, 469 frontend and 174 backend tests) |
-| Commit | `feat(overview): add persisted list sorting` |
-| Next Role | review |
-
----
-
-### T-004 — implement commit_task — 2026-06-09T11:00:25Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Marked the reviewed overview sorting task done and created its approved task commit |
-| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
-| Validation | Review verdict PASS; implementation validation recorded in prior handoff |
-| Commit | `feat(overview): add persisted list sorting` |
-| Next Role | none |
-
----
-
-### Cycle closed — unversioned — 2026-06-09T11:56:25Z
+### Cycle closed — unversioned — 2026-06-15T17:35:00Z
 
 | Field | Value |
 |-------|-------|

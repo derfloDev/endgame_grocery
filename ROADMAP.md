@@ -1,40 +1,26 @@
 # ROADMAP
 
-Goal: Deliver two user-facing improvements to list management: leave-shared-list and list sorting.
+Goal: Zwei UX-Verbesserungen auf der Einkauflisten-Detailseite.
 
-## Priority 1 — Leave shared list (Unfollow)
+## Priority 1 — Suchfunktion (Filter)
 
-Objective: Let a non-owner member remove themselves from a list shared with them.
+Objective: Nutzer können schnell prüfen, ob ein Artikel bereits auf der Liste steht.
 
-- A member (non-owner) can leave a shared list from both the ListCard in the overview and from the list detail page (via list options).
-- The list immediately disappears from their overview and they lose access.
-- The list owner receives an e-mail notification that the member left (consistent with the existing revoke-notification flow).
-- Owners cannot use the "leave" action on their own lists (they must delete the list instead).
+- Auf der `ListDetailPage` erscheint direkt unter der Abschnittsüberschrift „OFFENE ARTIKEL" eine immer sichtbare Suchleiste.
+- Bei Texteingabe werden die **offenen Einträge** nach Name (`entry.text`) und Details (`entry.details`) gefiltert (case-insensitive, enthält-Suche).
+- Der Abschnitt „Zuletzt verwendet" (`RecentlyUsedSection`) wird nicht gefiltert.
+- Wenn die Suche keine Ergebnisse liefert, zeigt ein spezifischer `EmptyState` einen passenden Hinweis (abweichend vom „Alles erledigt"-Text).
+- Das Suchfeld lässt sich leeren (Clear-Button oder natives Input-Reset).
+- i18n-Strings werden für `de` und `en` gepflegt.
+- Bestehende Tests für `ListDetailPage` bleiben grün; neue Tests decken Filter-Logik und den leeren Suchzustand ab.
 
-### Acceptance Criteria
-- `DELETE /api/lists/:id/leave` endpoint removes the calling user from `list_members` (403 if they are the owner, 404 if they are not a member).
-- An e-mail is sent to the list owner after a successful leave.
-- An SSE `member:removed` event is broadcast to remaining list members.
-- The ListCard for non-owner lists exposes a menu button that opens a "Leave list" bottom sheet with a confirmation action.
-- The list detail page exposes a "Leave list" option in the list options sheet for non-owners.
-- Both entry points optimistically remove the list from the UI on confirmation.
-- i18n keys added for DE and EN.
-- Tests cover the new backend endpoint and the frontend interaction.
+## Priority 2 — Swipe-Fix (ungewolltes Öffnen beim Scrollen)
 
-## Priority 2 — List sorting on the overview page
+Objective: Vertikales Scrollen auf der Einkaufliste öffnet keine Einträge mehr.
 
-Objective: Let the user sort their list overview by name, creation date, or date of last change.
-
-- A compact sort control appears in the overview header (dropdown or segmented control).
-- Sort options: Name (A→Z), Creation date (oldest first), Last change (newest first).
-- Default sort when no preference is stored: Creation date ascending (preserves existing behaviour).
-- The chosen sort preference is persisted in localStorage and restored on next visit.
-- "Last change" is defined as the most recent `entries.updated_at` within the list; if the list has no entries, the list's own `created_at` is used as fallback.
-
-### Acceptance Criteria
-- Backend `GET /api/lists` response includes `created_at` and `last_activity` (max entry `updated_at`, falling back to list `created_at`) for each list.
-- Frontend sorts the already-fetched list array client-side using these fields.
-- Sort state is stored in `localStorage` key `overview_sort` and rehydrated on mount.
-- Sort control is rendered in the overview header and is accessible (label + aria).
-- i18n keys added for DE and EN.
-- Tests cover sort logic and the sort-control render/interaction.
+- Im `useLongPress`-Hook wird ein `onTouchMove`-Handler ergänzt, der die vertikale Touch-Verschiebung trackt.
+- Überschreitet die vertikale Verschiebung einen Schwellenwert (≥ 8 px), gilt die Geste als Scroll:
+  - Der Long-Press-Timer wird abgebrochen.
+  - Ein internes Flag verhindert, dass das nachfolgende synthetische `click`-Event `onToggle` auslöst.
+- Horizontales Scrollen (z. B. seitliches Wischen) hat keinen Einfluss auf das Toggle-Verhalten.
+- Bestehende Tests für `useLongPress` bleiben grün; neue Tests belegen das Scroll-Abbruchverhalten.
