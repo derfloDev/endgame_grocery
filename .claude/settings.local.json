@@ -46,7 +46,9 @@
       "Bash(xargs head -40)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
       "Bash(xargs grep -l \"keyword\\\\|synonym\\\\|iconData\\\\|iconDb\\\\|matche\")",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "PowerShell(\\(Get-Content \"C:\\\\develop\\\\endgame_grocery\\\\frontend\\\\src\\\\pages\\\\ListDetailPage\\\\ListDetailPage.tsx\" | Measure-Object -Line\\).Lines)",
+      "PowerShell(Get-Content *)"
     ]
   }
 }

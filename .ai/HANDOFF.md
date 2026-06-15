@@ -22,3 +22,64 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | plan \| implement \| review \| none |
 
 ---
+
+### T-001 — plan — 2026-06-15T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Suchfunktion geplant: immer sichtbare Suchleiste auf ListDetailPage filtert offene Einträge nach Name und Details, mit eigenem EmptyState und i18n. |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-002 — plan — 2026-06-15T00:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Swipe-Fix geplant: useLongPress-Hook erhält onTouchMove-Handler, der bei δY ≥ 8 px den Timer abbricht und den nachfolgenden Click blockiert. |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md |
+| Next Role | implement |
+
+---
+
+### T-001 — implement — 2026-06-15T14:07:28Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added an always-visible open-item search that filters names and details, restores all items when cleared, and shows a localized no-results state. |
+| Files Changed | README.md, frontend/src/locales/de/translation.json, frontend/src/locales/en/translation.json, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/pages/ListDetailPage/ListDetailPage.module.css, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` passed with one existing Fast Refresh warning; `npm run build` passed with the existing large-chunk warning; `npm test` passed (474 frontend tests, 174 backend tests); targeted ListDetailPage suite passed (22 tests); `git diff --check` passed; ListDetailPage.tsx has 389 lines. |
+| Commit | `feat(list-detail): filter open items with search` |
+| Next Role | review |
+
+---
+
+### T-001 — review — 2026-06-15T17:31:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-001 search feature: all acceptance criteria met, 474 tests pass, lint clean, build succeeds, 389 lines < 400. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-001 — commit_task — 2026-06-15T16:06:52Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed open-item search task done and created its approved Conventional Commit. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Review verdict PASS; implementation validation recorded in the preceding handoff. |
+| Commit | `feat(list-detail): filter open items with search` |
+| Next Role | none |
+
+---

@@ -16,6 +16,23 @@
   flex-wrap: wrap;
 }
 
+.detail-search {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(139, 43, 226, 0.25);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.detail-search:focus {
+  outline: none;
+  border-color: rgba(0, 229, 255, 0.4);
+}
+
 .entry-tile-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
