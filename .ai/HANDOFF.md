@@ -83,3 +83,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — implement — 2026-06-15T16:12:53Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Prevented vertical touch scrolling from triggering EntryTile long presses or synthetic clicks while preserving taps, stationary holds, and horizontal movement. |
+| Files Changed | README.md, frontend/src/hooks/useLongPress.test.tsx, frontend/src/hooks/useLongPress.ts, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` passed with one existing Fast Refresh warning; targeted useLongPress and EntryTile tests passed (19 tests); `npm run build` passed with the existing large-chunk warning; `npm test` passed (480 frontend tests, 174 backend tests); `git diff --check` passed. |
+| Commit | `fix(entry-tile): prevent toggles while scrolling` |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-06-15T18:57:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-002 swipe-fix: all acceptance criteria met, 480 tests pass (6 new hook tests), lint clean, build succeeds, EntryTile wires onTouchMove automatically via handler spread. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — commit_task — 2026-06-15T17:20:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Marked the reviewed scroll-safe EntryTile task done and created its approved Conventional Commit. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Review verdict PASS; implementation validation recorded in the preceding handoff. |
+| Commit | `fix(entry-tile): prevent toggles while scrolling` |
+| Next Role | none |
+
+---

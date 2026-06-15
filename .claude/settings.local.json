@@ -48,7 +48,8 @@
       "Bash(xargs grep -l \"keyword\\\\|synonym\\\\|iconData\\\\|iconDb\\\\|matche\")",
       "Bash(echo \"EXIT:$?\")",
       "PowerShell(\\(Get-Content \"C:\\\\develop\\\\endgame_grocery\\\\frontend\\\\src\\\\pages\\\\ListDetailPage\\\\ListDetailPage.tsx\" | Measure-Object -Line\\).Lines)",
-      "PowerShell(Get-Content *)"
+      "PowerShell(Get-Content *)",
+      "PowerShell(git *)"
     ]
   }
 }
