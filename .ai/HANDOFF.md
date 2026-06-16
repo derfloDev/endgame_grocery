@@ -23,107 +23,94 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
-### T-001 — plan — 2026-06-15T00:00:00Z
+### T-001 — plan — 2026-06-16T00:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Suchfunktion geplant: immer sichtbare Suchleiste auf ListDetailPage filtert offene Einträge nach Name und Details, mit eigenem EmptyState und i18n. |
-| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md |
+| Summary | Planned CSS flex-layout fix so the settings button stays visible on mobile screens |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
 | Next Role | implement |
 
 ---
 
-### T-002 — plan — 2026-06-15T00:00:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Swipe-Fix geplant: useLongPress-Hook erhält onTouchMove-Handler, der bei δY ≥ 8 px den Timer abbricht und den nachfolgenden Click blockiert. |
-| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md |
-| Next Role | implement |
-
----
-
-### T-001 — implement — 2026-06-15T14:07:28Z
+### T-001 — implement — 2026-06-16T06:10:04Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Added an always-visible open-item search that filters names and details, restores all items when cleared, and shows a localized no-results state. |
-| Files Changed | README.md, frontend/src/locales/de/translation.json, frontend/src/locales/en/translation.json, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/pages/ListDetailPage/ListDetailPage.module.css, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, .ai/TASKS.md, .ai/HANDOFF.md |
-| Validation | `npm run lint` passed with one existing Fast Refresh warning; `npm run build` passed with the existing large-chunk warning; `npm test` passed (474 frontend tests, 174 backend tests); targeted ListDetailPage suite passed (22 tests); `git diff --check` passed; ListDetailPage.tsx has 389 lines. |
-| Commit | `feat(list-detail): filter open items with search` |
+| Summary | Fixed the OverviewPage topbar flex sizing so mobile users keep access to the settings button while the sort control wraps below it |
+| Files Changed | `frontend/src/pages/OverviewPage/OverviewPage.tsx`, `frontend/src/pages/OverviewPage/OverviewPage.module.css`, `frontend/src/pages/page-components.test.ts`, `e2e/lists.spec.js`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run test --workspace frontend -- page-components.test.ts OverviewPage.test.tsx` pass; `npm run lint` pass with existing `AuthContext.tsx` Fast Refresh warning; `npm run build` pass with existing chunk-size warning; `npm test` pass; `npm run e2e -- e2e/lists.spec.js` pass |
+| Commit | `fix(overview): keep settings button visible on mobile` |
 | Next Role | review |
 
 ---
 
-### T-001 — review — 2026-06-15T17:31:00Z
+### T-001 — review — 2026-06-16T08:35:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed T-001 search feature: all acceptance criteria met, 474 tests pass, lint clean, build succeeds, 389 lines < 400. |
-| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
-| Verdict | PASS |
+| Summary | Reviewed CSS flex-layout fix for mobile settings button visibility; all plan requirements met, 481/481 tests pass, lint and build clean |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-001 — commit_task — 2026-06-15T16:06:52Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Marked the reviewed open-item search task done and created its approved Conventional Commit. |
-| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
-| Validation | Review verdict PASS; implementation validation recorded in the preceding handoff. |
-| Commit | `feat(list-detail): filter open items with search` |
-| Next Role | none |
-
----
-
-### T-002 — implement — 2026-06-15T16:12:53Z
-
-| Field | Value |
-|-------|-------|
-| Agent | codex |
-| Summary | Prevented vertical touch scrolling from triggering EntryTile long presses or synthetic clicks while preserving taps, stationary holds, and horizontal movement. |
-| Files Changed | README.md, frontend/src/hooks/useLongPress.test.tsx, frontend/src/hooks/useLongPress.ts, .ai/TASKS.md, .ai/HANDOFF.md |
-| Validation | `npm run lint` passed with one existing Fast Refresh warning; targeted useLongPress and EntryTile tests passed (19 tests); `npm run build` passed with the existing large-chunk warning; `npm test` passed (480 frontend tests, 174 backend tests); `git diff --check` passed. |
-| Commit | `fix(entry-tile): prevent toggles while scrolling` |
-| Next Role | review |
-
----
-
-### T-002 — review — 2026-06-15T18:57:00Z
+### T-001 — plan (rework) — 2026-06-16T00:00:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed T-002 swipe-fix: all acceptance criteria met, 480 tests pass (6 new hook tests), lint clean, build succeeds, EntryTile wires onTouchMove automatically via handler spread. |
-| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
-| Verdict | PASS |
+| Summary | Reworked plan after regression: brand title clips to "END" because `flex-shrink:0` on `.overview-actions` (which still contained the sort-select) left only ~30 px for the title; new plan separates sort-control into its own `.overview-sort-row` below the brand row |
+| Files Changed | `ROADMAP.md`, `.ai/PLAN.md`, `.ai/TASKS.md` |
+| Next Role | implement |
+
+---
+
+### T-001 — implement — 2026-06-16T09:51:12Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Reworked the OverviewPage topbar so the brand row only contains the app name, logo, and settings button, with sorting in a separate row that no longer clips the brand on mobile |
+| Files Changed | `frontend/src/pages/OverviewPage/OverviewPage.tsx`, `frontend/src/pages/OverviewPage/OverviewPage.module.css`, `frontend/src/pages/page-components.test.ts`, `e2e/lists.spec.js`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | `npm run test --workspace frontend -- page-components.test.ts` failed before implementation as expected; `npm run test --workspace frontend -- page-components.test.ts OverviewPage.test.tsx` pass; `npm run e2e -- e2e/lists.spec.js` pass; `npm run lint` pass with existing `AuthContext.tsx` Fast Refresh warning; `npm run build` pass with existing chunk-size warning; `npm test` pass |
+| Commit | `fix(overview): keep mobile topbar brand and settings visible` |
+| Next Role | review |
+
+---
+
+### T-001 — review — 2026-06-16T12:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Round 2 review of structural sort-row separation; all plan requirements met, 481/481 tests pass, lint and build clean |
+| Files Changed | `.ai/REVIEW.md`, `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Verdict | PASS_WITH_NOTES |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-002 — commit_task — 2026-06-15T17:20:55Z
+### T-001 — commit_task — 2026-06-16T10:31:38Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Marked the reviewed scroll-safe EntryTile task done and created its approved Conventional Commit. |
-| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
-| Validation | Review verdict PASS; implementation validation recorded in the preceding handoff. |
-| Commit | `fix(entry-tile): prevent toggles while scrolling` |
+| Summary | Marked T-001 done and committed the reviewed OverviewPage mobile topbar fix |
+| Files Changed | `.ai/TASKS.md`, `.ai/HANDOFF.md` |
+| Validation | not run during commit_task; reused reviewed validation evidence |
+| Commit | `fix(overview): keep mobile topbar brand and settings visible` |
 | Next Role | none |
 
 ---
 
-### Cycle closed — unversioned — 2026-06-15T17:35:00Z
+### Cycle closed — unversioned — 2026-06-16T10:33:32Z
 
 | Field | Value |
 |-------|-------|

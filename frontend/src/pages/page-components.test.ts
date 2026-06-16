@@ -16,7 +16,14 @@ const authPages = [
 ];
 
 const moduleClasses = {
-  OverviewPage: ["overview-topbar", "overview-brand", "overview-content", "overview-header"],
+  OverviewPage: [
+    "overview-topbar",
+    "overview-brand",
+    "overview-brand-left",
+    "overview-sort-row",
+    "overview-content",
+    "overview-header"
+  ],
   ListDetailPage: ["detail-content", "detail-meta", "detail-member-badges", "entry-tile-grid"]
 } as const;
 
@@ -40,6 +47,20 @@ describe("page CSS module layout", () => {
     for (const className of classNames) {
       expect(cssSource).toMatch(new RegExp(`\\.${className}\\b`));
     }
+  });
+
+  it("keeps the overview sort control in its own row below the brand actions", () => {
+    const pageSource = readFileSync(path.resolve(pagesDir, "OverviewPage", "OverviewPage.tsx"), "utf8");
+    const cssSource = readFileSync(path.resolve(pagesDir, "OverviewPage", "OverviewPage.module.css"), "utf8");
+
+    expect(pageSource).toContain('className={styles["overview-brand-left"]}');
+    expect(pageSource).toContain('className={styles["overview-sort-row"]}');
+    expect(pageSource).toMatch(/styles\["overview-actions"\][\s\S]*overview-logo[\s\S]*settings\.open[\s\S]*<\/div>\s*<\/div>\s*<div className={styles\["overview-sort-row"\]}>/);
+    expect(cssSource).toMatch(/\.overview-brand-left\s*{[^}]*min-width:\s*0;[^}]*flex-shrink:\s*1;/s);
+    expect(cssSource).toMatch(/\.overview-actions\s*{[^}]*flex-shrink:\s*0;/s);
+    expect(cssSource).toMatch(/\.overview-sort-row\s*{[^}]*display:\s*flex;[^}]*justify-content:\s*flex-end;[^}]*margin-bottom:\s*12px;/s);
+    expect(cssSource).not.toMatch(/\.overview-sort-control\b/);
+    expect(cssSource).not.toMatch(/@media\s*\(max-width:\s*480px\)/);
   });
 
   it("keeps cross-component detail and entry section classes shared", () => {

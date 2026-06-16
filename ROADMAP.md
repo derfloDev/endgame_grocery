@@ -1,26 +1,32 @@
 # ROADMAP
 
-Goal: Zwei UX-Verbesserungen auf der Einkauflisten-Detailseite.
+Goal: Fix the OverviewPage topbar so both the settings button AND the full app name are
+always visible on all mobile screen sizes.
 
-## Priority 1 — Suchfunktion (Filter)
+## Priority 1
 
-Objective: Nutzer können schnell prüfen, ob ein Artikel bereits auf der Liste steht.
+Objective: Stable topbar layout on narrow phones (≥ 320 px viewport).
 
-- Auf der `ListDetailPage` erscheint direkt unter der Abschnittsüberschrift „OFFENE ARTIKEL" eine immer sichtbare Suchleiste.
-- Bei Texteingabe werden die **offenen Einträge** nach Name (`entry.text`) und Details (`entry.details`) gefiltert (case-insensitive, enthält-Suche).
-- Der Abschnitt „Zuletzt verwendet" (`RecentlyUsedSection`) wird nicht gefiltert.
-- Wenn die Suche keine Ergebnisse liefert, zeigt ein spezifischer `EmptyState` einen passenden Hinweis (abweichend vom „Alles erledigt"-Text).
-- Das Suchfeld lässt sich leeren (Clear-Button oder natives Input-Reset).
-- i18n-Strings werden für `de` und `en` gepflegt.
-- Bestehende Tests für `ListDetailPage` bleiben grün; neue Tests decken Filter-Logik und den leeren Suchzustand ab.
+- **Problem 1 (original):** Settings button was pushed off-screen on narrow screens because
+  the brand title div had no flex-shrink constraint.
+- **Problem 2 (regression from P1 fix):** Adding `flex-shrink: 0` to `.overview-actions`
+  and keeping the sort-select inside the same container causes the actions div to claim its
+  full max-content width (~244 px: sort + logo + button + gaps), leaving only ~30 px for
+  the brand title → title clips after "END".
 
-## Priority 2 — Swipe-Fix (ungewolltes Öffnen beim Scrollen)
+**Root cause of regression:**  
+The sort-select lives inside `.overview-actions`, which must be `flex-shrink: 0` to keep
+the settings button visible. These two requirements are fundamentally in conflict when the
+sort-select adds ~150 px to the container width.
 
-Objective: Vertikales Scrollen auf der Einkaufliste öffnet keine Einträge mehr.
+**Chosen fix: structural separation of the sort control**  
+Move the sort-select out of `.overview-actions` into a dedicated `.overview-sort-row` div
+that sits below the brand row. The brand row then only contains:
+  - Left: `.overview-brand-left` (title + subtitle)
+  - Right: `.overview-actions` (logo + settings button only, ~88 px)
 
-- Im `useLongPress`-Hook wird ein `onTouchMove`-Handler ergänzt, der die vertikale Touch-Verschiebung trackt.
-- Überschreitet die vertikale Verschiebung einen Schwellenwert (≥ 8 px), gilt die Geste als Scroll:
-  - Der Long-Press-Timer wird abgebrochen.
-  - Ein internes Flag verhindert, dass das nachfolgende synthetische `click`-Event `onToggle` auslöst.
-- Horizontales Scrollen (z. B. seitliches Wischen) hat keinen Einfluss auf das Toggle-Verhalten.
-- Bestehende Tests für `useLongPress` bleiben grün; neue Tests belegen das Scroll-Abbruchverhalten.
+This removes the conflict entirely:
+- Brand title always has ample horizontal space.
+- Settings button is always visible (actions container is small and `flex-shrink: 0`).
+- Sort control occupies its own row, right-aligned.
+- The `flex-wrap: wrap-reverse` mobile hack is no longer needed.
