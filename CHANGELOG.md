@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/derfloDev/endgame_grocery/compare/v1.9.0...v1.9.1) (2026-06-16)
+
+
+### Bug Fixes
+
+* **overview:** keep mobile topbar brand and settings visible ([22f6e0b](https://github.com/derfloDev/endgame_grocery/commit/22f6e0b0ac3d22b6f26b55e6a22e9f25ea2794ef))
+
 ## [1.9.0](https://github.com/derfloDev/endgame_grocery/compare/v1.8.0...v1.9.0) (2026-06-15)
 
 
