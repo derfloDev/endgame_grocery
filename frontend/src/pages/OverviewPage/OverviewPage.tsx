@@ -189,31 +189,31 @@ export default function OverviewPage(): ReactElement {
     <div>
       <div className={styles["overview-topbar"]}>
         <div className={styles["overview-brand"]}>
-          <div>
+          <div className={styles["overview-brand-left"]}>
             <div className={`eg-gradient-text eg-orbitron ${styles["overview-brand-title"]}`}>{t("app.brandMain")}</div>
             <div className={styles["overview-brand-sub"]}>{t("app.brandSub")}</div>
           </div>
           <div className={styles["overview-actions"]}>
-            <div className={styles["overview-sort-control"]}>
-              <label className="visually-hidden" htmlFor="overview-sort">
-                {t("overview.sortLabel")}
-              </label>
-              <select
-                id="overview-sort"
-                className={styles["overview-sort-select"]}
-                value={sortMode}
-                onChange={(event) => handleSortChange(event.target.value as OverviewSortMode)}
-              >
-                <option value="created_asc">{t("overview.sortCreatedAsc")}</option>
-                <option value="name_asc">{t("overview.sortNameAsc")}</option>
-                <option value="activity_desc">{t("overview.sortActivityDesc")}</option>
-              </select>
-            </div>
             <img alt={t("app.brandName")} className={styles["overview-logo"]} src={logo} />
             <button aria-label={t("settings.open")} className="eg-icon-btn" type="button" onClick={() => setShowInfo(true)}>
               <Icon name="settings" color="var(--text-secondary)" size={18} />
             </button>
           </div>
+        </div>
+        <div className={styles["overview-sort-row"]}>
+          <label className="visually-hidden" htmlFor="overview-sort">
+            {t("overview.sortLabel")}
+          </label>
+          <select
+            id="overview-sort"
+            className={styles["overview-sort-select"]}
+            value={sortMode}
+            onChange={(event) => handleSortChange(event.target.value as OverviewSortMode)}
+          >
+            <option value="created_asc">{t("overview.sortCreatedAsc")}</option>
+            <option value="name_asc">{t("overview.sortNameAsc")}</option>
+            <option value="activity_desc">{t("overview.sortActivityDesc")}</option>
+          </select>
         </div>
       </div>
 

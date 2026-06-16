@@ -20,4 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
+| T-001 | Fix OverviewPage topbar: settings button visible AND app name not clipped on mobile | done | App name fully visible (no clipping) on ≥ 320 px; settings button always visible; sort row below brand row on all sizes; lint + build + tests pass | `npm run lint` pass (1 existing warning); `npm run build` pass; `npm test` pass; `npm run e2e -- e2e/lists.spec.js` pass | none |
