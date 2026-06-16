@@ -20,5 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | Suchfunktion: Suchleiste auf ListDetailPage filtert offene Einträge nach Name und Details | done | Suchleiste sichtbar; filtert case-insensitiv; eigener EmptyState bei keinen Treffern; i18n de+en; bestehende Tests grün; Zeilen < 400 | `npm run lint`; `npm run build`; `npm test`; ListDetailPage.tsx: 389 lines | none |
-| T-002 | Swipe-Fix: Vertikales Scrollen öffnet keine EntryTiles mehr | done | δY ≥ 8 px bricht Timer ab und blockiert Click; kurzes Tippen/langes Drücken unverändert; bestehende Tests grün | `npm run lint`; `npm run build`; `npm test`; targeted hook and EntryTile tests | none |
+| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |

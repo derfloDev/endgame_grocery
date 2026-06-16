@@ -1,26 +1,29 @@
 # ROADMAP
 
-Goal: Zwei UX-Verbesserungen auf der Einkauflisten-Detailseite.
+Goal: define and deliver the scope for this cycle.
 
-## Priority 1 — Suchfunktion (Filter)
+Delete any unused example sections below. Only the Goal and one concrete priority are required.
 
-Objective: Nutzer können schnell prüfen, ob ein Artikel bereits auf der Liste steht.
+## Priority 1
 
-- Auf der `ListDetailPage` erscheint direkt unter der Abschnittsüberschrift „OFFENE ARTIKEL" eine immer sichtbare Suchleiste.
-- Bei Texteingabe werden die **offenen Einträge** nach Name (`entry.text`) und Details (`entry.details`) gefiltert (case-insensitive, enthält-Suche).
-- Der Abschnitt „Zuletzt verwendet" (`RecentlyUsedSection`) wird nicht gefiltert.
-- Wenn die Suche keine Ergebnisse liefert, zeigt ein spezifischer `EmptyState` einen passenden Hinweis (abweichend vom „Alles erledigt"-Text).
-- Das Suchfeld lässt sich leeren (Clear-Button oder natives Input-Reset).
-- i18n-Strings werden für `de` und `en` gepflegt.
-- Bestehende Tests für `ListDetailPage` bleiben grün; neue Tests decken Filter-Logik und den leeren Suchzustand ab.
+Objective: replace with objective.
 
-## Priority 2 — Swipe-Fix (ungewolltes Öffnen beim Scrollen)
+- Replace with planned outcome.
 
-Objective: Vertikales Scrollen auf der Einkaufliste öffnet keine Einträge mehr.
+## Examples
 
-- Im `useLongPress`-Hook wird ein `onTouchMove`-Handler ergänzt, der die vertikale Touch-Verschiebung trackt.
-- Überschreitet die vertikale Verschiebung einen Schwellenwert (≥ 8 px), gilt die Geste als Scroll:
-  - Der Long-Press-Timer wird abgebrochen.
-  - Ein internes Flag verhindert, dass das nachfolgende synthetische `click`-Event `onToggle` auslöst.
-- Horizontales Scrollen (z. B. seitliches Wischen) hat keinen Einfluss auf das Toggle-Verhalten.
-- Bestehende Tests für `useLongPress` bleiben grün; neue Tests belegen das Scroll-Abbruchverhalten.
+These example sections are optional illustrations, not required structure.
+
+<!-- Example: remove or replace this section -->
+## Priority 2
+
+Objective: optional second objective.
+
+- Replace with optional planned outcome.
+
+<!-- Example: remove or replace this section -->
+## Priority 3
+
+Objective: optional third objective.
+
+- Replace with optional planned outcome.
