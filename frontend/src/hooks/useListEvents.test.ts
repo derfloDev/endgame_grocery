@@ -21,6 +21,7 @@ describe("useListEvents", () => {
     const handler = vi.fn();
 
     useEventSourceMock.mockReturnValue({
+      connectionState: "open",
       addEventListener: subscriptions.addEventListener
     });
 
@@ -41,6 +42,7 @@ describe("useListEvents", () => {
     const handler = vi.fn();
 
     useEventSourceMock.mockReturnValue({
+      connectionState: "open",
       addEventListener: subscriptions.addEventListener
     });
 
@@ -57,6 +59,7 @@ describe("useListEvents", () => {
     const handler = vi.fn();
 
     useEventSourceMock.mockReturnValue({
+      connectionState: "open",
       addEventListener: subscriptions.addEventListener
     });
 
@@ -73,6 +76,7 @@ describe("useListEvents", () => {
     const handler = vi.fn();
 
     useEventSourceMock.mockReturnValue({
+      connectionState: "open",
       addEventListener: subscriptions.addEventListener
     });
 

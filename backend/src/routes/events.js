@@ -2,8 +2,6 @@ import { Router } from "express";
 import { createRequireAuthFn } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
-const HEARTBEAT_MESSAGE = ":heartbeat\n\n";
-
 export function createEventsRouter({
   requireAuthFn = createRequireAuthFn(),
   sseManager = defaultSseManager,
@@ -51,7 +49,8 @@ export function createEventsRouter({
       }
 
       try {
-        res.write(HEARTBEAT_MESSAGE);
+        // A named event reaches the mobile client's watchdog; SSE comments are invisible to JS.
+        res.write(`event: ping\ndata: ${JSON.stringify({ ts: new Date().toISOString() })}\n\n`);
       } catch {
         cleanup();
       }
