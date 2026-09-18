@@ -8,6 +8,10 @@ import { writeCachedResource } from "../../api/offlineStore";
 import { leaveList } from "../../api/sharing";
 import OverviewPage from "./OverviewPage";
 
+const streamState = vi.hoisted(() => ({ resyncVersion: 0 }));
+vi.mock("../../context/EventSourceContext", () => ({ useEventSource: () => streamState }));
+beforeEach(() => { streamState.resyncVersion = 0; });
+
 vi.mock("../../api/lists", () => ({
   createList: vi.fn(),
   deleteList: vi.fn(),
@@ -151,8 +155,28 @@ describe("OverviewPage sorting", () => {
   });
 });
 
+describe("OverviewPage resync", () => {
+  afterEach(cleanup);
+
+  it("refetches on a resync bump without duplicating the initial load", async () => {
+    fetchListsMock.mockReset();
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Before reconnect" }] });
+    const view = renderOverviewPage();
+    await screen.findByText("Before reconnect");
+    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "After reconnect" }] });
+    streamState.resyncVersion += 1;
+    view.rerenderPage();
+    await screen.findByText("After reconnect");
+    expect(screen.queryByText("Before reconnect")).toBeNull();
+    expect(fetchListsMock).toHaveBeenCalledTimes(2);
+    view.rerenderPage();
+    expect(fetchListsMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 function renderOverviewPage() {
-  return render(
+  const tree = () => (
     <MemoryRouter
       future={{
         v7_relativeSplatPath: true,
@@ -165,6 +189,8 @@ function renderOverviewPage() {
       </Routes>
     </MemoryRouter>
   );
+  const view = render(tree());
+  return { ...view, rerenderPage: () => view.rerender(tree()) };
 }
 
 function getRenderedListNames(): string[] {

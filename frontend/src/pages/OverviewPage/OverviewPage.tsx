@@ -15,6 +15,7 @@ import Icon from "../../components/ui/Icon/Icon";
 import LoadingState from "../../components/ui/LoadingState/LoadingState";
 import logo from "../../assets/endgame_grocery_logo.png";
 import { useAuth } from "../../context/AuthContext";
+import { useEventSource } from "../../context/EventSourceContext";
 import { useListEvents } from "../../hooks/useListEvents";
 import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 import type { List } from "../../types";
@@ -41,6 +42,7 @@ export default function OverviewPage(): ReactElement {
   const navigate = useNavigate();
   const { token } = useAuth();
   const { syncVersion } = useOfflineQueue();
+  const { resyncVersion } = useEventSource();
   const [lists, setLists] = useState<OverviewList[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -83,7 +85,7 @@ export default function OverviewPage(): ReactElement {
 
   useEffect(() => {
     void loadLists();
-  }, [loadLists, syncVersion]);
+  }, [loadLists, syncVersion, resyncVersion]);
 
   const handleListChange = useCallback(() => {
     void loadLists();

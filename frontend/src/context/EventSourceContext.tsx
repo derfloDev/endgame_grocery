@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactElement, ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import {
+  RESYNC_DEDUPE_WINDOW_MS,
   SSE_HEARTBEAT_TIMEOUT_MS,
   SSE_RECONNECT_BASE_DELAY_MS,
   SSE_RECONNECT_JITTER_RATIO,
@@ -24,6 +25,7 @@ export type SseHandler = (data: Record<string, unknown>) => void;
 interface EventSourceContextValue {
   addEventListener: (type: SseEventType, handler: SseHandler) => () => void;
   connectionState: "connecting" | "open" | "closed";
+  resyncVersion: number;
 }
 
 interface EventSourceTimings {
@@ -31,6 +33,7 @@ interface EventSourceTimings {
   SSE_RECONNECT_MAX_DELAY_MS: number;
   SSE_RECONNECT_JITTER_RATIO: number;
   SSE_HEARTBEAT_TIMEOUT_MS: number;
+  RESYNC_DEDUPE_WINDOW_MS: number;
 }
 
 interface EventSourceProviderProps {
@@ -56,7 +59,9 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
   const maxDelay = timings?.SSE_RECONNECT_MAX_DELAY_MS ?? SSE_RECONNECT_MAX_DELAY_MS;
   const jitterRatio = timings?.SSE_RECONNECT_JITTER_RATIO ?? SSE_RECONNECT_JITTER_RATIO;
   const heartbeatTimeout = timings?.SSE_HEARTBEAT_TIMEOUT_MS ?? SSE_HEARTBEAT_TIMEOUT_MS;
+  const resyncDedupeWindow = timings?.RESYNC_DEDUPE_WINDOW_MS ?? RESYNC_DEDUPE_WINDOW_MS;
   const [connectionState, setConnectionState] = useState<EventSourceContextValue["connectionState"]>("closed");
+  const [resyncVersion, setResyncVersion] = useState(0);
   const listenersRef = useRef(new Map<SseEventType, Set<SseHandler>>());
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,18 +82,37 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
       }
     };
   }, []);
-  const contextValue = useMemo(() => ({ addEventListener, connectionState }), [addEventListener, connectionState]);
+  const contextValue = useMemo(
+    () => ({ addEventListener, connectionState, resyncVersion }),
+    [addEventListener, connectionState, resyncVersion]
+  );
 
   useEffect(() => {
+    setResyncVersion(0);
     if (!token || typeof window.EventSource !== "function") {
       setConnectionState("closed");
       return undefined;
     }
 
     let disposed = false;
+    let hasOpened = false;
+    let lostSinceOpen = false;
+    let wasHidden = document.visibilityState === "hidden";
+    let lastResyncAt = -Infinity;
     let removeSourceListeners: (() => void) | undefined;
     const url = `/api/events?token=${encodeURIComponent(token)}`;
     attemptRef.current = 0;
+
+    function requestResync() {
+      // Pages load on mount, so the first open is excluded by the caller. Collapse the
+      // reconnect and foreground notifications that often arrive together after mobile sleep.
+      const now = Date.now();
+      if (now - lastResyncAt < resyncDedupeWindow) {
+        return;
+      }
+      lastResyncAt = now;
+      setResyncVersion((version) => version + 1);
+    }
 
     function clearReconnectTimer() {
       if (reconnectTimerRef.current !== null) {
@@ -114,6 +138,7 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
         return;
       }
       closeSource();
+      lostSinceOpen = true;
       reportStreamState("lost");
       setConnectionState("closed");
       // A quick first retry recovers mobile drops; the cap and jitter limit outage retry storms.
@@ -176,11 +201,17 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
         reportStreamState("open");
         setConnectionState("open");
         armWatchdog();
+        if (hasOpened && lostSinceOpen) {
+          requestResync();
+        }
+        hasOpened = true;
+        lostSinceOpen = false;
       };
       source.onerror = () => {
         if (!isCurrent()) {
           return;
         }
+        lostSinceOpen = true;
         reportStreamState("lost");
         if (source.readyState === window.EventSource.CLOSED) {
           scheduleReconnect();
@@ -204,14 +235,22 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
       const healthy = eventSourceRef.current?.readyState === window.EventSource.OPEN
         && Date.now() - lastTrafficRef.current < heartbeatTimeout;
       if (!healthy) {
+        lostSinceOpen = true;
         reportStreamState("lost");
         connect();
       }
+      return healthy;
     }
 
     function onVisibilityChange() {
       if (document.visibilityState === "visible") {
-        reconnectIfUnhealthy();
+        const healthy = reconnectIfUnhealthy();
+        if (wasHidden && healthy) {
+          requestResync();
+        }
+        wasHidden = false;
+      } else if (document.visibilityState === "hidden") {
+        wasHidden = true;
       }
     }
 
@@ -227,7 +266,7 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
       closeSource();
       reportStreamState("lost");
     };
-  }, [token, baseDelay, maxDelay, jitterRatio, heartbeatTimeout]);
+  }, [token, baseDelay, maxDelay, jitterRatio, heartbeatTimeout, resyncDedupeWindow]);
 
   return (
     <EventSourceContext.Provider value={contextValue}>

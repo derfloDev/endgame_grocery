@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
@@ -18,26 +18,16 @@ import Icon from "../../components/ui/Icon/Icon";
 import LoadingState from "../../components/ui/LoadingState/LoadingState";
 import TopBar from "../../components/ui/TopBar/TopBar";
 import { useAuth } from "../../context/AuthContext";
+import { useEventSource } from "../../context/EventSourceContext";
 import { useListEvents } from "../../hooks/useListEvents";
 import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { getRecentlyUsedDisplayState } from "../recentlyUsedState";
 import { leaveSharedList } from "../leaveListAction";
 import styles from "./ListDetailPage.module.css";
-import { getChangeKind, getErrorMessage, getInitials } from "./listDetailUtils";
+import { getChangeKind, getErrorMessage, getInitials, isShareInviteResult } from "./listDetailUtils";
 import { useListDetailData } from "./useListDetailData";
 import type { DetailEntry, DetailMember } from "./useListDetailData";
-
-interface ShareInviteResult {
-  queued?: boolean;
-  invite?: {
-    invited_email?: string;
-  };
-}
-
-function isShareInviteResult(value: unknown): value is ShareInviteResult {
-  return Boolean(value) && typeof value === "object";
-}
 
 export default function ListDetailPage(): ReactElement {
   const { t } = useTranslation();
@@ -46,6 +36,8 @@ export default function ListDetailPage(): ReactElement {
   const listId = id ?? "";
   const { token } = useAuth();
   const { syncVersion } = useOfflineQueue();
+  const { resyncVersion } = useEventSource();
+  const lastResyncRef = useRef(resyncVersion);
   const [shareEmail, setShareEmail] = useState<string>("");
   const [shareError, setShareError] = useState<string>("");
   const [shareNotice, setShareNotice] = useState<string>("");
@@ -109,6 +101,16 @@ export default function ListDetailPage(): ReactElement {
   const handleMemberChange = useCallback(() => void loadMembers({ isOwner: list?.is_owner ?? false }), [list?.is_owner, loadMembers]);
 
   const handleHistoryChange = useCallback(() => void reloadHistory(), [reloadHistory]);
+
+  useEffect(() => {
+    // Mount already loads the page. Later versions refresh in place without clearing it.
+    if (lastResyncRef.current === resyncVersion || isLoading) return;
+    lastResyncRef.current = resyncVersion;
+    void loadEntries().then((nextEntries) => Promise.all([
+      reloadHistory(nextEntries),
+      loadMembers({ isOwner: list?.is_owner ?? false })
+    ]));
+  }, [resyncVersion, isLoading, loadEntries, reloadHistory, loadMembers, list?.is_owner]);
 
   useListEvents("entry:created", listId, handleEntryChange);
   useListEvents("entry:updated", listId, handleEntryChange);

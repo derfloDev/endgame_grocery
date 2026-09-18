@@ -126,7 +126,8 @@ describe("EventSource reconnect manager", () => {
     SSE_RECONNECT_BASE_DELAY_MS: 100,
     SSE_RECONNECT_MAX_DELAY_MS: 400,
     SSE_RECONNECT_JITTER_RATIO: 0.3,
-    SSE_HEARTBEAT_TIMEOUT_MS: 1000
+    SSE_HEARTBEAT_TIMEOUT_MS: 1000,
+    RESYNC_DEDUPE_WINDOW_MS: 200
   };
 
   beforeEach(() => {
@@ -167,6 +168,96 @@ describe("EventSource reconnect manager", () => {
       }
     });
   }
+
+  function resyncVersion() {
+    return Number.parseInt(screen.getByTestId("resync-version").textContent ?? "", 10);
+  }
+
+  it("does not resync on the first successful connection, even after initial failures", () => {
+    mount();
+    expect(resyncVersion()).toBe(0);
+    act(() => { latest().fail(); });
+    advance(100);
+    act(() => { latest().open(); });
+    expect(resyncVersion()).toBe(0);
+    act(() => { latest().open(); });
+    expect(resyncVersion()).toBe(0);
+  });
+
+  it.each([MockEventSource.CLOSED, MockEventSource.CONNECTING])("resyncs on a confirmed reconnect after loss in state %s", (state) => {
+    mount();
+    act(() => { latest().open(); latest().fail(state); });
+    expect(resyncVersion()).toBe(0);
+    if (state === MockEventSource.CLOSED) advance(100);
+    act(() => { latest().open(); });
+    expect(resyncVersion()).toBe(1);
+    advance(200);
+    act(() => { latest().open(); });
+    expect(resyncVersion()).toBe(1);
+  });
+
+  it("resyncs only on hidden-to-visible transitions with a healthy stream", () => {
+    mount();
+    act(() => { latest().open(); });
+    wake("visible");
+    wake("online");
+    expect(resyncVersion()).toBe(0);
+    wake("hidden");
+    expect(resyncVersion()).toBe(0);
+    wake("visible");
+    expect(resyncVersion()).toBe(1);
+    advance(200);
+    wake("visible");
+    expect(resyncVersion()).toBe(1);
+    wake("hidden");
+    wake("visible");
+    expect(resyncVersion()).toBe(2);
+  });
+
+  it("deduplicates reconnect followed by foreground within the configured window", () => {
+    mount();
+    act(() => { latest().open(); });
+    wake("hidden");
+    act(() => { latest().fail(); });
+    advance(100);
+    act(() => { latest().open(); });
+    expect(resyncVersion()).toBe(1);
+    advance(199);
+    wake("visible");
+    expect(resyncVersion()).toBe(1);
+    advance(1);
+    wake("hidden");
+    wake("visible");
+    expect(resyncVersion()).toBe(2);
+  });
+
+  it("deduplicates foreground followed by a reconnect", () => {
+    mount();
+    act(() => { latest().open(); });
+    wake("hidden");
+    wake("visible");
+    act(() => { latest().fail(MockEventSource.CONNECTING); latest().open(); });
+    expect(resyncVersion()).toBe(1);
+  });
+
+  it("waits for the unhealthy foreground stream to reopen before resyncing", () => {
+    mount();
+    act(() => { latest().open(); });
+    wake("hidden");
+    vi.setSystemTime(Date.now() + 1001);
+    wake("visible");
+    expect(resyncVersion()).toBe(0);
+    act(() => { latest().open(); });
+    expect(resyncVersion()).toBe(1);
+  });
+
+  it("resyncs after watchdog recovery", () => {
+    mount();
+    act(() => { latest().open(); });
+    advance(1100);
+    act(() => { latest().open(); });
+    expect(resyncVersion()).toBe(1);
+  });
 
   it("creates no stream or timer without a token, including on wake-up", () => {
     useAuthMock.mockReturnValue(createAuthValue(""));
@@ -438,7 +529,8 @@ describe("EventSource reconnect manager", () => {
 });
 
 function StateHarness() {
-  return <span data-testid="connection-state">{useEventSource().connectionState}</span>;
+  const { connectionState, resyncVersion } = useEventSource();
+  return <><span data-testid="connection-state">{connectionState}</span><span data-testid="resync-version">{resyncVersion}</span></>;
 }
 
 interface ListenerHarnessProps {

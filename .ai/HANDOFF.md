@@ -105,3 +105,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — implement — 2026-09-18T10:46:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | next_task T-002: added deduplicated reconnect/foreground resync, wired overview and lightweight detail refreshes, and preserved pending local entries across recovery and ordinary SSE refetches, including writes queued during an in-flight refresh. |
+| Files Changed | frontend/src/context/EventSourceContext.tsx, frontend/src/context/EventSourceContext.test.tsx, frontend/src/hooks/useListEvents.test.ts, frontend/src/pages/OverviewPage/OverviewPage.tsx, frontend/src/pages/OverviewPage/OverviewPage.test.tsx, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage/useListDetailData.ts, frontend/src/pages/ListDetailPage/listDetailUtils.ts, frontend/src/pages/ListDetailPage/listDetailUtils.test.ts, frontend/src/pages/ListDetailPage.test.tsx, e2e/resync.spec.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Tests written first and confirmed failing for missing resync/merge behavior. Final `npm run lint` PASS (existing AuthContext fast-refresh warning); `npm run build` PASS (existing chunk-size warning); `npm test` PASS (40 frontend files / 530 tests and 174 backend tests); `npm run e2e -- e2e/resync.spec.js` PASS (2 Chromium scenarios, exit 0). Browser checks use controlled API/SSE and simulated lifecycle events, verify foreground changes and a single reconnect-plus-foreground detail refresh without clearing content; real-device suspension and database-backed E2E remain outside these checks. Windows Playwright server teardown hung after tests finished; stopped only the temporary server trees from these runs, after which the successful runner exited 0. `npx tsc --noEmit -p frontend/tsconfig.json` reports only the same three pre-existing errors: ListDetailPage.tsx:223 (nullable details), OverviewPage.test.tsx:51 (owner_name), iconWorker.ts:42 (quantized option). `git diff --check` and `git diff --cached --check` PASS. Two new test files explicitly staged; no commit created. |
+| Commit | `fix(sync): refresh lists after reconnecting or returning to the app` |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-09-18T11:44:07Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed resyncVersion with its dedupe window, the overview and detail light-reload wiring and mergePendingEntries against PLAN T-002; all four acceptance criteria met and confirmed in real Chromium, no required fixes, six non-blocking notes recorded. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-09-18T11:47:39Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task T-002: accepted review round 1 PASS_WITH_NOTES with no required fixes, marked the task done and prepared the reviewed changes for commit using the original next_task Commit field. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md; reviewed T-002 implementation, tests, documentation and review artifacts staged by git add -A |
+| Validation | Confirmed ready_to_commit and no required review fixes; review records passing lint, build, 530 frontend tests, 174 backend tests and two successful runs of both Chromium resync scenarios. Existing typecheck errors, contention-related test flakiness and browser-fixture limitations remain documented in .ai/REVIEW.md. No implementation changes during commit_task. |
+| Commit | `fix(sync): refresh lists after reconnecting or returning to the app` |
+| Next Role | none |
+
+---

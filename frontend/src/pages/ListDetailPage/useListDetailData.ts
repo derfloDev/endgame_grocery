@@ -7,6 +7,7 @@ import { writeCachedResource } from "../../api/offlineStore";
 import { fetchListMembers } from "../../api/sharing";
 import type { Entry, List, Member, Suggestion } from "../../types";
 import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "../recentlyUsedState";
+import { mergePendingEntries } from "./listDetailUtils";
 
 export interface DetailEntry extends Omit<Entry, "details"> {
   details?: string | null;
@@ -56,7 +57,8 @@ export function useListDetailData({
   token
 }: UseListDetailDataOptions) {
   const [list, setList] = useState<DetailList | null>(null);
-  const [entries, setEntries] = useState<DetailEntry[]>([]);
+  const [entries, setEntriesState] = useState<DetailEntry[]>([]);
+  const entriesRef = useRef<DetailEntry[]>([]);
   const [members, setMembers] = useState<DetailMember[]>([]);
   const [recentlyUsed, setRecentlyUsed] = useState<Suggestion[]>([]);
   const [entryError, setEntryError] = useState<unknown>(null);
@@ -64,6 +66,15 @@ export function useListDetailData({
   const [isSharingLoading, setIsSharingLoading] = useState<boolean>(false);
   const isMountedRef = useRef<boolean>(false);
   const locallyDoneIdsRef = useRef<Set<string>>(new Set());
+
+  // Keep an immediate snapshot for async reloads: React may defer state updaters, but
+  // both the merge and the following history refresh must see entries queued meanwhile.
+  const setEntries = useCallback((value: DetailEntry[] | ((current: DetailEntry[]) => DetailEntry[])) => {
+    const nextEntries = typeof value === "function" ? value(entriesRef.current) : value;
+    entriesRef.current = nextEntries;
+    setEntriesState(nextEntries);
+    return nextEntries;
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -77,13 +88,14 @@ export function useListDetailData({
     async ({ historyItems = null, throwOnError = false }: LoadEntriesOptions = {}): Promise<DetailEntry[]> => {
       try {
         const entriesResult = await fetchEntries(listId, token);
-        const nextEntries = (entriesResult.entries ?? []).map((entry) => {
+        const serverEntries = (entriesResult.entries ?? []).map((entry) => {
           const detailEntry = entry as DetailEntry;
 
           return locallyDoneIdsRef.current.has(detailEntry.id) && detailEntry.status === "done"
             ? { ...detailEntry, is_changed: true }
             : detailEntry;
         });
+        const nextEntries = mergePendingEntries(serverEntries, entriesRef.current);
 
         if (isMountedRef.current) {
           setEntries(nextEntries);
@@ -103,7 +115,7 @@ export function useListDetailData({
         return [];
       }
     },
-    [listId, token]
+    [listId, token, setEntries]
   );
 
   const reloadHistory = useCallback(
@@ -168,16 +180,11 @@ export function useListDetailData({
 
   const updateEntries = useCallback(
     async (updater: (currentEntries: DetailEntry[]) => DetailEntry[]): Promise<void> => {
-      let nextEntries: DetailEntry[] = [];
-
-      setEntries((currentEntries) => {
-        nextEntries = updater(currentEntries);
-        return nextEntries;
-      });
+      const nextEntries = setEntries(updater);
 
       await writeCachedResource(`entries:${listId}`, { entries: nextEntries });
     },
-    [listId]
+    [listId, setEntries]
   );
 
   const addEntryByText = useCallback(
@@ -439,7 +446,7 @@ export function useListDetailData({
     }
 
     void loadListDetail();
-  }, [accessErrorMessage, listId, loadMembers, onLoadStart, onNonOwnerList, syncVersion, token]);
+  }, [accessErrorMessage, listId, loadMembers, onLoadStart, onNonOwnerList, syncVersion, token, setEntries]);
 
   return {
     addEntryByText,

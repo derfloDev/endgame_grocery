@@ -22,6 +22,7 @@ describe("useListEvents", () => {
 
     useEventSourceMock.mockReturnValue({
       connectionState: "open",
+      resyncVersion: 0,
       addEventListener: subscriptions.addEventListener
     });
 
@@ -43,6 +44,7 @@ describe("useListEvents", () => {
 
     useEventSourceMock.mockReturnValue({
       connectionState: "open",
+      resyncVersion: 0,
       addEventListener: subscriptions.addEventListener
     });
 
@@ -60,6 +62,7 @@ describe("useListEvents", () => {
 
     useEventSourceMock.mockReturnValue({
       connectionState: "open",
+      resyncVersion: 0,
       addEventListener: subscriptions.addEventListener
     });
 
@@ -77,6 +80,7 @@ describe("useListEvents", () => {
 
     useEventSourceMock.mockReturnValue({
       connectionState: "open",
+      resyncVersion: 0,
       addEventListener: subscriptions.addEventListener
     });
 
