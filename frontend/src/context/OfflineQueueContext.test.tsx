@@ -8,6 +8,7 @@ import {
 } from "../api/offlineStore";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 import { OfflineQueueProvider } from "./OfflineQueueContext";
+import { reportStreamState, resetConnectivityForTests } from "../api/connectivity";
 
 const offlineStoreMock = vi.hoisted(() => ({
   listOfflineMutations: vi.fn(),
@@ -37,11 +38,14 @@ describe("OfflineQueueProvider", () => {
     vi.stubGlobal("fetch", fetchMock);
     setNavigatorOnline(false);
     setVisibilityState("visible");
+    resetConnectivityForTests();
+    reportStreamState("open");
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     cleanup();
+    resetConnectivityForTests();
   });
 
   it("drains queued mutations when the page becomes visible while online", async () => {
@@ -101,7 +105,6 @@ describe("OfflineQueueProvider", () => {
 
     renderProvider();
 
-    setNavigatorOnline(true);
     act(() => {
       window.dispatchEvent(new Event("online"));
     });
@@ -125,6 +128,46 @@ describe("OfflineQueueProvider", () => {
     await waitFor(() => {
       expect(removeOfflineMutationMock).toHaveBeenCalledWith("mutation-1");
     });
+  });
+
+  it.each(["focus", "pageshow", "online", "offline", "visibilitychange", OFFLINE_QUEUE_CHANGED_EVENT])("checks reachability and drains on %s even with a false browser hint", async (event) => {
+    resetConnectivityForTests();
+    fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+    render(<OfflineQueueProvider timings={{ REACHABILITY_PROBE_MIN_INTERVAL_MS: 0 }}><OfflineQueueState /></OfflineQueueProvider>);
+    await waitFor(() => expect(screen.getByTestId("is-offline").textContent).toBe("true"));
+    currentMutations = [createMutation()];
+    fetchMock.mockResolvedValue(createResponse({ ok: true }));
+    act(() => { (event === "visibilitychange" ? document : window).dispatchEvent(new Event(event)); });
+    await waitFor(() => expect(removeOfflineMutationMock).toHaveBeenCalledWith("mutation-1"));
+    expect(screen.getByTestId("is-offline").textContent).toBe("false");
+    expect(navigator.onLine).toBe(false);
+  });
+
+  it("keeps queued writes offline despite a true browser hint and coalesces wake-ups", async () => {
+    resetConnectivityForTests();
+    setNavigatorOnline(true);
+    currentMutations = [createMutation()];
+    fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+    renderProvider(<OfflineQueueState />);
+    await waitFor(() => expect(screen.getByTestId("is-offline").textContent).toBe("true"));
+    act(() => { for (const event of ["focus", "pageshow", "online", "offline", OFFLINE_QUEUE_CHANGED_EVENT]) window.dispatchEvent(new Event(event)); });
+    await flushAsyncWork();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/health", expect.any(Object));
+    expect(removeOfflineMutationMock).not.toHaveBeenCalled();
+    expect(currentMutations).toHaveLength(1);
+  });
+
+  it("does not drain when a probe finishes after unmount", async () => {
+    resetConnectivityForTests();
+    currentMutations = [createMutation()];
+    const health = createDeferred<Response>();
+    fetchMock.mockReturnValue(health.promise);
+    const { unmount } = renderProvider();
+    unmount();
+    await act(async () => { health.resolve(createResponse({ ok: true })); await health.promise; });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(removeOfflineMutationMock).not.toHaveBeenCalled();
   });
 
   it("keeps a failed mutation in the queue and exposes it for discard after a 4xx response", async () => {
@@ -188,10 +231,11 @@ describe("OfflineQueueProvider", () => {
 });
 
 function OfflineQueueState() {
-  const { discardFailedMutation, failedMutationId, syncError } = useOfflineQueue();
+  const { discardFailedMutation, failedMutationId, syncError, isOffline } = useOfflineQueue();
 
   return (
     <>
+      <div data-testid="is-offline">{String(isOffline)}</div>
       <div data-testid="failed-mutation-id">{failedMutationId}</div>
       <div data-testid="sync-error">{syncError}</div>
       <button onClick={() => void discardFailedMutation()} type="button">

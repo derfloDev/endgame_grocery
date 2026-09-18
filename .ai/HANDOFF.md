@@ -144,3 +144,42 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — implement — 2026-09-18T12:14:03Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | next_task T-003: completed shared reachability with a 5-second health deadline, probe de-duplication/rate limiting, stream and HTTP evidence, and browser hints that only invalidate freshness. Queue and banner consume confirmed connectivity; online/offline, visible, pageshow, focus and queue changes check reachability before draining. Updated README and preserved banner wording. |
+| Files Changed | frontend/src/api/connectivity.ts, frontend/src/api/connectivity.test.ts, frontend/src/api/client.ts, frontend/src/api/client.test.ts, frontend/src/context/OfflineQueueContext.tsx, frontend/src/context/OfflineQueueContext.test.tsx, frontend/src/app.test.tsx, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Tests written first and confirmed red; added 28 tests covering both misleading browser hints, all wake-up triggers, cached/concurrent probes, timeout cancellation, late-result isolation, request fallback and stale SSE evidence. Final `npm run lint` PASS (existing AuthContext fast-refresh warning); `npm run build` PASS (existing chunk-size warning); `npm test` PASS (40 frontend files / 558 tests and 174 backend tests). Application fixtures route health separately from ordered API responses and inject a zero probe interval; default timing behavior is covered with fake timers in connectivity tests. `npx tsc --noEmit -p frontend/tsconfig.json` reports only the same three existing errors: ListDetailPage.tsx:223, OverviewPage.test.tsx:51 and iconWorker.ts:42. No new files or commit; E2E not rerun for this task. Ordinary request deadlines and automatic queue retry remain T-004 scope. |
+| Commit | `fix(sync): detect server reachability and resume queued changes on wake` |
+| Next Role | review |
+
+---
+
+### T-003 — review — 2026-09-18T12:42:30Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the reachability probe with its rate limit and in-flight de-duplication, the request-outcome reporting and the offline queue lifecycle triggers against PLAN T-003; all four acceptance criteria met and the two headline ones confirmed in real Chromium, no required fixes, four non-blocking notes recorded. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-09-18T12:50:28Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task T-003: accepted review round 1 PASS_WITH_NOTES with no required fixes, marked the task done and prepared the reviewed changes for commit using the original next_task Commit field. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md; reviewed T-003 implementation, tests, documentation and review artifacts staged by git add -A |
+| Validation | Confirmed ready_to_commit and no required review fixes; git diff --check and git diff --cached --check PASS. Review records passing lint, build, two full runs of 558 frontend and 174 backend tests, both resync E2E scenarios and live Chromium reachability/rate-limit checks. Existing TypeScript errors and non-blocking review notes remain documented in .ai/REVIEW.md. No implementation changes during commit_task. |
+| Commit | `fix(sync): detect server reachability and resume queued changes on wake` |
+| Next Role | none |
+
+---

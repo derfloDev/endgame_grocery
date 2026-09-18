@@ -1,5 +1,6 @@
 import { enqueueOfflineMutation, readCachedResource, writeCachedResource } from "./offlineStore";
 import type { QueueMeta } from "../types";
+import { reportRequestOutcome } from "./connectivity";
 
 export const OFFLINE_SYNC_COMPLETE_EVENT = "endgame_grocery.offline_sync_complete";
 
@@ -59,7 +60,11 @@ export async function sendJsonRequest(
         ...headers
       },
       ...(payload ? { body: JSON.stringify(payload) } : {})
+    }).catch((error: unknown) => {
+      if (isNetworkError(error)) reportRequestOutcome("network-error");
+      throw error;
     });
+    reportRequestOutcome("ok");
 
     if (response.status === 204) {
       return null;

@@ -282,7 +282,7 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - History chips and autocomplete suggestions fall back to the cart icon when no specific saved icon is available, so list rows keep a consistent visual layout.
 - Sharing supports invite emails for existing and new users, direct invite-link acceptance after login, and revoking member access.
 - Shared lists support browser push opt-in, batched activity notifications, actor exclusion, and cooldown-based suppression to avoid notification spam.
-- Offline support caches successful reads and queues failed writes for replay after reconnect, when the app becomes visible again, or when a new queued write is added while the browser is online; non-retriable queued write failures show a discard action so the remaining queue can continue.
+- Offline support caches successful reads and queues failed writes for replay when server reachability is confirmed. Browser online/offline events, returning to a visible page, page restoration (`pageshow`), focus and queue changes recheck reachability and resume the queue when online. The browser's online flag is only a hint: shared `/api/health` probes bypass the cache, time out after 5 seconds and run at most once per 5-second window; an open live-update stream confirms connectivity without a probe, and HTTP responses also confirm reachability. Non-retriable queued write failures show a discard action so the remaining queue can continue.
 
 ### Icon Assignment
 

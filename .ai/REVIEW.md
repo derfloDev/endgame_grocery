@@ -257,3 +257,140 @@ and detail wiring on the light reload path, and `mergePendingEntries`, against `
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-09-18
+
+Scope reviewed: uncommitted working-tree changes completing the connectivity module (probe, rate limit,
+in-flight de-duplication, request-outcome reporting), the `client.ts` outcome hooks, and the offline
+queue's derived state plus extended lifecycle triggers, against `.ai/PLAN.md` Task T-003.
+
+#### Findings
+
+1. **minor** — `frontend/src/context/OfflineQueueContext.tsx:29` — the initial banner state is
+   `getIsOnline() === false`, which is `false` at startup because reachability is still unknown (`null`).
+   Previously it was `!navigator.onLine`, so a cold start with no connectivity showed the offline banner
+   immediately; now the app looks online until the first probe resolves (up to
+   `REACHABILITY_PROBE_TIMEOUT_MS`). This follows directly from demoting `navigator.onLine` to a hint and
+   is arguably the correct trade, but it is a user-visible change that neither the plan nor the README
+   calls out. Seeding the initial state from the hint while still letting the probe be authoritative
+   would keep both properties. *Required fix: no.*
+2. **nit** — `frontend/src/context/OfflineQueueContext.tsx:115-118` — `checkAndDrain` closes over the
+   `timings` **prop object**, so a consumer passing an inline object literal would give it a new identity
+   every render, tearing down and re-registering all six lifecycle listeners and calling `checkAndDrain()`
+   on every render. Not reachable today: production passes no `timings` (stable `undefined`), `app.test.tsx`
+   uses a module-level constant, and the provider test renders once. Worth a `useMemo` or destructuring
+   the two numbers if the prop ever gets a second caller. *Required fix: no.*
+3. **nit** — `frontend/src/context/OfflineQueueContext.tsx:115-118` and `:131-139` — on recovery the drain
+   is requested twice: `checkAndDrain` awaits `ensureFreshState()`, whose successful probe calls `notify()`,
+   which makes the subscriber see `recovered` and call `checkAndDrain()` again, while the original call
+   continues into `drainQueue()`. The `isSyncingRef` guard at the top of `drainQueue` makes the second a
+   no-op, so this is harmless today, but it does mean the recovery path depends on that guard for
+   correctness rather than by construction. *Required fix: no.*
+4. **nit** — `frontend/src/context/OfflineQueueContext.tsx:150-152` — the `offline` browser event no longer
+   sets the banner directly; it now only schedules a reachability check, so the banner can lag a genuine
+   disconnect by up to the probe timeout. Inherent to the "reachability is truth" design and consistent
+   with the README wording ("recheck reachability"), but it is slower than the old immediate flip.
+   *Required fix: no.*
+
+#### Required Fixes
+- None.
+
+#### Verification
+
+##### Steps
+- Re-read `.ai/TASKS.md` and `.ai/PLAN.md`; moved T-003 to `in_review`.
+- Read the full diff for all changed files and the complete `connectivity.ts`, tracing every state
+  transition (`streamState`, `isOnline`, `stale`, `lastCheckedAt`, `lastProbeAt`, `browserHint`,
+  `inFlight`) through `confirmOnline`, `reportStreamState`, `reportRequestOutcome`, `ensureFreshState`,
+  `probeReachability` and `finish`.
+- `npm run lint` — PASS (exit 0). Only the pre-existing `AuthContext.tsx:158` warning.
+- `npm run build` — PASS (exit 0), frontend and backend.
+- `npm test` — PASS (exit 0) **twice**: 40 files / 558 frontend tests (28 new), 174 backend tests.
+  Machine confirmed idle first (ports 4000/5173 free, CPU 0), after the contention problems seen in the
+  T-002 round; no flakiness observed in either run.
+- `npx tsc -b --noEmit` (frontend) — the same three pre-existing errors, none new.
+- `npm run e2e -- e2e/resync.spec.js` — PASS (2/2), confirming T-002's browser scenarios still hold now
+  that the queue provider probes on `focus`/`pageshow` during those runs.
+- **Live browser verification of the rate limit** (real Chromium against the real dev servers, driven by a
+  throwaway script outside the repo): loaded the app and counted `/api/health` requests. One probe on
+  load; a burst of five wake-up events (`focus`, `pageshow`, `online`, `offline`, `visibilitychange`)
+  inside the window produced **0** additional probes; one further trigger after the window expired
+  produced exactly **1**. That is acceptance criterion 3 proven in a browser, not just under fake timers.
+- **Live browser verification of the headline criterion**: seeded an authenticated session, stubbed
+  `/api/*`, and used an `EventSource` that never opens so the stream shortcut could not mask the probe.
+  With a reachable server and `navigator.onLine === true` there was no banner. I then made `/api/health`
+  fail while leaving `navigator.onLine === true`, and after one wake-up the banner appeared reading
+  *"Offline mode: cached data is available."* Restoring the server and firing another wake-up cleared it
+  with no reload. Three probes total across the run. This is acceptance criterion 1 — the exact mobile
+  failure mode this epic exists to fix — confirmed end to end.
+- My first pass at that check reported no banner and I chased it down rather than accepting it:
+  `OfflineBanner` is mounted only inside `ProtectedLayout`, so it never renders on `/login` where the
+  first attempt ran. A harness artifact, not a product gap; the second run above corrects it.
+- Inspected `/api/health` (`backend/src/app.js:63`) and the service worker. The endpoint is a static
+  handler with no database access, no auth and no rate limiting, registered ahead of the other middleware
+  and excluded from request logging. The service worker only calls `precacheAndRoute` on the build
+  manifest and registers `push`/`notificationclick`; it has no runtime route for `/api/*`. Together with
+  `cache: "no-store"` this means the probe genuinely reaches the network and cannot be answered from a
+  cache.
+
+##### Findings
+- All four acceptance criteria are met:
+  - *`navigator.onLine === true` plus a failing probe reports offline and keeps queueing* — the provider
+    test asserts the offline state, that no mutation was removed and that the queue still holds its
+    entry; confirmed in a real browser as described above.
+  - *`navigator.onLine === false` plus a succeeding probe reports online and drains* — parameterised
+    across `focus`, `pageshow`, `online`, `offline`, `visibilitychange` and the queue-changed event, each
+    asserting the mutation drains while `navigator.onLine` is still `false`.
+  - *At most one probe per window* — asserted at the boundary (4999 ms no, 5000 ms yes), for bursts, and
+    for the case where a failed probe or a browser-hint change must **not** bypass the limit.
+  - *An open stream reports online without a probe* — asserted with a `fetch` spy, including that the
+    shortcut survives 10 s and then correctly gives way to probing once the stream is lost.
+- The probe implementation is careful in ways the plan did not spell out but that matter: `finish` is
+  idempotent via the `finished` flag, always cancels the deadline and removes its abort listener (every
+  probe test asserts `vi.getTimerCount() === 0`), and a late-arriving `fetch` result after a timeout
+  cannot republish state. A newer `reportStreamState("open")` or `reportRequestOutcome("ok")` landing
+  while a probe is in flight cancels it and keeps the newer success rather than letting the stale failure
+  overwrite it — tested for both sources.
+- The derivation rule matches the plan exactly: a lost stream, a failed request or a `navigator.onLine`
+  transition only marks the state **stale**, never offline. `navigator.onLine === false` on its own never
+  forces offline, which is the whole point on mobile, and there is a test asserting precisely that.
+- Reporting any HTTP response — including 404 and 503 — as "reachable" is the right reading of
+  *reachability*: the server answered. It also means a 5xx episode will not flip the app into offline mode
+  and start queueing writes behind a server that is actually up. The 5xx retry behaviour belongs to T-004,
+  and this split is clean.
+- `sendJsonRequest` reports `network-error` only when `isNetworkError(error)` holds, so an
+  `AuthExpiredError` or a JSON parse failure does not get misread as a connectivity problem. The probe
+  itself uses raw `fetch`, not `sendJsonRequest`, so there is no reporting recursion.
+- `mountedRef` correctly prevents a drain from starting after unmount when a probe resolves late, with a
+  dedicated test.
+- Scope was respected: `OfflineBanner.tsx` and the `en`/`de` translation files were left untouched, which
+  the plan permitted only if the wording still fit — it does, as the live check showed.
+- `app.test.tsx` now intercepts `/api/health` ahead of the ordered fixture chain. This is the right fix:
+  those tests drive `fetch` through strict `mockResolvedValueOnce` sequences, and an unmodelled probe
+  request would shift every subsequent response.
+- Documentation is accurate and shipped with the change: the README offline bullet now describes probe-based
+  reachability, the hint demotion, the no-store probe, the 5 s timeout and window, the stream shortcut and
+  the HTTP-response evidence. Code comments cover the derivation rule and why each browser hint is distrusted.
+
+##### Risks
+- Initial-state latency (finding 1): a cold start with no connectivity briefly presents as online.
+- Every wake-up trigger now funnels into `ensureFreshState`, so the queue's behaviour depends on the shared
+  module's rate limiter. It held in both the unit tests and the live browser run, but it is now a single
+  point of failure for probe volume across the app; T-004 adds more callers on top of it.
+- The module is process-global singleton state. `resetConnectivityForTests` is thorough (listeners,
+  in-flight abort, all timestamps, the hint), and the provider tests reset in both `beforeEach` and
+  `afterEach`, but any future test that forgets will inherit state from its neighbours.
+- Real-device behaviour (iOS bfcache, background suspension) is still unproven by automation; the new
+  `pageshow` trigger is the mitigation the plan intended, and it is covered in jsdom but not on a device.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`

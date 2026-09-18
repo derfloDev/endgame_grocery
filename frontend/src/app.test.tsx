@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18next from "i18next";
 import "./i18n";
 import { resetOfflineStateForTests } from "./api/offlineStore";
+import { resetConnectivityForTests } from "./api/connectivity";
 import App from "./App";
 import { StaticAppConfigProvider } from "./context/AppConfigContext";
 import { AuthProvider } from "./context/AuthContext";
@@ -13,6 +14,7 @@ import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 
 const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>>();
+const queueTimings = { REACHABILITY_PROBE_MIN_INTERVAL_MS: 0 };
 
 interface RenderAppOptions {
   registrationEnabled?: boolean;
@@ -45,7 +47,7 @@ function renderApp(
       <StaticAppConfigProvider registrationEnabled={registrationEnabled}>
         <AuthProvider>
           <EventSourceProvider>
-            <OfflineQueueProvider>
+            <OfflineQueueProvider timings={queueTimings}>
               <App />
             </OfflineQueueProvider>
           </EventSourceProvider>
@@ -58,7 +60,15 @@ function renderApp(
 describe("authentication shell", () => {
   beforeEach(async () => {
     fetch.mockReset();
-    vi.stubGlobal("fetch", fetch);
+    resetConnectivityForTests();
+    // Keep health checks independent of ordered resource-response fixtures.
+    // These integration scenarios simulate loss of both browser connectivity and health access.
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/health") {
+        return navigator.onLine ? Promise.resolve(createNoContentResponse()) : Promise.reject(new TypeError("Failed to fetch"));
+      }
+      return fetch(input, init);
+    });
     stubMatchMedia();
     MockEventSource.instances = [];
     vi.stubGlobal("EventSource", MockEventSource);
@@ -105,9 +115,10 @@ describe("authentication shell", () => {
   });
 
   afterEach(() => {
+    cleanup();
+    resetConnectivityForTests();
     vi.useRealTimers();
     vi.unstubAllGlobals();
-    cleanup();
   });
 
   it("redirects unauthenticated users to login", async () => {

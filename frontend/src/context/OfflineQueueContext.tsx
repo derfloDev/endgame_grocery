@@ -8,21 +8,25 @@ import {
 } from "../api/offlineStore";
 import type { OfflineQueueContextValue } from "../types";
 import { OfflineQueueContext } from "./offlineQueueContextValue";
+import { ensureFreshState, getIsOnline, reportRequestOutcome, subscribe } from "../api/connectivity";
+import type { ReachabilityTimings } from "../api/connectivity";
 
 interface OfflineQueueProviderProps {
   children: ReactNode;
+  timings?: ReachabilityTimings;
 }
 
 type IdMap = Map<string, string>;
 
-export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): ReactElement {
-  const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
+export function OfflineQueueProvider({ children, timings }: OfflineQueueProviderProps): ReactElement {
+  const [isOffline, setIsOffline] = useState(() => getIsOnline() === false);
   const [queuedCount, setQueuedCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState("");
   const [syncVersion, setSyncVersion] = useState(0);
   const [failedMutationId, setFailedMutationId] = useState("");
   const isSyncingRef = useRef(false);
+  const mountedRef = useRef(false);
 
   const refreshQueuedCount = useCallback(async (): Promise<void> => {
     const pendingMutations = await listOfflineMutations();
@@ -62,7 +66,11 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
             ...(mutation.token ? { Authorization: `Bearer ${mutation.token}` } : {})
           },
           ...(payload ? { body: JSON.stringify(payload) } : {})
+        }).catch((error: unknown) => {
+          reportRequestOutcome("network-error");
+          throw error;
         });
+        reportRequestOutcome("ok");
 
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
@@ -104,6 +112,11 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
     }
   }, [refreshQueuedCount]);
 
+  const checkAndDrain = useCallback(async (): Promise<void> => {
+    const online = await ensureFreshState(timings);
+    if (mountedRef.current && online) await drainQueue();
+  }, [drainQueue, timings]);
+
   const discardFailedMutation = useCallback(async (): Promise<void> => {
     if (!failedMutationId) {
       return;
@@ -112,51 +125,55 @@ export function OfflineQueueProvider({ children }: OfflineQueueProviderProps): R
     await removeOfflineMutation(failedMutationId);
     setFailedMutationId("");
     setSyncError("");
-    void drainQueue();
-  }, [drainQueue, failedMutationId]);
+    void checkAndDrain();
+  }, [checkAndDrain, failedMutationId]);
 
   useEffect(() => {
+    mountedRef.current = true;
     void refreshQueuedCount();
-
-    async function handleOnline(): Promise<void> {
-      setIsOffline(false);
-      await drainQueue();
-    }
-
-    function handleOffline(): void {
-      setIsOffline(true);
-    }
+    let previousOnline = getIsOnline();
+    const unsubscribe = subscribe(() => {
+      const online = getIsOnline();
+      // Only confirmed reachability changes the banner; browser events just request a check.
+      setIsOffline(online === false);
+      const recovered = online === true && previousOnline !== true;
+      previousOnline = online;
+      if (recovered) void checkAndDrain();
+    });
+    function handleWake(): void { void checkAndDrain(); }
 
     function handleQueueChanged(): void {
       void refreshQueuedCount();
 
-      if (navigator.onLine) {
-        void drainQueue();
-      }
+      void checkAndDrain();
     }
 
     function handleVisibilityChange(): void {
-      if (document.visibilityState === "visible" && navigator.onLine) {
-        void drainQueue();
+      if (document.visibilityState === "visible") {
+        void checkAndDrain();
       }
     }
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleWake);
+    window.addEventListener("offline", handleWake);
+    window.addEventListener("pageshow", handleWake);
+    window.addEventListener("focus", handleWake);
     window.addEventListener(OFFLINE_QUEUE_CHANGED_EVENT, handleQueueChanged);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    if (navigator.onLine) {
-      void drainQueue();
-    }
+    void checkAndDrain();
 
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      mountedRef.current = false;
+      unsubscribe();
+      window.removeEventListener("online", handleWake);
+      window.removeEventListener("offline", handleWake);
+      window.removeEventListener("pageshow", handleWake);
+      window.removeEventListener("focus", handleWake);
       window.removeEventListener(OFFLINE_QUEUE_CHANGED_EVENT, handleQueueChanged);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [drainQueue, refreshQueuedCount]);
+  }, [checkAndDrain, refreshQueuedCount]);
 
   return (
     <OfflineQueueContext.Provider
