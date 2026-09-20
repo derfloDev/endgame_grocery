@@ -7,9 +7,6 @@ import { AppConfigProvider } from "./context/AppConfigContext";
 import { AuthProvider } from "./context/AuthContext";
 import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
-import { primeIconWorker } from "./workers/iconWorkerClient";
-
-primeIconWorker();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

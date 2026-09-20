@@ -84,6 +84,8 @@ function getIconWorker(): Worker | null {
   return iconWorker;
 }
 
+// Explicit first-use warm-up; importing this module must not download the model.
+// Fetch only on sheet open, with no speculative or idle prefetch.
 export function primeIconWorker(): void {
   const worker = getIconWorker();
 

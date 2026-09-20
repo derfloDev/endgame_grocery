@@ -13,6 +13,12 @@ import { writeCachedResource } from "../api/offlineStore";
 import { useListEvents } from "../hooks/useListEvents";
 import ListDetailPage from "./ListDetailPage/ListDetailPage";
 import type { Entry, List, Suggestion } from "../types";
+import { primeIconWorker } from "../workers/iconWorkerClient";
+
+vi.mock("../workers/iconWorkerClient", () => ({
+  primeIconWorker: vi.fn(),
+  requestIconMatch: vi.fn().mockResolvedValue({ iconName: null, score: 0, topMatches: [] })
+}));
 
 const streamState = vi.hoisted(() => ({ resyncVersion: 0 }));
 vi.mock("../context/EventSourceContext", () => ({ useEventSource: () => streamState }));
@@ -160,6 +166,20 @@ function createDeferred<T = unknown>() {
 describe("ListDetailPage resync", () => {
   beforeEach(() => { vi.clearAllMocks(); });
   afterEach(cleanup);
+
+  it("does not warm the icon model while loading or after entries render", async () => {
+    mockListDetailData();
+    const request = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
+    fetchEntriesMock.mockReturnValue(request.promise);
+    renderListDetailPage();
+    expect(primeIconWorker).not.toHaveBeenCalled();
+
+    await act(async () => {
+      request.resolve({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
+    });
+    await screen.findByText("Milk");
+    expect(primeIconWorker).not.toHaveBeenCalled();
+  });
 
   it("refreshes entries, history and members without clearing content or running the full loader", async () => {
     mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });

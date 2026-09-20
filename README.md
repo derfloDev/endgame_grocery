@@ -298,6 +298,8 @@ Hand-crafted custom icons live as SVG files in `frontend/src/assets/icons/custom
 
 The semantic matcher runs in an ES-module web worker so the ONNX runtime can initialise correctly in both development and production builds. If that worker crashes, the frontend recreates it on the next suggestion request instead of leaving the icon-loading spinner stuck indefinitely.
 
+The icon model is fetched on first use instead of at app startup: opening the add/edit item sheet starts the download while you type. The first semantic suggestion may take longer and shows a loading indicator while the model loads and matching completes. Exact catalogue matches remain immediate and work offline; semantic suggestions need the model and runtime to have been downloaded and retained in the browser cache before offline use. If they are unavailable, you can still choose an icon manually.
+
 ## AI Workflow
 
 This project uses the persistent planner/implementer/reviewer workflow defined in `AGENTS.md`.
