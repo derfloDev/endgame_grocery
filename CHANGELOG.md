@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.9.2](https://github.com/derfloDev/endgame_grocery/compare/v1.9.1...v1.9.2) (2026-09-20)
+
+
+### Bug Fixes
+
+* **sync:** detect server reachability and resume queued changes on wake ([39bf0dc](https://github.com/derfloDev/endgame_grocery/commit/39bf0dce0e85f0eec3317cbeffc2aac857912a2f))
+* **sync:** reconnect live updates after mobile connection loss ([ea5dd61](https://github.com/derfloDev/endgame_grocery/commit/ea5dd612ee6c233993057db0b17a10be1487b3a2))
+* **sync:** refresh lists after reconnecting or returning to the app ([b82a0fc](https://github.com/derfloDev/endgame_grocery/commit/b82a0fc1cd9caf8d4946cdccf40fa4b17de7114b))
+* **sync:** restore mobile updates and offline queue recovery ([6eeb2d7](https://github.com/derfloDev/endgame_grocery/commit/6eeb2d74335b8f6e5499cb3e2549a1a3536df4a6))
+* **sync:** retry queued changes automatically and time out stalled requests ([771b1c5](https://github.com/derfloDev/endgame_grocery/commit/771b1c564222346f200eeb9ba43c7934c1ef5f18))
+
+
+### Miscellaneous Chores
+
+* **ai:** close cycle ([9226520](https://github.com/derfloDev/endgame_grocery/commit/92265204794b56e8a17c8a74b854a37ef8cccc2b))
+
 ## [1.9.1](https://github.com/derfloDev/endgame_grocery/compare/v1.9.0...v1.9.1) (2026-06-16)
 
 
