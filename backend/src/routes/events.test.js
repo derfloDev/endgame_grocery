@@ -41,7 +41,7 @@ describe("events route", () => {
     assert.deepEqual(response.body, { error: "Authentication token is invalid." });
   });
 
-  it("opens an SSE stream with the expected headers and heartbeat", async () => {
+  it("opens an SSE stream with the expected headers and named ping heartbeat", async () => {
     const token = jwt.sign({ sub: "user-1" }, "test-secret");
     const app = createTestApp({ sseHeartbeatIntervalMs: 10 });
     const { req, res } = await openEventStream(app, `/api/events?token=${token}`);
@@ -52,15 +52,25 @@ describe("events route", () => {
       chunks.push(chunk);
     });
 
-    await waitFor(() => chunks.includes(":heartbeat\n\n"));
+    try {
+      await waitFor(() => chunks.join("").split("\n\n").slice(0, -1).length >= 2);
+      const frames = chunks.join("").split("\n\n").slice(0, -1);
+      for (const frame of frames) {
+        assert.match(frame, /^event: ping\ndata: \{"ts":"[^"]+"\}$/);
+        const payload = JSON.parse(frame.split("\ndata: ")[1]);
+        assert.equal(new Date(payload.ts).toISOString(), payload.ts);
+      }
+      // Named ping frames cannot dispatch the default message event used by older clients.
+      assert.ok(frames.every((frame) => frame.startsWith("event: ping\n")));
 
-    assert.equal(res.statusCode, 200);
-    assert.equal(res.headers["content-type"], "text/event-stream; charset=utf-8");
-    assert.equal(res.headers["cache-control"], "no-cache");
-    assert.equal(res.headers.connection, "keep-alive");
-    assert.equal(res.headers["x-accel-buffering"], "no");
-
-    req.destroy();
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.headers["content-type"], "text/event-stream; charset=utf-8");
+      assert.equal(res.headers["cache-control"], "no-cache");
+      assert.equal(res.headers.connection, "keep-alive");
+      assert.equal(res.headers["x-accel-buffering"], "no");
+    } finally {
+      req.destroy();
+    }
   });
 
   it("removes the connection when the client closes the request", async () => {

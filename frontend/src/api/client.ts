@@ -1,5 +1,7 @@
 import { enqueueOfflineMutation, readCachedResource, writeCachedResource } from "./offlineStore";
 import type { QueueMeta } from "../types";
+import { isNetworkError, requestJson } from "./request";
+import { REQUEST_TIMEOUT_MS } from "./connectionTimings";
 
 export const OFFLINE_SYNC_COMPLETE_EVENT = "endgame_grocery.offline_sync_complete";
 
@@ -12,6 +14,7 @@ interface SendJsonRequestOptions {
   offlineFallbackMessage?: string;
   queueable?: boolean;
   queueMeta?: QueueMeta | null;
+  timeoutMs?: number;
 }
 
 interface ErrorResponse {
@@ -29,10 +32,6 @@ export function createCacheKey(resource: string, suffix = ""): string {
   return suffix ? `${resource}:${suffix}` : resource;
 }
 
-function isNetworkError(error: unknown): boolean {
-  return error instanceof TypeError || (error instanceof Error && error.message === "Failed to fetch");
-}
-
 export function createTemporaryId(resource: string): string {
   return `temp-${resource}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -47,11 +46,12 @@ export async function sendJsonRequest(
     cacheKey = "",
     offlineFallbackMessage = "Offline data is unavailable.",
     queueable = false,
-    queueMeta = null
+    queueMeta = null,
+    timeoutMs = REQUEST_TIMEOUT_MS
   }: SendJsonRequestOptions = {}
 ): Promise<unknown> {
   try {
-    const response = await fetch(url, {
+    const { response, data } = await requestJson<ErrorResponse>(url, {
       method,
       headers: {
         ...(payload ? { "Content-Type": "application/json" } : {}),
@@ -59,13 +59,11 @@ export async function sendJsonRequest(
         ...headers
       },
       ...(payload ? { body: JSON.stringify(payload) } : {})
-    });
+    }, timeoutMs);
 
     if (response.status === 204) {
       return null;
     }
-
-    const data = (await response.json().catch(() => ({}))) as ErrorResponse;
 
     if (!response.ok) {
       if (response.status === 401 && token) {

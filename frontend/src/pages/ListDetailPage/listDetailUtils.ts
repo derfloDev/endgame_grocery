@@ -1,5 +1,23 @@
 import type { DetailEntry } from "./useListDetailData";
 
+/** Keep queued local entries absent from the server until sync can return their IDs. */
+export function mergePendingEntries(serverEntries: readonly DetailEntry[], currentEntries: readonly DetailEntry[]): DetailEntry[] {
+  const serverIds = new Set(serverEntries.map((entry) => entry.id));
+  return [
+    ...serverEntries,
+    ...currentEntries.filter((entry) => entry.is_pending_sync && !serverIds.has(entry.id))
+  ];
+}
+
+interface ShareInviteResult {
+  queued?: boolean;
+  invite?: { invited_email?: string };
+}
+
+export function isShareInviteResult(value: unknown): value is ShareInviteResult {
+  return Boolean(value) && typeof value === "object";
+}
+
 export function getInitials(name: unknown): string {
   if (typeof name !== "string") {
     return "?";

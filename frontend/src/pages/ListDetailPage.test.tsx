@@ -14,6 +14,10 @@ import { useListEvents } from "../hooks/useListEvents";
 import ListDetailPage from "./ListDetailPage/ListDetailPage";
 import type { Entry, List, Suggestion } from "../types";
 
+const streamState = vi.hoisted(() => ({ resyncVersion: 0 }));
+vi.mock("../context/EventSourceContext", () => ({ useEventSource: () => streamState }));
+beforeEach(() => { streamState.resyncVersion = 0; });
+
 const cssSource = [
   "./ListDetailPage/ListDetailPage.module.css",
   "../styles/shared.css",
@@ -87,7 +91,7 @@ const updateEntryMock = vi.mocked(updateEntry);
 const writeCachedResourceMock = vi.mocked(writeCachedResource);
 
 function renderListDetailPage() {
-  return render(
+  const tree = () => (
     <MemoryRouter
       future={{
         v7_relativeSplatPath: true,
@@ -101,6 +105,8 @@ function renderListDetailPage() {
       </Routes>
     </MemoryRouter>
   );
+  const view = render(tree());
+  return { ...view, rerenderPage: () => view.rerender(tree()) };
 }
 
 interface TestEntry extends Entry {
@@ -150,6 +156,70 @@ function createDeferred<T = unknown>() {
 
   return { promise, resolve, reject };
 }
+
+describe("ListDetailPage resync", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+  afterEach(cleanup);
+
+  it("refreshes entries, history and members without clearing content or running the full loader", async () => {
+    mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    const view = renderListDetailPage();
+    await screen.findByText("Milk");
+    expect(fetchEntriesMock).toHaveBeenCalledTimes(1);
+    expect(fetchRecentlyUsedMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMembersMock).toHaveBeenCalledTimes(1);
+    const request = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
+    fetchEntriesMock.mockReturnValueOnce(request.promise);
+    fetchRecentlyUsedMock.mockResolvedValue({ history: [{ text: "Eggs" }] });
+    const member = { id: "member-2", user_id: "member-2", display_name: "Jane Doe", email: "jane@example.com" };
+    fetchListMembersMock.mockResolvedValue({ members: [member] });
+    streamState.resyncVersion += 1;
+    view.rerenderPage();
+    expect(fetchEntriesMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Milk")).toBeTruthy();
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    await act(async () => { request.resolve({ entries: [{ id: "entry-2", text: "Bread", status: "open" }] }); });
+    await screen.findByText("Bread");
+    await screen.findByText("Eggs");
+    await screen.findByTitle("Jane Doe");
+    expect(screen.queryByText("Milk")).toBeNull();
+    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    expect(markListViewedMock).toHaveBeenCalledTimes(1);
+    expect(fetchEntriesMock).toHaveBeenCalledTimes(2);
+    expect(fetchRecentlyUsedMock).toHaveBeenCalledTimes(2);
+    expect(fetchListMembersMock).toHaveBeenCalledTimes(2);
+    view.rerenderPage();
+    expect(fetchEntriesMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["resync", "SSE"])("keeps an entry queued during an in-flight %s reload", async (trigger) => {
+    mockListDetailData({ history: [{ text: "Bread", icon: "IconBread", details: "Whole wheat" }, { text: "Eggs" }] });
+    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    const view = renderListDetailPage();
+    await screen.findByRole("button", { name: "Bread" });
+    const request = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
+    fetchEntriesMock.mockReturnValueOnce(request.promise);
+    if (trigger === "resync") {
+      streamState.resyncVersion += 1;
+      view.rerenderPage();
+    } else {
+      const handler = useListEventsMock.mock.calls.find(([type]) => type === "entry:created")![2];
+      act(() => { handler({ listId: "list-1" }); });
+    }
+    expect(fetchEntriesMock).toHaveBeenCalledTimes(2);
+    await userEvent.click(screen.getByRole("button", { name: "Bread" }));
+    await waitFor(() => { expect(within(getOpenItemsSection()).getByText("Queued")).toBeTruthy(); });
+    await act(async () => { request.resolve({ entries: [{ id: "server-1", text: "Milk", status: "open" }] }); });
+    await screen.findByText("Milk");
+    await waitFor(() => { expect(fetchRecentlyUsedMock).toHaveBeenCalledTimes(2); });
+    expect(within(getOpenItemsSection()).getByText("Bread")).toBeTruthy();
+    expect(within(getOpenItemsSection()).getByText("Whole wheat")).toBeTruthy();
+    expect(within(getOpenItemsSection()).getByText("Queued")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Recently Used" })).getByText("Eggs")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Recently Used" })).queryByText("Bread")).toBeNull();
+  });
+});
 
 describe("ListDetailPage optimistic updates", () => {
   beforeEach(() => {

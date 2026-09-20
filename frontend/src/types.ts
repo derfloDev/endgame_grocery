@@ -55,6 +55,8 @@ export interface OfflineMutation {
   token: string;
   createdAt: string;
   queueMeta?: QueueMeta | null;
+  // Accepted creates leave mappings on pending mutations so retries survive a page reload.
+  resolvedIds?: Record<string, string>;
 }
 
 export interface OfflineQueueContextValue {
