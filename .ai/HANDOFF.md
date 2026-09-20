@@ -155,3 +155,65 @@ Review notes:
 | Next Role | none |
 
 - Excluded unrelated get-docker.sh and .claude/settings.local.json from staging, as required by review round 2. Their working-tree contents are preserved.
+
+---
+
+### T-002 — implement — 2026-09-20T18:25:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | next_task: removed translation-driven duplicate detail loads and let entries render without waiting for members, retaining member-loading feedback and errors |
+| Files Changed | frontend/src/pages/ListDetailPage/useListDetailData.ts, frontend/src/pages/ListDetailPage/listDetailUtils.ts, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/pages/ListDetailPage/listDetailUtils.test.ts, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Test-first targeted run: 5 expected failures, 31 passes; implementation run: 36/36 PASS; npm run lint PASS (existing AuthContext warning); npm run build PASS (existing chunk-size warning); npm test PASS (588 frontend + 174 backend); final fixture adjustment: 4/4 loading tests PASS; production Chromium scenarios 3/3 PASS; git diff --check PASS; extra tsc check reports 3 pre-existing errors below |
+| Commit | `perf(lists): show list entries without waiting for member data` |
+| Next Role | review |
+
+- Removed the translated access-error option from the hook and its effect dependencies. ListAccessError is defined with the pure error formatter in listDetailUtils.ts rather than in the hook to avoid a runtime circular import; the page supplies the current translation at render time. Ordinary server error text is preserved.
+- Initial member loading now uses the existing non-throwing path without awaiting it. Its own finally block controls the sharing spinner; member failure surfaces an error without clearing the list, entries or history. The existing list/entries/history Promise.all gate remains as specified in PLAN.md Phase 2. README and hook comments document the behavior.
+- Tests were written before implementation and reproduced duplicate endpoint calls after delayed i18n resources/language change, entries hidden behind pending members, and entries cleared by member failure. Tests also verify the sharing spinner remains until members resolve, the access error updates language without refetching, and ordinary error messages remain intact. Existing resync, optimistic update and pending-entry tests continue passing.
+- Production-browser verification used the built frontend via vite preview on 127.0.0.1:4318 and fresh Chromium contexts with API fixtures and service workers blocked. Held translation JS and member responses independently: Milk rendered while both were pending, translation arrival updated labels without refetching, the sharing sheet showed its spinner until member release. After network idle, lists/entries/history/members/mark-viewed each had exactly 1 request. A separate member-503 scenario preserved Milk and the title with an error banner and the same counts. A missing-list scenario displayed the German access error, with lists/entries/history once and no members/mark-viewed. Preview server stopped after verification.
+- Additional `node node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json` remains nonzero on 3 existing issues: nullable DetailEntry.details passed to getRecentlyUsedDisplayState (ListDetailPage.tsx:222), owner_name in the OverviewPage test fixture (:51), and quantized in iconWorker.ts (:42). Corresponding code/types are unchanged from HEAD. A new excess-property diagnostic in the member fixture was fixed before handoff, with the targeted tests and lint rerun.
+- DB-backed E2E was not rerun; browser checks used fixtures. No new repository files were created and no commit was made. Unrelated .claude/settings.local.json and get-docker.sh remain untouched and must be excluded when committing.
+
+---
+
+### T-002 — review — 2026-09-20T18:41:51Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | next_task: verified the detail page now loads each endpoint exactly once across late-arriving translations and renders entries without waiting for members, with member failures and the access error still surfacing correctly |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+Review notes:
+
+- Validation re-run by the reviewer: `npm run lint` PASS (0 errors, the pre-existing `AuthContext` react-refresh warning); `npm run build` PASS (pre-existing chunk-size warning, precache 14 entries / 1845.07 KiB); frontend `vitest run --environment jsdom` PASS 588/588 across 41 files; backend `npm test` PASS 174/174.
+- The implementer's "3 pre-existing tsc errors" claim was checked rather than trusted: the five changed source files were stashed and `tsc --noEmit` re-run against the committed baseline, producing the identical three errors (`DetailEntry.details` nullability, `owner_name` in the OverviewPage fixture, `quantized` in `iconWorker.ts`), differing only by a one-line shift. The diff adds no new type errors. Working tree restored and confirmed intact.
+- Independent browser verification against `vite preview` of the production build, three scenarios with API fixtures, the service worker blocked so it cannot distort request counting, and the lazy `assets/translation-*.js` chunk artificially delayed to reproduce the original defect. Scenario A (translations held 2.5 s, members held 4 s): lists/entries/history/members/mark-viewed each requested exactly once, `Milk` visible while members were still pending, no page skeleton at that moment. Scenario B (members 503): same counts, error banner shown, title and entries still visible. Scenario C (list absent, `de`): lists/entries/history once each, no members and no mark-viewed, German access error rendered.
+- Root cause is removed rather than worked around: `accessErrorMessage` is gone from the hook options and the effect dependency array, no remaining dependency derives from `t()`, and the other deps were each confirmed stable (`loadMembers` on `listId`/`token`, `setEntries` with empty deps, `onLoadStart`/`onNonOwnerList` memoised with empty deps in `ListDetailPage`).
+- Removing `setIsSharingLoading(false)` from the effect's `finally` is safe because `loadMembers` owns the flag on every branch; the one narrow window this opens is recorded as a nit, not a fix.
+- Tests are genuine regression guards written test-first: a real `i18next` instance with a stub backend asserts the five call counts before and after resources arrive; the members-pending case separates the page skeleton from the sharing spinner through the shared `aria-label="Loading"`; the language-switch case proves re-translation without refetch; the member-failure case pins entries, title and banner together. `listDetailUtils.test.ts` covers the sentinel in two languages and the pass-through of ordinary errors.
+- Documentation rule satisfied: the new README paragraph matches the shipped behaviour exactly, and the two new hook comments explain the sentinel and why members sit outside the loading gate.
+- Two non-blocking nits in REVIEW.md: `getErrorMessage`'s default second argument returns the raw i18n key, which is unreachable today but a footgun for a future caller; and the `isSharingLoading` window described above.
+- Commit-hygiene reminder for `commit_task`, unchanged from T-001: keep untracked `get-docker.sh` and the modified `.claude/settings.local.json` out of the `git add -A`.
+- Environmental limits unchanged: PostgreSQL and Docker unavailable, so DB-backed Playwright specs and a live-backend pass could not run.
+- No code was modified during review and no commit was made.
+
+---
+
+### T-002 — implement — 2026-09-20T18:43:52Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task: accepted review round 1 PASS_WITH_NOTES and marked T-002 done |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md; reviewed T-002 implementation, tests, README and review artifacts included in the commit |
+| Validation | Reviewed lint/build PASS, 588 frontend + 174 backend tests PASS, three production-browser scenarios PASS; reviewer confirmed the three typecheck errors against baseline; staged diff checked before commit |
+| Commit | `perf(lists): show list entries without waiting for member data` |
+| Next Role | none |
+
+- Excluded unrelated get-docker.sh and .claude/settings.local.json from staging as requested in the review. Their working-tree contents are preserved.

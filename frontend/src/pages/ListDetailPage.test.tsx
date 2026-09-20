@@ -2,9 +2,14 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { createInstance } from "i18next";
+import type { i18n, ReadCallback } from "i18next";
+import { I18nextProvider } from "react-i18next";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../i18n";
+import enTranslations from "../locales/en/translation.json";
+import deTranslations from "../locales/de/translation.json";
 import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
 import { fetchLists, markListViewed } from "../api/lists";
@@ -96,7 +101,7 @@ const useListEventsMock = vi.mocked(useListEvents);
 const updateEntryMock = vi.mocked(updateEntry);
 const writeCachedResourceMock = vi.mocked(writeCachedResource);
 
-function renderListDetailPage() {
+function renderListDetailPage(translations?: i18n) {
   const tree = () => (
     <MemoryRouter
       future={{
@@ -111,8 +116,11 @@ function renderListDetailPage() {
       </Routes>
     </MemoryRouter>
   );
-  const view = render(tree());
-  return { ...view, rerenderPage: () => view.rerender(tree()) };
+  const translatedTree = () => translations
+    ? <I18nextProvider i18n={translations}>{tree()}</I18nextProvider>
+    : tree();
+  const view = render(translatedTree());
+  return { ...view, rerenderPage: () => view.rerender(translatedTree()) };
 }
 
 interface TestEntry extends Entry {
@@ -162,6 +170,94 @@ function createDeferred<T = unknown>() {
 
   return { promise, resolve, reject };
 }
+
+describe("ListDetailPage initial loading", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+  afterEach(cleanup);
+
+  function expectOneLoad() {
+    for (const request of [fetchListsMock, fetchEntriesMock, fetchRecentlyUsedMock, fetchListMembersMock, markListViewedMock]) {
+      expect(request).toHaveBeenCalledTimes(1);
+    }
+  }
+
+  it("loads each endpoint once when language resources arrive after mount", async () => {
+    const translations = createInstance();
+    const backendRead = vi.fn<(language: string, namespace: string, callback: ReadCallback) => void>();
+    translations.use({ type: "backend", read: backendRead });
+    const initialized = translations.init({ lng: "en", fallbackLng: false, react: { useSuspense: false } });
+    mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    renderListDetailPage(translations);
+    await screen.findByText("Milk");
+    expect(translations.t("detail.accessError")).toBe("detail.accessError");
+    expectOneLoad();
+
+    await waitFor(() => { expect(backendRead).toHaveBeenCalled(); });
+    await act(async () => {
+      backendRead.mock.calls[0][2](null, enTranslations);
+      await initialized;
+    });
+    expect(screen.getByText("OPEN ITEMS")).toBeTruthy();
+    expect(translations.t("detail.accessError")).toBe(enTranslations["detail.accessError"]);
+    expectOneLoad();
+  });
+
+  it("renders entries while members are pending and keeps the sharing spinner until they arrive", async () => {
+    mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    const members = createDeferred<Awaited<ReturnType<typeof fetchListMembers>>>();
+    fetchListMembersMock.mockReturnValue(members.promise);
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    expectOneLoad();
+    await userEvent.click(screen.getByRole("button", { name: "List options" }));
+    await userEvent.click(screen.getByRole("button", { name: /Share list/ }));
+    expect(screen.getByLabelText("Loading")).toBeTruthy();
+
+    const member = { id: "member-1", user_id: "member-1", display_name: "Jane Doe", email: "jane@example.com" };
+    await act(async () => {
+      members.resolve({ members: [member] });
+    });
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    expect(screen.getByText("Jane Doe")).toBeTruthy();
+    expectOneLoad();
+  });
+
+  it("translates a missing-list error at render time without fetching again on language change", async () => {
+    const translations = createInstance();
+    await translations.init({ lng: "en", resources: { en: { translation: enTranslations }, de: { translation: deTranslations } } });
+    mockListDetailData();
+    fetchListsMock.mockResolvedValue({ lists: [] });
+    renderListDetailPage(translations);
+    await screen.findByText(enTranslations["detail.accessError"]);
+
+    await act(async () => { await translations.changeLanguage("de"); });
+    expect(screen.getByText(deTranslations["detail.accessError"])).toBeTruthy();
+    expect(screen.queryByText(enTranslations["detail.accessError"])).toBeNull();
+    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    expect(fetchEntriesMock).toHaveBeenCalledTimes(1);
+    expect(fetchRecentlyUsedMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMembersMock).not.toHaveBeenCalled();
+    expect(markListViewedMock).not.toHaveBeenCalled();
+  });
+
+  it("shows member-load errors without clearing entries or the list", async () => {
+    mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    const members = createDeferred<Awaited<ReturnType<typeof fetchListMembers>>>();
+    fetchListMembersMock.mockReturnValue(members.promise);
+    renderListDetailPage();
+    await waitFor(() => { expect(fetchListMembersMock).toHaveBeenCalledTimes(1); });
+    await act(async () => { members.reject(new Error("Mitglieder konnten nicht geladen werden.")); });
+    expect(screen.getByText("Mitglieder konnten nicht geladen werden.").closest(".eg-error-banner")).toBeTruthy();
+    expect(screen.getByText("Milk")).toBeTruthy();
+    expect(screen.getByText("Weekly groceries")).toBeTruthy();
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    expectOneLoad();
+  });
+});
 
 describe("ListDetailPage resync", () => {
   beforeEach(() => { vi.clearAllMocks(); });

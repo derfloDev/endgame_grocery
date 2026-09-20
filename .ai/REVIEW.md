@@ -253,3 +253,128 @@ None blocking. Finding 2 is a commit-time action for `commit_task`, not a change
 #### Verdict
 
 `PASS_WITH_NOTES`
+
+## Task: T-002
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-09-20
+
+Scope: working-tree changes to `useListDetailData.ts`, `listDetailUtils.ts`, `ListDetailPage.tsx`,
+their two test files and `README.md`, against PLAN.md Phase 2.
+
+#### Findings
+
+1. `nit` — `frontend/src/pages/ListDetailPage/listDetailUtils.ts:57` — not a required fix.
+   `getErrorMessage(error, accessErrorMessage = "detail.accessError")` defaults to the raw i18n
+   key, so a future caller that forgets the second argument would render `detail.accessError` to
+   the user instead of a sentence. Harmless today — the only call site that can receive a
+   `ListAccessError` is `ListDetailPage.tsx:280`, and it passes `t("detail.accessError")`; every
+   other `getErrorMessage` call in the page and the hook converts errors that can never be the
+   sentinel. PLAN.md explicitly allowed "return the key so the caller can translate it", so this
+   matches the plan. A required second parameter would make the footgun unrepresentable.
+
+2. `nit` — `frontend/src/pages/ListDetailPage/useListDetailData.ts:437` — not a required fix.
+   `setIsSharingLoading(false)` was removed from the effect's `finally`. That is correct for the
+   normal paths, because `loadMembers` now owns the flag in all of its branches (non-owner,
+   success and failure). It does leave one narrow window: if an owner list's member request is
+   still in flight when the effect re-runs for a non-owner list or for a list the user can no
+   longer access, neither of those branches calls `loadMembers`, so `isSharingLoading` stays true
+   until the previous request's own `finally` clears it. No user-visible consequence today —
+   `onNonOwnerList` closes the share sheet and the access-error state has no sheet — and the
+   previous request always does settle the flag. Worth knowing if the share sheet ever becomes
+   reachable earlier.
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps
+
+- `npm run lint` — PASS (0 errors; the pre-existing `react-refresh` warning in `AuthContext.tsx`).
+- `npm run build` — PASS (pre-existing chunk-size warning; precache 14 entries, 1845.07 KiB).
+- `npx vitest run --environment jsdom` (frontend) — PASS 588/588, 41 files, exit 0.
+- `npm test --workspace backend` — PASS 174/174.
+- `node node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json` — 3 errors, and the
+  implementer's "pre-existing" claim was checked rather than taken on trust: the five changed
+  source files were stashed and the typecheck re-run against the committed baseline, which
+  produced the identical three errors (`ListDetailPage.tsx` `DetailEntry.details` nullability,
+  `OverviewPage.test.tsx` `owner_name`, `iconWorker.ts` `quantized`), differing only by the
+  one-line shift in `ListDetailPage.tsx`. The diff introduces no new type errors. Working tree
+  restored and re-verified afterwards.
+- Real-browser verification against `vite preview` of the production build on port 4318, three
+  scenarios with API fixtures, per-endpoint request counting, the service worker blocked so it
+  cannot distort the counts, and the lazily loaded `assets/translation-*.js` chunk artificially
+  delayed to reproduce the original defect.
+- Source review of the full diff, plus a trace of every `getErrorMessage`, `entryError`,
+  `ListAccessError` and `isSharingLoading` reference in the frontend.
+- Dependency-stability check of the load effect: `loadMembers` (`useCallback` on `listId`,
+  `token`), `setEntries` (empty deps), and `onLoadStart` / `onNonOwnerList` (`useCallback` with
+  empty deps at `ListDetailPage.tsx:51` and `:55`).
+
+##### Findings
+
+- Criterion "each of `/api/lists`, `/entries`, `/history`, `/members`, `/mark-viewed` requested
+  exactly once per visit even after lazy i18n resources arrive" — PASS. Scenario A held the
+  translation chunk for 2.5 s and the members response for 4 s; after network idle plus a 3.5 s
+  settle the counts were 1 / 1 / 1 / 1 / 1. Scenario B (members 503) gave the same counts.
+  Scenario C (list absent) gave 1 / 1 / 1 and correctly issued neither `/members` nor
+  `/mark-viewed`.
+- Criterion "entries visible as soon as `/entries` resolves" — PASS. In both scenarios A and B,
+  `Milk` was visible while the members response was still being held, and no `LoadingState`
+  skeleton was present at that moment. This is the behaviour the removed `await loadMembers(...)`
+  used to block.
+- Criterion "access error still surfaces translated" — PASS. Scenario C, with `i18nextLng` set to
+  `de`, rendered "Du hast keinen Zugriff mehr auf diese Liste." in the error banner. The sentinel
+  survives the round trip from hook to render and is translated at render time, which is the
+  point of the change.
+- Criterion "member-load failures still surface translated" — PASS. Scenario B rendered the
+  member error in `.eg-error-banner` while "Weekly groceries" and "Milk" both stayed on screen.
+  Under the old `throwOnError: true` path the outer catch cleared the list, entries, members and
+  history; that destructive behaviour is gone and the message itself is unchanged, since the old
+  path already surfaced the same raw error string through the same banner.
+- The root cause is genuinely removed, not worked around. `accessErrorMessage` is gone from the
+  hook's options and from the effect's dependency array, and no remaining dependency is derived
+  from `t()`, so an arriving language resource cannot restart the load. `ListAccessError` lives in
+  `listDetailUtils.ts` rather than the hook, which the implementer notes avoids a circular import
+  — checked and correct, since the hook already imports from that module.
+- `entryError` was already typed `unknown`, so storing an `Error` subclass needed no widening, and
+  `shouldSuppressEntryError`'s `instanceof AuthExpiredError` check is unaffected.
+- Tests are real regression guards and were written test-first per the handoff. The i18n case
+  builds an actual `i18next` instance with a stub backend, asserts `t("detail.accessError")`
+  returns the bare key before resources land and the translated string after, and asserts the
+  five call counts on both sides of that transition — it would have failed against the old code.
+  The members-pending case distinguishes the page skeleton from the sharing spinner through the
+  same `aria-label="Loading"` on `LoadingState`, asserting it absent on the page and then present
+  inside the share sheet. The language-switch case proves re-translation with no refetch. The
+  member-failure case pins entries, title and the banner together.
+- `listDetailUtils.test.ts` covers the sentinel in both languages and confirms ordinary `Error`
+  and non-`Error` values still pass through unchanged.
+- Documentation rule satisfied. The new `README.md` paragraph describes exactly the shipped
+  behaviour — one load per visit, unaffected by translation loading or switching; entries not
+  gated on members; a separate member indicator; a member failure that keeps the list visible —
+  and the two new comments in `useListDetailData.ts` state why the error is a sentinel and why
+  members sit outside the loading gate.
+
+##### Risks
+
+- The browser scenarios used API fixtures with the service worker blocked, so a real
+  service-worker-served visit was not measured. The request counting would otherwise be
+  unreliable, and the counts under test are client-initiated, so this is a measurement trade-off
+  rather than a coverage gap.
+- PostgreSQL and Docker remain unavailable here, so the DB-backed Playwright specs and a
+  live-backend pass could not run. Unchanged from T-001 and recorded in PLAN.md.
+- A language switch performed through the app's own UI on an already-rendered access error was
+  not exercised in the browser; it is covered at unit level by the `changeLanguage("de")` test,
+  and scenario C confirms the sentinel translates correctly at render in German.
+- The three `tsc --noEmit` errors are pre-existing and out of scope here, but they mean the
+  project's typecheck cannot currently be used as a regression gate. Worth a cleanup task in a
+  later cycle; it does not block T-002.
+
+#### Verdict
+
+`PASS_WITH_NOTES`

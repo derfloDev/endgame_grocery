@@ -7,7 +7,7 @@ import { writeCachedResource } from "../../api/offlineStore";
 import { fetchListMembers } from "../../api/sharing";
 import type { Entry, List, Member, Suggestion } from "../../types";
 import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "../recentlyUsedState";
-import { mergePendingEntries } from "./listDetailUtils";
+import { ListAccessError, mergePendingEntries } from "./listDetailUtils";
 
 export interface DetailEntry extends Omit<Entry, "details"> {
   details?: string | null;
@@ -40,7 +40,6 @@ interface LoadMembersOptions {
 }
 
 interface UseListDetailDataOptions {
-  accessErrorMessage: string;
   listId: string;
   onLoadStart?: () => void;
   onNonOwnerList?: () => void;
@@ -49,7 +48,6 @@ interface UseListDetailDataOptions {
 }
 
 export function useListDetailData({
-  accessErrorMessage,
   listId,
   onLoadStart,
   onNonOwnerList,
@@ -403,7 +401,8 @@ export function useListDetailData({
         }
 
         if (!activeList) {
-          setEntryError(accessErrorMessage);
+          // Translate at render time so arriving language resources cannot restart this load.
+          setEntryError(new ListAccessError());
           setList(null);
           setEntries([]);
           setMembers([]);
@@ -421,10 +420,8 @@ export function useListDetailData({
         });
 
         if (activeList.is_owner) {
-          await loadMembers({
-            isOwner: true,
-            throwOnError: true
-          });
+          // Members own their loading/error state and must not delay or clear loaded entries.
+          void loadMembers({ isOwner: true });
         } else {
           setMembers([]);
           onNonOwnerList?.();
@@ -440,13 +437,12 @@ export function useListDetailData({
       } finally {
         if (isMountedRef.current) {
           setIsLoading(false);
-          setIsSharingLoading(false);
         }
       }
     }
 
     void loadListDetail();
-  }, [accessErrorMessage, listId, loadMembers, onLoadStart, onNonOwnerList, syncVersion, token, setEntries]);
+  }, [listId, loadMembers, onLoadStart, onNonOwnerList, syncVersion, token, setEntries]);
 
   return {
     addEntryByText,

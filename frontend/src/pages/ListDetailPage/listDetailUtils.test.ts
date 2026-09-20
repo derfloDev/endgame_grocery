@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { mergePendingEntries } from "./listDetailUtils";
+import { getErrorMessage, ListAccessError, mergePendingEntries } from "./listDetailUtils";
 import type { DetailEntry } from "./useListDetailData";
+
+describe("getErrorMessage", () => {
+  it("translates the access sentinel using the current render's message", () => {
+    const error = new ListAccessError();
+    expect(getErrorMessage(error, "Access denied")).toBe("Access denied");
+    expect(getErrorMessage(error, "Kein Zugriff")).toBe("Kein Zugriff");
+  });
+
+  it("preserves ordinary server errors and non-error values", () => {
+    expect(getErrorMessage(new Error("Members unavailable"), "Access denied")).toBe("Members unavailable");
+    expect(getErrorMessage("Request failed", "Access denied")).toBe("Request failed");
+  });
+});
 
 describe("mergePendingEntries", () => {
   const server: DetailEntry = { id: "entry-1", text: "Milk", status: "open" };
