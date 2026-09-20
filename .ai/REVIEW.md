@@ -394,3 +394,149 @@ queue's derived state plus extended lifecycle triggers, against `.ai/PLAN.md` Ta
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-09-20
+
+Scope reviewed: uncommitted working-tree changes for request timeouts, transient-vs-permanent error
+classification, queue retry with capped backoff, the stall release, and the order/idempotency guarantees,
+against `.ai/PLAN.md` Task T-004. This round covers a substantial restructuring: the drain loop moved out
+of the provider into `frontend/src/api/offlineQueueDrain.ts`, and the timeout/outcome plumbing into
+`frontend/src/api/request.ts`.
+
+#### Findings
+
+1. **minor** — `frontend/src/api/request.ts:29-30` with `:5-9` — a deliberate cancellation is reported as a
+   connectivity failure. When the stall deadline or unmount aborts a drain, `requestJson` catches the
+   resulting `AbortError`, which `isNetworkError` now classifies as a network error, so it calls
+   `reportRequestOutcome("network-error")`. That marks the shared connectivity state stale and provokes an
+   extra `/api/health` probe even though nothing about the network failed. Harmless in effect — stale is
+   not offline, and T-003's rate limit bounds the probe — but it feeds a false signal into the module that
+   is now the app's source of truth. Distinguishing an abort caused by the parent signal from one caused by
+   the request deadline would fix it. *Required fix: no.*
+2. **minor** — `frontend/src/context/OfflineQueueContext.tsx:100-102` and `:140-143` — a wake-up that lands
+   during an active drain is dropped rather than deferred. `checkAndDrain` returns early while
+   `activeRun.current` is set, so an `OFFLINE_QUEUE_CHANGED_EVENT` fired between the drain loop's final
+   `listOfflineMutations()` and the release of `activeRun` is lost. Because that drain succeeded, no retry
+   is scheduled, so the newly queued mutation waits for the next `focus`/`visibilitychange`/`online` event
+   instead of syncing promptly. The window is small and every later wake-up recovers it, but the drain loop
+   already re-reads the queue each iteration, so a "re-check once more before releasing" pass would close it
+   cheaply. *Required fix: no.*
+3. **nit** — `frontend/src/context/OfflineQueueContext.tsx:76` — `setIsSyncing(true)` is now unconditional at
+   the top of `drainQueue`, whereas the previous implementation set it only after confirming a non-empty
+   queue. With an empty queue `isSyncing` therefore goes true then false around an await, and `OfflineBanner`
+   renders `offline.syncing` with `queuedCount` 0 — "Syncing 0 queued changes..." — if React ever commits the
+   intermediate state. I could not reproduce a visible flash: a real-browser run with a `MutationObserver`
+   watching for any banner node recorded nothing across a cold load and three `focus` wake-ups, because the
+   settle lands in the same commit. It stays latent rather than actual, but a slow IndexedDB open could
+   surface it and no test pins `isSyncing === false` for an empty queue. *Required fix: no.*
+4. **nit** — `frontend/src/api/offlineStore.ts:170-196` — `completeOfflineMutation` rewrites every remaining
+   queued mutation on each completion, so draining a queue of n mutations performs O(n²) record writes.
+   Irrelevant at grocery-list queue sizes and it buys genuine atomicity, so this is a note rather than a
+   concern. *Required fix: no.*
+5. **nit** — `frontend/src/api/offlineStore.test.ts:9` — the new unit test stubs `indexedDB` to `undefined`
+   and therefore exercises only the in-memory fallback, while the IndexedDB cursor path is what production
+   uses and is the more intricate of the two. The `e2e/queue-retry.spec.js` reload test covers it end to end,
+   and I verified it directly (see Verification), so this is a coverage-shape note, not a gap in behaviour.
+   *Required fix: no.*
+
+#### Required Fixes
+- None.
+
+#### Verification
+
+##### Steps
+- Re-read `.ai/TASKS.md` and `.ai/PLAN.md`; moved T-004 to `in_review`.
+- Read the full diff and both new modules end to end, tracing the abort plumbing
+  (`createTimeoutSignal` → `abortable` → `requestJson`'s parent-signal relay → the drain's `run.signal`) and
+  every early return in `drainQueue`/`checkAndDrain`/`scheduleRetry`.
+- `npm run lint` — PASS (exit 0). Only the pre-existing `AuthContext.tsx:158` warning.
+- `npm run build` — PASS (exit 0), frontend and backend.
+- `npm test` — PASS (exit 0) **twice**: 41 files / 579 frontend tests (21 new), 174 backend tests. Machine
+  confirmed idle first; no flakiness in either run.
+- `npx tsc -b --noEmit` (frontend) — the same three pre-existing errors, none new.
+- `npm run e2e -- e2e/queue-retry.spec.js e2e/resync.spec.js` — PASS, 4/4. The two new browser scenarios
+  prove the retry-after-transient-failure path and, critically, that a reload mid-drain does **not** resend
+  the already-accepted parent (`writes` is exactly `["/api/lists", "/api/lists/real-list/entries",
+  "/api/lists/real-list/entries"]`). T-002's resync scenarios still pass unchanged.
+- **Direct verification of `completeOfflineMutation` against real IndexedDB**, because its unit test stubs
+  IndexedDB away and this function carries the task's headline risk. Driving real Chromium, I enqueued three
+  mutations out of chronological order, then completed them one at a time and read the store back. Results:
+  listing order followed `createdAt` (`parent`, `child`, `third`); completing `parent` left **both** `child`
+  and `third` in place, each carrying `{temp-list: real-list}`; completing `child` left `third` carrying the
+  **merged** `{temp-list: real-list, temp-entry: real-entry}`. That matches the memory-path unit test exactly
+  and confirms the delete-plus-cursor-update transaction and the accumulating id map behave correctly on the
+  production storage path.
+- **A false alarm I chased down rather than reported.** My first pass at that check appeared to show
+  catastrophic data loss — `third` vanished from IndexedDB, which would have meant silently discarding a
+  user's queued item. Re-running against the raw object store reproduced it, so I isolated the cause instead
+  of filing it: the app was mounted and live, so `enqueueOfflineMutation`'s queue-changed event woke the
+  provider, which legitimately drained my seeded mutations against my stubbed 200 routes. Repeating the
+  experiment with `/api/health` failing (so the provider stays offline and never drains) produced the correct
+  results above, and the recorded write attempts confirmed the provider had been the one consuming them.
+  There is no data-loss defect here.
+- Re-read `OfflineBanner.tsx` against the new state model and ran the banner check described in finding 3.
+
+##### Findings
+- All five acceptance criteria are met:
+  - *Network error or 5xx retries automatically with increasing delay* — the 5xx test walks the full
+    `100, 200, 400, 400` capped sequence, asserting at each step that the request fires only on the boundary
+    tick, and separately that the delay resets to the base after a successful drain. A second test covers a
+    pure network error and confirms recovery happens on the retry timer alone, with no browser event.
+  - *4xx does not retry and still offers discard* — asserted including a later `focus` wake-up, with the
+    request count pinned at 1, the discard button present and `vi.getTimerCount()` 0.
+  - *Timeout treated as offline* — `isNetworkError` now covers `AbortError`/`TimeoutError`, so the
+    `client.test.ts` cases show a timed-out read falling back to cache and a timed-out queueable write being
+    enqueued.
+  - *Interrupted drain resumes in order without resending* — covered three ways: a unit test that remounts
+    mid-queue and asserts the exact URL sequence with the resolved real id and the removal order
+    `parent, child, last`; a unit test where local acknowledgement fails and the request is **not** resent;
+    and the e2e reload test above.
+  - *Stalled drain cannot block past the stall timeout* — parameterised over both the request deadline and
+    the stall deadline, asserting the signal aborts, `isSyncing` returns to false, a later trigger drains
+    successfully, and a late-arriving response from the abandoned run is ignored.
+- The idempotency design is stronger than the plan required. The plan asked for removal-after-accepted plus a
+  rebuilt id map; the implementation additionally persists the temp→real mappings onto the remaining queued
+  mutations inside the *same* IndexedDB transaction that deletes the completed one, so the mapping survives a
+  page reload rather than living only in memory. The in-memory `accepted` map then covers the narrower window
+  where the server accepted a request but local persistence failed — which is exactly the case its dedicated
+  test exercises.
+- `syncError` is only ever set from the 4xx path, so a transient failure under retry renders no error banner,
+  as the plan required. The e2e test asserts the user-visible consequence directly: the queued-changes text is
+  shown while the server error text has count 0.
+- Cancellation is handled thoroughly. `abortable` settles operations whose implementations ignore abort,
+  `requestJson` bounds the body read as well as the headers and always cancels its deadline in `finally`, and
+  the provider's cleanup aborts the active run and clears the retry timer. Many tests assert
+  `vi.getTimerCount() === 0`, which is the right way to pin this down.
+- `generationRef` guards the post-await continuations against StrictMode double-mount, and `mountedRef` stops
+  state updates after unmount — both with tests.
+- T-003 review finding 2 (the `timings` prop identity footgun) is incidentally resolved: the provider now
+  extracts each timing as a primitive and memoizes `probeTimings` on those, so an inline `timings` object no
+  longer re-registers listeners on every render.
+- Documentation shipped with the change: the README offline section now covers the 10 s request timeout, the
+  transient-vs-permanent split, capped retry backoff, the stall release, and the queue-retry e2e spec. Code
+  comments explain the classification, the retry policy and the stall release, as the plan required.
+
+##### Risks
+- **At-least-once delivery after a stall.** When the stall deadline aborts a run, the request may already
+  have been processed by the server; since the response never arrived, `accepted` was never populated and the
+  replacement run resends it. This is inherent to aborting an in-flight write without server-side idempotency
+  keys, and the plan's chosen guard (removal only after an accepted response) is honoured. For this app the
+  visible consequence is a possible duplicate item after a 30 s stall.
+- The drain now depends on the shared connectivity module for every trigger, so T-003's rate limiter and this
+  task's retry timer jointly determine how quickly a queue recovers. Both are covered by tests, but they are
+  two independent backoffs interacting.
+- Real-device behaviour (iOS bfcache, background suspension, throttled timers) remains unproven by automation
+  across all four tasks in this cycle; a device smoke test before release is still worthwhile.
+- The full E2E suite is still blocked by the missing local PostgreSQL; only the fixture-based specs run here.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`

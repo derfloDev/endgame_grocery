@@ -167,6 +167,36 @@ export async function removeOfflineMutation(id: string): Promise<void> {
   });
 }
 
+/** Commit acceptance and carry temporary IDs forward atomically before another drain can read them. */
+export async function completeOfflineMutation(id: string, resolvedIds: Record<string, string>): Promise<void> {
+  if (!supportsIndexedDb()) {
+    memoryQueue.delete(id);
+    for (const [key, mutation] of memoryQueue) {
+      memoryQueue.set(key, { ...mutation, resolvedIds: { ...mutation.resolvedIds, ...resolvedIds } });
+    }
+  } else {
+    const database = await openDatabase();
+    if (!database) return;
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(QUEUE_STORE, "readwrite");
+      const store = transaction.objectStore(QUEUE_STORE);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("Failed to acknowledge queued change."));
+      transaction.onabort = () => reject(transaction.error ?? new Error("Queue acknowledgement aborted."));
+      store.delete(id);
+      const request = store.openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const mutation = cursor.value as OfflineMutation;
+        cursor.update({ ...mutation, resolvedIds: { ...mutation.resolvedIds, ...resolvedIds } });
+        cursor.continue();
+      };
+    });
+  }
+  dispatchQueueChanged();
+}
+
 export async function resetOfflineStateForTests(): Promise<void> {
   memoryCache.clear();
   memoryQueue.clear();

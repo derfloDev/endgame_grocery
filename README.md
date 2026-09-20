@@ -220,6 +220,8 @@ The Playwright config reuses an already-running frontend or backend dev server w
 
 `npm run e2e -- e2e/resync.spec.js` runs the browser resync checks with controlled API responses and SSE/lifecycle events, covering foreground refresh, reconnect deduplication, and content remaining visible during detail reloads. These scenarios use the normal dev servers but do not require database fixtures. Real-device background suspension still needs a separate smoke test.
 
+`npm run e2e -- e2e/queue-retry.spec.js` verifies automatic queue retries after a page wake-up and recovery across a reload using real browser IndexedDB, controlled API responses and the Playwright clock. It checks that successful parent creates are not resent and dependent writes retain their resolved IDs. These scenarios also run without database fixtures.
+
 ## Available Scripts
 
 | Script | Purpose |
@@ -283,6 +285,8 @@ The repository is bootstrapped with `.release-please-manifest.json` and the base
 - Sharing supports invite emails for existing and new users, direct invite-link acceptance after login, and revoking member access.
 - Shared lists support browser push opt-in, batched activity notifications, actor exclusion, and cooldown-based suppression to avoid notification spam.
 - Offline support caches successful reads and queues failed writes for replay when server reachability is confirmed. Browser online/offline events, returning to a visible page, page restoration (`pageshow`), focus and queue changes recheck reachability and resume the queue when online. The browser's online flag is only a hint: shared `/api/health` probes bypass the cache, time out after 5 seconds and run at most once per 5-second window; an open live-update stream confirms connectivity without a probe, and HTTP responses also confirm reachability. Non-retriable queued write failures show a discard action so the remaining queue can continue.
+- API requests, including queued writes and response-body reads, time out after 10 seconds. Timed-out reads fall back to cached data and queueable writes enter the offline queue. Network failures, timeouts and server errors during replay retry automatically after 1, 2, 4 seconds and so on, capped at 60 seconds; transient failures do not show a hard error banner. Successful completion resets the delay; another successful wake-up drain cancels the pending retry. A 4xx stops replay until the failed change is discarded. A 30-second drain deadline aborts stalled work before allowing another run, and unmounting cancels requests and retry timers.
+- Queued mutations replay in creation order. Accepted mutations are removed together with persisting their temporary-to-server ID mappings on remaining mutations in one IndexedDB transaction, so partial retries and reloads retain dependent URLs and payloads. An accepted response is also retained in memory while local acknowledgement is retried. As with any client-only retry, if a server applies a write but its response is lost, the client cannot guarantee exactly-once delivery without server-side idempotency support.
 
 ### Icon Assignment
 

@@ -183,3 +183,44 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-004 — implement — 2026-09-20T11:05:13Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | next_task T-004: added 10-second request and response-body deadlines, quiet capped retries for transient queue failures, permanent 4xx discard handling, and a 30-second drain deadline that aborts abandoned work before releasing the guard. Queue replay preserves creation order and temporary IDs across partial drains and reloads. Implementation and verification completed September 18; resumed September 20 to recover the completed full-suite result and finish this handoff. |
+| Files Changed | frontend/src/api/client.ts, frontend/src/api/client.test.ts, frontend/src/api/connectionTimings.ts, frontend/src/api/request.ts, frontend/src/api/offlineQueueDrain.ts, frontend/src/api/offlineStore.ts, frontend/src/api/offlineStore.test.ts, frontend/src/context/OfflineQueueContext.tsx, frontend/src/context/OfflineQueueContext.test.tsx, frontend/src/types.ts, e2e/queue-retry.spec.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Implementation Notes | Extracted shared request handling and queue replay to keep the provider focused on lifecycle and retry ownership. Added optional resolvedIds to stored mutations and atomic completeOfflineMutation in offlineStore: removing a successful create without persisting its mapping would make the planned reconstruction from the remaining queue impossible. Accepted responses also remain in memory during local acknowledgement retries. These storage changes implement the partial-drain requirement without changing the IndexedDB schema version or banner interface. |
+| Validation | Tests written first and confirmed failing for missing timeout/retry/acknowledgement behavior; 21 additional frontend tests cover deadlines, abort classification, capped backoff/reset, offline recovery without events, 4xx blocking/discard, timer cancellation, partial-drain remount, storage failure/stall, late responses and Strict Mode. Final npm run lint PASS (existing AuthContext fast-refresh warning); npm run build PASS (existing chunk-size warning); npm test PASS (41 frontend files / 579 tests and 174 backend tests). npm run e2e -- e2e/queue-retry.spec.js PASS (2 Chromium scenarios, exit 0), using real IndexedDB and controlled API/clock to verify automatic retry and persisted dependent IDs after reload. Both existing resync scenarios passed in the earlier combined browser run. Initial queue browser attempts failed because of fixture routing and clock setup; corrected without changing application behavior. Windows Playwright teardown stalled in the earlier runs; stopped only their identified temporary server trees. npx tsc --noEmit -p frontend/tsconfig.json reports only the three existing errors: ListDetailPage.tsx:223, OverviewPage.test.tsx:51 and iconWorker.ts:42. git diff --check and git diff --cached --check PASS. Four new files explicitly staged; no commit created. |
+| Limits | Browser checks use controlled transport and simulated wake-ups; real-device suspension and database-backed full E2E were not exercised. Accepted responses are not resent during partial retries, but client-side abort cannot prove that a server did not apply a write whose response was lost; exactly-once delivery requires server-side idempotency support. This limit is documented in README. |
+| Commit | `fix(sync): retry queued changes automatically and time out stalled requests` |
+| Next Role | review |
+
+---
+
+### T-004 — review — 2026-09-20T11:40:12Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed request timeouts, transient-vs-permanent error classification, capped retry backoff, the stall release and the order/idempotency guarantees against PLAN T-004; all five acceptance criteria met, the no-resend guarantee confirmed in a real browser across a reload, and completeOfflineMutation verified directly against real IndexedDB. No required fixes, five non-blocking notes recorded. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-09-20T11:50:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task T-004: accepted review round 1 PASS_WITH_NOTES with no required fixes, marked the task done and prepared the reviewed changes for commit using the original next_task Commit field. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md; reviewed T-004 implementation, tests, documentation and review artifacts staged by git add -A |
+| Validation | Confirmed ready_to_commit and no required review fixes; git diff --check and git diff --cached --check PASS. Review records passing lint, build, two full runs of 579 frontend and 174 backend tests, 4/4 browser scenarios and direct IndexedDB verification. Existing TypeScript errors, delivery limits and non-blocking review notes remain documented in .ai/REVIEW.md. No implementation changes during commit_task. |
+| Commit | `fix(sync): retry queued changes automatically and time out stalled requests` |
+| Next Role | none |
+
+---

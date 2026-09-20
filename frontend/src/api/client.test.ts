@@ -107,3 +107,64 @@ describe("request reachability reporting", () => {
     expect(enqueueOfflineMutation).toHaveBeenCalledOnce();
   });
 });
+
+describe("request deadlines", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+    resetConnectivityForTests();
+    vi.mocked(readCachedResource).mockResolvedValue({ lists: [{ id: "cached" }] });
+  });
+  afterEach(() => {
+    resetConnectivityForTests();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("aborts a hanging read after ten seconds and returns cached data", async () => {
+    fetchMock.mockReturnValue(new Promise(() => {}));
+    const pending = sendJsonRequest("/api/lists", { cacheKey: "lists" });
+    const signal = fetchMock.mock.calls[0][1]!.signal!;
+    await vi.advanceTimersByTimeAsync(9999);
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toEqual({ lists: [{ id: "cached" }], offline: true });
+    expect(signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("queues a timed-out write once and ignores a late response", async () => {
+    let resolve!: (value: unknown) => void;
+    fetchMock.mockReturnValue(new Promise((done) => { resolve = done; }));
+    const pending = sendJsonRequest("/api/lists", { method: "POST", payload: { name: "Milk" }, queueable: true, timeoutMs: 25 });
+    await vi.advanceTimersByTimeAsync(25);
+    expect(await pending).toEqual({ queued: true });
+    resolve({ ok: true, status: 200, json: async () => ({}) });
+    await Promise.resolve();
+    expect(enqueueOfflineMutation).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(["AbortError", "TimeoutError"])("treats %s as a network failure", async (name) => {
+    fetchMock.mockRejectedValue(new DOMException("Request interrupted", name));
+    expect(await sendJsonRequest("/api/lists", { cacheKey: "lists" })).toHaveProperty("offline", true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("bounds response-body reads too", async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: () => new Promise(() => {}) });
+    const pending = sendJsonRequest("/api/lists", { cacheKey: "lists", timeoutMs: 25 });
+    await vi.advanceTimersByTimeAsync(25);
+    expect(await pending).toHaveProperty("offline", true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([200, 204, 401, 503])("clears deadlines after a fast HTTP %s response", async (status) => {
+    fetchMock.mockResolvedValue({ ok: status < 400, status, json: async () => ({}) });
+    await sendJsonRequest("/api/lists", { token: "token" }).catch(() => undefined);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(fetchMock.mock.calls[0][1]!.signal!.aborted).toBe(false);
+  });
+});

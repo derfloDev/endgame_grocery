@@ -15,8 +15,18 @@ export const QUEUE_RETRY_MAX_DELAY_MS = 60_000;
 export const QUEUE_DRAIN_STALL_TIMEOUT_MS = 30_000;
 
 /** A cancellable request deadline that also works where AbortSignal.timeout is unavailable. */
-export function createTimeoutSignal(ms: number): { signal: AbortSignal; cancel: () => void } {
+export function createTimeoutSignal(ms: number): { signal: AbortSignal; cancel: () => void; abort: () => void } {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
-  return { signal: controller.signal, cancel: () => clearTimeout(timer) };
+  return { signal: controller.signal, cancel: () => clearTimeout(timer), abort: () => controller.abort() };
+}
+
+/** Also settle operations whose implementation does not reject after an abort. */
+export function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new DOMException("Request interrupted", "AbortError"));
+    if (signal.aborted) onAbort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+    operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
 }
