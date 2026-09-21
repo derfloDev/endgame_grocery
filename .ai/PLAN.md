@@ -58,7 +58,8 @@ with an authenticated session. Cold start means Cache Storage and IndexedDB clea
 3. Each of `/api/lists`, `/api/lists/:id/entries`, `/api/lists/:id/history`,
    `/api/lists/:id/members`, `/api/lists/:id/mark-viewed` is requested exactly once per visit.
 4. Entries become visible as soon as `/entries` has responded; `/members` does not delay them.
-5. With a populated cache, entries are visible in the first frame after mount, without a spinner.
+5. With a populated cache, entries are visible as soon as the asynchronous cache read completes,
+   without waiting for the network and with no spinner while cached content is displayed.
 6. `/api/health` is not requested at startup while the offline queue is empty.
 7. Adding an entry still yields an icon suggestion, with a visible loading state while the
    model is still being fetched.
@@ -165,6 +166,10 @@ Documentation:
 Suggested commit subject: `perf(lists): show list entries without waiting for member data`
 
 ### Phase 3 — T-003: render cached data first
+
+Timing clarification accepted by the user — 2026-09-21T04:59:12Z: show cached entries as soon
+as the cache read completes. A loading frame before IndexedDB returns is acceptable; preloading
+before detail-page mount is not required. This supersedes the original first-frame wording.
 
 `sendJsonRequest` writes every successful GET into `offlineStore` but only reads the cache in
 the `isNetworkError` branch, so an online cold start always shows a spinner even when the

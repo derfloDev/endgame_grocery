@@ -91,7 +91,10 @@ Acceptance criteria:
   exactly once per page visit.
 - Entries become visible as soon as `/entries` has responded; the members request does not
   delay them.
-- With a populated cache, entries are visible in the first frame after mount, with no spinner.
+- With a populated cache, entries are visible as soon as the asynchronous cache read completes,
+  without waiting for the network and with no spinner while cached content is displayed.
+  User clarification accepted 2026-09-21T04:59:12Z: a loading frame before the cache read completes
+  is acceptable; preloading before mount is not required.
 - Offline reads, the mutation queue and SSE resync behave as before; existing tests stay green.
 
 Decision point: show a "stale data" indicator while the cache-first render is being revalidated?

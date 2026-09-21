@@ -1,9 +1,10 @@
 import { createCacheKey, sendJsonRequest } from "./client";
+import type { CachedReadOptions } from "./client";
 import type { List, QueueMeta } from "../types";
 
 const LISTS_CACHE_KEY = createCacheKey("lists");
 
-interface ListRequestOptions {
+interface ListRequestOptions extends CachedReadOptions<ListsResponse> {
   method?: string;
   payload?: unknown;
   queueable?: boolean;
@@ -36,14 +37,15 @@ function sendListRequest(path: string, token: string, options: ListRequestOption
     token,
     payload: options.payload,
     cacheKey: method === "GET" ? LISTS_CACHE_KEY : "",
+    onCachedValue: options.onCachedValue,
     offlineFallbackMessage: "Offline list data is unavailable.",
     queueable: options.queueable ?? method !== "GET",
     queueMeta: options.queueMeta ?? null
   });
 }
 
-export function fetchLists(token: string): Promise<ListsResponse> {
-  return sendListRequest("", token) as Promise<ListsResponse>;
+export function fetchLists(token: string, options: CachedReadOptions<ListsResponse> = {}): Promise<ListsResponse> {
+  return sendListRequest("", token, options) as Promise<ListsResponse>;
 }
 
 export function createList(

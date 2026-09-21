@@ -5,7 +5,11 @@ import { REQUEST_TIMEOUT_MS } from "./connectionTimings";
 
 export const OFFLINE_SYNC_COMPLETE_EVENT = "endgame_grocery.offline_sync_complete";
 
-interface SendJsonRequestOptions {
+export interface CachedReadOptions<T> {
+  onCachedValue?: (value: T) => void;
+}
+
+interface SendJsonRequestOptions<T> extends CachedReadOptions<T> {
   token?: string;
   method?: string;
   payload?: unknown;
@@ -36,7 +40,7 @@ export function createTemporaryId(resource: string): string {
   return `temp-${resource}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function sendJsonRequest(
+export async function sendJsonRequest<T = unknown>(
   url: string,
   {
     token = "",
@@ -44,12 +48,24 @@ export async function sendJsonRequest(
     payload,
     headers = {},
     cacheKey = "",
+    onCachedValue,
     offlineFallbackMessage = "Offline data is unavailable.",
     queueable = false,
     queueMeta = null,
     timeoutMs = REQUEST_TIMEOUT_MS
-  }: SendJsonRequestOptions = {}
+  }: SendJsonRequestOptions<T> = {}
 ): Promise<unknown> {
+  let networkSettled = false;
+  if (method === "GET" && cacheKey && onCachedValue) {
+    // Read alongside the network, never delaying it. Once the response settles (including
+    // access errors), a late cache read must not restore stale data, even during persistence.
+    void readCachedResource(cacheKey).then((cachedValue) => {
+      if (!networkSettled && cachedValue != null) onCachedValue(cachedValue as T);
+    }).catch(() => {
+      // An unavailable cache must not prevent an online read from succeeding.
+    });
+  }
+
   try {
     const { response, data } = await requestJson<ErrorResponse>(url, {
       method,
@@ -60,6 +76,7 @@ export async function sendJsonRequest(
       },
       ...(payload ? { body: JSON.stringify(payload) } : {})
     }, timeoutMs);
+    networkSettled = true;
 
     if (response.status === 204) {
       return null;
@@ -80,6 +97,7 @@ export async function sendJsonRequest(
 
     return data;
   } catch (error) {
+    networkSettled = true;
     if (method === "GET" && cacheKey && isNetworkError(error)) {
       const cachedValue = await readCachedResource(cacheKey);
 

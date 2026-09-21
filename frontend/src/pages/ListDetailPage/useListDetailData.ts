@@ -57,6 +57,7 @@ export function useListDetailData({
   const [list, setList] = useState<DetailList | null>(null);
   const [entries, setEntriesState] = useState<DetailEntry[]>([]);
   const entriesRef = useRef<DetailEntry[]>([]);
+  const entriesScopeRef = useRef({ listId, token });
   const [members, setMembers] = useState<DetailMember[]>([]);
   const [recentlyUsed, setRecentlyUsed] = useState<Suggestion[]>([]);
   const [entryError, setEntryError] = useState<unknown>(null);
@@ -378,7 +379,17 @@ export function useListDetailData({
   );
 
   useEffect(() => {
+    let active = true;
+    let networkFinished = false;
+
     async function loadListDetail(): Promise<void> {
+      // Only merge pending entries from this list and session, never from the previous route.
+      if (entriesScopeRef.current.listId !== listId || entriesScopeRef.current.token !== token) {
+        entriesScopeRef.current = { listId, token };
+        setEntries([]);
+        setList(null);
+        setMembers([]);
+      }
       setEntryError(null);
       setIsLoading(true);
       setRecentlyUsed([]);
@@ -387,16 +398,31 @@ export function useListDetailData({
 
       try {
         const [listsResult, entriesResult, historyResult] = await Promise.all([
-          fetchLists(token),
-          fetchEntries(listId, token),
+          fetchLists(token, {
+            onCachedValue: (cached) => {
+              if (!active || networkFinished) return;
+              const cachedList = cached.lists?.find((candidate) => candidate.id === listId);
+              if (cachedList) setList(cachedList);
+            }
+          }),
+          fetchEntries(listId, token, {
+            onCachedValue: (cached) => {
+              if (!active || networkFinished) return;
+              const nextEntries = mergePendingEntries(cached.entries ?? [], entriesRef.current);
+              setEntries(nextEntries);
+              setRecentlyUsed((current) => filterRecentlyUsedItems(current, nextEntries));
+              setIsLoading(false);
+            }
+          }),
           fetchRecentlyUsed(listId, token).catch((error) => {
             console.error("Failed to load recently used history.", error);
             return { history: [] };
           })
         ]);
+        networkFinished = true;
         const activeList = ((listsResult.lists ?? []) as DetailList[]).find((candidate) => candidate.id === listId);
 
-        if (!isMountedRef.current) {
+        if (!active) {
           return;
         }
 
@@ -411,7 +437,14 @@ export function useListDetailData({
         }
 
         setList(activeList);
-        const nextEntries = (entriesResult.entries ?? []) as DetailEntry[];
+        // Cached content is interactive while revalidating; preserve queued additions and
+        // local completion badges just as subsequent SSE/recovery reloads do.
+        const serverEntries = (entriesResult.entries ?? []).map((entry) =>
+          locallyDoneIdsRef.current.has(entry.id) && entry.status === "done"
+            ? { ...entry, is_changed: true }
+            : entry
+        );
+        const nextEntries = mergePendingEntries(serverEntries, entriesRef.current);
         setEntries(nextEntries);
         setRecentlyUsed(filterRecentlyUsedItems(historyResult?.history ?? [], nextEntries));
 
@@ -427,7 +460,8 @@ export function useListDetailData({
           onNonOwnerList?.();
         }
       } catch (loadError) {
-        if (isMountedRef.current) {
+        networkFinished = true;
+        if (active) {
           setEntryError(loadError);
           setList(null);
           setEntries([]);
@@ -435,13 +469,14 @@ export function useListDetailData({
           setRecentlyUsed([]);
         }
       } finally {
-        if (isMountedRef.current) {
+        if (active) {
           setIsLoading(false);
         }
       }
     }
 
     void loadListDetail();
+    return () => { active = false; };
   }, [listId, loadMembers, onLoadStart, onNonOwnerList, syncVersion, token, setEntries]);
 
   return {

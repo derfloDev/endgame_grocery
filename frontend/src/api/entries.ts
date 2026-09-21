@@ -1,7 +1,8 @@
 import { createCacheKey, sendJsonRequest } from "./client";
+import type { CachedReadOptions } from "./client";
 import type { Entry, QueueMeta } from "../types";
 
-interface EntryRequestOptions {
+interface EntryRequestOptions extends CachedReadOptions<EntriesResponse> {
   method?: string;
   payload?: unknown;
   queueMeta?: QueueMeta | null;
@@ -44,14 +45,15 @@ function sendEntryRequest(
     token,
     payload: options.payload,
     cacheKey: method === "GET" ? createEntriesCacheKey(listId) : "",
+    onCachedValue: options.onCachedValue,
     offlineFallbackMessage: "Offline entry data is unavailable.",
     queueable: method !== "GET",
     queueMeta: options.queueMeta ?? null
   });
 }
 
-export function fetchEntries(listId: string, token: string): Promise<EntriesResponse> {
-  return sendEntryRequest(listId, token) as Promise<EntriesResponse>;
+export function fetchEntries(listId: string, token: string, options: CachedReadOptions<EntriesResponse> = {}): Promise<EntriesResponse> {
+  return sendEntryRequest(listId, token, "", options) as Promise<EntriesResponse>;
 }
 
 export function createEntry(

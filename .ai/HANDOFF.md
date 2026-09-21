@@ -217,3 +217,84 @@ Review notes:
 | Next Role | none |
 
 - Excluded unrelated get-docker.sh and .claude/settings.local.json from staging as requested in the review. Their working-tree contents are preserved.
+
+---
+
+### T-003 — implement — 2026-09-21T04:44:25Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | next_task: implemented and verified the planned cache-first callbacks; retained in_implementation pending a decision on the literal first-frame acceptance conflict |
+| Files Changed | frontend/src/api/client.ts, frontend/src/api/entries.ts, frontend/src/api/lists.ts, frontend/src/pages/ListDetailPage/useListDetailData.ts, frontend/src/api/client.test.ts, frontend/src/pages/ListDetailPage.test.tsx, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Test-first run: 8 expected failures / 56 passes; added cross-list isolation regression failed before its fix; targeted final run 65/65 PASS; npm run lint PASS (existing AuthContext warning); npm run build PASS (existing chunk-size warning); npm test PASS (605 frontend + 174 backend); 4 production Chromium scenarios PASS for data behavior; frame sampling shows literal first-frame criterion NOT met; git diff --check PASS |
+| Commit | `perf(lists): show the last known list contents instantly on open` |
+| Next Role | implement |
+
+- Added typed, opt-in onCachedValue callbacks for list and entry GETs. The cache read and network run concurrently; response settlement, including access failures, suppresses late cache delivery before cache persistence finishes. Ordinary reads/writes retain their existing path, and network failures retain the offline fallback and offline marker. Cache-preview read failures do not block an online result.
+- The detail hook shows cached entries as soon as they are read, then replaces them with the server payload. Initial refresh now uses mergePendingEntries and restores local completion badges, preserving recently-used filtering. Per-effect guards ignore superseded or unmounted loads; list/session changes clear the old entry scope to avoid merging queued entries into another list. Member requests and mark-viewed still run once after the authoritative initial load.
+- Tests cover early cache delivery, network winning, slow persistence, HTTP 401/403, cache miss/read failure, offline fallback, opt-in behavior and API forwarding; page tests cover cached replacement, empty cache, pending additions/history filtering, Done badges, access denial, superseded sync loads and cross-list isolation. README and ordering comments updated.
+- Independent Chromium verification used the production build on 127.0.0.1:4318, fresh contexts, real IndexedDB resource_cache records, API fixtures and blocked service workers. Cached scenario: cached title/entries visible with the network held, no spinner once the cache is applied; fresh response replaces old content and keeps a queued entry out of recently-used history. Empty cache: existing loading state until network completes. Offline: aborted network reads fall back to cached data. Denied: missing server list clears the cached view and shows the translated access error. Each of lists/entries/history/members/mark-viewed was requested once, except denied correctly skips members/mark-viewed. Temporary preview server stopped.
+- Acceptance conflict discovered by requestAnimationFrame sampling: even with populated IndexedDB, an initial detail loading frame is painted before the asynchronous read returns. The PLAN.md Phase 3 callback mechanism delivers immediately after cache-read completion, but cannot synchronously populate the first render after mount. The literal TASKS.md/ROADMAP.md first-frame/no-spinner wording therefore does not pass; no acceptance claim or ready_for_review transition has been made. Asked the user whether to accept cache-read completion timing within planned scope or expand scope to cache preloading before detail-page mount. Answer pending; no scope expansion implemented.
+- Extra tsc --noEmit check reports only the three existing errors confirmed by the T-002 reviewer: DetailEntry.details nullability at ListDetailPage.tsx:222, owner_name in OverviewPage.test.tsx:51, quantized in iconWorker.ts:42. No new diagnostics.
+- No DB-backed E2E run; browser checks use fixtures and real local caching. No new repository files or commit created. The already-staged unrelated .claude/settings.local.json was preserved; exclude it from any later task commit.
+
+---
+
+### T-003 — implement — 2026-09-21T04:59:12Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | next_task completion: user accepted showing cached entries as soon as the cache read completes; aligned acceptance wording and moved T-003 to ready_for_review |
+| Files Changed | .ai/PLAN.md, ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Existing implementation evidence remains applicable: lint/build PASS, 779 unit tests PASS, 65 targeted tests PASS, four production Chromium cache scenarios PASS; no code changes since validation; git diff --check PASS |
+| Commit | `perf(lists): show the last known list contents instantly on open` |
+| Next Role | review |
+
+- Explicit user decision: "accept showing cached entities as soon as the cache read completes". This resolves the timing conflict recorded in the previous entry. A loading frame while IndexedDB is still reading is acceptable; the cached view itself has no spinner and does not wait for the network.
+- Updated only the timing wording in PLAN.md, ROADMAP.md and TASKS.md to reflect the user's decision. No pre-mount preload or other scope expansion is required. README already describes the accepted behavior accurately.
+- All other acceptance requirements and the earlier validation evidence remain unchanged. The three pre-existing TypeScript diagnostics and fixture-based browser coverage remain documented in the prior entry.
+- No commit made. Preserve the unrelated staged .claude/settings.local.json and exclude it from the eventual task commit.
+
+---
+
+### T-003 — review — 2026-09-21T05:24:58Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | next_task: verified cache-first rendering against real IndexedDB in a production build — cached entries appear 257 ms after navigation with no spinner, the server payload replaces them, and the offline fallback, pending merge and access-error clearing all still hold |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+Review notes:
+
+- Validation re-run by the reviewer: `npm run lint` PASS (0 errors, the pre-existing `AuthContext` react-refresh warning); `npm run build` PASS; frontend `vitest run --environment jsdom` PASS 605/605 across 41 files; backend `npm test` PASS 174/174 (779 total, matching the handoff); `tsc --noEmit` shows only the three errors established as pre-existing during the T-002 review.
+- Browser verification used a persistent context against `vite preview` of the production build, so the feature was exercised against real IndexedDB rather than the mocked `offlineStore` the unit tests use. With `/api/lists` and `/entries` held for 6 s: cached entry and cached list title on screen at 257 ms with zero loading indicators and no fresh content; fresh payload replaced both at 6227 ms. Aborting requests as `internetdisconnected` still produced the offline banner with cached content. A clean context with no cache kept the loading indicator until the held responses arrived.
+- Separate browser run for revoked access against a populated cache: cached content rendered while the response was held, then both the entry and the cached title were cleared and "You no longer have access to this list." was shown. The T-002 access-error behaviour survives cache-first rendering.
+- The ordering guarantee was traced in source, not just trusted: `sendJsonRequest` sets `networkSettled` immediately after `requestJson` resolves — before `await writeCachedResource` — and in the catch, and the hook adds a second `networkFinished` guard for the aggregate. Each request's flag settles strictly before `Promise.all` resolves, so a cache callback cannot fire after its payload has been applied. `client.test.ts` pins late-cache-after-success, cache-during-persistence, 401/403, null cache and a rejecting cache read.
+- Two changes that look like scope creep are in fact required by the new interactive window and are correct: running the initial network result through `mergePendingEntries` plus the `locallyDoneIdsRef` mapping, so entries queued or completed over cached content are not discarded; and the new `entriesScopeRef` clear, without which a route change would merge the previous list's queued entries into the next one. Replacing `isMountedRef` with a per-run `active` flag likewise fixes a real gap, since `isMountedRef` never invalidated a superseded run.
+- `readCachedResource` runs only for callers that opt in — asserted by test — so the overview and every other GET gained no IndexedDB work.
+- Finding 1 (`minor`, not required, for the planner): cache keys are `lists` and `entries:<listId>` with no account component, and `logout()` clears only the token while nothing clears cached resources. Before this change the unscoped cache surfaced only on the network-error fallback; it now surfaces on every online detail-page load. Reachability is narrow — the lists callback applies a cached list only when the id matches, so a second account sees another account's cached title and entries only by navigating directly to a list URL it cannot access, and the window self-corrects. Cheap remedies: fold the account id into `createCacheKey`, or clear cached resources on logout. Recommend a separate planner task rather than expanding T-003.
+- Finding 2 (`nit`): the `filterRecentlyUsedItems` call inside the entries cache callback always receives an empty list, because the effect resets Recently Used synchronously and the history branch runs only after the callback is suppressed. Harmless defensive no-op, worth a comment or removal.
+- Environmental limits unchanged: PostgreSQL and Docker unavailable; the browser runs blocked the service worker to keep request timing meaningful; route-to-route navigation between two lists was covered at hook level via `renderHook` rather than by clicking through the app.
+- No code was modified during review and no commit was made.
+
+---
+
+### T-003 — implement — 2026-09-21T05:55:12Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task: accepted review round 1 PASS_WITH_NOTES and marked T-003 done |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md; reviewed T-003 implementation, tests, documentation, accepted timing clarification and review artifacts included in the commit |
+| Validation | Reviewed lint/build PASS, 605 frontend + 174 backend tests PASS, production-browser cache checks PASS; no new TypeScript errors; staged task diff checked before commit |
+| Commit | `perf(lists): show the last known list contents instantly on open` |
+| Next Role | none |
+
+- Commit limited to the reviewed task paths so the unrelated, already-staged .claude/settings.local.json remains staged and uncommitted.
+- The review's account-scoped cache follow-up remains recorded for the planner in REVIEW.md; no required fixes or scope changes were requested for this commit.

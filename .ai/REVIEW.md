@@ -378,3 +378,142 @@ None.
 #### Verdict
 
 `PASS_WITH_NOTES`
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-09-21
+
+Scope: working-tree changes to `client.ts`, `entries.ts`, `lists.ts`, `useListDetailData.ts`,
+their tests and `README.md`, against PLAN.md Phase 3 as amended by the user's timing
+clarification of 2026-09-21T04:59:12Z.
+
+#### Findings
+
+1. `minor` — `frontend/src/api/client.ts:35` (`createCacheKey`) — not a required fix; a planner
+   decision rather than a defect in this diff.
+   Cached resources are keyed `lists` and `entries:<listId>`, with no user or account component,
+   and `logout()` in `AuthContext.tsx:87` only clears the auth token — nothing clears cached
+   resources, and `offlineStore` exposes no production clear function. Before this change that
+   unscoped cache only surfaced on the network-error fallback path. Cache-first rendering now
+   surfaces it on every online detail-page load, so the exposure widens from "offline only" to
+   "every visit".
+   Reachability is narrow, and this is deliberately not rated higher for that reason: the lists
+   callback applies a cached list only when its id equals the current `listId`, so nothing from
+   the overview leaks, and a second account on the same browser profile sees another account's
+   cached title and entries only if it navigates directly to a list URL it has no access to. When
+   both accounts legitimately share the list, showing cached content is the intended feature, not
+   a leak. The window is also self-correcting — measured at 257 ms locally, and the access-denied
+   path was confirmed to clear the cached view entirely (see Verification).
+   Cheap remedies exist — fold the account id into `createCacheKey`, or clear cached resources on
+   logout. Recommend routing this to the planner as its own task rather than expanding T-003.
+
+2. `nit` — `frontend/src/pages/ListDetailPage/useListDetailData.ts:410` — not a required fix.
+   The entries cache callback calls
+   `setRecentlyUsed((current) => filterRecentlyUsedItems(current, nextEntries))`, but `current` is
+   always `[]` at that point: the effect sets `setRecentlyUsed([])` synchronously before the
+   awaits, and the only other writer is the history branch, which runs after `Promise.all`
+   resolves and therefore after the callback is already suppressed. The call is a harmless
+   defensive no-op; a short comment saying so, or dropping it, would save the next reader the
+   trace.
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps
+
+- `npm run lint` — PASS (0 errors; the pre-existing `react-refresh` warning in `AuthContext.tsx`).
+- `npm run build` — PASS (pre-existing chunk-size warning).
+- `npx vitest run --environment jsdom` (frontend) — PASS 605/605 across 41 files, exit 0.
+- `npm test --workspace backend` — PASS 174/174. Total 779, matching the handoff.
+- `node node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json` — the same three
+  pre-existing errors established as baseline during the T-002 review, and no new ones.
+- Real-browser verification against `vite preview` of the production build on port 4318, using a
+  persistent browser context so the change is exercised against real IndexedDB rather than the
+  mocked `offlineStore` the unit tests use, with the service worker blocked and the `/api/lists`
+  and `/entries` responses held to open a measurable window.
+- A second browser run covering revoked access against a populated cache.
+- Source review of the diff, plus a trace of the ordering guarantee through `sendJsonRequest`, and
+  of `createCacheKey`, `logout` and the `offlineStore` exports for finding 1.
+
+##### Findings
+
+- Criterion "entries render as soon as the cache read completes, without waiting for the network
+  and with no spinner over cached content" — PASS. With the list and entries responses held for
+  6 s, the cached entry and the cached list title were on screen **257 ms** after navigation, with
+  zero `LoadingState` elements present and no fresh content yet.
+- Criterion "then get replaced by the server payload" — PASS. The fresh entry appeared at 6227 ms,
+  the cached entry count dropped to 0 and the list title switched from the cached to the fresh
+  name.
+- Criterion "cached value never applied after the network response" — PASS, by double guard and
+  by test. `sendJsonRequest` sets `networkSettled = true` immediately after `requestJson` resolves
+  — before the `await writeCachedResource(...)` — and in the catch, so a late cache read is
+  suppressed during persistence and on error; the hook adds its own `networkFinished` guard for
+  the aggregate `Promise.all`. Because each request's own flag settles strictly before
+  `Promise.all` resolves, a cache callback cannot fire after its network payload has been applied.
+  `client.test.ts` pins every branch of this: late cache after success, cache landing during
+  persistence, 401 and 403, a null cache, and a rejecting cache read.
+- Criterion "existing offline fallback unchanged" — PASS, verified in the browser rather than only
+  by test: with requests aborted as `internetdisconnected`, the page still rendered the offline
+  banner and the last cached list and entry. The client test also pins the `offline: true` marker
+  with the callback enabled.
+- Criterion "pending-entry merge unchanged" — PASS, and strengthened. The initial load now runs
+  the network result through `mergePendingEntries` and the `locallyDoneIdsRef` mapping, which it
+  previously did not. That is required, not incidental: cached content is interactive before the
+  network lands, so an entry queued or completed during that window would otherwise be discarded
+  by the server payload. The two tests covering it — a queued entry surviving the replacement with
+  its details and "Queued" badge while being filtered out of Recently Used, and a Done badge
+  surviving a completion made before the initial read settles — both fail to exist in the old
+  design because the window did not exist.
+- Cache miss behaves as before: a clean context showed the loading indicator until the held
+  responses arrived, consistent with the amended criterion that a loading frame before the cache
+  read completes is acceptable.
+- Revoked access correctly overrides the cached render — the most important safety property here.
+  With a populated cache and `/api/lists` no longer returning the list, the browser showed the
+  cached entry while the response was held, then cleared both the entry and the cached title and
+  displayed "You no longer have access to this list." The T-002 access-error behaviour is intact
+  on top of cache-first rendering.
+- The `active` flag replacing `isMountedRef` inside the load effect is a real improvement, not
+  churn: `isMountedRef` only tracked mount, so a superseded run could still write state after the
+  effect re-ran for a new `listId`, `token` or `syncVersion`. The cleanup now invalidates the
+  previous run, and the cache callbacks check it too. The stale-load test covers this.
+- The new `entriesScopeRef` clear is necessary rather than defensive. Without it,
+  `mergePendingEntries(cached.entries, entriesRef.current)` would carry the previous route's
+  queued entries into the next list, since `entriesRef` survives a `listId` change. It keys on
+  both `listId` and `token`, so it also covers a re-login. It does change what the user sees while
+  navigating between two lists — an immediate clear instead of the previous list's entries
+  lingering — which is the correct trade and is covered by the `renderHook` route-change test.
+- `readCachedResource` is only called when a caller opts in: the client test asserts no cache read
+  for a plain GET or a write, so the overview page and every other GET are untouched and no extra
+  IndexedDB work was added to them.
+- Documentation rule satisfied. The rewritten `README.md` bullet covers cache-first reading, the
+  replacement preserving queued additions and completion badges, the ordering guarantee, the
+  cache-miss loading state, the unchanged offline fallback and the access-error clear. The comment
+  in `client.ts` states the ordering guarantee including the persistence window, and the hook
+  carries comments for the scope reset and the merge.
+
+##### Risks
+
+- Finding 1 is the one worth tracking. It is not a defect in this diff, but this diff is what
+  makes an unscoped cache visible during normal online use.
+- Route-to-route navigation between two lists was verified at hook level through `renderHook`
+  rather than by clicking through the running app, because the UI path runs via the overview. The
+  hook test exercises the same `listId` change the router produces.
+- The browser runs blocked the service worker so request timing and counting stay meaningful, so a
+  real service-worker-served visit was not measured. Unchanged trade-off from T-002.
+- PostgreSQL and Docker remain unavailable, so DB-backed Playwright specs and a live-backend pass
+  could not run.
+- Cache-first rendering means a user can now briefly act on stale content — toggling or editing an
+  entry that the server has already changed. The merge and `locallyDoneIdsRef` handling cover the
+  local-write case, and the server response still wins, but the window is new. ROADMAP records an
+  open decision on a "stale data" indicator; nothing here forecloses it.
+
+#### Verdict
+
+`PASS_WITH_NOTES`
