@@ -446,3 +446,61 @@ Review notes:
 | Next Role | none |
 
 - Staged and committed the T-004 files only. The pre-existing staged `.claude/settings.local.json` was left out of the commit.
+
+---
+
+### T-005 — implement — 2026-09-22T08:51:43Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | next_task completion: self-host Exo 2, Orbitron and JetBrains Mono and precache the WOFF2 subsets for offline use |
+| Files Changed | frontend/index.html, frontend/src/index.css, frontend/src/styles/fonts.css, frontend/src/styles/index-cleanup.test.ts, frontend/src/vite-config.test.ts, frontend/vite.config.ts, frontend/public/fonts/, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` PASS (existing AuthContext warning); `npm run build` PASS (existing chunk-size warning; 19 precache entries); focused tests 15/15 PASS; `npm test` PASS (612 frontend + 174 backend); production Chromium loaded all three local families with no Google Fonts requests, and loaded extended-Latin glyphs offline from the five service-worker-cached subsets; `git diff --check` PASS |
+| Commit | `perf(ui): self-host the app fonts so the first paint needs no third-party request` |
+| Next Role | review |
+
+- Removed the two Google Fonts preconnects and blocking stylesheet from `frontend/index.html`. Added variable font faces with `font-display: swap` and the Latin / Latin Extended ranges needed by the app; the files are served locally from `frontend/public/fonts/`.
+- Added `.woff2` to the service-worker precache pattern with a comment explaining why. The production manifest contains all five WOFF2 subsets, and the Chromium offline check loaded Exo 2, Orbitron and JetBrains Mono successfully with `Āā` from the extended subsets.
+- Copied each font's SIL OFL 1.1 license text and copyright notice beside the font assets; `frontend/public/fonts/README.md` records weights, subsets, versions and upstream attribution. Root README now documents the self-hosted, precached fonts.
+- The already-staged unrelated `.claude/settings.local.json` remains untouched. No commit made in `next_task`.
+
+---
+
+### T-005 — review — 2026-09-22T10:24:40Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | next_task: self-hosted fonts verified against the Google Fonts baseline — zero third-party requests, pixel-identical rendering, and fonts served from the precache with the origin killed |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+Review notes:
+
+- Validation re-run by the reviewer: `npm run lint` PASS (0 errors, the pre-existing `AuthContext` react-refresh warning); `npm run build` PASS with precache at 19 entries / 1970.78 KiB; frontend `vitest run --environment jsdom` PASS 612/612 across 41 files. Backend tests not re-run — no backend file is touched.
+- Criterion "no Google Fonts requests" PASS: the self-hosted build's entire host set for a detail-page load is `localhost`, against 3 requests across both Google hosts from the stashed baseline build measured the same way. Only the needed subsets are fetched (`orbitron-latin`, `exo-2-latin`, plus `exo-2-latin-ext` when Latin-Extended characters appear), so `unicode-range` is working.
+- Criterion "typography visually unchanged" PASS, verified rather than eyeballed: full-page screenshots of the baseline and self-hosted builds are pixel-identical — 0 of 1,152,000 pixels differ, empty diff bbox — and repeating the whole comparison with Latin-Extended content also gave 0 of 1,152,000. Computed family, weight, size and measured boxes match exactly for every text-bearing element.
+- Weight ranges checked against the codebase rather than assumed: CSS uses only 400/500/600/700/800 with no 900 anywhere, so dropping the Orbitron 900 from the old URL changes nothing, and the declared ranges cover every weight each family actually renders at.
+- Orbitron ships Latin only while the other two also ship Latin-Extended, which looked like a possible regression for list names containing `Ł`, `ź` or `Ć` in the Orbitron heading. Tested directly: the baseline also fetches only `orbitron-latin` from Google, both builds fall back identically, and the Latin-Extended screenshots are pixel-identical. Not a regression.
+- Criterion "fonts render offline" PASS, tested through the precache rather than around it. Playwright's `setOffline` blocks navigations before the service worker can answer, so the preview server was killed after the worker took control; the reload then succeeded from cache with Exo 2 400–700 and Orbitron 400–800 loaded, both WOFF2 files served from Cache Storage, and every rendered box matching the online and baseline numbers. Cache Storage holds all five subsets.
+- Criterion "licences documented" PASS: three complete OFL 1.1 texts stored per family plus a `public/fonts/README.md` recording family, weights, subsets, source version, copyright holder and upstream URL.
+- Finding 1 (`minor`, for T-006): precaching the fonts grows the manifest by 124.84 KiB while removing only the 52.1 KiB Google pair, a net increase of about 73 KiB on a cold load, because the service worker install fetches every precache entry regardless of `unicode-range`. PLAN.md Phase 6's table still lists the Google pair as weight T-005 removes; that line is now wrong in sign and T-006 must re-measure rather than subtract it. The two Latin-Extended subsets (42.4 KiB) are the headroom candidates, but the Exo 2 one is used by real content, so it is a content trade-off rather than free.
+- Finding 2 (`nit`): the new WOFF2 precache test in `vite-config.test.ts` sits outside its `describe` with indentation implying otherwise. It runs and passes as a root-level test; moving it inside would match the file.
+- Residual risks recorded in REVIEW.md: Chromium on Windows only, and the pixel comparison covers the list detail page at one viewport, though the weight inventory covers every declaration in the codebase.
+- Two stash-and-rebuild cycles were needed for the baseline comparisons; the working tree was confirmed restored afterwards and no committed file was touched.
+- No code was modified during review and no commit was made.
+
+---
+
+### T-005 — commit_task — 2026-09-22T10:28:28.5680804Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | committed the reviewed self-hosted font changes |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, README.md, frontend/index.html, frontend/public/fonts/, frontend/src/index.css, frontend/src/styles/fonts.css, frontend/src/styles/index-cleanup.test.ts, frontend/src/vite-config.test.ts, frontend/vite.config.ts |
+| Commit | `perf(ui): self-host the app fonts so the first paint needs no third-party request` |
+| Next Role | implement |

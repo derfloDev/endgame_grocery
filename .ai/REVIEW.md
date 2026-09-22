@@ -892,3 +892,132 @@ None.
 #### Verdict
 
 `PASS`
+
+## Task: T-005
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-09-22
+
+Scope: working-tree changes to `index.html`, `index.css`, the new `styles/fonts.css`, the five
+WOFF2 subsets and licence files under `public/fonts/`, `vite.config.ts`, two test files and
+`README.md`, against PLAN.md Phase 5.
+
+All five acceptance criteria pass. "Typography visually unchanged" was verified by pixel-diffing
+full-page screenshots of both builds rather than by inspection.
+
+#### Findings
+
+1. `minor` — `frontend/vite.config.ts` (precache manifest) — not a required fix; a hand-off to
+   T-006 rather than a defect here.
+   Adding `woff2` to `globPatterns` grows the precache from 14 entries / 1845.94 KiB to 19 /
+   1970.78 KiB, a delta of 124.84 KiB, while removing only the 52.1 KiB Google Fonts pair from the
+   cold load — a **net increase of roughly 73 KiB** on a first visit, because the service worker
+   install fetches every precache entry regardless of `unicode-range`. T-006 owns the
+   `< 500 KiB` budget and its plan table still lists the Google pair as weight that T-005 removes;
+   that line is now wrong in sign. T-006 should re-measure rather than subtract 52.1 KiB.
+   If T-006 needs the headroom, the two Latin-Extended subsets (42.4 KiB combined) are the
+   candidates — but only two of the five files are fetched for rendering on a German page, and the
+   Latin-Extended Exo 2 subset does get used by real content, so dropping them is a content
+   trade-off, not free. Recorded so the decision is made deliberately.
+
+2. `nit` — `frontend/src/vite-config.test.ts:72` — not a required fix.
+   The new `it("precaches self-hosted WOFF2 fonts for offline rendering")` sits after the closing
+   `});` of `describe("vite worker config")`, indented as though it were inside it. It does run —
+   verbose output lists it as a root-level test with no suite name — and it passes, so this is
+   cosmetic. Moving it inside the describe would match the file and stop the indentation from
+   misleading the next reader.
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps
+
+- `npm run lint` — PASS (0 errors; the pre-existing `react-refresh` warning in `AuthContext.tsx`).
+- `npm run build` — PASS; precache 19 entries, 1970.78 KiB.
+- `npx vitest run --environment jsdom` (frontend) — PASS 612/612 across 41 files, exit 0.
+- Backend tests not re-run: no backend file is touched.
+- The two changed test files re-run with `--reporter=verbose` to confirm the new cases actually
+  execute and to check where the misplaced one is registered.
+- Font-weight inventory across every CSS file in `frontend/src`, cross-checked against the declared
+  variable-font ranges and against the weights the removed Google Fonts URL requested.
+- Browser runs against `vite preview` of the production build, capturing requested hosts, WOFF2
+  requests, loaded `document.fonts` faces, and computed family / weight / size plus measured
+  bounding boxes for every text-bearing element.
+- Baseline comparison: `index.html`, `index.css`, `fonts.css`, `public/fonts/` and `vite.config.ts`
+  stashed, the frontend rebuilt, the same capture re-run against the Google Fonts build, then
+  restored and rebuilt. Done twice — once with German text, once with Latin-Extended text.
+- Full-page screenshots from both builds pixel-diffed.
+- Offline test with the origin killed rather than the browser put offline, so the service worker
+  precache is what actually serves the reload.
+
+##### Findings
+
+- Criterion "no request to `fonts.googleapis.com` or `fonts.gstatic.com`" — PASS. The self-hosted
+  build's entire host set for a detail-page load is `localhost`. The baseline build, measured the
+  same way, issued 3 requests across both Google hosts (4 with Latin-Extended text). Only the
+  subsets the page needs are fetched: `orbitron-latin` and `exo-2-latin` for German text, plus
+  `exo-2-latin-ext` when Latin-Extended characters are present, which is `unicode-range` working
+  as intended.
+- Criterion "no third-party render-blocking stylesheet" — PASS. `index.html` no longer carries the
+  stylesheet link or either `preconnect`, and the faces now arrive through the bundled CSS. The new
+  `index-cleanup` test asserts the HTML contains no `fonts.googleapis|gstatic` reference, so the
+  removal is pinned.
+- Criterion "typography visually unchanged" — PASS, and verified rather than eyeballed. Full-page
+  screenshots of the baseline and self-hosted builds at 1280×900 are **pixel-identical: 0 of
+  1,152,000 pixels differ, diff bounding box empty**. Repeated with Latin-Extended content: also
+  0 of 1,152,000. Computed family, weight, size and measured box for every text-bearing element
+  match exactly across builds — the Orbitron brand title at 302 × 21.6, the Exo 2 rows at
+  71.1 × 36.4, 100.8 × 19.5, 32.2 × 36.4, and the entry text at 79.2 × 16.6 (85.9 × 16.6 for the
+  Latin-Extended string).
+- The weight ranges are correct and not merely plausible. The CSS uses only 400, 500, 600, 700 and
+  800; there is no 900 anywhere, so dropping the Orbitron 900 the old URL requested changes
+  nothing. The declared ranges — Exo 2 400–700, Orbitron 400–800, JetBrains Mono 400–600 — cover
+  every weight each family is actually rendered at, and the pixel-identical result confirms the
+  variable instances match the static ones the baseline served.
+- Orbitron ships a Latin subset only, while Exo 2 and JetBrains Mono also ship Latin-Extended. This
+  looked like a possible regression for a list name containing characters such as `Ł`, `ź` or `Ć`
+  in the Orbitron heading, so it was tested directly: the baseline build also fetches only
+  `orbitron-latin` from Google, so both builds fall back identically for those glyphs, and the
+  Latin-Extended screenshots are pixel-identical. Not a regression, and the subset selection
+  matches upstream.
+- Criterion "fonts render while offline" — PASS, tested through the precache rather than around it.
+  Playwright's `setOffline` blocks navigations before the service worker can answer, so instead the
+  preview server was killed after the worker took control. The reload then succeeded from cache,
+  `document.fonts` reported Exo 2 400–700 and Orbitron 400–800 loaded, `document.fonts.check`
+  returned true for both, the two WOFF2 files were served from Cache Storage, and every rendered
+  box matched the online and baseline numbers exactly. Cache Storage was confirmed to hold all five
+  subsets.
+- Criterion "licences documented" — PASS. All three families are SIL OFL 1.1, with the complete
+  upstream licence text stored per family as `OFL-Exo2.txt`, `OFL-Orbitron.txt` and
+  `OFL-JetBrainsMono.txt`, and `public/fonts/README.md` recording family, weights, subsets, source
+  version, copyright holder and upstream project URL for each.
+- `README.md` correctly describes the fonts as self-hosted and precached and points at their
+  location, satisfying the documentation rule.
+- The new tests are meaningful rather than tautological: the HTML assertion would fail if the
+  Google link came back, and the fonts.css assertion checks each family is declared, that all five
+  faces use `font-display: swap`, and that every referenced subset file exists on disk — so a
+  dangling `src` URL cannot pass.
+
+##### Risks
+
+- The precache growth in finding 1 lands on T-006's budget. Flagged there rather than fixed here.
+- Font rendering was verified on Chromium on Windows only. WOFF2 and variable-weight ranges are
+  broadly supported, and the faces are byte-identical to the Google subsets, so cross-browser risk
+  is low, but no other engine was exercised.
+- The visual comparison covers the list detail page at one viewport. Other pages use the same three
+  families through the same global stack, and the weight inventory covers every declaration in the
+  codebase, but only this page was diffed pixel for pixel.
+- PostgreSQL and Docker remain unavailable, so DB-backed Playwright specs and a live-backend pass
+  could not run. Unchanged across this cycle.
+- Two stash-and-rebuild cycles were needed for the baseline comparisons. The working tree was
+  confirmed restored afterwards and no committed file was touched.
+
+#### Verdict
+
+`PASS_WITH_NOTES`

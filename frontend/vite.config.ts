@@ -85,7 +85,8 @@ export default defineConfig({
         ]
       },
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,svg,png,webmanifest,json}"]
+        // Keep local WOFF2 fonts in the offline shell so typography remains available without a network connection.
+        globPatterns: ["**/*.{js,css,html,svg,png,webmanifest,json,woff2}"]
       }
     })
   ]

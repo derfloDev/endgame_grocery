@@ -68,3 +68,7 @@ describe("vite worker config", () => {
     expect(serviceWorkerSource).toMatch(/addEventListener\(["']notificationclick["']/);
   });
 });
+
+  it("precaches self-hosted WOFF2 fonts for offline rendering", () => {
+    expect(viteConfigSource).toMatch(/globPatterns:\s*\[[^\]]*woff2[^\]]*\]/i);
+  });

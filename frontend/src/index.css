@@ -1,4 +1,5 @@
 @import "./styles/tokens.css";
+@import "./styles/fonts.css";
 @import "./styles/shared.css";
 
 :root { color-scheme: dark; color: var(--text-primary); background: var(--bg-base); font-family: "Exo 2", "Segoe UI", sans-serif; line-height: 1.5; font-weight: 400; }
