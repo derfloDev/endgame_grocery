@@ -1,11 +1,13 @@
 import { clientsClaim } from "workbox-core";
-import { precacheAndRoute } from "workbox-precaching";
+import { NavigationRoute, registerRoute } from "workbox-routing";
+import { createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
 
 self.skipWaiting();
 clientsClaim();
 const precacheManifest = self.__WB_MANIFEST;
 
 precacheAndRoute(precacheManifest || []);
+registerRoute(new NavigationRoute(createHandlerBoundToURL("/index.html")));
 
 self.addEventListener("push", (event) => {
   if (import.meta.env.DEV) {

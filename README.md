@@ -88,6 +88,14 @@ The Vite PWA plugin also enables the module service worker in dev mode, so local
 
 In production, the protected app shell shows a dismissible update banner when a new service worker version is waiting. Use the banner's reload action to activate the new version immediately; dismissing it hides the prompt for the current browser session.
 
+### Cold-load assets and offline precache
+
+The cold-load target for `/lists/<id>` is below 500 KiB transferred, with no single response over 150 KiB. The PWA keeps 192×192 and 512×512 any-maskable PNG icons, and the app logo remains a 256×256 PNG rendered at 40–44 px. The self-hosted fonts and app shell are precached for offline use, and the service worker routes app navigations to the cached shell when offline. The icon-matching worker is excluded from that initial precache because `iconWorkerClient.ts` creates it only when a user opens the add-item flow.
+
+A clean authenticated Chromium run against Vite's production preview transferred 655,775 bytes (640.4 KiB) across 25 responses. Seven hashed asset paths were requested both by the page and by service-worker precaching, and preview returned full 200 responses for both copies because it sends no-cache headers. This preview measurement exceeds the target and does not represent the deployed cache behavior.
+
+The production Nginx configuration in docker/nginx.conf enables gzip and serves hashed JavaScript, CSS, images and fonts with Cache-Control: public, immutable. Those immutable headers let the service-worker install reuse the browser's cached response for each asset already fetched by the page. Counting each path once gives 427,883 bytes (417.9 KiB); adjusting the text assets from preview's gzip level 6 to Nginx's default gzip level 1 gives a modeled production cold load of about 446 KiB, with an estimated largest response of 116,614 bytes (113.9 KiB). This is a model based on the repository's Nginx configuration, not a measurement against a running Nginx image, and the under-500-KiB target depends on those immutable cache headers.
+
 The frontend initializes i18next before React renders, detects English or German from local storage and the browser, and keeps the document `<html lang>` attribute aligned with the active language. Translation catalogs live in `frontend/src/locales/{en,de}/translation.json` and are delivered through Vite code splitting; JSON assets are included in the service worker precache patterns for offline-first locale support.
 
 ### 7. Generate VAPID keys for push notifications (optional)

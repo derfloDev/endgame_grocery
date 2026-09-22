@@ -1021,3 +1021,257 @@ None.
 #### Verdict
 
 `PASS_WITH_NOTES`
+
+## Task: T-006
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-09-22
+
+Scope: working-tree changes to the three PNG assets, `vite.config.ts`, `src/sw/service-worker.js`,
+`vite-config.test.ts`, `README.md` and `.ai/PLAN.md`, against PLAN.md Phase 6.
+
+Every functional acceptance criterion is met, and the asset work is good. Review fails on recorded
+evidence: the measurement figure and the caching mechanism written into `README.md`, `.ai/PLAN.md`
+and the handoff do not reproduce, and the reason the budget actually holds is never stated.
+
+#### Findings
+
+1. `major` — `README.md:290` (and the same claim in `.ai/PLAN.md` and the handoff) — required fix.
+   The documented evidence says "The page and precache both request hashed app chunks, but the
+   browser reused the HTTP-cached payload during installation", and reports the cold load at
+   "about 492,000 bytes (480.5 KiB)". Neither reproduces in the environment the cycle has measured
+   in all along. A clean run against `vite preview` of this build gives **655,775 B (640.4 KiB)**
+   across 25 responses, and all seven duplicated paths are full `status=200` re-downloads, not
+   cache hits or 304s:
+
+   | Path | page | service worker |
+   | --- | --- | --- |
+   | `assets/index-DcIpjXI8.js` | 200, 100,758 B | 200, 100,706 B |
+   | `assets/react-vendor-DqMU5JJk.js` | 200, 61,119 B | 200, 61,067 B |
+   | `fonts/exo-2-latin.woff2` | 200, 41,216 B | 200, 41,164 B |
+   | `assets/index-2r4qoe7M.css` | 200, 7,538 B | 200, 7,486 B |
+   | `fonts/orbitron-latin.woff2` | 200, 12,120 B | 200, 12,068 B |
+   | `assets/translation-BZ3ccX9k.js` | 200, 2,777 B | 200, 2,725 B |
+   | `assets/workbox-window.prod.es5-*.js` | 200, 2,728 B | 200, 2,676 B |
+
+   The cause is that `vite preview` sends `Cache-Control: no-cache` for every asset, so the
+   precache install cannot reuse anything. The budget nonetheless holds in production, for a
+   reason the evidence never mentions: `docker/nginx.conf:9-12` serves `js|css|png|jpg|svg|ico|woff2?`
+   with `expires 1y` and `Cache-Control: "public, immutable"`, which makes the service worker's
+   precache fetch a genuine HTTP-cache hit. That is the real answer to PLAN.md Phase 6's
+   "investigate the duplicate fetch" item, and it is a property of the deployment config rather
+   than something a browser timing record shows.
+
+   What should be documented is the verified figure and mechanism, not a number that cannot be
+   reproduced. Deduplicating to one copy per path — the production case — gives **427,883 B
+   (417.9 KiB)** under preview's compression. `docker/nginx.conf` sets `gzip on` without
+   `gzip_comp_level`, so nginx compresses at level 1 while preview delivers roughly level 6;
+   re-compressing each text asset at level 1 adds about 29.2 KiB, putting a realistic production
+   cold load near **446 KiB**, inside the budget with roughly 11 % headroom. The largest response
+   becomes `index-DcIpjXI8.js` at 116,614 B (113.9 KiB), still under the 150 KiB limit.
+
+   Correct `README.md` to state the measured number, the environment it was measured in, and that
+   the duplicate precache fetch is free only because the production server marks hashed assets
+   immutable. No code change is required.
+
+2. `major` — `.ai/PLAN.md:276`, `:304` — required fix.
+   The implementer edited `.ai/PLAN.md`, which is a planner-owned artifact, and used the edit to
+   record an unverified conclusion — rewriting "investigate the duplicate fetch" to "verified
+   HTTP-cache payload reuse" and appending "The authenticated production-preview run confirmed
+   hashed app payloads are reused from the HTTP cache during precache installation", which
+   finding 1 shows did not happen in that run. Per AGENTS.md the implementer implements the plan
+   and must not invent requirements; changes to `.ai/PLAN.md` belong to `rework_plan`. Revert the
+   `.ai/PLAN.md` edits and record the outcome in the handoff instead, or take the amendment to the
+   planner. The added line describing the `service-worker.js` change is a scope correction that
+   also belongs to the planner rather than to the implementer's own pass.
+
+3. `nit` — `frontend/src/vite-config.test.ts:93` — not a required fix.
+   The WOFF2 precache test carried over from T-005 still sits outside the `describe` block, and
+   this round's four new tests were correctly added inside it, so the stray one now trails the
+   closing brace in the middle of the file. Same cosmetic issue reported in the T-005 review;
+   worth folding in whenever this file is next touched.
+
+#### Required Fixes
+
+1. Correct the cold-load evidence in `README.md` so the figure and the caching mechanism match
+   what is reproducible, and name `docker/nginx.conf`'s immutable headers as the reason the
+   duplicate precache fetch costs nothing in production (finding 1).
+2. Revert the `.ai/PLAN.md` edits, or route them through the planner (finding 2).
+
+#### Verification
+
+##### Steps
+
+- `npm run lint` — PASS (0 errors; the pre-existing `react-refresh` warning in `AuthContext.tsx`).
+- `npm run build` — PASS; precache 19 entries, 834.41 KiB uncompressed, down from 1845.94 KiB.
+- `npx vitest run --environment jsdom` (frontend) — PASS 616/616 across 41 files, exit 0.
+- `npm test --workspace backend` — PASS 174/174.
+- Cold-load measurement against `vite preview` of the production build in a fresh context with
+  service workers allowed, summing `responseBodySize + responseHeadersSize` per response and
+  excluding only the API fixtures, then recomputed deduplicated by path.
+- `Cache-Control` and compression headers checked directly for `index.html`, a hashed JS asset, a
+  hashed CSS asset, an icon and a font, and compared against `docker/nginx.conf`.
+- Each text asset re-compressed at gzip levels 1 and 6 to model nginx's default against preview's
+  delivery.
+- Precache manifest read out of the built `dist/service-worker.js`.
+- PWA manifest icon declarations read at runtime from the running app.
+- Image dimensions, colour mode and byte size compared against the committed originals, plus
+  per-pixel difference statistics at full and rendered sizes and a visual side-by-side inspection.
+- Offline reopen tested by killing the origin after the service worker took control, rather than
+  putting the browser offline, so the precache is what serves the navigation.
+
+##### Findings
+
+- Criterion "no single cold-load response over 150 KiB" — PASS. Largest measured response is
+  `assets/index-DcIpjXI8.js` at 100,758 B under preview, and 116,614 B (113.9 KiB) when
+  re-compressed at nginx's default gzip level. The React split into `react-vendor` is what buys
+  this: the pre-split entry chunk was the 162.2 KiB response PLAN.md recorded.
+- Criterion "cold load transfers < 500 KiB" — PASS on the production serving configuration, at an
+  estimated 446 KiB, and only there. The number and the mechanism recorded in the repository are
+  wrong; see finding 1. The criterion itself is met.
+- Criterion "`assets/iconWorker-*.js` is no longer precached" — PASS, confirmed twice: the built
+  `dist/service-worker.js` manifest lists 19 entries with no `iconWorker`, and the browser made no
+  request for it during a full cold load with the precache installing.
+- Criterion "PWA icons stay 192×192 and 512×512 with `purpose: \"any maskable\"`" — PASS, read from
+  the served `manifest.webmanifest` at runtime: `192x192 image/png purpose=any maskable` and
+  `512x512 image/png purpose=any maskable`. The files themselves are still exactly 192×192 and
+  512×512 on disk.
+- Criterion "icons and logo visually unchanged at rendered sizes" — PASS. `icon-192.png` is
+  bit-for-bit identical in rendering: zero channel difference at 192, 64 and 32 px, so that
+  re-encode really is lossless. `icon-512.png` and the logo were converted to 256-colour indexed
+  PNGs, which is lossy: at full size the 512 icon peaks at a 47/255 channel delta with a mean of
+  3.8, and the logo peaks at 30 with a mean of 3.8. At the sizes they are actually rendered the
+  deltas fall to 24 at 192 px and 16 at 96 px for the icon, and 14 at the logo's 44 px render.
+  Because indexed-colour conversion risks visible banding in this artwork's neon gradients rather
+  than random noise, the images were also inspected directly, side by side at 192 px and at 1:1 on
+  a gradient-heavy crop of the 512 icon: the neon strokes, glow falloff, star field and background
+  gradient all read the same, with no banding introduced. The savings are large — 515,411 B to
+  46,073 B for the 512 icon, 130,144 B to 15,989 B for the logo, 74,777 B to 55,883 B for the 192
+  icon.
+- Criterion "the app still installs and opens offline" — PASS. With the origin killed after the
+  service worker took control, a reload of `/lists/<id>` was served from the precache and rendered
+  the cached `Offline oats` entry, with Exo 2 and Orbitron loaded from Cache Storage and every text
+  box matching the online measurements.
+- The `service-worker.js` change adding `NavigationRoute(createHandlerBoundToURL("/index.html"))`
+  is outside T-006's declared file scope but is defensible and safe. It mirrors what
+  `docker/nginx.conf:24` already does with `try_files $uri $uri/ /index.html`, so online navigation
+  semantics are unchanged; `/api/` calls are not navigations and are unaffected; and the existing
+  `skipWaiting()` plus `clientsClaim()` keep a redeploy picking up the new revisioned shell. Worth
+  noting that offline reopen also worked before this change, so it hardens the path rather than
+  repairing it.
+- The four new tests added this round are inside the describe block and are meaningful: the icon
+  assertions would fail if a re-encode changed the declared sizes or dropped `any maskable`, the
+  `globIgnores` assertion pins the exclusion, the `manualChunks` test calls the real function with
+  a React module id, and the navigation-route assertion pins the shell fallback.
+- Precache weight is down sharply: 19 entries at 834.41 KiB uncompressed against 1845.94 KiB
+  before, despite T-005 having added 124.84 KiB of fonts to it.
+
+##### Risks
+
+- The 446 KiB production estimate is modelled, not measured against the real nginx image: preview's
+  own compression was used for the fonts and images, with the text assets re-compressed at gzip
+  level 1 to match `docker/nginx.conf`. A measurement against the actual container would be the
+  authoritative figure, and would also settle whether nginx's level-1 gzip is worth raising given
+  the headroom is about 11 %.
+- The budget's dependence on `Cache-Control: immutable` is now load-bearing and undocumented. If
+  the deployment ever serves hashed assets without it, the cold load jumps by roughly 227 KiB to
+  about 640 KiB and silently breaks the criterion. Finding 1's documentation fix is what guards
+  against that.
+- The 512 icon and the logo are lossy re-encodes. They were judged visually equivalent at rendered
+  sizes, but that judgement was made on one display; the 512 icon in particular is also used at
+  install and splash sizes that were not inspected on a real device.
+- PostgreSQL and Docker remain unavailable, so DB-backed Playwright specs, a live-backend pass and
+  a real nginx-served measurement could not run. Unchanged across this cycle.
+
+#### Verdict
+
+`FAIL`
+
+### Review Round 2
+
+Status: **complete**
+
+Reviewed: 2026-09-22
+
+Scope: the rework against Round 1's two required fixes. Both are documentation and process
+corrections; no source or asset file changed, which was re-confirmed rather than assumed.
+
+#### Findings
+
+1. `nit` — `frontend/src/vite-config.test.ts:93` — not a required fix.
+   Unchanged from Round 1 and from the T-005 review: the WOFF2 precache test still sits outside
+   the `describe` block, trailing its closing brace mid-file. It runs and passes as a root-level
+   test. Worth folding in whenever this file is next touched.
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps
+
+- `npm run lint` — PASS (0 errors; the pre-existing `react-refresh` warning in `AuthContext.tsx`).
+- `npm run build` — PASS; precache 19 entries, 834.41 KiB, unchanged from Round 1.
+- `npx vitest run --environment jsdom` (frontend) — PASS 616/616 across 41 files, exit 0.
+- `npm test --workspace backend` — PASS 174/174.
+- `git diff HEAD --stat -- frontend/` compared against Round 1 to confirm no source or asset file
+  moved: the three PNGs at identical byte counts, `service-worker.js` +4, `vite-config.test.ts`
+  +24, `vite.config.ts` +14 — the same diff Round 1 reviewed.
+- `git diff HEAD -- .ai/PLAN.md` to confirm the plan is back to its committed state.
+- Cold-load measurement re-run against `vite preview` of a fresh build, to check the figures the
+  README now publishes actually reproduce.
+
+##### Findings
+
+- Round 1 finding 2 — **resolved**. `.ai/PLAN.md` is byte-identical to `HEAD`; the edits asserting
+  "verified HTTP-cache payload reuse" and the added `service-worker.js` scope line are gone. The
+  plan is the planner's again.
+- Round 1 finding 1 — **resolved**, and the replacement text is accurate rather than merely
+  softened. Every figure in the new `README.md` section reproduces exactly against an independent
+  re-measurement: 25 responses, **655,775 B (640.4 KiB)** on preview; **427,883 B (417.9 KiB)**
+  counting each path once; largest response at nginx's gzip level **116,614 B (113.9 KiB)**; and
+  the modelled production cold load of about **446 KiB**. These match the reviewer's own numbers
+  byte for byte.
+- The rewrite also fixes the reasoning, not just the number. It states plainly that the preview
+  measurement "exceeds the target and does not represent the deployed cache behavior", names
+  `docker/nginx.conf` and its `Cache-Control: public, immutable` as the reason the precache install
+  reuses the page's responses, explains the gzip level-6 to level-1 adjustment, and closes by
+  saying this is "a model based on the repository's Nginx configuration, not a measurement against
+  a running Nginx image, and the under-500-KiB target depends on those immutable cache headers".
+  That last sentence is the one that matters: the budget's dependence on a deployment header is now
+  documented where someone changing the serving config will see it, which was the substance of the
+  finding.
+- No functional re-verification was necessary and none of Round 1's results are stale: the frontend
+  diff is unchanged, so the Round 1 findings stand — no response over 150 KiB, `iconWorker` absent
+  from the 19-entry manifest and never requested, manifest icons still 192×192 and 512×512 with
+  `purpose: "any maskable"`, offline reopen rendering the cached entry from the precache, the
+  192 icon a bit-for-bit lossless re-encode, and the lossy 512 icon and logo visually equivalent at
+  rendered sizes. The re-measurement confirmed the precache exclusion and manifest icons again in
+  passing.
+- With this task the cycle's six tasks are complete. The cold load is down from the 1266.7 KiB
+  recorded during the T-001 review to roughly 446 KiB modelled on the production configuration,
+  with no third-party host on the critical path.
+
+##### Risks
+
+- Carried forward unchanged from Round 1: the 446 KiB figure is modelled from
+  `docker/nginx.conf` rather than measured against a running nginx image, and the budget now
+  depends on that config keeping `Cache-Control: public, immutable` on hashed assets. A
+  measurement against the real container remains the authoritative check, and is the natural first
+  step if the budget is ever revisited — nginx's unset `gzip_comp_level` is the obvious lever if
+  the roughly 11 % headroom needs widening.
+- The 512 icon and the logo remain lossy re-encodes judged on one display; install and splash sizes
+  on a real device were not inspected.
+- PostgreSQL and Docker remain unavailable, so DB-backed Playwright specs, a live-backend pass and
+  the real nginx measurement could not run. Unchanged across this cycle.
+- Board hygiene, not a defect in this task: the T-005 row still carries `implement` in its Next
+  Role column although its status is `done`. It does not block `aide cycle end`, which checks
+  status rather than owner.
+
+#### Verdict
+
+`PASS_WITH_NOTES`
