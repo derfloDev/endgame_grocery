@@ -104,6 +104,11 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
   const checkAndDrain = useCallback(async (): Promise<void> => {
     if (!mountedRef.current || activeRun.current || blockedRef.current) return;
     const generation = generationRef.current;
+    // A real request or live stream already establishes reachability. Only queue work
+    // needs an explicit probe, avoiding a health request on every empty-queue startup.
+    const pending = await listOfflineMutations();
+    if (!mountedRef.current || generation !== generationRef.current || activeRun.current || blockedRef.current) return;
+    if (pending.length === 0 && getIsOnline() !== false) return;
     const online = await ensureFreshState(probeTimings);
     if (!mountedRef.current || generation !== generationRef.current) return;
     if (online) await drainQueue();

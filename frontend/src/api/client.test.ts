@@ -241,7 +241,9 @@ describe("request deadlines", () => {
   });
 
   it("aborts a hanging read after ten seconds and returns cached data", async () => {
-    fetchMock.mockReturnValue(new Promise(() => {}));
+    fetchMock.mockImplementation((input) => input === "/api/health"
+      ? Promise.resolve({ ok: false, status: 503, json: async () => ({}) })
+      : new Promise(() => {}));
     const pending = sendJsonRequest("/api/lists", { cacheKey: "lists" });
     const signal = fetchMock.mock.calls[0][1]!.signal!;
     await vi.advanceTimersByTimeAsync(9999);

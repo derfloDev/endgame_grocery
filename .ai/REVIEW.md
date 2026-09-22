@@ -517,3 +517,378 @@ None.
 #### Verdict
 
 `PASS_WITH_NOTES`
+
+## Task: T-004
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-09-21
+
+Scope: working-tree changes to `OfflineQueueContext.tsx`, `request.ts`, `OfflineQueueContext.test.tsx`
+and `README.md`, against PLAN.md Phase 4.
+
+The primary criterion is met and the queue path is intact. Review fails on a regression to the
+third criterion, "offline banner and recovery behaviour unchanged", demonstrated by a before/after
+build comparison rather than inferred.
+
+#### Findings
+
+1. `blocker` — `frontend/src/api/request.ts:33` — required fix.
+   The offline banner no longer appears when the backend is unreachable while the browser still
+   reports itself online. Demonstrated by building and running both revisions against the same
+   scenario — every `/api/*` request aborted with `connectionrefused`, `navigator.onLine` true,
+   empty queue:
+
+   | Build | `/api/health` probes | "Offline mode" banner |
+   | --- | --- | --- |
+   | HEAD (before T-004) | 1 | present |
+   | working tree (T-004) | 0 | **absent** |
+
+   The mechanism: `reportRequestOutcome("network-error")` only sets `stale`, never
+   `isOnline = false` (`connectivity.ts:45`), and the banner renders on `getIsOnline() === false`
+   (`OfflineQueueContext.tsx:137`). Publishing `false` requires a probe. Removing the mount probe
+   therefore removes the only thing that published it, and the compensating probe added to
+   `request.ts` is gated on `navigator.onLine === false`, which is exactly the case this scenario
+   is not. A backend restart, a captive portal, a dropped VPN or a DNS failure all leave
+   `navigator.onLine` true, so this is the common shape of the problem the banner exists for —
+   the `navigator.onLine === false` case is the one the browser already signals clearly.
+   The user is not left with nothing: the detail page still shows "Offline list data is
+   unavailable." from the per-response fallback. But the app's global connectivity indicator is
+   gone in the scenario where it is most useful, so this is a behaviour regression against a
+   stated acceptance criterion, not a cosmetic one.
+
+   Recovery is affected in the same way and for the same reason: once `isOnline === false` has
+   been published, an `online` event with an empty queue now returns early before
+   `ensureFreshState`, so the banner clears only when a real request happens to succeed or SSE
+   reopens, rather than on the event itself.
+
+   Two shapes of fix, both inside T-004's own files and neither needing the planner. They are
+   offered as analysis, not a prescription — the implementer should pick:
+   - Drop the `navigator.onLine === false` gate in `request.ts`, so any network-errored request
+     refreshes reachability. `probeReachability` already dedupes in-flight calls and rate-limits
+     to one per `REACHABILITY_PROBE_MIN_INTERVAL_MS`, so the cost stays bounded, and a healthy
+     load has no failed request to trigger it — criterion 1 was measured at 0 probes on a healthy
+     load and would stay there.
+   - And for the recovery direction, let `checkAndDrain` skip the probe only while reachability is
+     not already known to be false — for example gate the empty-queue early return on
+     `getIsOnline() !== false` — so a known-offline app still re-probes on `online`, `focus`,
+     `pageshow` and `visibilitychange`, while a healthy startup still probes zero times.
+
+2. `major` — `frontend/src/api/request.ts:30` — required fix.
+   The new `request.ts` behaviour ships with no test at all. There is no `request.test.ts`, and no
+   existing suite asserts either that a network-errored request triggers `probeReachability()`
+   when `navigator.onLine === false`, or that it does not when `navigator.onLine` is true. That
+   gate is the entire compensation for removing the mount probe, and it is the code finding 1
+   shows is wrong — an untested branch that is load-bearing for an acceptance criterion. AGENTS.md
+   requires tests for each changed behaviour, written before the implementation. Whatever shape
+   finding 1's fix takes, it needs coverage that pins the banner outcome, ideally at the
+   `OfflineQueueContext` level where `isOffline` is observable, so the assertion is about
+   behaviour rather than about which function was called.
+
+3. `nit` — `frontend/src/api/request.ts:33` — not a required fix, and it disappears if finding 1
+   is fixed by dropping the gate.
+   `typeof navigator === "undefined" || navigator.onLine === false` probes when `navigator` is
+   absent. Harmless in practice, but it means a non-browser environment takes the probe path for a
+   reason unrelated to reachability.
+
+#### Required Fixes
+
+1. Restore the offline banner when the backend is unreachable while `navigator.onLine` is true,
+   and restore probe-on-recovery for a known-offline app, without reintroducing the empty-queue
+   startup probe (finding 1).
+2. Add test coverage for the reachability-refresh behaviour in `request.ts` and for the banner
+   outcome in both connectivity scenarios (finding 2).
+
+#### Verification
+
+##### Steps
+
+- `npm run lint` — PASS (0 errors; the pre-existing `react-refresh` warning in `AuthContext.tsx`).
+- `npm run build` — PASS.
+- `npx vitest run --environment jsdom` (frontend) — PASS 606/606 across 41 files, exit 0.
+- Backend tests were not re-run for this task: no backend file is touched, and the suite passed at
+  174/174 in the T-003 review on the same backend tree.
+- Real-browser scenarios against `vite preview` of the production build on port 4318, with the
+  service worker and the SSE endpoint blocked so probe counting is unambiguous, counting
+  `/api/health` through `page.on("request")` rather than through the route handler so that
+  requests failing below the routing layer are still counted.
+- Before/after comparison for finding 1: the three changed source files were stashed, the frontend
+  rebuilt, the same scenario re-run against the baseline, then the stash popped and the frontend
+  rebuilt again. Working tree confirmed restored.
+- Source review of the diff, and a trace of `reportRequestOutcome`, `probeReachability`,
+  `ensureFreshState`, `getIsOnline` and the `isOffline` consumers.
+
+##### Findings
+
+- Criterion "no `/api/health` request on mount with an empty queue" — PASS. A healthy load of
+  `/lists/<id>` with an empty queue issued **0** `/api/health` requests, measured over a 4 s settle
+  after network idle. This is the point of the task and it works.
+- Criterion "a queued mutation still probes, drains, and retries" — PASS, verified end to end in
+  the browser without reloading the page: going offline and marking an entry done queued the
+  write, triggered exactly **1** probe, and showed "Offline mode: 1 change waiting to sync."
+  Restoring connectivity and firing the `online` event triggered **1** further probe, drained the
+  queue, cleared the banner and restored the entry from the server response.
+- Criterion "offline banner and recovery behaviour unchanged" — **FAIL**. See finding 1 and the
+  before/after table.
+- The `OfflineQueueContext.tsx` change itself is exactly what PLAN.md Phase 4 asked for and is
+  correctly written: the queue is read before `ensureFreshState`, and the early return re-checks
+  `mountedRef`, the generation, `activeRun` and `blockedRef` after the await, so the generation
+  guard semantics survive the new suspension point. Retry scheduling for the non-empty case is
+  untouched. Had the change stopped there, the only gap would be the banner, which is what
+  `request.ts` was reaching for.
+- The test adaptations are legitimate and do not weaken anything. Moving
+  `currentMutations = [createMutation()]` above the render in the parametrised wake-event test is
+  required now that an empty queue no longer probes at mount; the test still asserts offline
+  detection and then a drain on each of the six events. The extra `listOfflineMutations` mock in
+  the stalled-read test matches the new read, and the added
+  `waitFor(fetchMock).toHaveBeenCalledWith("/api/health", …)` in the unmount test makes that test
+  stricter, not looser. The new "does not probe reachability on mount when the queue is empty"
+  test directly covers criterion 1.
+- `README.md` is accurate for the shipped `OfflineQueueContext` behaviour and correctly states
+  that an empty queue does not trigger a startup probe. Its sentence "A failed real request also
+  refreshes the shared reachability state so the offline banner remains accurate" overstates what
+  ships, since the refresh only happens when `navigator.onLine` is false; it should be revised
+  alongside finding 1 so the documentation and the behaviour agree.
+- Probe volume from the new `request.ts` path is bounded: `probeReachability` returns the in-flight
+  promise when one exists and otherwise short-circuits within
+  `REACHABILITY_PROBE_MIN_INTERVAL_MS`, so a burst of failing requests cannot produce a probe
+  storm. This remains true if the gate is dropped.
+
+##### Risks
+
+- The scenarios blocked the service worker and `/api/events`. Blocking SSE is deliberate and
+  material here: an open stream calls `confirmOnline()` and would mask exactly the state
+  transitions under test. In production a list page with a live stream will often recover the
+  banner on its own, which narrows but does not remove finding 1 — the stream is lost in the same
+  situations that make the backend unreachable, and pages without a stream have no such recovery.
+- PostgreSQL and Docker remain unavailable, so DB-backed Playwright specs and a live-backend pass
+  could not run.
+- The before/after comparison required rebuilding the frontend twice. The working tree was
+  confirmed byte-identical to its pre-comparison state afterwards, and no committed file was
+  touched.
+
+#### Verdict
+
+`FAIL`
+
+### Review Round 2
+
+Status: **complete**
+
+Reviewed: 2026-09-21
+
+Scope: the rework of `OfflineQueueContext.tsx`, `request.ts` and `OfflineQueueContext.test.tsx`
+against Round 1's two required fixes.
+
+Both Round 1 required fixes are genuinely resolved and were re-measured, not assumed. Review fails
+on one residual instance of the same acceptance criterion, found by continuing to test that
+criterion rather than stopping at the two scenarios Round 1 happened to use.
+
+#### Findings
+
+1. `major` — `frontend/src/api/request.ts:33` — required fix.
+   The reachability refresh is now gated on `error instanceof TypeError || error.message ===
+   "Failed to fetch"`, which excludes the `AbortError` / `TimeoutError` half of
+   `isNetworkError` (`request.ts:4`). So a backend that accepts connections but never answers —
+   requests hitting the 10 s deadline instead of being refused — still produces no probe and no
+   offline banner. Measured both ways against the same scenario, every `/api/*` request accepted
+   and left unanswered, `navigator.onLine` true, empty queue:
+
+   | Build | `/api/health` probes | "Offline mode" banner |
+   | --- | --- | --- |
+   | HEAD (before T-004) | 1 | present |
+   | working tree (rework) | 0 | **absent** |
+
+   This is the same criterion and the same mechanism as Round 1 finding 1, with a different
+   trigger: a hung or overloaded backend rather than a refused connection. It is narrower than the
+   Round 1 case and the user still sees "Offline list data is unavailable." on the page, which is
+   why it is `major` rather than `blocker`.
+
+   The exclusion is not arbitrary and should not simply be deleted. `isNetworkError` conflates two
+   very different aborts: the request's own 10 s deadline, which is real evidence of
+   unreachability, and a `parentSignal` cancellation from the drain or from unmount, which is
+   deliberate and must not trigger a probe — the unmount test exists to guard exactly that, and
+   `requestJson` wires `parentSignal` to `deadline.abort`, so a parent cancellation also shows up
+   as a deadline abort. The discriminator is already in scope at the catch site: probe when the
+   deadline fired and the parent did not cancel, for example
+   `deadline.signal.aborted && !parentSignal?.aborted`. That keeps the unmount and drain-cancel
+   behaviour the current gate was protecting while restoring the banner for a hung backend.
+
+   If the timeout case is deliberately out of scope, that is a legitimate call — but it belongs to
+   the planner as a narrowing of "offline banner and recovery behaviour unchanged", not to a gate
+   whose stated reason is probe-timer hygiene.
+
+2. `nit` — `README.md:287` — not a required fix.
+   "A failed real request also refreshes the shared reachability state so the offline banner
+   remains accurate" is now true for refused connections and false for timeouts. Whatever shape
+   finding 1's fix takes, this sentence should end up matching it.
+
+#### Required Fixes
+
+1. Refresh reachability after a request that fails on its own deadline, while continuing to
+   ignore deliberate `parentSignal` cancellations, and cover it with a test that asserts the
+   banner outcome (finding 1).
+
+#### Verification
+
+##### Steps
+
+- `npm run lint` — PASS (0 errors; the pre-existing `react-refresh` warning in `AuthContext.tsx`).
+- `npm run build` — PASS.
+- `npx vitest run --environment jsdom` (frontend) — PASS 608/608 across 41 files, exit 0.
+- Backend tests not re-run: no backend file is touched.
+- Four real-browser scenarios against `vite preview` of the production build, service worker and
+  `/api/events` blocked, `/api/health` counted through `page.on("request")`.
+- Queued-mutation path re-run in the browser, because `checkAndDrain` changed again in this round.
+- Before/after comparison for finding 1: `request.ts` and `OfflineQueueContext.tsx` stashed, the
+  frontend rebuilt, the hung-backend scenario run against the baseline, then the stash popped and
+  the frontend rebuilt again. Working tree confirmed restored.
+
+##### Findings
+
+- Round 1 finding 1 — **resolved**. With every `/api/*` request refused, `navigator.onLine` true
+  and an empty queue, the reworked build issues 1 probe and renders "Offline mode: cached data is
+  available.", identical to the HEAD baseline that Round 1 recorded. The scenario that failed
+  review now matches the behaviour it regressed from.
+- Recovery — **resolved**, and this is the part the new `getIsOnline() !== false` condition adds.
+  From a known-offline state with an **empty** queue, an `online` event now issues 1 probe and
+  clears the banner. Round 1's concern that recovery would wait for an incidental successful
+  request no longer applies.
+- Criterion "no `/api/health` on mount with an empty queue" — still PASS, 0 probes on a healthy
+  load over a 4 s settle after network idle. The new condition is correctly ordered: reachability
+  that is unknown (`null`) or `true` still skips the probe, so the task's actual objective is
+  intact and did not regress while fixing the banner.
+- Criterion "a queued mutation still probes, drains, and retries" — re-verified end to end after
+  the `checkAndDrain` change: an offline write queued, 1 probe, "Offline mode: 1 change waiting to
+  sync."; restoring connectivity and firing `online` gave 1 further probe, a drained queue, a
+  cleared banner and the entry restored from the server.
+- Criterion "offline banner and recovery behaviour unchanged" — **FAIL** for the timeout trigger
+  only. See finding 1.
+- Round 1 finding 2 — **resolved**. The rework adds two behaviour-level tests that pin the
+  outcomes rather than the call: "shows the offline state after a real request fails while the
+  browser is online" drives a real `requestJson` failure and asserts `is-offline` becomes true
+  with `/api/health` called, and "re-probes a known offline state on recovery events with an empty
+  queue" asserts the banner clears after `online` with the queue emptied and counts two health
+  calls. Both assert on `isOffline`, which is what the user sees. They would have failed against
+  the Round 1 code.
+- The `OfflineQueueContext.tsx` guard sequence remains correct after the second edit: the post-await
+  re-check of `mountedRef`, generation, `activeRun` and `blockedRef` is unchanged, and the new
+  `pending.length === 0 && getIsOnline() !== false` test is a pure addition after it.
+- No test was weakened in this round. The Round 1 adaptations stand, and the additions are new
+  cases.
+
+##### Risks
+
+- Blocking SSE in the scenarios is deliberate: an open stream calls `confirmOnline()` and would
+  mask the transitions under test. In production, a list page with a live stream recovers the
+  banner on its own, which narrows finding 1's practical impact further — though the stream is
+  lost in the same situations that make the backend unreachable.
+- The hung-backend scenario needed a 25 s settle to clear the 10 s request deadline plus the 5 s
+  probe deadline. Both builds were given the same budget.
+- PostgreSQL and Docker remain unavailable, so DB-backed Playwright specs and a live-backend pass
+  could not run.
+- The comparison rebuilt the frontend twice via `git stash`. The working tree was confirmed
+  restored afterwards and no committed file was touched.
+
+#### Verdict
+
+`FAIL`
+
+### Review Round 3
+
+Status: **complete**
+
+Reviewed: 2026-09-22
+
+Scope: the rework of `request.ts` against Round 2's single required fix, plus a re-run of every
+scenario from Rounds 1 and 2 and a cross-task regression check, since `request.ts` is on the path
+of every API call in the app.
+
+#### Findings
+
+None.
+
+#### Required Fixes
+
+None.
+
+#### Verification
+
+##### Steps
+
+- `npm run lint` — PASS (0 errors; the pre-existing `react-refresh` warning in `AuthContext.tsx`).
+- `npm run build` — PASS.
+- `npx vitest run --environment jsdom` (frontend) — PASS 609/609 across 41 files, exit 0.
+- Backend tests not re-run: no backend file is touched.
+- All four connectivity scenarios re-run in the browser against `vite preview` of the production
+  build — healthy, refused, recovery from known-offline with an empty queue, and hung backend —
+  with the service worker and `/api/events` blocked and `/api/health` counted through
+  `page.on("request")`.
+- Queued-mutation path re-run end to end, because `request.ts` now probes on deadline aborts and
+  the drain cancels through `parentSignal`.
+- T-003's cache-first scenarios re-run as a cross-task regression check.
+- Source review of the new condition and its interaction with `parentSignal`, `deadline`, the
+  drain abort and the unmount path.
+
+##### Findings
+
+- Round 2 finding 1 — **resolved**. The fix is the discriminator the review identified:
+  `deadline.signal.aborted && !parentSignal?.aborted`. With every `/api/*` request accepted and
+  left unanswered, `navigator.onLine` true and an empty queue, the build now issues 1 probe and
+  renders "Offline mode: cached data is available.", matching the HEAD baseline measured in
+  Round 2. The timeout trigger and the refused trigger now behave identically.
+- The exclusion that made Round 2 fail is preserved where it was correct. A `parentSignal`
+  cancellation — unmount, or the drain's abort — still suppresses the probe, because
+  `requestJson` wires `parentSignal` to `deadline.abort` and the new condition requires the parent
+  *not* to have aborted. The unmount test that guards a probe timer surviving teardown still
+  passes, and the queued-mutation run showed no spurious probe around drain cancellation.
+- Criterion "no `/api/health` on mount with an empty queue" — PASS, still 0 probes on a healthy
+  load over a 4 s settle after network idle. Three rounds of fixes to the banner have not eroded
+  the task's actual objective.
+- Criterion "a queued mutation still probes, drains, and retries" — PASS, re-verified after this
+  round's change: offline write queued, 1 probe, "Offline mode: 1 change waiting to sync.";
+  restoring connectivity and firing `online` gave 1 further probe, a drained queue, a cleared
+  banner and the entry restored from the server.
+- Criterion "offline banner and recovery behaviour unchanged" — PASS. All four scenarios now match
+  the pre-T-004 baseline: refused 1 probe with banner, hung 1 probe with banner, recovery from
+  known-offline clears the banner on the `online` event with an empty queue, healthy 0 probes and
+  no banner.
+- Probe volume stays bounded under the widened trigger. The hung-backend run issued exactly 1
+  probe across 25 s despite several requests reaching their deadlines, confirming that
+  `probeReachability`'s in-flight dedupe and minimum interval absorb the new call site rather than
+  multiplying it.
+- Cross-task check: T-003's behaviour is unaffected by the shared-path change. Cached entries and
+  title rendered at 367 ms with no spinner while the network was held, the server payload replaced
+  them at 6296 ms, the offline fallback still produced its banner and cached content, and a cache
+  miss still showed the loading state until the network answered.
+- The new test "shows the offline state after a real request reaches its deadline" pins exactly the
+  Round 2 finding, at the observable level — it drives a real `requestJson` with a 1 ms deadline and
+  asserts `is-offline` becomes true with `/api/health` called. Together with the two tests added in
+  Round 2, all three connectivity outcomes are now covered by behaviour assertions rather than by
+  call spying.
+- The `client.test.ts` adjustment is a legitimate adaptation, not a weakening: the hanging-read
+  test now answers `/api/health` with a 503 because a deadline abort legitimately triggers a probe.
+  Its assertions about aborting at ten seconds and returning cached data are unchanged, and the
+  fallback still wins independently of the probe, which runs detached.
+- `README.md` is now accurate. The sentence "A failed real request also refreshes the shared
+  reachability state so the offline banner remains accurate" holds for both refused connections and
+  timeouts, and the parent-cancellation exclusion is an internal detail with no user-facing
+  behaviour to document. The Round 2 nit is resolved.
+
+##### Risks
+
+- Blocking SSE in the scenarios is deliberate, since an open stream calls `confirmOnline()` and
+  would mask the transitions under test. Production behaviour on a list page with a live stream is
+  therefore at least as good as measured here.
+- PostgreSQL and Docker remain unavailable, so DB-backed Playwright specs and a live-backend pass
+  could not run. Unchanged across this cycle.
+- Widening the probe trigger to deadline aborts means a genuinely slow-but-working connection can
+  now cost one extra `/api/health` request per five-second window while requests are timing out.
+  Measured at 1 probe per 25 s in the hung case, and the probe is small and cache-busting by
+  design, so this is a fair trade for an accurate banner.
+
+#### Verdict
+
+`PASS`

@@ -1,5 +1,5 @@
 import { abortable, createTimeoutSignal, REQUEST_TIMEOUT_MS } from "./connectionTimings";
-import { reportRequestOutcome } from "./connectivity";
+import { probeReachability, reportRequestOutcome } from "./connectivity";
 
 export function isNetworkError(error: unknown): boolean {
   return error instanceof TypeError ||
@@ -27,7 +27,16 @@ export async function requestJson<T = unknown>(
     }), deadline.signal);
     return { response, data: data as T };
   } catch (error) {
-    if (isNetworkError(error)) reportRequestOutcome("network-error");
+    if (isNetworkError(error)) {
+      reportRequestOutcome("network-error");
+      // A failed real request is useful evidence to refresh the shared offline state,
+      // including when there is no queued write waiting for the queue provider. A deadline
+      // abort is also evidence, but a parent cancellation from unmount or drain abort is not.
+      const ownDeadlineExpired = deadline.signal.aborted && !parentSignal?.aborted;
+      if (ownDeadlineExpired || error instanceof TypeError || (error instanceof Error && error.message === "Failed to fetch")) {
+        void probeReachability();
+      }
+    }
     throw error;
   } finally {
     deadline.cancel();
