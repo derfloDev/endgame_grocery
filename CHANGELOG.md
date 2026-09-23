@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.9.3](https://github.com/derfloDev/endgame_grocery/compare/v1.9.2...v1.9.3) (2026-09-23)
+
+
+### Performance Improvements
+
+* **assets:** cut the cold-load download weight of icons, logo and precache ([06fb35f](https://github.com/derfloDev/endgame_grocery/commit/06fb35f110b2e766f630958bff384eed03331fab))
+* **icons:** load the icon model on first use instead of at startup ([5c9d5df](https://github.com/derfloDev/endgame_grocery/commit/5c9d5df6e934b0795b28be98a3f5ef8e413cfe53))
+* **lists:** show list entries without waiting for member data ([6903cb9](https://github.com/derfloDev/endgame_grocery/commit/6903cb940cdd81df652fa20fed9460fe069ef01a))
+* **lists:** show the last known list contents instantly on open ([6adb763](https://github.com/derfloDev/endgame_grocery/commit/6adb7638948655a0d307aa6567f2a735c85b63bd))
+* **sync:** stop probing the server at startup when nothing is queued ([be3e774](https://github.com/derfloDev/endgame_grocery/commit/be3e774b17c65916af49d8ff169644a5464e47da))
+* **ui:** self-host the app fonts so the first paint needs no third-party request ([fa2078f](https://github.com/derfloDev/endgame_grocery/commit/fa2078f002b390350a5c59caba724a72fa447b0f))
+
+
+### Miscellaneous Chores
+
+* **ai:** close cycle ([7c5ca75](https://github.com/derfloDev/endgame_grocery/commit/7c5ca7588b09620b53be5b224ac795537c2f990d))
+
 ## [1.9.2](https://github.com/derfloDev/endgame_grocery/compare/v1.9.1...v1.9.2) (2026-09-20)
 
 
