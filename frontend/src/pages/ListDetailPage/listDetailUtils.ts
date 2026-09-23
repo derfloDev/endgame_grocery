@@ -1,5 +1,12 @@
 import type { DetailEntry } from "./useListDetailData";
 
+export class ListAccessError extends Error {
+  constructor() {
+    super("detail.accessError");
+    this.name = "ListAccessError";
+  }
+}
+
 /** Keep queued local entries absent from the server until sync can return their IDs. */
 export function mergePendingEntries(serverEntries: readonly DetailEntry[], currentEntries: readonly DetailEntry[]): DetailEntry[] {
   const serverIds = new Set(serverEntries.map((entry) => entry.id));
@@ -47,6 +54,10 @@ export function getChangeKind(entry: DetailEntry): "new" | "edited" | "done" | u
     : "new";
 }
 
-export function getErrorMessage(error: unknown): string {
+export function getErrorMessage(error: unknown, accessErrorMessage = "detail.accessError"): string {
+  if (error instanceof ListAccessError) {
+    return accessErrorMessage;
+  }
+
   return error instanceof Error ? error.message : String(error);
 }

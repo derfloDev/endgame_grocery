@@ -34,6 +34,17 @@ export default defineConfig({
     // transformers.js relies on the worker bundle staying ESM so ONNX runtime can register its backend.
     format: "es"
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (/[/\\]node_modules[/\\](?:react|react-dom|scheduler)[/\\]/.test(id)) {
+            return "react-vendor";
+          }
+        }
+      }
+    }
+  },
   test: {
     hookTimeout: 20000,
     testTimeout: 20000,
@@ -85,7 +96,11 @@ export default defineConfig({
         ]
       },
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,svg,png,webmanifest,json}"]
+        // Keep local WOFF2 fonts in the offline shell so typography remains available without a network connection.
+        // The icon-matching worker in iconWorkerClient.ts loads on first use, so skip downloading it during the initial precache.
+        // Hashed app chunks fetched for the page are reused from the HTTP cache during precache install.
+        globIgnores: ["**/assets/iconWorker-*.js"],
+        globPatterns: ["**/*.{js,css,html,svg,png,webmanifest,json,woff2}"]
       }
     })
   ]

@@ -77,7 +77,6 @@ export default function ListDetailPage(): ReactElement {
     submitEditEntry,
     toggleStatus
   } = useListDetailData({
-    accessErrorMessage: t("detail.accessError"),
     listId,
     onLoadStart: resetShareFeedback,
     onNonOwnerList: closeOwnerOnlySheets,
@@ -278,7 +277,7 @@ export default function ListDetailPage(): ReactElement {
         ) : null}
 
         {entryError && !shouldSuppressEntryError ? (
-          <div className="detail-banner eg-error-banner">{getErrorMessage(entryError)}</div>
+          <div className="detail-banner eg-error-banner">{getErrorMessage(entryError, t("detail.accessError"))}</div>
         ) : null}
         {isLoading ? <LoadingState rows={4} /> : null}
 

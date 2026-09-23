@@ -58,6 +58,42 @@ async function createEntryByApi(request, token, listId, text) {
 }
 
 test.describe("shopping lists", () => {
+  test("cold list visits do not request the icon model before first use", async ({ page, context }) => {
+    // Each test starts with empty caches; API fixtures avoid a PostgreSQL dependency.
+    await context.addInitScript(() => {
+      localStorage.setItem("endgame_grocery.auth_token", "e30.eyJzdWIiOiJ1c2VyLTEifQ.test");
+      localStorage.setItem("i18nextLng", "en");
+    });
+    await context.route((url) => url.pathname.startsWith("/api/"), async (route) => {
+      const pathname = new URL(route.request().url()).pathname;
+      const responses = {
+        "/api/config": { registrationEnabled: true },
+        "/api/auth/me": { id: "user-1", display_name: "Cold Load Tester" },
+        "/api/lists": { lists: [{ id: "list-1", name: "Cold Pantry", is_owner: true }] },
+        "/api/lists/list-1/entries": { entries: [{ id: "entry-1", text: "Milk", status: "open" }] },
+        "/api/lists/list-1/history": { history: [] },
+        "/api/lists/list-1/members": { members: [] }
+      };
+      await route.fulfill({ json: responses[pathname] ?? {} });
+    });
+    const modelRequests = [];
+    context.on("request", (request) => {
+      const host = new URL(request.url()).hostname;
+      if (["huggingface.co", "hf.co", "cdn.jsdelivr.net"].some((domain) =>
+        host === domain || host.endsWith(`.${domain}`))) {
+        modelRequests.push(request.url());
+      }
+    });
+    const workers = [];
+    page.on("worker", (worker) => workers.push(worker.url()));
+    await page.goto("/lists/list-1");
+    await expect(page.getByText("Milk", { exact: true })).toBeVisible();
+    // Allow idle callbacks and worker startup to run after the list becomes visible.
+    await page.waitForTimeout(1500);
+    expect(workers).toEqual([]);
+    expect(modelRequests).toEqual([]);
+  });
+
   test("keeps overview controls visible without clipping the brand", async ({ page, request }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await setupLoggedInUser(page, request);

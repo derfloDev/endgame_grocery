@@ -1,365 +1,354 @@
 # Plan
 
-Status: **ready_for_implement**
+Status: **ready**
 
-Goal: make the PWA survive mobile lifecycle events as defined in `ROADMAP.md` — a backgrounded tab
-reconnects and resynchronizes by itself, and queued offline writes reach the server without a manual
-reload.
+Revision 2 — replanned 2026-09-20 after the T-001 review (`rework_plan`). Two findings were
+escalated to the planner and are resolved here; see "Replan decisions" below.
+
+Goal: implement the scope defined in `ROADMAP.md` — remove the blocking work from the cold
+start of `/lists/<id>` so entries are visible immediately, without losing icon suggestions,
+offline behaviour or i18n.
+
+## Replan decisions
+
+Both decisions were taken by the user on 2026-09-20 in response to `.ai/REVIEW.md` findings 1
+and 2 for T-001.
+
+1. **No idle warm-up ships.** The roadmap's optional connection-gated idle prefetch is dropped
+   outright. `warmIconWorkerWhenIdle()`, its unit tests, its `ListDetailPage.test.tsx`
+   assertions and the README sentence describing it are removed. The icon model is fetched on
+   sheet open and nowhere else. This removes the contradiction the reviewer identified: an
+   automatic warm-up cannot coexist with "a cold load issues no model-host request", and a
+   helper with no call site is dead code. The `saveData` / `2g` / `3g` criterion disappears with
+   the helper, since there is no longer a speculative download to gate.
+2. **The `< 500 KiB` transfer budget moves to a new task, T-006.** It is unreachable from
+   T-001's four files: the measured 1266.7 KiB is `icon-512.png`, the precached but never
+   executed `iconWorker-*.js` chunk, a double-fetched main bundle, the logo, the PWA icons and
+   the Google Fonts pair. T-006 owns the static assets and the precache manifest; T-005 removes
+   the font weight. The budget is verified once both have landed.
 
 ## Scope
 
-Four tasks, one per roadmap priority, in dependency order:
+Six tasks, derived from the Lighthouse run of 2026-09-20 recorded in `ROADMAP.md` and from the
+cold-load measurement taken during the T-001 review:
 
-| Task | Scope | Depends on |
-| --- | --- | --- |
-| T-001 | SSE reconnect manager with backoff, heartbeat watchdog, lifecycle-triggered reconnect | — |
-| T-002 | Resync of the active view after reconnect / foreground return, pending entries preserved | T-001 |
-| T-003 | Reachability-based connectivity state replacing bare `navigator.onLine` | T-001 |
-| T-004 | Request timeouts and queue retry with backoff | T-003 |
+| Task | Subject |
+| --- | --- |
+| T-001 | Icon model no longer loads during the cold start |
+| T-002 | Detail page loads each endpoint once and renders entries without waiting for members |
+| T-003 | Cached list data renders immediately, network response replaces it |
+| T-004 | No startup reachability probe when the offline queue is empty |
+| T-005 | Self-hosted fonts, precached, no third-party render blocking |
+| T-006 | Static assets and precache manifest trimmed to a real transfer budget |
 
-Decisions locked in during roadmap refinement:
-- Keep `EventSource`; no WebSocket migration, no polling fallback.
-- Full resync on reconnect/foreground; no backend event IDs and no `Last-Event-ID` replay buffer.
-- Reachability probe against the existing `GET /api/health` is the source of truth; `navigator.onLine`
-  is only a hint.
-- Retry with backoff plus request timeouts; no Background Sync API.
+T-002 lands before T-003: cache-first rendering builds on a load path that runs once.
+T-006 is verified after T-005, because the font weight is part of the same budget; it can be
+implemented at any point, but its transfer criterion is only meaningful once T-005 has landed.
+T-001, T-004 and T-005 are independent of the others and of each other.
 
-## Shared foundations
+## Acceptance Criteria
 
-### Timing constants
+Verified in a Chrome incognito window with no extensions, mobile Lighthouse, on `/lists/<id>`
+with an authenticated session. Cold start means Cache Storage and IndexedDB cleared first.
 
-New file `frontend/src/api/connectionTimings.ts` — every value a named export, all consumers import
-from here, and both providers accept an optional `timings` prop that defaults to these values so tests
-never depend on real wall-clock delays.
+1. A cold load issues no request to `huggingface.co`, `hf.co`, `cdn.jsdelivr.net`,
+   `fonts.googleapis.com` or `fonts.gstatic.com`. (T-001, T-005)
+2. Total transfer of a cold load is below 500 KiB, and no single cold-load response exceeds
+   150 KiB. Owned by T-006, verified after T-005 has landed.
+3. Each of `/api/lists`, `/api/lists/:id/entries`, `/api/lists/:id/history`,
+   `/api/lists/:id/members`, `/api/lists/:id/mark-viewed` is requested exactly once per visit.
+4. Entries become visible as soon as `/entries` has responded; `/members` does not delay them.
+5. With a populated cache, entries are visible as soon as the asynchronous cache read completes,
+   without waiting for the network and with no spinner while cached content is displayed.
+6. `/api/health` is not requested at startup while the offline queue is empty.
+7. Adding an entry still yields an icon suggestion, with a visible loading state while the
+   model is still being fetched.
+8. Typography is visually unchanged and the app renders with its own fonts while offline.
+9. Offline reads, the mutation queue, SSE resync and push behave as before.
+10. The PWA still installs and still works offline after the precache exclusions in T-006.
 
-| Constant | Value | Reason |
-| --- | --- | --- |
-| `SSE_RECONNECT_BASE_DELAY_MS` | `1_000` | first retry is fast enough to be invisible |
-| `SSE_RECONNECT_MAX_DELAY_MS` | `30_000` | bounds battery drain while backgrounded |
-| `SSE_RECONNECT_JITTER_RATIO` | `0.3` | avoids synchronized reconnect storms after an outage |
-| `SSE_HEARTBEAT_TIMEOUT_MS` | `45_000` | 1.5x the 30 s server heartbeat, tolerates one lost ping |
-| `REQUEST_TIMEOUT_MS` | `10_000` | a mobile request past this is effectively offline |
-| `REACHABILITY_PROBE_TIMEOUT_MS` | `5_000` | probe must answer faster than a normal request |
-| `REACHABILITY_PROBE_MIN_INTERVAL_MS` | `5_000` | rate limit against wake-up trigger bursts |
-| `RESYNC_DEDUPE_WINDOW_MS` | `2_000` | collapses reconnect + visibilitychange into one resync |
-| `QUEUE_RETRY_BASE_DELAY_MS` | `1_000` | first drain retry right after a failed wake-up attempt |
-| `QUEUE_RETRY_MAX_DELAY_MS` | `60_000` | upper bound for a long outage |
-| `QUEUE_DRAIN_STALL_TIMEOUT_MS` | `30_000` | releases a drain guard that never resolved |
-
-### Timeout signal helper
-
-`AbortSignal.timeout` is not reliably present on the jsdom global used by Vitest, so requests use a
-local helper instead: `createTimeoutSignal(ms)` in `frontend/src/api/connectionTimings.ts`, built from
-`AbortController` + `setTimeout`, returning `{ signal, cancel }` so the timer is always cleared. It is
-driven by fake timers in tests.
-
-### Connectivity module
-
-New file `frontend/src/api/connectivity.ts` — a provider-free singleton so the SSE layer and the
-offline queue can share one connectivity truth without React coupling (`EventSourceProvider` wraps
-`OfflineQueueProvider` in `frontend/src/main.tsx:24`, but the existing standalone provider tests must
-keep rendering each provider in isolation):
-
-- `reportStreamState("open" | "lost")` — called by the SSE reconnect manager.
-- `reportRequestOutcome("ok" | "network-error")` — called by `sendJsonRequest` and the queue drain.
-- `probeReachability()` — `fetch("/api/health", { cache: "no-store", signal })` with
-  `REACHABILITY_PROBE_TIMEOUT_MS`; de-duplicates in-flight probes and returns the cached result inside
-  `REACHABILITY_PROBE_MIN_INTERVAL_MS`.
-- `ensureFreshState()` — probes only when the cached state is stale or unknown.
-- `getIsOnline()` / `subscribe(listener)` — read and observe the derived state.
-- `resetConnectivityForTests()` — clears cached state, in-flight probe and listeners.
-
-Derivation rule: an open SSE stream means online without probing; a lost stream, a failed request or a
-`navigator.onLine` transition marks the state stale and the next `ensureFreshState()` probes.
-`navigator.onLine === false` alone never forces offline without a failed probe, because mobile browsers
-report it wrongly in both directions.
-
-## Task T-001 — SSE reconnect manager
-
-Problem: `frontend/src/context/EventSourceContext.tsx:98` closes the stream for good once
-`readyState === CLOSED`, with no path back except a token change or a page reload. There is also no
-client-side liveness check, so a half-open mobile connection is never detected.
-
-Backend prerequisite: the browser `EventSource` API surfaces no JS event for SSE comment lines, so the
-current `:heartbeat\n\n` (`backend/src/routes/events.js:5`) is invisible to a client watchdog. The
-heartbeat becomes a named event — `event: ping\ndata: {"ts":"<iso>"}\n\n` — which is additive and
-backward compatible: existing clients register no `ping` listener and ignore it, and the frame keeps
-the connection alive exactly like the comment did.
-
-Implementation:
-- `backend/src/routes/events.js`: emit the named `ping` heartbeat; keep the 30 s default and the
-  `heartbeatIntervalMs` option unchanged.
-- `frontend/src/context/EventSourceContext.tsx`: replace the single token effect with a reconnect
-  manager holding refs for the active source, the reconnect timer, the watchdog timer and the attempt
-  counter.
-  - `connect()` opens the stream, registers the `EVENT_TYPES` listeners plus a `ping` listener, and
-    arms the watchdog.
-  - `onopen` resets the attempt counter to 0, reports `reportStreamState("open")` and re-arms the
-    watchdog.
-  - Any incoming event, `ping` included, re-arms the watchdog.
-  - The watchdog firing after `SSE_HEARTBEAT_TIMEOUT_MS` with no traffic closes the stream, reports
-    `reportStreamState("lost")` and schedules a reconnect.
-  - `onerror` schedules a reconnect instead of giving up; a non-`CLOSED` state is left to the browser's
-    own retry and only the watchdog escalates it.
-  - Reconnect delay: `min(BASE * 2^attempt, MAX)` with `±JITTER_RATIO` jitter; the attempt counter
-    increments per failed attempt.
-  - `visibilitychange` to `visible` and the `online` event cancel the pending backoff timer and
-    reconnect immediately when the stream is not healthy; when it is healthy they do nothing.
-  - Teardown on unmount and on token removal closes the stream and clears both timers; nothing
-    reconnects without a token.
-- Context value gains `connectionState: "connecting" | "open" | "closed"` for T-002 and T-003. It must
-  stay referentially stable for the existing `addEventListener` consumers, so the value is memoized and
-  the state is exposed through a `useState` in the provider rather than a mutable ref.
-
-Tests (written before the implementation):
-- `frontend/src/context/EventSourceContext.test.tsx` — extend the existing `MockEventSource` with
-  `onopen` and a `readyState` that can be driven, and add: no connection and no timer without a token;
-  error schedules a reconnect with increasing, bounded delay; watchdog expiry reconnects without any
-  error event; `ping` re-arms the watchdog so no reconnect happens; `visibilitychange` and `online`
-  reconnect immediately when closed and are no-ops when open; unmount and token removal leave no open
-  stream and no pending timer.
-- `backend/src/routes/events.test.js` — assert the named `ping` frame instead of `:heartbeat\n\n`.
-
-Files to change:
-- `frontend/src/api/connectionTimings.ts` (new)
-- `frontend/src/context/EventSourceContext.tsx`
-- `frontend/src/context/EventSourceContext.test.tsx`
-- `frontend/src/api/connectivity.ts` (new — only `reportStreamState` and the state container are needed
-  here; the probe lands in T-003)
-- `frontend/src/api/connectivity.test.ts` (new)
-- `backend/src/routes/events.js`
-- `backend/src/routes/events.test.js`
-- `README.md:274` — one shared SSE connection now reconnects with backoff and a heartbeat watchdog
-- `README.md` SSE/heartbeat mention around the API section — document the `ping` event
-- Code comments on the reconnect manager and the watchdog stating the mobile-lifecycle reason for each
-  timing constant
-
-Acceptance criteria:
-- No token means no connection and no scheduled timer.
-- A closed or errored stream produces a new attempt with increasing delay, capped at
-  `SSE_RECONNECT_MAX_DELAY_MS`.
-- No traffic within `SSE_HEARTBEAT_TIMEOUT_MS` closes and reconnects the stream even without an `error`
-  event.
-- `visibilitychange` to `visible` and `online` reconnect immediately when unhealthy, no-op when
-  healthy.
-- Unmount and token removal leave no open stream and no pending timer.
-- Backend emits the named `ping` heartbeat at the configured interval; unknown-event clients are
-  unaffected.
-
-## Task T-002 — Resync after reconnect and foreground return
-
-Problem: events emitted while the stream was down are unrecoverable (`backend/src/sseManager.js:54`
-writes no `id:` field) and nothing refetches on `visibilitychange`, so the view stays stale while
-looking connected.
-
-Implementation:
-- `frontend/src/context/EventSourceContext.tsx`: add `resyncVersion: number` to the context value, plus
-  an internal `requestResync()` that increments it at most once per `RESYNC_DEDUPE_WINDOW_MS`.
-  - Triggered by a confirmed reconnect — an `onopen` that follows a previous loss, never the first
-    connect, because pages already load on mount.
-  - Triggered by `visibilitychange` to `visible` when the page was hidden and the stream is healthy.
-  - The dedupe window makes a reconnect immediately followed by a foreground return one increment.
-- `frontend/src/pages/OverviewPage/OverviewPage.tsx:84`: add `resyncVersion` to the `loadLists` effect
-  dependencies, mirroring the existing `syncVersion` pattern.
-- `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`: add an effect on `resyncVersion` that runs the
-  light reload path — `loadEntries()`, then `reloadHistory(nextEntries)` and
-  `loadMembers({ isOwner })` — deliberately **not** the full loader in
-  `frontend/src/pages/ListDetailPage/useListDetailData.ts:375`, which sets `isLoading(true)` and clears
-  `entries`/`members`/`recentlyUsed` and would flash an empty screen on every foreground return. Skip
-  the first run so mount does not double-load.
-- Pending-entry preservation: `loadEntries` currently replaces state with the server response, which
-  drops optimistic `temp-*` entries that are still in the offline queue. Add
-  `mergePendingEntries(serverEntries, currentEntries)` to
-  `frontend/src/pages/ListDetailPage/listDetailUtils.ts`, keeping local entries flagged
-  `is_pending_sync` whose id the server does not know yet, and use it in `loadEntries`. This also fixes
-  the same loss on the existing SSE-refetch path.
-
-Tests (written before the implementation):
-- `frontend/src/context/EventSourceContext.test.tsx` — `resyncVersion` stays `0` on the first connect;
-  increments once on a reconnect after a loss; increments on a hidden-to-visible transition;
-  a reconnect plus a visibility change inside the dedupe window increments exactly once.
-- `frontend/src/pages/ListDetailPage/listDetailUtils.test.ts` — `mergePendingEntries` keeps pending
-  local entries, drops pending entries the server now returns, and preserves ordering.
-- `frontend/src/pages/OverviewPage` and `ListDetailPage` tests — a `resyncVersion` bump refetches, and
-  the detail page does not enter its full loading state while resyncing.
-
-Files to change:
-- `frontend/src/context/EventSourceContext.tsx`
-- `frontend/src/context/EventSourceContext.test.tsx`
-- `frontend/src/pages/OverviewPage/OverviewPage.tsx`
-- `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`
-- `frontend/src/pages/ListDetailPage/useListDetailData.ts`
-- `frontend/src/pages/ListDetailPage/listDetailUtils.ts`
-- `frontend/src/pages/ListDetailPage/listDetailUtils.test.ts`
-- page-level tests for overview and list detail (extend the existing files, or add them where the page
-  has none)
-- `README.md:273` — the overview/detail refetch description must cover reconnect and foreground resync
-- Code comments on `requestResync` (why the first connect is excluded) and on `mergePendingEntries`
-
-Acceptance criteria:
-- A list changed by someone else while the page was backgrounded shows up after the page becomes
-  visible again, with no manual reload.
-- A reconnect immediately followed by a foreground return triggers exactly one resync.
-- Entries still queued for sync stay visible with their pending state across a resync.
-- A resync does not put the detail page into its full-screen loading state.
-
-## Task T-003 — Reachability-based connectivity
-
-Problem: `frontend/src/context/OfflineQueueContext.tsx:19`, `:133`, `:139` and `:149` trust
-`navigator.onLine` alone. On mobile it stays `true` without usable connectivity and its `online` event
-does not reliably fire after wake-up, so `drainQueue()` is never started.
-
-Implementation:
-- `frontend/src/api/connectivity.ts`: complete the module — `probeReachability`, `ensureFreshState`,
-  `getIsOnline`, `subscribe`, rate limiting, in-flight de-duplication, `reportRequestOutcome`.
-- `frontend/src/api/client.ts`: report `ok` / `network-error` outcomes from `sendJsonRequest` so a
-  failed real request marks the state stale without an extra probe.
-- `frontend/src/context/OfflineQueueContext.tsx`:
-  - `isOffline` derives from `connectivity.getIsOnline()` via `subscribe`, not from `navigator.onLine`.
-  - Lifecycle triggers `online`, `offline`, `visibilitychange`, `pageshow` and `focus` each call
-    `ensureFreshState()` and drain when the resolved state is online. `pageshow` matters because iOS
-    restores a backgrounded page from the back/forward cache without firing `visibilitychange`.
-  - The `OFFLINE_QUEUE_CHANGED_EVENT` handler uses the same derived state.
-- `frontend/src/components/OfflineBanner/OfflineBanner.tsx` keeps its current shape; only the meaning of
-  `isOffline` changes. Verify the existing wording still fits and adjust the i18n strings in
-  `frontend/src/locales/{en,de}/translation.json` only if it does not.
-
-Tests (written before the implementation):
-- `frontend/src/api/connectivity.test.ts` — probe success and failure map to online/offline; repeated
-  `ensureFreshState()` calls inside `REACHABILITY_PROBE_MIN_INTERVAL_MS` issue one probe; concurrent
-  calls share one in-flight probe; a probe exceeding `REACHABILITY_PROBE_TIMEOUT_MS` counts as offline;
-  `reportStreamState("open")` marks online without a probe.
-- `frontend/src/context/OfflineQueueContext.test.tsx` — `navigator.onLine === true` with a failing probe
-  reports offline and keeps queueing; `navigator.onLine === false` with a succeeding probe reports
-  online and drains; `pageshow` and `focus` trigger a drain; a burst of wake-up triggers produces one
-  probe per rate-limit window.
-
-Files to change:
-- `frontend/src/api/connectivity.ts`
-- `frontend/src/api/connectivity.test.ts`
-- `frontend/src/api/client.ts`
-- `frontend/src/api/client.test.ts`
-- `frontend/src/context/OfflineQueueContext.tsx`
-- `frontend/src/context/OfflineQueueContext.test.tsx`
-- `frontend/src/components/OfflineBanner/OfflineBanner.test.tsx` (only if the derived state changes the
-  rendered output)
-- `frontend/src/locales/en/translation.json`, `frontend/src/locales/de/translation.json` (only if the
-  banner wording must change)
-- `README.md:282` — offline support now detects connectivity by reachability probe, not `navigator.onLine`
-- Code comments on the derivation rule and on why `navigator.onLine === false` alone is not trusted
-
-Acceptance criteria:
-- `navigator.onLine === true` plus a failing probe reports offline and keeps queueing.
-- `navigator.onLine === false` plus a succeeding probe reports online and drains the queue.
-- Repeated wake-ups in quick succession issue at most one probe per `REACHABILITY_PROBE_MIN_INTERVAL_MS`.
-- An open SSE stream reports online without issuing a probe.
-
-## Task T-004 — Request timeouts and queue retry
-
-Problem: a network error or 5xx during the drain sets `syncError` and stops with no retry
-(`frontend/src/context/OfflineQueueContext.tsx:98`). A first attempt that fails right after wake-up,
-before connectivity is back, leaves the queue untouched until the user happens to act. Neither the drain
-`fetch` (`:58`) nor `sendJsonRequest` (`frontend/src/api/client.ts:54`) has a timeout, so a hung request
-blocks the queue indefinitely through `isSyncingRef`.
-
-Implementation:
-- `frontend/src/api/client.ts`: attach `createTimeoutSignal(REQUEST_TIMEOUT_MS)` to every `fetch`, and
-  always cancel the timer in a `finally`. Extend `isNetworkError` (`:32`) to classify an abort —
-  `DOMException` with name `AbortError` or `TimeoutError` — as a network error, so a timed-out read falls
-  back to cache and a timed-out write is queued instead of surfacing as a hard failure.
-- `frontend/src/context/OfflineQueueContext.tsx`:
-  - The drain `fetch` gets the same timeout signal.
-  - Error classification: `4xx` is permanent and keeps today's behavior — set `syncError`, set
-    `failedMutationId`, stop, offer discard. Network error, timeout and `5xx` are transient.
-  - A transient failure schedules a retry after `min(QUEUE_RETRY_BASE_DELAY_MS * 2^attempt,
-    QUEUE_RETRY_MAX_DELAY_MS)`; the attempt counter is per drain run and resets after a fully successful
-    drain. The retry timer is cleared on unmount and cancelled when another trigger drains first.
-  - `isSyncingRef` gains a `QUEUE_DRAIN_STALL_TIMEOUT_MS` release so a drain that never resolves cannot
-    block later triggers; the released run must not double-apply its current mutation, so the guard
-    release only allows a *new* run after the stalled request has been aborted.
-  - Order and idempotency: mutations keep processing in `createdAt` order, a mutation is removed from
-    IndexedDB only after its response was accepted, and the `temp-*` → real-id map is rebuilt from the
-    remaining queue at the start of each run so a retry after a partial drain still resolves dependent
-    mutations.
-  - `syncError` is only surfaced to the user for permanent failures; a transient failure that is being
-    retried must not render as a hard error banner.
-
-Tests (written before the implementation):
-- `frontend/src/api/client.test.ts` — a request exceeding `REQUEST_TIMEOUT_MS` falls back to the cached
-  read; the same on a queueable write enqueues it; the timeout timer is cleared on a fast response.
-- `frontend/src/context/OfflineQueueContext.test.tsx` — a `5xx` drain retries automatically with
-  increasing delay under fake timers; a network error retries; a `4xx` does not retry and still offers
-  discard; a drain interrupted mid-queue resumes with the remaining mutations in order and does not
-  resend already-synced ones; a stalled drain releases the guard and a later trigger can drain; a
-  transient failure under retry does not render the error banner.
-
-Files to change:
-- `frontend/src/api/client.ts`
-- `frontend/src/api/client.test.ts`
-- `frontend/src/api/connectionTimings.ts` (retry and stall constants, `createTimeoutSignal`)
-- `frontend/src/context/OfflineQueueContext.tsx`
-- `frontend/src/context/OfflineQueueContext.test.tsx`
-- `frontend/src/components/OfflineBanner/OfflineBanner.tsx` (only if transient-vs-permanent changes what
-  is rendered)
-- `frontend/src/types.ts` (only if `OfflineQueueContextValue` needs a retry-state field for the banner)
-- `README.md:282` — offline support now retries transient sync failures with backoff and times out
-  requests
-- Code comments on the error classification, the retry policy and the stall release
-
-Acceptance criteria:
-- A drain failing with a network error or `5xx` retries automatically with increasing delay and no user
-  interaction.
-- A `4xx` failure does not retry and still offers the discard action.
-- A request exceeding the timeout is treated as offline: reads fall back to cache, writes are queued.
-- A drain interrupted mid-queue resumes with the remaining mutations in their original order, and
-  already-synced mutations are not resent.
-- A stalled drain cannot block the queue past `QUEUE_DRAIN_STALL_TIMEOUT_MS`.
+CPU-bound numbers (TBT, main-thread work, bootup time) are recorded as observations in the
+review evidence, not used as pass/fail gates — the baseline run was polluted by browser
+extensions and is not a fair comparison.
 
 ## Implementation Phases
 
-### Phase 1 — T-001
-Reconnect manager, heartbeat watchdog, named backend `ping`, connectivity state container.
+### Phase 1 — T-001: keep the icon model out of the cold start
 
-### Phase 2 — T-002
-`resyncVersion` with dedupe, page wiring on the light reload path, pending-entry merge.
+Status: implemented and reviewed `FAIL`; this phase is now a **rework**. Run it with
+`rework_task T-001` and treat `.ai/REVIEW.md` "Required Fixes" as the checklist.
 
-### Phase 3 — T-003
-Reachability probe, derived connectivity state, extended lifecycle triggers in the offline queue.
+The core deferral already works and was confirmed in a real browser during review: after the
+list renders there are zero dedicated workers and zero model requests; opening the add sheet
+creates the worker and starts the download; a non-catalogue term shows the spinner while
+`EXACT_MATCH_MAP` hits stay instant. **Do not re-open that behaviour.** The rework is
+subtractive: remove the idle warm-up that never runs, and stop claiming a budget this task
+cannot control.
 
-### Phase 4 — T-004
-Request timeouts everywhere, transient-vs-permanent error classification, retry with backoff, stall
-release.
+Files to change:
 
-## Constraints
+- `frontend/src/workers/iconWorkerClient.ts`: delete `warmIconWorkerWhenIdle()` and the
+  `idleWarmUpScheduled` module flag. `primeIconWorker()` stays as the single explicit warm-up.
+  Keep the `// Explicit first-use warm-up; importing this module must not download the model.`
+  comment above it and extend it to say the model is fetched only on sheet open, with no
+  speculative or idle prefetch.
+- `frontend/src/workers/iconWorkerClient.test.ts`: delete the four idle warm-up cases (no-op
+  under `saveData`, no-op under slow `effectiveType`, schedules only once, `setTimeout`
+  fallback). Keep the cases that must survive: importing the module creates no worker;
+  `primeIconWorker()` posts `init`; a worker error rejects pending matches and recreates the
+  worker.
+- `frontend/src/pages/ListDetailPage.test.tsx`: drop `warmIconWorkerWhenIdle` from the import
+  on line 16 and from the `vi.mock` factory on line 20, and drop the two
+  `expect(warmIconWorkerWhenIdle).not.toHaveBeenCalled()` assertions. The surrounding test must
+  keep both of its `expect(primeIconWorker).not.toHaveBeenCalled()` assertions — before the
+  entries resolve and after they render — since that is the actual regression guard.
+- `README.md` line 301: delete the final sentence, "The worker client also exposes an optional,
+  once-per-page idle warm-up that skips data-saving connections and slow-2g/2g/3g, but list
+  visits do not invoke it automatically." The rest of the paragraph is accurate and stays.
+- `frontend/src/main.tsx`, `frontend/src/components/AddItemSheet/AddItemSheet.tsx`,
+  `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`, `e2e/lists.spec.js`: **unchanged**.
+  `ListDetailPage.tsx` was correctly left unwired and stays that way.
 
-- No WebSocket migration, no backend SSE replay buffer, no Background Sync API.
-- Backend changes stay additive and backward compatible; the named `ping` heartbeat must not break a
-  client that registers no `ping` listener.
-- Every timing value is a named constant in `frontend/src/api/connectionTimings.ts` and injectable, so
-  no test waits on real time. Tests use `vi.useFakeTimers()` and simulated `visibilitychange`,
-  `pageshow`, `focus`, `online`, `offline`, `error` and timeout events. No `sleep`-based tests.
-- Tests are written or updated before the implementation code for each changed behaviour.
-- Documentation updates listed per task ship in the same commit as the behaviour change.
-- Existing provider tests must keep rendering `EventSourceProvider` and `OfflineQueueProvider` in
-  isolation; that is why connectivity is a plain module and not a third React context.
+Optional, from REVIEW.md finding 4 (`nit`, not required): replace the fixed
+`page.waitForTimeout(1500)` in `e2e/lists.spec.js:91` with an explicit load-state or
+network-idle wait, so a slow runner cannot hide a late request. Take it only if it does not
+destabilise the spec.
+
+Do **not** attempt the transfer budget here — it is T-006. REVIEW.md finding 3 (the precached
+`iconWorker-*.js` chunk) is also T-006 scope, not a T-001 fix.
+
+Verification for the rework: confirm by repository-wide search that `warmIconWorkerWhenIdle`
+has no remaining occurrence in any file, including `README.md`.
+
+Suggested commit subject: `perf(icons): load the icon model on first use instead of at startup`
+
+### Phase 2 — T-002: load the detail page exactly once
+
+`useListDetailData` takes `accessErrorMessage: t("detail.accessError")` and lists it in the
+dependency array of the load effect. i18n resolves resources lazily (`resourcesToBackend`,
+`useSuspense: false`), so `t()` switches from the key to the translated string mid-load and the
+effect re-runs, refetching all five endpoints. Separately, `loadMembers` is awaited inside the
+effect before `setIsLoading(false)` runs in `finally`, so entries wait for a second round trip.
+
+Files to change:
+
+- `frontend/src/pages/ListDetailPage/useListDetailData.ts`:
+  - Remove the `accessErrorMessage` option. On a list that is not in the `fetchLists` result,
+    set a stable sentinel error instead of a translated string — a `ListAccessError` class
+    exported from this module is the clearest form.
+  - Confirm the remaining dependencies are stable: `listId`, `token`, `syncVersion`,
+    `setEntries`, `loadMembers`, `onLoadStart`, `onNonOwnerList` — the last two are already
+    memoised with empty dependency arrays in `ListDetailPage`.
+  - Move `setIsLoading(false)` so it runs once the list, entries and history are applied, and
+    start the member load without awaiting it. Keep `isSharingLoading` as the members' own
+    indicator, and let member failures continue to surface through `setEntryError` (the
+    existing `throwOnError: false` branch already does this).
+- `frontend/src/pages/ListDetailPage/listDetailUtils.ts`: teach `getErrorMessage` to recognise
+  the sentinel, or return the key so the caller can translate it.
+- `frontend/src/pages/ListDetailPage/ListDetailPage.tsx`: stop passing `accessErrorMessage`, and
+  translate the sentinel with `t("detail.accessError")` at render time.
+
+Tests:
+
+- `frontend/src/pages/ListDetailPage.test.tsx`: a language-resource load after mount does not
+  cause a second round of fetches — each endpoint is called exactly once; entries render while
+  the members request is still pending; a list missing from the lists response still shows the
+  translated access error; a failing members request still surfaces an error banner.
+- `frontend/src/pages/ListDetailPage/listDetailUtils.test.ts`: sentinel handling in
+  `getErrorMessage`.
+
+Documentation:
+
+- Comments in `useListDetailData.ts` explaining why the error is stored as a sentinel and why
+  members are deliberately outside the loading gate.
+- `README.md` if it describes the detail page loading behaviour.
+
+Suggested commit subject: `perf(lists): show list entries without waiting for member data`
+
+### Phase 3 — T-003: render cached data first
+
+Timing clarification accepted by the user — 2026-09-21T04:59:12Z: show cached entries as soon
+as the cache read completes. A loading frame before IndexedDB returns is acceptable; preloading
+before detail-page mount is not required. This supersedes the original first-frame wording.
+
+`sendJsonRequest` writes every successful GET into `offlineStore` but only reads the cache in
+the `isNetworkError` branch, so an online cold start always shows a spinner even when the
+previous payload is on disk.
+
+Files to change:
+
+- `frontend/src/api/client.ts`: add an opt-in cache-first read for GETs with a `cacheKey` — an
+  `onCachedValue` callback (or an equivalent explicit option) that delivers the cached payload
+  as soon as it is read, while the network request continues and its response still wins. Do not
+  change the existing offline fallback behaviour, and do not emit the cached value after the
+  network response has already been applied.
+- `frontend/src/api/entries.ts` and `frontend/src/api/lists.ts`: expose that option on
+  `fetchEntries` and `fetchLists`.
+- `frontend/src/pages/ListDetailPage/useListDetailData.ts`: on mount, apply the cached entries
+  and list immediately (`isLoading` false, entries rendered), then replace them with the network
+  result. Pending local entries must keep surviving through `mergePendingEntries`, and a cached
+  render must not break the `locallyDoneIdsRef` handling or the recently-used filtering.
+
+Tests:
+
+- `frontend/src/api/client.test.ts`: cache-first callback fires before the network resolves; it
+  does not fire after the network response; the existing offline fallback path is unchanged.
+- `frontend/src/pages/ListDetailPage.test.tsx`: with a populated cache, entries render without a
+  loading state and are then replaced by the server payload; with an empty cache the current
+  behaviour is unchanged.
+
+Documentation:
+
+- `README.md`: describe the cache-first read behaviour alongside the existing offline section.
+- Comments in `client.ts` covering the ordering guarantee.
+
+Suggested commit subject: `perf(lists): show the last known list contents instantly on open`
+
+### Phase 4 — T-004: no reachability probe when there is nothing to sync
+
+`OfflineQueueContext.checkAndDrain()` calls `ensureFreshState()` before it looks at the queue,
+so every startup fires `/api/health` — 372 ms in the baseline — even with an empty queue, while
+real API calls are already proving reachability through `reportRequestOutcome`.
+
+Files to change:
+
+- `frontend/src/context/OfflineQueueContext.tsx`: read `listOfflineMutations()` first and return
+  early when the queue is empty, so `ensureFreshState()` only runs when there is something to
+  drain. Keep the existing retry scheduling for the non-empty case, and keep the generation
+  guard semantics intact.
+
+Tests:
+
+- `frontend/src/context/OfflineQueueContext.test.tsx`: no probe on mount with an empty queue; a
+  probe and a drain with a queued mutation; recovery after an offline period still drains.
+
+Documentation:
+
+- Comment in `OfflineQueueContext.tsx` explaining that reachability is established by real
+  requests and only probed when the queue has work.
+
+Suggested commit subject: `perf(sync): stop probing the server at startup when nothing is queued`
+
+### Phase 5 — T-005: self-host the fonts
+
+`frontend/index.html` loads a render-blocking stylesheet from `fonts.googleapis.com`, worth
+788 ms in the baseline, and the font files are never precached, so they are refetched on every
+cold start and are unavailable offline.
+
+Files to change:
+
+- Inventory the weights actually used: `Exo 2`, `Orbitron` and `JetBrains Mono` appear in the
+  CSS with weights 400-800, while `index.html` currently requests Orbitron up to 900. Ship only
+  what the stylesheets use.
+- Add the woff2 files to the repository (suggested location `frontend/public/fonts/`) with local
+  `@font-face` declarations carrying `font-display: swap`.
+- `frontend/index.html`: remove the Google Fonts `<link>` and both `preconnect` hints.
+- `frontend/vite.config.ts`: add `woff2` to `injectManifest.globPatterns` so the service worker
+  precaches the fonts.
+- Check the licences (all three are SIL OFL) and record the attribution.
+
+Tests:
+
+- `frontend/src/vite-config.test.ts`: `globPatterns` includes `woff2`.
+- A check that `index.html` references no `fonts.googleapis.com` or `fonts.gstatic.com` host —
+  extend `frontend/src/styles/index-cleanup.test.ts` or add an equivalent assertion.
+- `frontend/src/styles/shared.test.ts` if it asserts anything about font declarations.
+
+Documentation:
+
+- `README.md`: note that fonts are self-hosted and precached, and where they live.
+- `LICENSE` or a `frontend/public/fonts/README.md`: font licences and attribution.
+
+Suggested commit subject: `perf(ui): self-host the app fonts so the first paint needs no third-party request`
+
+### Phase 6 — T-006: bring the cold load under a real transfer budget
+
+New task, added in revision 2. It owns the `< 500 KiB` criterion that REVIEW.md finding 2
+showed is unreachable from T-001. The review measured a cold load at 1266.7 KiB; the weight is
+static assets and the precache manifest, so this task owns both.
+
+Measured cold-load responses to attack, largest first:
+
+| Response | Transfer | Action |
+| --- | --- | --- |
+| `icon-512.png` | 503.6 KiB | re-encode |
+| `assets/iconWorker-*.js` | 162.2 KiB | exclude from precache |
+| `assets/index-*.js` | 158.3 KiB, fetched twice | investigate the duplicate fetch |
+| `endgame_grocery_logo.png` | 127.4 KiB | re-encode |
+| `icon-192.png` | 73.3 KiB | re-encode |
+| Google Fonts woff2 pair | 52.1 KiB | removed by T-005 |
+
+Files to change:
+
+- `frontend/public/icon-512.png` (515,411 B on disk) and `frontend/public/icon-192.png`
+  (74,777 B): re-encode losslessly or near-losslessly. These are flat PWA icons and should be a
+  fraction of their current size. They must stay PNG at exactly 512×512 and 192×192, because
+  `vite.config.ts` declares them in the manifest with `purpose: "any maskable"` and lists them
+  in `includeAssets`. Do not change the filenames, the dimensions or the maskable safe zone.
+- `frontend/src/assets/endgame_grocery_logo.png`: re-encode. It is imported by seven pages
+  (`LoginPage`, `RegisterPage`, `OverviewPage`, `ForgotPasswordPage`, `ResetPasswordPage`,
+  `VerifyEmailPage`, `InviteAcceptPage`), so it is a hashed bundle asset and is swept into the
+  precache by the `png` glob. Check the largest size it is actually rendered at before choosing
+  the target resolution; keep the file a PNG so the seven imports need no change.
+- `frontend/vite.config.ts`: narrow `injectManifest.globPatterns`, currently
+  `["**/*.{js,css,html,svg,png,webmanifest,json}"]`, so that `assets/iconWorker-*.js` is not
+  precached. After T-001 that chunk never executes on a cold visit. Prefer adding an explicit
+  `globIgnores` entry over rewriting the whole pattern, so nothing else silently drops out of
+  the manifest. Note that T-005 adds `woff2` to the same option — expect a conflict there and
+  keep both changes.
+- Investigate the duplicate `assets/index-*.js` and CSS fetch (once by the page, once by
+  service-worker precaching). If it is inherent to `injectManifest` install behaviour, record
+  that finding in the handoff and in a comment rather than forcing a fix; if it is avoidable
+  through cache headers or manifest scope, fix it.
+
+Tests:
+
+- `frontend/src/vite-config.test.ts`: assert the precache configuration excludes the icon
+  worker chunk, alongside the existing assertions. Do not weaken the `woff2` assertion T-005
+  adds to the same file.
+- Assert the PWA manifest still declares both icons at 192×192 and 512×512 with
+  `purpose: "any maskable"`, so a re-encode cannot silently break installability.
+- Re-encoding is not unit-testable on its own; it is verified by the reviewer's cold-load
+  measurement and the visual check below.
+
+Documentation:
+
+- `README.md`: document the cold-load transfer budget, where the asset weight lives, and that
+  the icon worker chunk is deliberately excluded from the precache because it only loads on
+  first use.
+- Comment in `frontend/vite.config.ts` explaining the precache exclusion and its link to the
+  first-use icon loading in `iconWorkerClient.ts`.
+
+Manual verification required before handing to review:
+
+- Cold-load measurement against the production build, after T-005 has landed, recording total
+  transfer and the per-response breakdown.
+- Visual check of both PWA icons at their installed sizes and of the logo on the login page.
+- Install the PWA and load it offline once, to confirm the precache exclusions broke nothing.
+
+Suggested commit subject: `perf(assets): cut the cold-load download weight of icons, logo and precache`
 
 ## Validation
+
+Every task runs, before handing over to review:
 
 - `npm run lint`
 - `npm run build`
 - `npm test`
-- `npm run e2e` for T-002 and T-004 if a lifecycle scenario is expressible in Playwright; if it is not,
-  state that in the handoff entry instead of adding a flaky test.
 
-## Risks
+T-001 and any other task touching the E2E specs additionally run `npx playwright test`.
 
-- **StrictMode double-mount** (`frontend/src/main.tsx:15`) can create two connections or two timer sets
-  if teardown is incomplete. Every timer and stream must be owned by the effect that created it and
-  cleared in its cleanup.
-- **Reconnect storms** after a server restart — mitigated by jitter and the delay cap; the attempt
-  counter must only reset on a confirmed `onopen`, never on a scheduled attempt.
-- **Resync thundering herd** — every client refetches on foreground return. Acceptable for this
-  deployment size; the dedupe window keeps it to one request per view per wake-up.
-- **Probe cost** — the probe is only issued on demand and rate-limited; no background interval.
-- **Double-applied mutations** are the worst failure mode of the retry work. The removal-after-accepted
-  ordering and the rebuilt id map are the guard, and the resume test is the required evidence.
+Environment note carried over from the T-001 review: PostgreSQL and Docker are unavailable in
+this environment, so the DB-backed Playwright specs fail with `ECONNREFUSED`. Those failures are
+environmental. Report them as such rather than treating them as regressions, and cover the
+affected behaviour with API-fixture specs instead.
+
+Reviewer verification, on the finished cycle:
+
+- Cold-start Lighthouse run in an extension-free incognito window, recording transfer weight,
+  the list of requested hosts, and the per-endpoint request counts.
+- Warm-start run confirming entries appear without a spinner.
+- Offline exploratory check: read a cached list, queue a mutation, come back online, confirm the
+  queue drains and the fonts still render.
+- After T-005 and T-006: the cold-load transfer figure against the 500 KiB budget, with the
+  per-response breakdown, plus a PWA install-and-open-offline check.

@@ -67,4 +67,32 @@ describe("vite worker config", () => {
     expect(serviceWorkerSource).toMatch(/showNotification/);
     expect(serviceWorkerSource).toMatch(/addEventListener\(["']notificationclick["']/);
   });
+
+  it("keeps both install icons at their required sizes and purpose", () => {
+    expect(viteConfigSource).toMatch(/src:\s*["']\/icon-192\.png["'][\s\S]*?sizes:\s*["']192x192["'][\s\S]*?purpose:\s*["']any maskable["']/);
+    expect(viteConfigSource).toMatch(/src:\s*["']\/icon-512\.png["'][\s\S]*?sizes:\s*["']512x512["'][\s\S]*?purpose:\s*["']any maskable["']/);
+  });
+
+  it("excludes the lazy icon worker chunk from the service worker precache", () => {
+    expect(viteConfigSource).toMatch(/globIgnores:\s*\[[^\]]*iconWorker-\*/);
+  });
+
+  it("splits the React runtime into its own startup chunk", () => {
+    const output = viteConfig.build?.rollupOptions?.output;
+    const manualChunks = output && !Array.isArray(output) ? output.manualChunks : undefined;
+
+    expect(typeof manualChunks).toBe("function");
+    expect((manualChunks as (id: string) => string | undefined)('/node_modules/react/index.js')).toBe(
+      "react-vendor"
+    );
+  });
+
+  it("serves the precached app shell for offline navigations", () => {
+    expect(serviceWorkerSource).toMatch(/createHandlerBoundToURL\(["']\/index\.html["']\)/);
+    expect(serviceWorkerSource).toMatch(/new NavigationRoute\(/);
+  });
 });
+
+  it("precaches self-hosted WOFF2 fonts for offline rendering", () => {
+    expect(viteConfigSource).toMatch(/globPatterns:\s*\[[^\]]*woff2[^\]]*\]/i);
+  });

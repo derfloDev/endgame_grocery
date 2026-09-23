@@ -5,6 +5,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "../../index.css";
 import AddItemSheet from "./AddItemSheet";
+import { primeIconWorker } from "../../workers/iconWorkerClient";
+
+vi.mock("../../workers/iconWorkerClient", () => ({ primeIconWorker: vi.fn() }));
 
 const cssSource = [
   "../../index.css",
@@ -79,6 +82,22 @@ vi.mock("../../hooks/useIconSuggestion", () => ({
 describe("AddItemSheet", () => {
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("primes the worker only when the sheet opens", () => {
+    const props = { listId: "list-1", onAdd: vi.fn(), onClose: vi.fn() };
+    const view = render(<AddItemSheet {...props} open={false} />);
+    expect(primeIconWorker).not.toHaveBeenCalled();
+
+    view.rerender(<AddItemSheet {...props} open />);
+    expect(primeIconWorker).toHaveBeenCalledTimes(1);
+    fireEvent.change(screen.getByLabelText("Add item"), { target: { value: "Milch" } });
+    expect(primeIconWorker).toHaveBeenCalledTimes(1);
+    view.rerender(<AddItemSheet {...props} open={false} />);
+    expect(primeIconWorker).toHaveBeenCalledTimes(1);
+    view.rerender(<AddItemSheet {...props} open />);
+    expect(primeIconWorker).toHaveBeenCalledTimes(2);
   });
 
   it("renders the optional details field with the expected placeholder", () => {

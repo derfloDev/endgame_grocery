@@ -9,6 +9,7 @@ import {
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 import { OfflineQueueProvider } from "./OfflineQueueContext";
 import { reportStreamState, resetConnectivityForTests } from "../api/connectivity";
+import { requestJson } from "../api/request";
 import { StrictMode } from "react";
 
 const offlineStoreMock = vi.hoisted(() => ({
@@ -80,6 +81,58 @@ describe("OfflineQueueProvider", () => {
     expect(removeOfflineMutationMock).toHaveBeenCalledWith("mutation-1");
   });
 
+  it("does not probe reachability on mount when the queue is empty", async () => {
+    renderProvider();
+
+    await waitFor(() => {
+      expect(listOfflineMutationsMock).toHaveBeenCalled();
+    });
+    await flushAsyncWork();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("shows the offline state after a real request fails while the browser is online", async () => {
+    setNavigatorOnline(true);
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    fetchMock.mockResolvedValueOnce(createResponse({ ok: true }, 503));
+    renderProvider(<OfflineQueueState />);
+
+    await act(async () => {
+      await expect(requestJson("/api/lists", {})).rejects.toThrow("Failed to fetch");
+    });
+    await waitFor(() => expect(screen.getByTestId("is-offline").textContent).toBe("true"));
+    expect(fetchMock).toHaveBeenCalledWith("/api/health", expect.any(Object));
+  });
+
+  it("shows the offline state after a real request reaches its deadline", async () => {
+    setNavigatorOnline(true);
+    fetchMock.mockImplementation((input) => input === "/api/health"
+      ? Promise.resolve(createResponse({ ok: false }, 503))
+      : new Promise(() => undefined));
+    renderProvider(<OfflineQueueState />);
+
+    await expect(requestJson("/api/lists", {}, 1)).rejects.toThrow();
+    await waitFor(() => expect(screen.getByTestId("is-offline").textContent).toBe("true"));
+    expect(fetchMock).toHaveBeenCalledWith("/api/health", expect.any(Object));
+  });
+
+  it("re-probes a known offline state on recovery events with an empty queue", async () => {
+    resetConnectivityForTests();
+    setNavigatorOnline(true);
+    currentMutations = [createMutation()];
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    renderProvider(<OfflineQueueProvider timings={{ REACHABILITY_PROBE_MIN_INTERVAL_MS: 0 }}><OfflineQueueState /></OfflineQueueProvider>);
+
+    await waitFor(() => expect(screen.getByTestId("is-offline").textContent).toBe("true"));
+    currentMutations = [];
+    fetchMock.mockResolvedValueOnce(createResponse({ ok: true }));
+    act(() => window.dispatchEvent(new Event("online")));
+
+    await waitFor(() => expect(screen.getByTestId("is-offline").textContent).toBe("false"));
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/health")).toHaveLength(2);
+  });
+
   it("drains newly queued mutations when the queue changes while online", async () => {
     renderProvider();
 
@@ -139,10 +192,10 @@ describe("OfflineQueueProvider", () => {
 
   it.each(["focus", "pageshow", "online", "offline", "visibilitychange", OFFLINE_QUEUE_CHANGED_EVENT])("checks reachability and drains on %s even with a false browser hint", async (event) => {
     resetConnectivityForTests();
+    currentMutations = [createMutation()];
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
     render(<OfflineQueueProvider timings={{ REACHABILITY_PROBE_MIN_INTERVAL_MS: 0 }}><OfflineQueueState /></OfflineQueueProvider>);
     await waitFor(() => expect(screen.getByTestId("is-offline").textContent).toBe("true"));
-    currentMutations = [createMutation()];
     fetchMock.mockResolvedValue(createResponse({ ok: true }));
     act(() => { (event === "visibilitychange" ? document : window).dispatchEvent(new Event(event)); });
     await waitFor(() => expect(removeOfflineMutationMock).toHaveBeenCalledWith("mutation-1"));
@@ -171,6 +224,7 @@ describe("OfflineQueueProvider", () => {
     const health = createDeferred<Response>();
     fetchMock.mockReturnValue(health.promise);
     const { unmount } = renderProvider();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/health", expect.any(Object)));
     unmount();
     await act(async () => { health.resolve(createResponse({ ok: true })); await health.promise; });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -351,8 +405,12 @@ describe("OfflineQueueProvider", () => {
 
     it("releases a stalled storage read and prevents the abandoned run from sending", async () => {
       const stalled = createDeferred<OfflineMutation[]>();
-      // The first read refreshes the badge; the second belongs to the drain.
-      listOfflineMutationsMock.mockResolvedValueOnce([...currentMutations]).mockReturnValueOnce(stalled.promise);
+      // The first read refreshes the badge, the second checks whether probing is needed,
+      // and the third belongs to the drain.
+      listOfflineMutationsMock
+        .mockResolvedValueOnce([...currentMutations])
+        .mockResolvedValueOnce([...currentMutations])
+        .mockReturnValueOnce(stalled.promise);
       mount();
       await advance();
       await advance(3000);

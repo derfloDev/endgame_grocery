@@ -1,10 +1,15 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { createInstance } from "i18next";
+import type { i18n, ReadCallback } from "i18next";
+import { I18nextProvider } from "react-i18next";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../i18n";
+import enTranslations from "../locales/en/translation.json";
+import deTranslations from "../locales/de/translation.json";
 import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
 import { fetchLists, markListViewed } from "../api/lists";
@@ -12,11 +17,19 @@ import { fetchListMembers, leaveList } from "../api/sharing";
 import { writeCachedResource } from "../api/offlineStore";
 import { useListEvents } from "../hooks/useListEvents";
 import ListDetailPage from "./ListDetailPage/ListDetailPage";
+import { useListDetailData } from "./ListDetailPage/useListDetailData";
 import type { Entry, List, Suggestion } from "../types";
+import { primeIconWorker } from "../workers/iconWorkerClient";
+
+vi.mock("../workers/iconWorkerClient", () => ({
+  primeIconWorker: vi.fn(),
+  requestIconMatch: vi.fn().mockResolvedValue({ iconName: null, score: 0, topMatches: [] })
+}));
 
 const streamState = vi.hoisted(() => ({ resyncVersion: 0 }));
+const queueState = vi.hoisted(() => ({ syncVersion: 0 }));
 vi.mock("../context/EventSourceContext", () => ({ useEventSource: () => streamState }));
-beforeEach(() => { streamState.resyncVersion = 0; });
+beforeEach(() => { streamState.resyncVersion = 0; queueState.syncVersion = 0; });
 
 const cssSource = [
   "./ListDetailPage/ListDetailPage.module.css",
@@ -65,7 +78,7 @@ vi.mock("../hooks/useListEvents", () => ({
 }));
 
 vi.mock("../hooks/useOfflineQueue", () => ({
-  useOfflineQueue: () => ({ syncVersion: 0 })
+  useOfflineQueue: () => queueState
 }));
 
 vi.mock("../hooks/usePushNotifications", () => ({
@@ -90,7 +103,7 @@ const useListEventsMock = vi.mocked(useListEvents);
 const updateEntryMock = vi.mocked(updateEntry);
 const writeCachedResourceMock = vi.mocked(writeCachedResource);
 
-function renderListDetailPage() {
+function renderListDetailPage(translations?: i18n) {
   const tree = () => (
     <MemoryRouter
       future={{
@@ -105,8 +118,11 @@ function renderListDetailPage() {
       </Routes>
     </MemoryRouter>
   );
-  const view = render(tree());
-  return { ...view, rerenderPage: () => view.rerender(tree()) };
+  const translatedTree = () => translations
+    ? <I18nextProvider i18n={translations}>{tree()}</I18nextProvider>
+    : tree();
+  const view = render(translatedTree());
+  return { ...view, rerenderPage: () => view.rerender(translatedTree()) };
 }
 
 interface TestEntry extends Entry {
@@ -157,9 +173,254 @@ function createDeferred<T = unknown>() {
   return { promise, resolve, reject };
 }
 
+describe("ListDetailPage cache-first loading", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+  afterEach(cleanup);
+
+  function pendingDetail() {
+    mockListDetailData();
+    const lists = createDeferred<Awaited<ReturnType<typeof fetchLists>>>();
+    const entries = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
+    fetchListsMock.mockReturnValue(lists.promise);
+    fetchEntriesMock.mockReturnValue(entries.promise);
+    return { lists, entries };
+  }
+
+  async function deliverCache(entries: Entry[] = [{ id: "cached-1", text: "Cached Milk", status: "open" }]) {
+    await act(async () => {
+      fetchListsMock.mock.calls[0][1]?.onCachedValue?.({ lists: [{ id: "list-1", name: "Cached pantry", is_owner: true }] });
+      fetchEntriesMock.mock.calls[0][2]?.onCachedValue?.({ entries });
+    });
+  }
+
+  it("renders cached content without a spinner while the network is pending, then replaces it", async () => {
+    const network = pendingDetail();
+    renderListDetailPage();
+    await deliverCache();
+    expect(screen.getByText("Cached Milk")).toBeTruthy();
+    expect(screen.getByText("Cached pantry")).toBeTruthy();
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    expect(markListViewedMock).not.toHaveBeenCalled();
+    expect(fetchListMembersMock).not.toHaveBeenCalled();
+    await act(async () => {
+      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: true }] });
+      network.entries.resolve({ entries: [{ id: "fresh-1", text: "Fresh Bread", status: "open" }] });
+    });
+    expect(screen.getByText("Fresh Bread")).toBeTruthy();
+    expect(screen.getByText("Fresh pantry")).toBeTruthy();
+    expect(screen.queryByText("Cached Milk")).toBeNull();
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    expect(fetchEntriesMock).toHaveBeenCalledTimes(1);
+    expect(markListViewedMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMembersMock).toHaveBeenCalledTimes(1);
+    await deliverCache();
+    expect(screen.queryByText("Cached Milk")).toBeNull();
+    expect(screen.getByText("Fresh pantry")).toBeTruthy();
+  });
+
+  it("keeps the loading state on a cache miss until network data arrives", async () => {
+    const network = pendingDetail();
+    renderListDetailPage();
+    expect(screen.getByLabelText("Loading")).toBeTruthy();
+    await act(async () => {
+      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: false }] });
+      network.entries.resolve({ entries: [{ id: "fresh-1", text: "Fresh Bread", status: "open" }] });
+    });
+    expect(screen.getByText("Fresh Bread")).toBeTruthy();
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+  });
+
+  it("preserves cached pending entries and filters history when fresh entries replace the cache", async () => {
+    const network = pendingDetail();
+    fetchRecentlyUsedMock.mockResolvedValue({ history: [{ text: "Queued Bread" }, { text: "Eggs" }] });
+    renderListDetailPage();
+    const pending = { id: "temp-entry", text: "Queued Bread", status: "open" as const, is_pending_sync: true, details: "Whole wheat" };
+    await deliverCache([pending]);
+    expect(screen.getByText("Queued Bread")).toBeTruthy();
+    await act(async () => {
+      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: false }] });
+      network.entries.resolve({ entries: [{ id: "fresh-1", text: "Fresh Milk", status: "open" }] });
+    });
+    expect(within(getOpenItemsSection()).getByText("Queued Bread")).toBeTruthy();
+    expect(within(getOpenItemsSection()).getByText("Whole wheat")).toBeTruthy();
+    expect(within(getOpenItemsSection()).getByText("Queued")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Recently Used" })).queryByText("Queued Bread")).toBeNull();
+    expect(screen.getByText("Eggs")).toBeTruthy();
+  });
+
+  it("keeps the Done badge when a cached entry is completed before the initial network read settles", async () => {
+    const network = pendingDetail();
+    const doneEntry = { id: "cached-1", text: "Cached Milk", status: "done" as const };
+    updateEntryMock.mockResolvedValue({ entry: doneEntry });
+    renderListDetailPage();
+    await deliverCache();
+    await userEvent.click(screen.getByRole("button", { name: "Mark Cached Milk done" }));
+    await screen.findByText("Done");
+    await act(async () => {
+      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: false }] });
+      network.entries.resolve({ entries: [doneEntry] });
+    });
+    expect(screen.getByText("Done")).toBeTruthy();
+    expect(within(getOpenItemsSection()).queryByText("Cached Milk")).toBeNull();
+  });
+
+  it("clears cached content on access denial and ignores cache callbacks after failure", async () => {
+    const network = pendingDetail();
+    renderListDetailPage();
+    await deliverCache();
+    expect(screen.getByText("Cached Milk")).toBeTruthy();
+    await act(async () => {
+      network.lists.resolve({ lists: [] });
+      network.entries.resolve({ entries: [] });
+    });
+    expect(screen.getByText(enTranslations["detail.accessError"])).toBeTruthy();
+    await deliverCache();
+    expect(screen.queryByText("Cached Milk")).toBeNull();
+    expect(screen.queryByText("Cached pantry")).toBeNull();
+  });
+
+  it("ignores the old load's cache and network results after a queue-sync reload", async () => {
+    const oldNetwork = pendingDetail();
+    const view = renderListDetailPage();
+    await deliverCache();
+    expect(screen.getByText("Cached Milk")).toBeTruthy();
+    mockListDetailData({ entries: [{ id: "fresh-1", text: "Fresh Bread", status: "open" }] });
+    queueState.syncVersion += 1;
+    view.rerenderPage();
+    await screen.findByText("Fresh Bread");
+    await deliverCache();
+    await act(async () => {
+      oldNetwork.lists.resolve({ lists: [{ id: "list-1", name: "Old pantry", is_owner: true }] });
+      oldNetwork.entries.resolve({ entries: [{ id: "old-1", text: "Old Bread", status: "open" }] });
+    });
+    expect(screen.getByText("Fresh Bread")).toBeTruthy();
+    expect(screen.queryByText("Cached Milk")).toBeNull();
+    expect(screen.queryByText("Old Bread")).toBeNull();
+    expect(markListViewedMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not merge another list's queued entries when the route changes", async () => {
+    pendingDetail();
+    const view = renderHook(({ listId }) => useListDetailData({ listId, token: "test-token", syncVersion: 0 }), {
+      initialProps: { listId: "list-1" }
+    });
+    const pending = { id: "temp-entry", text: "First list only", status: "open" as const, is_pending_sync: true };
+    await deliverCache([pending]);
+    expect(view.result.current.entries).toEqual([pending]);
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-2", name: "Other list", is_owner: false }] });
+    fetchEntriesMock.mockResolvedValue({ entries: [] });
+    view.rerender({ listId: "list-2" });
+    await waitFor(() => { expect(view.result.current.list?.id).toBe("list-2"); });
+    expect(view.result.current.entries).toEqual([]);
+  });
+});
+
+describe("ListDetailPage initial loading", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+  afterEach(cleanup);
+
+  function expectOneLoad() {
+    for (const request of [fetchListsMock, fetchEntriesMock, fetchRecentlyUsedMock, fetchListMembersMock, markListViewedMock]) {
+      expect(request).toHaveBeenCalledTimes(1);
+    }
+  }
+
+  it("loads each endpoint once when language resources arrive after mount", async () => {
+    const translations = createInstance();
+    const backendRead = vi.fn<(language: string, namespace: string, callback: ReadCallback) => void>();
+    translations.use({ type: "backend", read: backendRead });
+    const initialized = translations.init({ lng: "en", fallbackLng: false, react: { useSuspense: false } });
+    mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    renderListDetailPage(translations);
+    await screen.findByText("Milk");
+    expect(translations.t("detail.accessError")).toBe("detail.accessError");
+    expectOneLoad();
+
+    await waitFor(() => { expect(backendRead).toHaveBeenCalled(); });
+    await act(async () => {
+      backendRead.mock.calls[0][2](null, enTranslations);
+      await initialized;
+    });
+    expect(screen.getByText("OPEN ITEMS")).toBeTruthy();
+    expect(translations.t("detail.accessError")).toBe(enTranslations["detail.accessError"]);
+    expectOneLoad();
+  });
+
+  it("renders entries while members are pending and keeps the sharing spinner until they arrive", async () => {
+    mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    const members = createDeferred<Awaited<ReturnType<typeof fetchListMembers>>>();
+    fetchListMembersMock.mockReturnValue(members.promise);
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    expectOneLoad();
+    await userEvent.click(screen.getByRole("button", { name: "List options" }));
+    await userEvent.click(screen.getByRole("button", { name: /Share list/ }));
+    expect(screen.getByLabelText("Loading")).toBeTruthy();
+
+    const member = { id: "member-1", user_id: "member-1", display_name: "Jane Doe", email: "jane@example.com" };
+    await act(async () => {
+      members.resolve({ members: [member] });
+    });
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    expect(screen.getByText("Jane Doe")).toBeTruthy();
+    expectOneLoad();
+  });
+
+  it("translates a missing-list error at render time without fetching again on language change", async () => {
+    const translations = createInstance();
+    await translations.init({ lng: "en", resources: { en: { translation: enTranslations }, de: { translation: deTranslations } } });
+    mockListDetailData();
+    fetchListsMock.mockResolvedValue({ lists: [] });
+    renderListDetailPage(translations);
+    await screen.findByText(enTranslations["detail.accessError"]);
+
+    await act(async () => { await translations.changeLanguage("de"); });
+    expect(screen.getByText(deTranslations["detail.accessError"])).toBeTruthy();
+    expect(screen.queryByText(enTranslations["detail.accessError"])).toBeNull();
+    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    expect(fetchEntriesMock).toHaveBeenCalledTimes(1);
+    expect(fetchRecentlyUsedMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMembersMock).not.toHaveBeenCalled();
+    expect(markListViewedMock).not.toHaveBeenCalled();
+  });
+
+  it("shows member-load errors without clearing entries or the list", async () => {
+    mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    const members = createDeferred<Awaited<ReturnType<typeof fetchListMembers>>>();
+    fetchListMembersMock.mockReturnValue(members.promise);
+    renderListDetailPage();
+    await waitFor(() => { expect(fetchListMembersMock).toHaveBeenCalledTimes(1); });
+    await act(async () => { members.reject(new Error("Mitglieder konnten nicht geladen werden.")); });
+    expect(screen.getByText("Mitglieder konnten nicht geladen werden.").closest(".eg-error-banner")).toBeTruthy();
+    expect(screen.getByText("Milk")).toBeTruthy();
+    expect(screen.getByText("Weekly groceries")).toBeTruthy();
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    expectOneLoad();
+  });
+});
+
 describe("ListDetailPage resync", () => {
   beforeEach(() => { vi.clearAllMocks(); });
   afterEach(cleanup);
+
+  it("does not warm the icon model while loading or after entries render", async () => {
+    mockListDetailData();
+    const request = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
+    fetchEntriesMock.mockReturnValue(request.promise);
+    renderListDetailPage();
+    expect(primeIconWorker).not.toHaveBeenCalled();
+
+    await act(async () => {
+      request.resolve({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
+    });
+    await screen.findByText("Milk");
+    expect(primeIconWorker).not.toHaveBeenCalled();
+  });
 
   it("refreshes entries, history and members without clearing content or running the full loader", async () => {
     mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });

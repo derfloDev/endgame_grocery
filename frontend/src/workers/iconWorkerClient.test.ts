@@ -40,6 +40,11 @@ describe("iconWorkerClient", () => {
     vi.resetModules();
   });
 
+  it("does not create a worker when the client module is imported", async () => {
+    await import("./iconWorkerClient");
+    expect(MockWorker.instances).toHaveLength(0);
+  });
+
   it("primes the shared worker with an init message", async () => {
     const { primeIconWorker } = await import("./iconWorkerClient");
 

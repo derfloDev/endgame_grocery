@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { formatIconName, ICON_REGISTRY, ICON_REGISTRY_KEYS, resolveIconName } from "../../data/iconRegistry";
 import { useAutocomplete } from "../../hooks/useAutocomplete";
 import { useIconSuggestion } from "../../hooks/useIconSuggestion";
+import { primeIconWorker } from "../../workers/iconWorkerClient";
 import AutocompleteSuggestions from "../AutocompleteSuggestions/AutocompleteSuggestions";
 import BottomSheet from "../ui/BottomSheet/BottomSheet";
 import styles from "./AddItemSheet.module.css";
@@ -61,6 +62,12 @@ export default function AddItemSheet({
   const submitLabel = isEditMode ? t("item.saveItem") : t("item.addTitle");
   const iconBrowserToggleLabel = showIconBrowser ? t("item.showLess") : t("item.showMore");
   const getClassName = (...classNames: Array<string | false | undefined>) => classNames.filter(Boolean).join(" ");
+
+  useEffect(() => {
+    if (open) {
+      primeIconWorker();
+    }
+  }, [open]);
 
   useEffect(() => {
     setText(initialText);
