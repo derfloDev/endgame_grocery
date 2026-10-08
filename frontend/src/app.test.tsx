@@ -61,11 +61,18 @@ describe("authentication shell", () => {
   beforeEach(async () => {
     fetch.mockReset();
     resetConnectivityForTests();
-    // Keep health checks independent of ordered resource-response fixtures.
+    // Keep health checks and the stream ticket independent of ordered resource-response fixtures.
     // These integration scenarios simulate loss of both browser connectivity and health access.
     vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input) === "/api/health") {
         return navigator.onLine ? Promise.resolve(createNoContentResponse()) : Promise.reject(new TypeError("Failed to fetch"));
+      }
+      // The event stream URL needs a ticket; answer it here so the ordered fixtures stay untouched.
+      if (String(input) === "/api/events/ticket") {
+        // Like the health check, a successful answer would prove connectivity, so fail it offline.
+        return navigator.onLine
+          ? Promise.resolve({ ok: true, status: 200, json: async () => ({ ticket: "ticket-test" }) } as Response)
+          : Promise.reject(new TypeError("Failed to fetch"));
       }
       return fetch(input, init);
     });

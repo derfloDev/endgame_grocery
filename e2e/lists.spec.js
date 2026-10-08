@@ -68,6 +68,7 @@ test.describe("shopping lists", () => {
       const pathname = new URL(route.request().url()).pathname;
       const responses = {
         "/api/config": { registrationEnabled: true },
+        "/api/events/ticket": { ticket: "e2e-ticket" },
         "/api/auth/me": { id: "user-1", display_name: "Cold Load Tester" },
         "/api/lists": { lists: [{ id: "list-1", name: "Cold Pantry", is_owner: true }] },
         "/api/lists/list-1/entries": { entries: [{ id: "entry-1", text: "Milk", status: "open" }] },

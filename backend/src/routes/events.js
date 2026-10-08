@@ -1,16 +1,29 @@
 import { Router } from "express";
 import { createRequireAuthFn } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { sseTickets as defaultSseTickets } from "../sseTickets.js";
 
+/**
+ * Creates the SSE router.
+ *
+ * `POST /ticket` (Bearer auth) issues a single-use, 30 s ticket. `GET /` opens the stream with
+ * either that ticket (`?ticket=`, what browsers use because `EventSource` cannot set headers) or
+ * an `Authorization` header. The JWT is never accepted in the query string, so it cannot leak
+ * into access logs or browser history.
+ *
+ * @param {object} [options] Router dependencies.
+ * @returns {import("express").Router} Configured events router.
+ */
 export function createEventsRouter({
   requireAuthFn = createRequireAuthFn(),
   sseManager = defaultSseManager,
+  sseTickets = defaultSseTickets,
   heartbeatIntervalMs = 30_000
 } = {}) {
   const router = Router();
 
-  router.get("/", (req, res) => {
-    const token = getTokenFromRequest(req);
+  router.post("/ticket", (req, res) => {
+    const token = getBearerToken(req);
 
     if (!token) {
       res.status(401).json({ error: "Authentication token is required." });
@@ -24,6 +37,38 @@ export function createEventsRouter({
     } catch {
       res.status(401).json({ error: "Authentication token is invalid." });
       return;
+    }
+
+    res.set("Cache-Control", "no-store");
+    res.json({ ticket: sseTickets.issue(user.sub) });
+  });
+
+  router.get("/", (req, res) => {
+    let user;
+
+    if (typeof req.query.ticket === "string" && req.query.ticket) {
+      const userId = sseTickets.consume(req.query.ticket);
+
+      if (!userId) {
+        res.status(401).json({ error: "Authentication ticket is invalid." });
+        return;
+      }
+
+      user = { sub: userId };
+    } else {
+      const token = getBearerToken(req);
+
+      if (!token) {
+        res.status(401).json({ error: "Authentication token is required." });
+        return;
+      }
+
+      try {
+        user = requireAuthFn(token);
+      } catch {
+        res.status(401).json({ error: "Authentication token is invalid." });
+        return;
+      }
     }
 
     req.user = user;
@@ -62,11 +107,7 @@ export function createEventsRouter({
   return router;
 }
 
-function getTokenFromRequest(req) {
-  if (typeof req.query.token === "string" && req.query.token.trim()) {
-    return req.query.token;
-  }
-
+function getBearerToken(req) {
   const header = req.headers.authorization;
 
   if (header?.startsWith("Bearer ")) {

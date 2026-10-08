@@ -1379,3 +1379,66 @@ No blocker or major findings; no required fixes.
 ##### Risks
 - I could not run the integration suite: the sandbox blocks setting `TEST_DATABASE_URL`. I relied on the implementer's recorded 16/16 pass against postgres:16, the code reading and the constraint check. CI is the authoritative run.
 - The allowlist could reject a legitimate push service host not in the list (for example a self-hosted or regional endpoint); Web Push on the main browsers (Chrome, Firefox, Edge, Safari) is covered.
+
+## Task: T-004 (hardening cycle 2026-10-08 — credential-free logs and SSE tickets)
+
+Note: the task ID repeats an earlier cycle's T-004 section above; this section covers the current plan's T-004 only.
+
+### Review Round 1
+
+#### Verdict
+
+`FAIL`
+
+#### Findings
+
+1. **major (required fix)** — `docker/nginx.conf:18-19`: both `main_noquery` and `invite_masked` log `"$http_referer"`. The referer is the full URL of the page that made the request, query string included. The app's own mail links are `/reset-password?token=<token>`, `/verify-email?token=<token>` and `/invite/<token>` (`routes/auth.js:622,650`, `routes/sharing.js:328`). Browsers send the full URL as `Referer` on same-origin requests by default (`strict-origin-when-cross-origin`), so every asset and API call made from those pages — including the `POST /api/auth/reset-password` that consumes the token — is logged with the one-time token in the referer field. This violates the acceptance criterion "No … nginx log line contains … one-time tokens". The masking of `$uri` is therefore incomplete.
+   Fix: drop `"$http_referer"` from both formats (simplest), or log a query-free referer through a `map`. Extend `nginxLogging.test.js` to assert that neither format contains `$http_referer` (or `$http_referrer`-style variables) and README wording stays accurate.
+2. **minor** — `docker/nginx.conf`: `nginx -t` was not run, and the textual test cannot prove the `map`/`access_log … if=` combination is valid. `map` and `log_format` sit at `http` level, which matches how `/etc/nginx/http.d/default.conf` is included, so I expect it to load, but a config check is cheap. Not a required fix; do it if nginx or Docker is available.
+3. **nit** — two `map` blocks plus two `access_log` lines express one condition; a single `map` plus `if=` on one line each is not possible with a single format, so this is acceptable.
+
+#### Required fixes
+- Remove (or sanitise) `$http_referer` from the nginx log formats and cover it with a test.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board and the diff: `logger.js`, `app.js`, new `sseTickets.js`, `routes/events.js`, `nginx.conf`, backend and frontend tests, README.
+- `npm run lint`: 0 errors. `npm run build`: ok. `npm test`: backend 242 pass, 0 fail.
+- Traced the token flows: `?token=` is no longer read by `GET /api/events` (401 "required"); `POST /api/events/ticket` needs a Bearer JWT and returns a 43-character base64url ticket with `Cache-Control: no-store`; tickets are single-use, expire after 30 s and are swept on issue; the pino-http serializer logs method, query-free path (invite token masked) and address only; `redact` covers Authorization, X-Api-Key and Cookie.
+- Searched the mail-link builders to find which one-time tokens appear in browser URLs; that exposed finding 1.
+
+##### Findings
+- Backend logging, ticket issuing/consumption and the removal of `?token=` meet the criteria. The nginx access log does not.
+- Frontend: ticket fetch before each connect, backoff on ticket failure, no retry on auth expiry — covered by new tests per the handoff; the changed expectations in `EventSourceContext.test.tsx` are the URL, the StrictMode instance count and the token-change check, none weakened.
+
+##### Risks
+- Frontend/E2E behaviour in a real browser, `nginx -t` and the Playwright specs were not run (no nginx, local `.env` secret rejected). Re-review after the fix should include a config check if nginx is available.
+- nginx error logs can still contain request lines on upstream errors (`request: "GET /path?query"`); this is outside the scope here but worth noting for T-005's hardening.
+
+### Review Round 2 (T-004, hardening cycle 2026-10-08)
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **resolved** — Round 1 major (nginx logged `$http_referer`): both `log_format` lines in `docker/nginx.conf` no longer contain the referer; a comment explains why. `nginxLogging.test.js` now asserts the referer is absent and that formats only use an allowlist of variables (`remote_addr`, `remote_user`, `time_local`, `request_method`, `uri`, `server_protocol`, `status`, `body_bytes_sent`, `http_user_agent`). README wording updated.
+2. **minor** — `nginx -t` still has not been run, so the `map` plus `access_log … if=` setup is verified only textually. `map`/`log_format` are at `http` level, which matches the `http.d` include, so I expect it to load; CI/container startup will confirm. Not a required fix.
+3. **minor** — nginx error logs may still carry request lines with query strings on upstream failures; deferred to T-005 as noted.
+
+No required fixes.
+
+#### Verification
+
+##### Steps performed
+- Re-read TASKS and the rework handoff; diffed `nginx.conf`, `nginxLogging.test.js` and the README line.
+- `npm run lint`: 0 errors. `npm run build`: ok. `npm test` backend: 244 pass, 0 fail.
+- Round 1 backend and frontend results are unchanged (only nginx config, its test and README changed).
+
+##### Findings
+- All acceptance criteria met on inspection: no Authorization/X-Api-Key/JWT/one-time token in backend or nginx access logs (query stripped, invite path masked, referer dropped), single-use 30 s tickets, `?token=` rejected, reconnect/backoff preserved.
+
+##### Risks
+- nginx config and Playwright specs not executed locally; the first container build/CI run is the authoritative check.

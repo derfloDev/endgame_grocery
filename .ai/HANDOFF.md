@@ -408,3 +408,71 @@ Notes for review: existing unit tests were adapted because the SQL changed on pu
 | Next Role | none |
 
 ---
+
+### T-004 — implement — 2026-10-08T15:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Request logs no longer contain credentials (header redaction, query-free path-only request serializer, masked invite tokens, query-free nginx format), and the event stream is opened with a single-use 30 s ticket from `POST /api/events/ticket` instead of the JWT in the URL. |
+| Files Changed | backend/src/logger.js, backend/src/app.js, backend/src/sseTickets.js, backend/src/sseTickets.test.js, backend/src/logging.test.js, backend/src/nginxLogging.test.js, backend/src/routes/events.js, backend/src/routes/events.test.js, backend/src/jwtHardening.test.js, docker/nginx.conf, frontend/src/api/events.ts, frontend/src/api/events.test.ts, frontend/src/context/EventSourceContext.tsx, frontend/src/context/EventSourceContext.test.tsx, frontend/src/app.test.tsx, e2e/resync.spec.js, e2e/queue-retry.spec.js, e2e/lists.spec.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` (0 errors, 1 pre-existing warning); `npm run build` ok; `npm test` backend 242/242, frontend 625/625 pass. Not run locally: nginx (`nginx -t`) and the Playwright specs (docker/E2E blocked or the local `.env` still has the rejected `change-me` secret). |
+| Commit | `feat(security): keep credentials out of logs and open the event stream with single-use tickets` |
+| Next Role | review |
+
+Notes for review: (1) `?token=` is removed from `GET /api/events`; the Authorization header still works and `POST /api/events/ticket` issues tickets (in-memory, single instance, README says so). (2) `EventSourceContext.test.tsx` reconnect-manager tests were made async (helpers `mount`/`advance`/`wake` flush the ticket promise); no assertion was removed. The only changed expectations are the stream URL (`?ticket=`), the StrictMode instance count (the first setup is cleaned up before its ticket arrives, so 1 stream instead of 2) and the token-change test (asserts the ticket request used the new token). Five new tests cover ticket use, fresh ticket per reconnect, backoff on a failed ticket request, no retry on `AuthExpiredError`, and late tickets after unmount. (3) `app.test.tsx` answers `/api/events/ticket` in its fetch wrapper (like `/api/health`; it rejects when offline because a successful reply would prove connectivity). The three Playwright specs that mock `/api/` got a ticket route. (4) The nginx plan used `$uri`; I additionally mask invite tokens (`/invite/<token>`, `/api/invites/<token>`) with two maps and `access_log … if=` because those tokens are path segments and the acceptance criteria exclude one-time tokens from logs. The config could not be validated with `nginx -t`; `nginxLogging.test.js` asserts the directives textually, so CI/build should confirm startup. (5) The pino-http `req` serializer logs only method, path and remote address, so headers are never logged; `redact` is a second layer on the default logger.
+
+---
+
+### T-004 — review — 2026-10-08T16:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed credential-free logging and SSE tickets; backend parts pass, but the nginx access log still records the full Referer, which carries reset/verify/invite tokens from the app's mail links. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | FAIL |
+| Blocking Findings | 1. docker/nginx.conf logs "$http_referer" in both log formats, leaking one-time tokens from /reset-password?token=, /verify-email?token= and /invite/<token> pages. |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-10-08T16:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Rework: removed `$http_referer` from both nginx log formats (it carried one-time-token URLs such as `/reset-password?token=…`) and added tests that fail if the referer or any non-allowlisted variable is logged. |
+| Files Changed | docker/nginx.conf, backend/src/nginxLogging.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` (0 errors, 1 pre-existing warning); `npm run build` ok; `npm test` backend 244/244, frontend 625/625 pass. `nginx -t` still not run (docker commands are blocked here). |
+| Commit | `feat(security): keep credentials out of logs and open the event stream with single-use tickets` |
+| Next Role | review |
+
+Notes for review: the one required fix (finding 1) is done; scope and commit message are unchanged. `nginxLogging.test.js` now also asserts that the log formats only use an allowlist of variables (`remote_addr`, `remote_user`, `time_local`, `request_method`, `uri`, `server_protocol`, `status`, `body_bytes_sent`, `http_user_agent`), so a later change cannot reintroduce a query- or header-bearing variable unnoticed. README wording mentions the omitted `Referer`. Findings 2 and 3 (config check, two maps) were not required; `nginx -t` remains unverified locally. The note about nginx error logs containing request lines is left for T-005.
+
+---
+
+### T-004 — review — 2026-10-08T16:40:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Re-reviewed T-004 after rework: the Referer is no longer logged by nginx and a variable allowlist test guards the formats; all criteria met. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-004 — implement — 2026-10-08T16:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-004 after review round 2 PASS_WITH_NOTES: credential-free backend and nginx logs and single-use ticket authentication for the event stream. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-004 implementation files |
+| Commit | `feat(security): keep credentials out of logs and open the event stream with single-use tickets` |
+| Next Role | none |
+
+---

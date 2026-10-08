@@ -9,7 +9,7 @@ import entryRoutes from "./routes/entries.js";
 import historyRoutes from "./routes/history.js";
 import invitesRoutes from "./routes/invites.js";
 import { getConfig } from "./env.js";
-import { logger as defaultLogger } from "./logger.js";
+import { logger as defaultLogger, serializeRequest } from "./logger.js";
 import listRoutes from "./routes/lists.js";
 import pushRoutes from "./routes/push.js";
 import suggestionRoutes from "./routes/suggestions.js";
@@ -51,6 +51,8 @@ export function createApp(options = {}) {
   app.use(
     pinoHttp({
       logger,
+      // Log method, path and address only; never headers or query strings (see logger.js).
+      serializers: { req: serializeRequest },
       autoLogging: {
         ignore(req) {
           return req.url === "/api/health";
@@ -73,6 +75,7 @@ export function createApp(options = {}) {
     createEventsRouter({
       requireAuthFn,
       sseManager,
+      sseTickets: options.sseTickets,
       heartbeatIntervalMs: options.sseHeartbeatIntervalMs
     })
   );

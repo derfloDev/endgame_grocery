@@ -19,6 +19,7 @@ async function setup(page) {
   const state = { writes: [], lists: [], failChild: true };
   await page.route((url) => url.pathname.startsWith("/api/"), async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path === "/api/events/ticket") return route.fulfill({ json: { ticket: "e2e-ticket" } });
     if (route.request().method() === "POST") {
       state.writes.push(path);
       if (path.endsWith("/entries") && state.failChild) {

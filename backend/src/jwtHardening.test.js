@@ -56,9 +56,17 @@ describe("JWT verification", () => {
     });
 
     it(`rejects ${name} on the event stream`, async () => {
-      const response = await request(createTestApp()).get(
-        `/api/events?token=${encodeURIComponent(makeToken())}`
-      );
+      const response = await request(createTestApp())
+        .get("/api/events")
+        .set("Authorization", `Bearer ${makeToken()}`);
+
+      assert.equal(response.status, 401);
+    });
+
+    it(`rejects ${name} when requesting an event stream ticket`, async () => {
+      const response = await request(createTestApp())
+        .post("/api/events/ticket")
+        .set("Authorization", `Bearer ${makeToken()}`);
 
       assert.equal(response.status, 401);
     });

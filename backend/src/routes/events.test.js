@@ -5,6 +5,7 @@ import { afterEach, describe, it } from "node:test";
 import jwt from "jsonwebtoken";
 import request from "supertest";
 import { createApp } from "../app.js";
+import { createSseTickets } from "../sseTickets.js";
 
 const servers = new Set();
 
@@ -34,17 +35,76 @@ describe("events route", () => {
     assert.deepEqual(response.body, { error: "Authentication token is required." });
   });
 
-  it("returns 401 for an invalid token", async () => {
-    const response = await request(createTestApp()).get("/api/events?token=bad-token");
+  it("returns 401 for an invalid bearer token", async () => {
+    const response = await request(createTestApp())
+      .get("/api/events")
+      .set("Authorization", "Bearer bad-token");
 
     assert.equal(response.status, 401);
     assert.deepEqual(response.body, { error: "Authentication token is invalid." });
   });
 
+  it("no longer accepts the JWT in the query string", async () => {
+    const token = jwt.sign({ sub: "user-1" }, "test-secret", { algorithm: "HS256" });
+    const response = await request(createTestApp()).get(`/api/events?token=${token}`);
+
+    assert.equal(response.status, 401);
+    assert.deepEqual(response.body, { error: "Authentication token is required." });
+  });
+
+  it("returns 401 for an unknown ticket", async () => {
+    const response = await request(createTestApp()).get("/api/events?ticket=unknown");
+
+    assert.equal(response.status, 401);
+    assert.deepEqual(response.body, { error: "Authentication ticket is invalid." });
+  });
+
+  describe("POST /api/events/ticket", () => {
+    it("requires a valid bearer token", async () => {
+      const missing = await request(createTestApp()).post("/api/events/ticket");
+      const invalid = await request(createTestApp())
+        .post("/api/events/ticket")
+        .set("Authorization", "Bearer bad-token");
+
+      assert.equal(missing.status, 401);
+      assert.equal(invalid.status, 401);
+    });
+
+    it("issues a ticket that opens the stream exactly once", async () => {
+      const token = jwt.sign({ sub: "user-1" }, "test-secret", { algorithm: "HS256" });
+      const app = createTestApp();
+      const issued = await request(app)
+        .post("/api/events/ticket")
+        .set("Authorization", `Bearer ${token}`);
+
+      assert.equal(issued.status, 200);
+      assert.equal(issued.headers["cache-control"], "no-store");
+      assert.match(issued.body.ticket, /^[A-Za-z0-9_-]{43}$/);
+
+      const { req } = await openEventStream(app, `/api/events?ticket=${issued.body.ticket}`);
+      req.destroy();
+
+      const reused = await request(app).get(`/api/events?ticket=${issued.body.ticket}`);
+      assert.equal(reused.status, 401);
+    });
+
+    it("rejects a ticket after it expired", async () => {
+      let now = 0;
+      const sseTickets = createSseTickets({ now: () => now });
+      const ticket = sseTickets.issue("user-1");
+      now += 30_001;
+
+      const response = await request(createTestApp({ sseTickets })).get(`/api/events?ticket=${ticket}`);
+
+      assert.equal(response.status, 401);
+    });
+  });
+
   it("opens an SSE stream with the expected headers and named ping heartbeat", async () => {
-    const token = jwt.sign({ sub: "user-1" }, "test-secret");
-    const app = createTestApp({ sseHeartbeatIntervalMs: 10 });
-    const { req, res } = await openEventStream(app, `/api/events?token=${token}`);
+    const sseTickets = createSseTickets();
+    const ticket = sseTickets.issue("user-1");
+    const app = createTestApp({ sseHeartbeatIntervalMs: 10, sseTickets });
+    const { req, res } = await openEventStream(app, `/api/events?ticket=${ticket}`);
     const chunks = [];
 
     res.setEncoding("utf8");
@@ -74,7 +134,8 @@ describe("events route", () => {
   });
 
   it("removes the connection when the client closes the request", async () => {
-    const token = jwt.sign({ sub: "user-1" }, "test-secret");
+    const sseTickets = createSseTickets();
+    const ticket = sseTickets.issue("user-1");
     const sseManager = {
       addCalls: [],
       removeCalls: [],
@@ -85,8 +146,8 @@ describe("events route", () => {
         this.removeCalls.push({ userId, res });
       }
     };
-    const app = createTestApp({ sseManager });
-    const { req, res } = await openEventStream(app, `/api/events?token=${token}`);
+    const app = createTestApp({ sseManager, sseTickets });
+    const { req, res } = await openEventStream(app, `/api/events?ticket=${ticket}`);
 
     req.destroy();
     await waitFor(() => sseManager.removeCalls.length === 1);
