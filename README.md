@@ -45,7 +45,7 @@ Copy the example environment file and adjust values for your machine:
 cp .env.example .env
 ```
 
-The backend requires a valid `DATABASE_URL` before registration, login, or list APIs can work. `JWT_SECRET` is fine for local development, but you must replace it with a strong secret outside local use. Mail-based flows also require SMTP credentials plus an `APP_BASE_URL` that points at the public frontend origin used in verification, invite, and password-reset links. Browser push also requires `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_CONTACT` so the backend can authenticate Web Push deliveries.
+The backend requires a valid `DATABASE_URL` before registration, login, or list APIs can work. `JWT_SECRET` must be at least 32 characters and must not contain `change-me`; the backend logs the problem and exits with code 1 at startup if `DATABASE_URL` is missing or the secret is empty, too short, or a placeholder. Generate one with `openssl rand -base64 48`. Mail-based flows also require SMTP credentials plus an `APP_BASE_URL` that points at the public frontend origin used in verification, invite, and password-reset links. Browser push also requires `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_CONTACT` so the backend can authenticate Web Push deliveries.
 
 Backend commands that read configuration, including `npm run dev` and `npm run db:seed`, load this project-root `.env` file automatically even when npm starts them from the `backend/` workspace directory. The frontend Vite app also reads `VITE_*` values from the same repo-root `.env`, including `VITE_ICON_SIMILARITY_THRESHOLD`.
 
@@ -162,7 +162,8 @@ The repository's checked-in `docker-compose.yml` is intentionally kept for local
 | Variable | Purpose | Example |
 | --- | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string used by migrations and the backend. | `postgres://postgres:change-me@postgres:5432/endgame_grocery` |
-| `JWT_SECRET` | Secret used to sign authentication tokens. Replace with a strong random value. | `change-me-strong-random-value` |
+| `JWT_SECRET` | Secret used to sign authentication tokens (HS256 only). Required: at least 32 characters and no `change-me` placeholder, otherwise the backend refuses to start. Generate with `openssl rand -base64 48`. | `replace-with-openssl-rand-base64-48-output` |
+| `ENABLE_TEST_ROUTES` | Set to `true` to mount `POST /api/test/create-verified-user` for E2E setup. Off by default; never enable it on a reachable deployment. | `false` |
 | `PORT` | Internal backend port that nginx proxies to. | `4000` |
 | `JWT_EXPIRES_IN` | JWT lifetime accepted by the backend. | `7d` |
 | `SMTP_HOST` | SMTP server hostname used for transactional mail delivery. | `smtp.change-me.example` |
@@ -210,7 +211,7 @@ can continue importing files that move in later tasks.
 
 ## E2E Tests
 
-Playwright E2E coverage exercises the registration, login, and core shopping-list CRUD flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first. The non-production backend also exposes `POST /api/test/create-verified-user` specifically for E2E setup, and transactional mail delivery is skipped with a warning when `SMTP_HOST` is not configured.
+Playwright E2E coverage exercises the registration, login, and core shopping-list CRUD flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first. The backend only exposes `POST /api/test/create-verified-user` for E2E setup when `ENABLE_TEST_ROUTES=true` (Playwright sets it for its backend dev server and the CI `.env` includes it; the production image never enables it), and transactional mail delivery is skipped with a warning when `SMTP_HOST` is not configured.
 
 Install the Chromium browser once:
 

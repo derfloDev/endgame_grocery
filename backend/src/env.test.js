@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { getConfig } from "./env.js";
+import { getConfig, validateConfig } from "./env.js";
 
 const testFilePath = fileURLToPath(import.meta.url);
 const backendSrcDir = path.dirname(testFilePath);
@@ -263,6 +263,56 @@ describe("getConfig", () => {
       restoreEnvVar("LOG_LEVEL", previousLogLevel);
       fs.rmSync(fixtureRootDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("validateConfig", () => {
+  const validConfig = {
+    databaseUrl: "postgres://db",
+    jwtSecret: "k3Jf9sL0pQ2xV7bN5mC8zA1dR4tY6uHw"
+  };
+
+  it("accepts a database URL and a strong secret", () => {
+    assert.deepEqual(validateConfig(validConfig), []);
+  });
+
+  it("reports a missing DATABASE_URL", () => {
+    const problems = validateConfig({ ...validConfig, databaseUrl: "" });
+
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /DATABASE_URL/);
+  });
+
+  it("reports an empty JWT_SECRET", () => {
+    const problems = validateConfig({ ...validConfig, jwtSecret: "" });
+
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /JWT_SECRET/);
+  });
+
+  it("reports a JWT_SECRET shorter than 32 characters", () => {
+    const problems = validateConfig({ ...validConfig, jwtSecret: "a".repeat(31) });
+
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /32/);
+  });
+
+  it("accepts a JWT_SECRET of exactly 32 characters", () => {
+    assert.deepEqual(validateConfig({ ...validConfig, jwtSecret: "a1B2".repeat(8) }), []);
+  });
+
+  it("reports a placeholder JWT_SECRET containing change-me", () => {
+    const problems = validateConfig({
+      ...validConfig,
+      jwtSecret: "change-me-strong-random-value-0123456789"
+    });
+
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /change-me/);
+  });
+
+  it("collects every problem", () => {
+    assert.equal(validateConfig({ databaseUrl: "", jwtSecret: "" }).length, 2);
   });
 });
 

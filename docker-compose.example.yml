@@ -13,7 +13,8 @@ services:
       - "80:80"
     environment:
       DATABASE_URL: postgres://postgres:change-me@postgres:5432/endgame_grocery
-      JWT_SECRET: change-me-strong-random-value
+      # Required: at least 32 characters. Generate with: openssl rand -base64 48
+      JWT_SECRET: replace-with-openssl-rand-base64-48-output
       PORT: 4000
       JWT_EXPIRES_IN: 7d
       SMTP_HOST: smtp.change-me.example

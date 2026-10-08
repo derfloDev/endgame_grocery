@@ -14,6 +14,9 @@ RUN npm run build --workspace frontend
 
 FROM node:22-alpine AS runtime
 
+# Production image: test routes stay off and dependencies behave in production mode.
+ENV NODE_ENV=production
+
 RUN apk add --no-cache nginx supervisor
 
 WORKDIR /app

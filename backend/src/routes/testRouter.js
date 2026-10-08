@@ -6,6 +6,7 @@ import { getConfig } from "../env.js";
 
 function createToken({ jwtLib, config, userId }) {
   return jwtLib.sign({ sub: userId }, config.jwtSecret, {
+    algorithm: "HS256",
     expiresIn: config.jwtExpiresIn
   });
 }

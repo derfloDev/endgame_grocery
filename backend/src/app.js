@@ -89,7 +89,7 @@ export function createApp(options = {}) {
   app.use("/api/v1", v1Routes(routerOptions));
   app.use("/api/invites", invitesRoutes(routerOptions));
   app.use("/api/push", pushRoutes(routerOptions));
-  if (process.env.NODE_ENV !== "production") {
+  if (config.enableTestRoutes) {
     app.use("/api/test", testRoutes(routerOptions));
   }
   app.use("/api/lists", listRoutes(routerOptions));

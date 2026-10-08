@@ -6,13 +6,13 @@
       "effort": "high"
     },
     "implement": {
-      "agent": "codex",
-      "model": "gpt-6-astra",
-      "effort": "high"
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "medium"
     },
     "review": {
       "agent": "claude",
-      "model": "opus",
+      "model": "sonnet",
       "effort": "high"
     }
   },

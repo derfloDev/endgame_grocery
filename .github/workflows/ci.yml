@@ -69,7 +69,7 @@ jobs:
       - run: npm ci
       - name: Create environment file
         run: |
-          printf 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/endgame_grocery\nJWT_SECRET=ci-test-secret\nPORT=4000\n' > .env
+          printf 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/endgame_grocery\nJWT_SECRET=ci-only-secret-0123456789abcdef0123456789abcdef\nPORT=4000\nENABLE_TEST_ROUTES=true\n' > .env
       - name: Run database migrations
         run: npm run migrate
       - name: Install Playwright browser

@@ -1,6 +1,10 @@
 import jwt from "jsonwebtoken";
 import { getConfig } from "../env.js";
 
+// Pin the algorithm so tokens with alg "none" or another HMAC variant are never accepted.
+export const JWT_ALGORITHM = "HS256";
+const JWT_VERIFY_OPTIONS = { algorithms: [JWT_ALGORITHM] };
+
 export function createRequireAuth({ jwtLib = jwt, config = getConfig() } = {}) {
   return function requireAuth(req, res, next) {
     const header = req.headers.authorization;
@@ -13,7 +17,7 @@ export function createRequireAuth({ jwtLib = jwt, config = getConfig() } = {}) {
     const token = header.slice("Bearer ".length);
 
     try {
-      req.user = jwtLib.verify(token, config.jwtSecret);
+      req.user = jwtLib.verify(token, config.jwtSecret, JWT_VERIFY_OPTIONS);
       next();
     } catch {
       res.status(401).json({ error: "Authentication token is invalid." });
@@ -23,7 +27,7 @@ export function createRequireAuth({ jwtLib = jwt, config = getConfig() } = {}) {
 
 export function createRequireAuthFn({ jwtLib = jwt, config = getConfig() } = {}) {
   return function requireAuthFn(token) {
-    return jwtLib.verify(token, config.jwtSecret);
+    return jwtLib.verify(token, config.jwtSecret, JWT_VERIFY_OPTIONS);
   };
 }
 

@@ -1275,3 +1275,38 @@ None.
 #### Verdict
 
 `PASS_WITH_NOTES`
+
+## Task: T-001 (hardening cycle 2026-10-08 — production-safe startup)
+
+Note: the task ID repeats the earlier cycle's T-001 section above; this section covers the current plan's T-001 only.
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `docker-compose.example.yml:17`, `README.md:165`: the placeholder `replace-with-openssl-rand-base64-48-output` is 41 characters and has no `change-me`, so it passes `validateConfig`. Copying the example unchanged boots with a publicly known secret. This matches the plan's wording (≥ 32 chars, no `change-me`), and the README tells users to generate their own. Not a required fix. Consider a `replace-me`/`example` denylist entry in a later task.
+2. **minor** — `.env.example:3`: the local dev default is a fixed string that passes validation. It is labelled "do not use in production" and is acceptable for local use. Not a required fix.
+3. **nit** — `backend/src/testRoutes.test.js` still saves and restores `NODE_ENV` for two tests that now only assert the flag is what matters. Harmless.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board and the full working-tree diff (`app.js`, `env.js`, `index.js`, `middleware/auth.js`, `routes/auth.js`, `routes/testRouter.js`, `Dockerfile`, `playwright.config.js`, `ci.yml`, `.env.example`, compose example, README, tests).
+- `rg` for every `jwt.sign`/`jwt.verify` call site in non-test code: all go through `createRequireAuth`, `createRequireAuthFn` (used by the events route) and the two sign helpers, and all pin HS256. No `NODE_ENV` checks remain in code.
+- `npm run lint`: 0 errors, 1 pre-existing warning. `npm run build`: ok.
+- `npm test`: backend `fail 0` (197 tests), frontend 41 files / 616 tests pass.
+- Checked the new tests cover: flag on/off/`"1"`, `validateConfig` for empty, 31/32-character, `change-me` and missing `DATABASE_URL`, `startServer` exit(1) without listening, and `alg:none`, wrong-secret, expired and HS512 tokens returning 401 on `/api/auth/me`, a list route and the events stream, plus HS256 signing.
+
+##### Findings
+- Acceptance criteria met: `/api/test/*` is 404 unless `ENABLE_TEST_ROUTES=true`; the runtime image sets `NODE_ENV=production`; startup rejects an empty, short or `change-me` secret and a missing `DATABASE_URL`; bad JWTs return 401; Playwright and the CI E2E `.env` opt in so E2E user creation still works.
+- `validateConfig` runs only in `startServer`, so `createApp` in tests stays unaffected, as planned.
+
+##### Risks
+- I could not run the real process to watch the exit (the shell blocked the env-prefixed command). The exit path is covered by `index.test.js` with an injected `exit`. PostgreSQL is unavailable locally, so the Playwright E2E and the CI change were not exercised; the CI diff is a one-line env change.
+- The implementer's note stands: a local gitignored `.env` with `JWT_SECRET=change-me` makes `npm run dev` and `npm run e2e` exit until replaced.
