@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import pino from "pino";
 import request from "supertest";
 import { createApp } from "../app.js";
-import { createRequireAuth } from "../middleware/auth.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
 import {
   TEST_JWT_SECRET,
@@ -35,9 +34,8 @@ describeDb("list access (PostgreSQL)", () => {
 
     app = createApp({
       pool: db.pool,
+      // The app wires real JWT verification (including the token version lookup) from this config.
       config: { jwtSecret: TEST_JWT_SECRET },
-      // Real JWT verification, bound to the test secret instead of the process environment.
-      requireAuthMiddleware: createRequireAuth({ config: { jwtSecret: TEST_JWT_SECRET } }),
       logger: pino({ level: "silent" })
     });
   });

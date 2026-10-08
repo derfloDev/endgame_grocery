@@ -524,3 +524,49 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-006 — implement — 2026-10-08T18:20:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | JWTs now carry a `tv` claim that is checked against the new `users.token_version` on every authenticated request (and event-stream ticket), and password reset consumes its token atomically in one transaction, bumps the version, deletes the user's other reset tokens and clears the API key. |
+| Files Changed | backend/src/db/migrations/1779979000002_add_token_version_to_users.cjs, backend/src/db/migrations.test.js, backend/src/db/client.js, backend/src/middleware/auth.js, backend/src/app.js, backend/src/routes/auth.js, backend/src/routes/events.js, backend/src/sessionRevocation.test.js, backend/src/auth.test.js, backend/src/hardening.test.js, backend/src/integration/auth.test.js, backend/src/integration/access.test.js, backend/src/integration/helpers.js, frontend/src/locales/en/translation.json, frontend/src/locales/de/translation.json, frontend/src/app.test.tsx, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run test:integration` against local postgres:16: 25/25 pass (migration round-trip includes the new migration; old JWT 401 after reset, concurrent resets → one 200 and one 400, other tokens invalidated, API key cleared, expired/used tokens rejected). `npm run lint` (0 errors, 1 pre-existing warning); `npm run build` ok; `npm test` backend 310/310, frontend 667/667 pass. |
+| Commit | `feat(security): sign users out everywhere and make password reset atomic` |
+| Next Role | review |
+
+Notes for review:
+1. **Middleware shape:** `createRequireAuthFn` is now async and `createRequireAuth` takes a `pool`. `createApp` builds one pool-aware `requireAuthMiddleware` and passes it to every router through `routerOptions` (routers previously defaulted to a module-level instance that read the secret from the process env, so `createApp({ config })` did not reach them). Without a pool (tests only) just the signature is checked; production cannot start without `DATABASE_URL`. DB errors from the lookup go to `next(error)` (500), not to a 401.
+2. **Token without `tv` ≡ version 0:** existing sessions stay valid after the migration until the owner resets the password. The migration adds `token_version integer NOT NULL DEFAULT 0`; `down` drops it.
+3. **Reset transaction:** new `withTransaction(pool, fn)` in `db/client.js` (T-009 can reuse it). The claim `UPDATE … WHERE token=$1 AND used=false AND expires_at>$2 RETURNING user_id` is the only validity check; bcrypt hashing happens after a successful claim, inside the transaction. The user update sets `password_hash`, `token_version = token_version + 1` and `api_key = NULL` together.
+4. **Existing tests adapted, nothing weakened:** six `auth.test.js` route tests and the two reset tests got small mock helpers (`withCurrentTokenVersion` answers the token-version lookup; `withTransactionClient` adds `connect()`); the reset success test now expects the single claim `UPDATE … RETURNING` instead of the earlier SELECT + UPDATE, because that is the behaviour change. `hardening.test.js` default pool got `connect()`. `app.test.tsx` asserts the new reset message with a regex instead of the old exact sentence.
+5. **Per-request cost:** one primary-key lookup per authenticated request, as planned; no cache.
+6. The reset message (DE/EN) now says the user was signed out elsewhere and that the API key was removed so a new one must be generated for Home Assistant.
+
+---
+
+### T-006 — review — 2026-10-08T18:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed token_version session revocation and the atomic password reset; criteria met by inspection and unit tests, integration suite not executed by the reviewer. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-006 — implement — 2026-10-08T18:40:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-006 after review PASS_WITH_NOTES: token_version session revocation and an atomic, single-use password reset that also clears the API key. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-006 implementation files |
+| Commit | `feat(security): sign users out everywhere and make password reset atomic` |
+| Next Role | none |
+
+---

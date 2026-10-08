@@ -6,9 +6,15 @@ import { createApp } from "./app.js";
 
 const silentLogger = pino({ level: "silent" });
 
+function emptyPool() {
+  const query = async () => ({ rows: [] });
+
+  return { query, async connect() { return { query, release() {} }; } };
+}
+
 function createTestApp({ pool, bcryptLib, rateLimits, requireAuthMiddleware, mailer } = {}) {
   return createApp({
-    pool: pool ?? { async query() { return { rows: [] }; } },
+    pool: pool ?? emptyPool(),
     startWorkers: false,
     logger: silentLogger,
     config: { jwtSecret: "test-secret-0123456789abcdef0123456789", jwtExpiresIn: "7d", registrationEnabled: true },

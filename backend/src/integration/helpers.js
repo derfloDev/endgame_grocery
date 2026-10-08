@@ -268,8 +268,12 @@ export async function createInvite(
  * Signs a JWT the same way the login route does.
  *
  * @param {string} userId User identifier.
+ * @param {number} [tokenVersion] Value of the `tv` claim; omit it to sign a token like the ones
+ *   issued before token versions existed.
  * @returns {string} Signed token.
  */
-export function signTestToken(userId) {
-  return jwt.sign({ sub: userId }, TEST_JWT_SECRET, { algorithm: "HS256", expiresIn: "1h" });
+export function signTestToken(userId, tokenVersion) {
+  const payload = tokenVersion === undefined ? { sub: userId } : { sub: userId, tv: tokenVersion };
+
+  return jwt.sign(payload, TEST_JWT_SECRET, { algorithm: "HS256", expiresIn: "1h" });
 }

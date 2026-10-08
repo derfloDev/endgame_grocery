@@ -1481,3 +1481,39 @@ No blocker or major findings; no required fixes.
 - I did not start nginx or the container, and I did not re-run the Chromium CSP check; the CSP evidence is the implementer's. A container build in CI plus a quick browser pass on the published image is the authoritative check.
 - Running the backend as `node` assumes `/app` is readable and any writable paths are not needed at runtime; the unit tests cannot prove this. First container start should be watched.
 - Behind Cloudflare or another proxy all visitors share one rate-limit counter unless nginx `real_ip` is configured (README warns about this).
+
+## Task: T-006 (hardening cycle 2026-10-08 — session revocation and atomic password reset)
+
+Note: the task ID repeats an earlier cycle's T-006 section above; this section covers the current plan's T-006 only.
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `backend/src/middleware/auth.js`: every authenticated request now costs one primary-key lookup (`SELECT token_version`). This is the planned design; no caching. Fine for the single-instance deployment.
+2. **minor** — tokens without a `tv` claim count as version 0, so sessions issued before the migration stay valid until that user resets the password. This is intentional (avoids signing everybody out on deploy) and documented in the migration comment.
+3. **minor** — the existing SSE stream of a user stays open after a reset; revocation applies to new requests, tickets and reconnects only. Acceptable for this task, since a reconnect is rejected.
+4. **nit** — `createRequireAuth` without a pool only checks the signature (test-only path, documented). The server cannot start without `DATABASE_URL` (T-001), so production always has a pool.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board, the handoff and the diff: new migration `1779979000002_add_token_version_to_users.cjs` (with working `down`), `middleware/auth.js`, `routes/auth.js` (login/verify/reset), `routes/events.js`, `app.js`, `db/client.js` (`withTransaction`), adapted tests, new `sessionRevocation.test.js` and `integration/auth.test.js`, locales, README.
+- Confirmed every authenticated router (`entries`, `lists`, `history`, `suggestions`, `sharing`, `invites`, `push`, `auth`) takes `requireAuthMiddleware` and that `createApp` passes the pool-aware instance through `routerOptions`; the SSE ticket endpoint and the Bearer fallback on `GET /api/events` use the same async check.
+- `npm run lint`: 0 errors. `npm run build`: ok. `npm test`: backend 310 pass, 0 fail (frontend 667 per the board entry).
+- Reset flow read against the acceptance criteria: the token is claimed with a single `UPDATE … WHERE used=false AND expires_at>$2 RETURNING user_id`; in the same transaction the hash is set, `token_version` is incremented, `api_key` is cleared and the user's other reset tokens are deleted. Login and email-verify tokens carry the user's current version.
+- Read the integration tests: old JWT → 401 after reset and login works with the new password; two concurrent resets → one 200 and one 400 with version 1; other reset tokens unusable; other users' tokens untouched; API key cleared; expired and used tokens rejected; deleted users rejected; tokens ahead of or behind the stored version rejected.
+
+##### Findings
+- All acceptance criteria are met on inspection and by the recorded tests, including the DE/EN reset message that explains the sign-out and the Home Assistant re-key.
+- Existing tests were adapted with mock helpers for the new queries; the reset success test now expects the single claim `UPDATE … RETURNING` because behaviour changed on purpose. `app.test.tsx` checks the new reset message by regex instead of the old exact sentence. No assertion was dropped.
+
+##### Risks
+- I could not run the integration suite (the sandbox blocks setting `TEST_DATABASE_URL`); I relied on the implementer's 25/25 run against postgres:16 and on reading the tests, which target the right behaviours. CI is the authoritative run, in particular the concurrent-reset test.
+- Authenticated requests now fail with 500 if the database lookup fails (by design — not an auth result), so a database outage turns into API-wide errors instead of 401s.

@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
-import { getPool } from "../db/client.js";
+import { getPool, withTransaction } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { acceptInviteForUser, getPendingInviteByToken } from "../inviteService.js";
 import { logger as defaultLogger } from "../logger.js";
@@ -19,11 +19,13 @@ const DUMMY_PASSWORD_HASH = "$2b$12$9D2Gq/c6ojGzJTRaJQ9Fh.MvGU9zq/NrLY8IGwzs1jy0
 /**
  * Creates a signed JWT for an authenticated user.
  *
- * @param {{ jwtLib: typeof jwt, config: { jwtSecret: string, jwtExpiresIn: string }, userId: string }} options Token options.
+ * @param {{ jwtLib: typeof jwt, config: { jwtSecret: string, jwtExpiresIn: string }, userId: string, tokenVersion?: number }} options Token options.
  * @returns {string} Signed JWT.
  */
-function createToken({ jwtLib, config, userId }) {
-  return jwtLib.sign({ sub: userId }, config.jwtSecret, {
+function createToken({ jwtLib, config, userId, tokenVersion = 0 }) {
+  // `tv` ties the token to the user's token_version; a password reset bumps it and thereby
+  // revokes every token issued before.
+  return jwtLib.sign({ sub: userId, tv: tokenVersion }, config.jwtSecret, {
     algorithm: "HS256",
     expiresIn: config.jwtExpiresIn
   });
@@ -58,10 +60,11 @@ export function createAuthRouter({
   generatePasswordResetToken = randomUUID,
   generateApiKey = randomUUID,
   now = () => new Date(),
-  rateLimiters = createRateLimiters()
+  rateLimiters = createRateLimiters(),
+  requireAuthMiddleware = createRequireAuth({ jwtLib, config, pool })
 } = {}) {
   const router = Router();
-  const requireAuth = createRequireAuth({ jwtLib, config });
+  const requireAuth = requireAuthMiddleware;
 
   router.post("/register", ...rateLimiters.register, async (req, res, next) => {
     if (config.registrationEnabled === false) {
@@ -200,7 +203,7 @@ export function createAuthRouter({
       const normalizedEmail = email.toLowerCase();
       const result = await pool.query(
         `
-          SELECT id, email, display_name, password_hash, email_verified
+          SELECT id, email, display_name, password_hash, email_verified, token_version
           FROM users
           WHERE email = $1
           LIMIT 1
@@ -235,7 +238,7 @@ export function createAuthRouter({
 
       logger.info({ userId: user.id }, "User logged in");
       res.json({
-        token: createToken({ jwtLib, config, userId: user.id }),
+        token: createToken({ jwtLib, config, userId: user.id, tokenVersion: user.token_version }),
         user: serializeAuthUser(user)
       });
     } catch (error) {
@@ -259,7 +262,7 @@ export function createAuthRouter({
     try {
       const result = await pool.query(
         `
-          SELECT evt.user_id, u.email, u.display_name
+          SELECT evt.user_id, u.email, u.display_name, u.token_version
           FROM email_verification_tokens evt
           JOIN users u ON u.id = evt.user_id
           WHERE evt.token = $1
@@ -293,7 +296,12 @@ export function createAuthRouter({
 
       logger.info({ userId: verification.user_id }, "Email verified");
       res.json({
-        token: createToken({ jwtLib, config, userId: verification.user_id }),
+        token: createToken({
+          jwtLib,
+          config,
+          userId: verification.user_id,
+          tokenVersion: verification.token_version
+        }),
         user: serializeAuthUser({
           id: verification.user_id,
           email: verification.email,
@@ -437,44 +445,58 @@ export function createAuthRouter({
     }
 
     try {
-      const result = await pool.query(
-        `
-          SELECT prt.user_id
-          FROM password_reset_tokens prt
-          WHERE prt.token = $1
-            AND prt.expires_at > $2
-            AND prt.used = false
-          LIMIT 1
-        `,
-        [token, now()]
-      );
-      const resetRequest = result.rows[0];
+      const userId = await withTransaction(pool, async (client) => {
+        // Claiming the token is the only check: two concurrent requests with the same token
+        // serialise on this row, and the loser re-evaluates `used = false` and gets no row.
+        const claim = await client.query(
+          `
+            UPDATE password_reset_tokens
+            SET used = true
+            WHERE token = $1
+              AND used = false
+              AND expires_at > $2
+            RETURNING user_id
+          `,
+          [token, now()]
+        );
+        const resetRequest = claim.rows[0];
 
-      if (!resetRequest) {
+        if (!resetRequest) {
+          return null;
+        }
+
+        const passwordHash = await bcryptLib.hash(password, 12);
+
+        // Bumping token_version signs the user out everywhere; the API key is cleared because
+        // whoever knew the old password may also have read the key (Home Assistant needs a new one).
+        await client.query(
+          `
+            UPDATE users
+            SET password_hash = $1,
+                token_version = token_version + 1,
+                api_key = NULL
+            WHERE id = $2
+          `,
+          [passwordHash, resetRequest.user_id]
+        );
+        await client.query(
+          `
+            DELETE FROM password_reset_tokens
+            WHERE user_id = $1
+              AND token <> $2
+          `,
+          [resetRequest.user_id, token]
+        );
+
+        return resetRequest.user_id;
+      });
+
+      if (!userId) {
         res.status(400).json({ error: "Password reset link is invalid or has expired." });
         return;
       }
 
-      const passwordHash = await bcryptLib.hash(password, 12);
-
-      await pool.query(
-        `
-          UPDATE users
-          SET password_hash = $1
-          WHERE id = $2
-        `,
-        [passwordHash, resetRequest.user_id]
-      );
-      await pool.query(
-        `
-          UPDATE password_reset_tokens
-          SET used = true
-          WHERE token = $1
-        `,
-        [token]
-      );
-
-      logger.info({ userId: resetRequest.user_id }, "Password reset completed");
+      logger.info({ userId }, "Password reset completed");
       res.json({ message: "Password updated." });
     } catch (error) {
       next(error);

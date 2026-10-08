@@ -625,7 +625,7 @@ describe("authentication shell", () => {
     });
 
     expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
-    expect(screen.getByText("Password updated. Please log in with your new password.")).toBeTruthy();
+    expect(screen.getByText(/^Password updated\. You were signed out on all other devices and your API key was removed.*Please log in with your new password\.$/)).toBeTruthy();
   });
 
   it("creates, renames, and deletes a list from the overview", async () => {

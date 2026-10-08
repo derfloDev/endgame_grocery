@@ -22,7 +22,7 @@ export function createEventsRouter({
 } = {}) {
   const router = Router();
 
-  router.post("/ticket", (req, res) => {
+  router.post("/ticket", async (req, res) => {
     const token = getBearerToken(req);
 
     if (!token) {
@@ -33,7 +33,8 @@ export function createEventsRouter({
     let user;
 
     try {
-      user = requireAuthFn(token);
+      // Also rejects tokens revoked by a password reset (token version check).
+      user = await requireAuthFn(token);
     } catch {
       res.status(401).json({ error: "Authentication token is invalid." });
       return;
@@ -43,7 +44,7 @@ export function createEventsRouter({
     res.json({ ticket: sseTickets.issue(user.sub) });
   });
 
-  router.get("/", (req, res) => {
+  router.get("/", async (req, res) => {
     let user;
 
     if (typeof req.query.ticket === "string" && req.query.ticket) {
@@ -64,7 +65,7 @@ export function createEventsRouter({
       }
 
       try {
-        user = requireAuthFn(token);
+        user = await requireAuthFn(token);
       } catch {
         res.status(401).json({ error: "Authentication token is invalid." });
         return;

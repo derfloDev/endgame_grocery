@@ -377,7 +377,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -427,7 +427,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -455,7 +455,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -481,7 +481,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -509,7 +509,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -549,7 +549,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -932,7 +932,7 @@ describe("authentication routes", () => {
       }
     };
 
-    const app = createApp({ pool });
+    const app = createApp({ pool: withTransactionClient(pool) });
 
     const response = await request(app).post("/api/auth/reset-password").send({
       token: "used-token",
@@ -951,14 +951,8 @@ describe("authentication routes", () => {
     const { logger, getEntries } = createLogCapture();
     const pool = {
       async query(text, params) {
-        if (text.includes("SELECT prt.user_id")) {
-          return {
-            rows: [
-              {
-                user_id: "user-1"
-              }
-            ]
-          };
+        if (["BEGIN", "COMMIT"].includes(text)) {
+          return { rows: [] };
         }
 
         if (text.includes("UPDATE users")) {
@@ -966,8 +960,13 @@ describe("authentication routes", () => {
           return { rows: [] };
         }
 
+        // The single conditional UPDATE claims the token and returns its user.
         if (text.includes("UPDATE password_reset_tokens")) {
           markedToken = params[0];
+          return { rows: [{ user_id: "user-1" }] };
+        }
+
+        if (text.includes("DELETE FROM password_reset_tokens")) {
           return { rows: [] };
         }
 
@@ -977,7 +976,7 @@ describe("authentication routes", () => {
 
     const app = createApp({
       logger,
-      pool,
+      pool: withTransactionClient(pool),
       now() {
         return new Date("2026-04-21T00:00:00Z");
       }
@@ -1142,6 +1141,36 @@ function createResponse() {
     json(payload) {
       this.body = payload;
       return this;
+    }
+  };
+}
+
+/**
+ * Adds `connect()` to a query-only pool mock so code that uses `withTransaction` runs against the
+ * same mock; BEGIN/COMMIT/ROLLBACK reach the mock's `query` like any other statement.
+ */
+function withTransactionClient(pool) {
+  return {
+    ...pool,
+    async connect() {
+      return { query: (text, params) => pool.query(text, params), release() {} };
+    }
+  };
+}
+
+/**
+ * Answers the token version lookup of the auth middleware so route tests can keep their
+ * single-purpose pool mocks. Every test token here carries no `tv` claim, i.e. version 0.
+ */
+function withCurrentTokenVersion(pool) {
+  return {
+    ...pool,
+    async query(text, params) {
+      if (text.includes("SELECT token_version FROM users")) {
+        return { rows: [{ token_version: 0 }] };
+      }
+
+      return pool.query(text, params);
     }
   };
 }

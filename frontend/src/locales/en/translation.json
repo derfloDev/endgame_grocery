@@ -154,7 +154,7 @@
   "auth.passwordTooShort": "Your password must be at least 8 characters long.",
   "auth.passwordTooLong": "Your password is too long: at most 72 bytes are allowed (non-Latin characters take more than one byte).",
   "auth.passwordUpdated": "Password updated.",
-  "auth.passwordUpdatedLogin": "Password updated. Please log in with your new password.",
+  "auth.passwordUpdatedLogin": "Password updated. You were signed out on all other devices and your API key was removed, so generate a new one for Home Assistant in the app settings. Please log in with your new password.",
   "auth.verifyTitle": "Verify your email",
   "auth.verifying": "Verifying your email",
   "auth.checkInbox": "Check your inbox",

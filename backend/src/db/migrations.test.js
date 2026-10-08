@@ -34,6 +34,9 @@ const lastUpdatedByMigrationPath = path.resolve(
 const listViewsMigrationPath = path.resolve(
   "src/db/migrations/1779979000001_add_list_views.cjs"
 );
+const tokenVersionMigrationPath = path.resolve(
+  "src/db/migrations/1779979000002_add_token_version_to_users.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -692,5 +695,20 @@ describe("database migrations", () => {
 
     assert.doesNotThrow(() => migration.down(pgm));
     assert.deepEqual(calls, [["dropTable", "list_views", { ifExists: true, cascade: true }]]);
+  });
+
+  it("adds and removes the per-user token version used to revoke sessions", async () => {
+    const migration = await import(pathToFileURL(tokenVersionMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      ["addColumns", "users", { token_version: { type: "integer", notNull: true, default: 0 } }]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [["dropColumns", "users", ["token_version"]]]);
   });
 });

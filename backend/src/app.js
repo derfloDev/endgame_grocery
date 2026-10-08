@@ -1,5 +1,5 @@
 import express from "express";
-import { createRequireApiKey, createRequireAuthFn } from "./middleware/auth.js";
+import { createRequireApiKey, createRequireAuth, createRequireAuthFn } from "./middleware/auth.js";
 import { createRateLimiters } from "./middleware/rateLimit.js";
 import pinoHttp from "pino-http";
 import authRoutes from "./routes/auth.js";
@@ -34,7 +34,17 @@ export function createApp(options = {}) {
     options.requireAuthFn ??
     createRequireAuthFn({
       jwtLib: options.jwtLib,
-      config
+      config,
+      pool
+    });
+  // Every authenticated router shares this middleware, so the token version check (session
+  // revocation) applies everywhere and uses the app's own config and pool.
+  const requireAuthMiddleware =
+    options.requireAuthMiddleware ??
+    createRequireAuth({
+      jwtLib: options.jwtLib,
+      config,
+      pool
     });
   const requireApiKey =
     options.requireApiKey ??
@@ -53,6 +63,7 @@ export function createApp(options = {}) {
     pool,
     rateLimiters,
     requireApiKey,
+    requireAuthMiddleware,
     sseManager
   };
 
