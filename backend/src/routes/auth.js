@@ -8,7 +8,13 @@ import { acceptInviteForUser, getPendingInviteByToken } from "../inviteService.j
 import { logger as defaultLogger } from "../logger.js";
 import createMailer from "../mail/mailer.js";
 import { createRequireAuth } from "../middleware/auth.js";
+import { createRateLimiters } from "../middleware/rateLimit.js";
+import { validatePassword } from "../passwordPolicy.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+
+// A valid cost-12 bcrypt hash of a throwaway password. Login compares against it when the email
+// is unknown so that the unknown-user path takes as long as a wrong-password check.
+const DUMMY_PASSWORD_HASH = "$2b$12$9D2Gq/c6ojGzJTRaJQ9Fh.MvGU9zq/NrLY8IGwzs1jy0zxVyzkTUq";
 
 /**
  * Creates a signed JWT for an authenticated user.
@@ -51,12 +57,13 @@ export function createAuthRouter({
   generateVerificationToken = randomUUID,
   generatePasswordResetToken = randomUUID,
   generateApiKey = randomUUID,
-  now = () => new Date()
+  now = () => new Date(),
+  rateLimiters = createRateLimiters()
 } = {}) {
   const router = Router();
   const requireAuth = createRequireAuth({ jwtLib, config });
 
-  router.post("/register", async (req, res, next) => {
+  router.post("/register", ...rateLimiters.register, async (req, res, next) => {
     if (config.registrationEnabled === false) {
       res.status(404).end();
       return;
@@ -66,6 +73,13 @@ export function createAuthRouter({
 
     if (!email || !password || !displayName) {
       res.status(400).json({ error: "Email, password, and display_name are required." });
+      return;
+    }
+
+    const passwordError = validatePassword(password);
+
+    if (passwordError) {
+      res.status(400).json({ error: passwordError });
       return;
     }
 
@@ -169,7 +183,7 @@ export function createAuthRouter({
     }
   });
 
-  router.post("/login", async (req, res, next) => {
+  router.post("/login", ...rateLimiters.login, async (req, res, next) => {
     const { email, password } = req.body ?? {};
 
     if (!email || !password) {
@@ -197,6 +211,9 @@ export function createAuthRouter({
       const user = result.rows[0];
 
       if (!user) {
+        // Hash-compare anyway so unknown accounts cost as much time as wrong passwords and the
+        // response time does not reveal which emails are registered.
+        await bcryptLib.compare(password, DUMMY_PASSWORD_HASH);
         logger.warn({ email: normalizedEmail, reason: "invalid_credentials" }, "Login failed");
         res.status(401).json({ error: "Invalid email or password." });
         return;
@@ -288,7 +305,7 @@ export function createAuthRouter({
     }
   });
 
-  router.post("/resend-verification", async (req, res, next) => {
+  router.post("/resend-verification", ...rateLimiters.resendVerification, async (req, res, next) => {
     const { email } = req.body ?? {};
 
     if (!email) {
@@ -347,7 +364,7 @@ export function createAuthRouter({
     }
   });
 
-  router.post("/forgot-password", async (req, res, next) => {
+  router.post("/forgot-password", ...rateLimiters.forgotPassword, async (req, res, next) => {
     const { email } = req.body ?? {};
 
     if (!email) {
@@ -399,11 +416,18 @@ export function createAuthRouter({
     }
   });
 
-  router.post("/reset-password", async (req, res, next) => {
+  router.post("/reset-password", ...rateLimiters.resetPassword, async (req, res, next) => {
     const { token, password } = req.body ?? {};
 
     if (!token || !password) {
       res.status(400).json({ error: "Token and password are required." });
+      return;
+    }
+
+    const passwordError = validatePassword(password);
+
+    if (passwordError) {
+      res.status(400).json({ error: passwordError });
       return;
     }
 

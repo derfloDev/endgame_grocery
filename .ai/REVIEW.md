@@ -1442,3 +1442,42 @@ No required fixes.
 
 ##### Risks
 - nginx config and Playwright specs not executed locally; the first container build/CI run is the authoritative check.
+
+## Task: T-005 (hardening cycle 2026-10-08 — abuse protection and hardening)
+
+Note: the task ID repeats an earlier cycle's T-005 section above; this section covers the current plan's T-005 only.
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `backend/src/middleware/rateLimit.js`: the per-email login limiter lets anyone lock a known account out of logging in for 15 minutes by sending 5 failed attempts for that email. This is what the plan specifies ("per IP or email") and failed attempts only are counted; worth knowing, not a required fix.
+2. **minor** — rate limits are switched off when `ENABLE_TEST_ROUTES=true` (`app.js`). This goes beyond the plan, is documented and tested, and production never sets the flag. Acceptable, but the README warning in T-001 about never enabling that flag now also covers brute-force protection.
+3. **minor** — `docker/security-headers.conf`: the CSP adds `blob:` to `script-src`, a deviation from the plan, justified by a blocked worker request in Chromium and pinned by `containerHardening.test.js`. Accepted on the evidence given.
+4. **minor** — `nginx -t`/a running container were not available, so nginx includes (`security-headers.conf` at server level and in the asset location) are verified by tests and the implementer's Chromium run only. Header inheritance for the future T-019 locations is flagged in the handoff.
+5. **nit** — nginx error logs may still print request lines with query strings on upstream failures (carried over from T-004); not addressed here, outside the criteria.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board, the handoff and the full diff: `rateLimit.js`, `app.js` (trust proxy, `x-powered-by`), `routes/auth.js`, `routes/sharing.js`, `passwordPolicy.js`, `security-headers.conf`, `nginx.conf`, `Dockerfile`, `supervisord.conf`, the three workflows, frontend `safeRedirect`, `passwordPolicy`, Login/Register/Reset pages and locales.
+- `npm run lint`: 0 errors. `npm run build`: ok. `npm test`: backend 289 pass / 0 fail; frontend 45 files pass.
+- Ran `bcrypt.compare` against the dummy hash: it is a valid bcrypt hash and takes full-cost time (about 0.4–0.6 s), so the unknown-user path matches a wrong-password check.
+- Checked the redirect rule: only `/` followed by something other than `/` or `\`, and no control characters; absolute URLs, `//evil` and `/\evil` fall back to `/`.
+- Checked the rate-limit design: login counts failed attempts only (successes refunded) per IP and per email; register, forgot-password and resend-verification per IP and email, 5/hour; reset-password 10/hour per IP; invites 20/hour per user; 429 with `Retry-After`. nginx forwards `$proxy_add_x_forwarded_for` and `trust proxy` is 1, so `req.ip` is the address nginx saw and clients cannot spoof it.
+- Checked workflows: top-level `permissions: contents: read` in `ci.yml`, every action pinned to a 40-character SHA with the tag in a comment; `supervisord.conf` runs the backend as `node`; password rule (≥ 8 characters, ≤ 72 bytes) enforced on register and reset in the server and mirrored in the UI with translated hints.
+
+##### Findings
+- All acceptance criteria are met on inspection and by tests, including the implementer's recorded Chromium CSP run (zero violations for login, list, icon model, push and Swagger UI).
+- The only existing tests changed are the workflow-pin expectations in `releaseWorkflow.test.js`, which now expect SHA pins for the same actions and majors; no assertion was weakened.
+
+##### Risks
+- I did not start nginx or the container, and I did not re-run the Chromium CSP check; the CSP evidence is the implementer's. A container build in CI plus a quick browser pass on the published image is the authoritative check.
+- Running the backend as `node` assumes `/app` is readable and any writable paths are not needed at runtime; the unit tests cannot prove this. First container start should be watched.
+- Behind Cloudflare or another proxy all visitors share one rate-limit counter unless nginx `real_ip` is configured (README warns about this).

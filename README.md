@@ -198,6 +198,27 @@ The manifest (`/manifest.webmanifest`) does not need a bypass policy: the app al
 sets `crossorigin="use-credentials"` on the manifest link so the browser sends the
 `CF_Authorization` cookie with that request.
 
+### Security hardening
+
+- **Rate limits** (in memory, so they reset on restart and assume a single backend instance): `POST /api/auth/login` allows 5 *failed* attempts per 15 minutes per client IP and, separately, per email (successful logins are not counted); register, forgot-password and resend-verification allow 5 requests per hour per IP and per email; reset-password allows 10 per hour per IP; list invitations allow 20 per hour per user. Blocked requests get `429` with a `Retry-After` header (seconds). The limits are switched off when `ENABLE_TEST_ROUTES=true` (the Playwright E2E setup, which registers and fails logins from one IP); the production image never sets it.
+- **Client IP:** the backend trusts exactly one proxy hop (`trust proxy` = 1), i.e. the nginx in the container, so the limits key on the address nginx saw. If you put another proxy or Cloudflare in front, nginx sees that proxy's address unless you add `set_real_ip_from` / `real_ip_header` to `docker/nginx.conf`; otherwise every visitor shares one counter.
+- **Login timing:** an unknown email is compared against a dummy bcrypt hash, so the response time does not reveal which emails are registered.
+- **Passwords** (registration and reset) must be strings of at least 8 characters and at most 72 UTF-8 bytes, because bcrypt ignores everything after 72 bytes. The server answers `400`; the register and reset forms check the same rule first and show a translated hint (DE/EN).
+- **Login redirects:** after signing in, `?redirect=` and the router state are only followed when they are an in-app path (a single leading `/`, not `//…`, `/\…` or an absolute URL); anything else goes to `/`.
+- **Security headers:** nginx sends `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and `Permissions-Policy` on every response (`docker/security-headers.conf`, included at server level and in the static-asset location, because nginx does not inherit `add_header` into a location that sets its own). The CSP is `default-src 'self'` with these additions, each verified against the production build in Chromium (zero violations for the login page, list detail, the first icon-model download, the service worker/push opt-in and the Swagger UI at `/api/docs/`):
+
+  | Directive | Extra sources | Why |
+  | --- | --- | --- |
+  | `script-src` | `'wasm-unsafe-eval'`, `blob:`, `https://cdn.jsdelivr.net` | ONNX runtime for the icon model: WebAssembly compilation, its loader module (imported through a `blob:` URL, which Chromium blocked without it) and the runtime files from jsDelivr |
+  | `connect-src` | `https://huggingface.co`, `https://*.hf.co`, `https://cdn.jsdelivr.net` | Model download on first use of the semantic icon suggestion |
+  | `worker-src` | `blob:` | Icon worker |
+  | `img-src` | `data:`, `blob:` | Inline and generated images |
+  | `style-src` | `'unsafe-inline'` | Inline styles set by the UI components (scripts stay free of inline code) |
+
+  Add hosts only with a recorded violation; the policy is covered by `backend/src/containerHardening.test.js`.
+- **Non-root backend:** supervisord starts the Node backend as the `node` user; only nginx runs as root (it binds port 80).
+- **CI:** every workflow declares least-privilege `permissions` and all third-party actions are pinned to a full commit SHA (the tag is kept as a comment). Update the SHA and the comment together when bumping an action.
+
 ## Validation
 
 Run these checks before merging changes:

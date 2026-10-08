@@ -5,6 +5,7 @@ import { getConfig } from "../env.js";
 import { logger as defaultLogger } from "../logger.js";
 import createMailer from "../mail/mailer.js";
 import { requireAuth } from "../middleware/auth.js";
+import { createRateLimiters } from "../middleware/rateLimit.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
 /**
@@ -29,7 +30,8 @@ export function createSharingRouter({
   sseManager = defaultSseManager,
   mailer = createMailer({ config }),
   generateInviteToken = randomUUID,
-  now = () => new Date()
+  now = () => new Date(),
+  rateLimiters = createRateLimiters()
 } = {}) {
   const router = Router({ mergeParams: true });
 
@@ -87,7 +89,8 @@ export function createSharingRouter({
     }
   });
 
-  router.post("/", async (req, res, next) => {
+  // Invitations send mail, so each user may only send a limited number per hour.
+  router.post("/", ...rateLimiters.invite, async (req, res, next) => {
     const email = req.body?.email?.trim();
 
     if (!email) {

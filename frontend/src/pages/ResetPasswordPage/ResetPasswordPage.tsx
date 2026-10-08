@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../../assets/endgame_grocery_logo.png";
 import { resetPassword } from "../../api/auth";
 import styles from "../../styles/auth.module.css";
+import { getPasswordPolicyError } from "../../utils/passwordPolicy";
 
 export default function ResetPasswordPage(): ReactElement {
   const { t } = useTranslation();
@@ -24,6 +25,14 @@ export default function ResetPasswordPage(): ReactElement {
     }
 
     setError("");
+
+    const passwordProblem = getPasswordPolicyError(password);
+
+    if (passwordProblem) {
+      setError(t(passwordProblem === "tooShort" ? "auth.passwordTooShort" : "auth.passwordTooLong"));
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -57,15 +66,16 @@ export default function ResetPasswordPage(): ReactElement {
             <label htmlFor="reset-password-next">{t("auth.newPassword")}</label>
             <input
               id="reset-password-next"
+              aria-describedby="reset-password-hint"
               autoComplete="new-password"
               className="eg-input"
-              minLength={8}
               name="password"
               required
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
+            <p className={styles["password-hint"]} id="reset-password-hint">{t("auth.passwordHint")}</p>
           </div>
           <div className="button-row">
             <button className="eg-btn-primary" disabled={isSubmitting} type="submit">

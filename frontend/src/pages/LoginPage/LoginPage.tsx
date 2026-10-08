@@ -7,6 +7,7 @@ import { useAuth } from "../../context/AuthContext";
 import { SESSION_EXPIRED_REDIRECT_KEY } from "../../context/authStorage";
 import { useAppConfig } from "../../context/appConfigState";
 import styles from "../../styles/auth.module.css";
+import { getSafeRedirect } from "../../utils/safeRedirect";
 
 interface LoginLocationState {
   from?: string;
@@ -28,7 +29,8 @@ export default function LoginPage(): ReactElement {
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const redirectTo = searchParams.get("redirect") ?? effectiveLocationState?.from ?? "/";
+  // Only in-app paths are followed; `//host`, `/\host` and absolute URLs would be open redirects.
+  const redirectTo = getSafeRedirect(searchParams.get("redirect") ?? effectiveLocationState?.from);
   const successMessage = effectiveLocationState?.message ?? "";
   const sessionExpired = effectiveLocationState?.sessionExpired ?? false;
 

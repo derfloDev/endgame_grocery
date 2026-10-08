@@ -476,3 +476,51 @@ Notes for review: the one required fix (finding 1) is done; scope and commit mes
 | Next Role | none |
 
 ---
+
+### T-005 — implement — 2026-10-08T17:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added rate limits (login, mail endpoints, reset, invites), trust-proxy, constant-time unknown-user login, a 8-char/72-byte password policy on server and UI, safe login redirects, nginx security headers with a CSP verified in Chromium, a non-root backend, and least-privilege, SHA-pinned workflows. |
+| Files Changed | backend/package.json, package-lock.json, backend/src/app.js, backend/src/middleware/rateLimit.js, backend/src/passwordPolicy.js, backend/src/routes/auth.js, backend/src/routes/sharing.js, backend/src/hardening.test.js, backend/src/passwordPolicy.test.js, backend/src/containerHardening.test.js, backend/src/releaseWorkflow.test.js, docker/nginx.conf, docker/security-headers.conf, docker/supervisord.conf, Dockerfile, .github/workflows/ci.yml, .github/workflows/docker-publish.yml, .github/workflows/release-please.yml, frontend/src/utils/safeRedirect.ts, frontend/src/utils/passwordPolicy.ts, their tests, frontend/src/pages/authPagesHardening.test.tsx, frontend/src/pages/LoginPage/LoginPage.tsx, frontend/src/pages/RegisterPage/RegisterPage.tsx, frontend/src/pages/ResetPasswordPage/ResetPasswordPage.tsx, frontend/src/styles/auth.module.css, frontend/src/locales/de/translation.json, frontend/src/locales/en/translation.json, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` (0 errors, 1 pre-existing warning); `npm run build` ok; `npm test` backend 289/289, frontend 667/667 pass; integration suite 16/16 against local postgres:16. CSP verified with a throwaway Playwright/Chromium script against the production `dist` served with the exact headers from `docker/security-headers.conf`: zero violations for login, list detail (service worker registered), first icon-model download (Hugging Face + jsDelivr), push opt-in click, and Swagger UI at `/api/docs/` (6 operations rendered, no override needed). nginx itself was not started (`nginx -t` unavailable), and the E2E specs were not run. |
+| Commit | `feat(security): rate-limit auth endpoints, enforce a password policy and ship security headers` |
+| Next Role | review |
+
+Notes for review:
+1. **CSP deviation, with evidence:** the plan's `script-src` lacks `blob:`. In Chromium the production build's icon worker made a request to a `blob:` URL that was blocked by CSP (visible as `requestfailed … csp`; absent without CSP). Adding `blob:` to `script-src` removed it with no other change, so `docker/security-headers.conf` has `script-src 'self' 'wasm-unsafe-eval' blob: https://cdn.jsdelivr.net`; README documents each directive and `containerHardening.test.js` pins it. I could not tell from screenshots whether semantic inference silently degraded without it (the test words hit keyword matches), so please treat it as precautionary but evidence-based.
+2. **Rate limits are disabled when `ENABLE_TEST_ROUTES=true`** (not in the plan): the Playwright auth spec registers ~5 users and fails logins from one IP and would hit the 5/hour limits (and retries would make it flaky). Production never sets that flag; tested and documented.
+3. **nginx header inheritance:** the asset location sets `Cache-Control`, so server-level `add_header` would not apply there; the headers live in `docker/security-headers.conf`, included at server level and in that location (Dockerfile copies it to `/etc/nginx/security-headers.conf`). A test fails if a location with `add_header` omits the include. T-019 will reuse this for the new cache locations.
+4. Existing tests changed: `releaseWorkflow.test.js` now expects `@<40-hex SHA> # vN` instead of `@vN` for the same actions/majors (plus new pinning and permissions tests). No other existing assertion changed.
+5. SHAs were resolved with `git ls-remote` against the current major tags (release-please-action's `v5` is an annotated tag; I used the peeled commit). `ci.yml` got workflow-level `contents: read`; the other two already had permissions.
+6. `app.set("trust proxy", 1)` assumes nginx is the only hop; README warns that Cloudflare or another proxy in front makes all visitors share one counter unless `real_ip` is configured in nginx.
+7. Not done (outside the plan): nginx error logs may still print request lines with query strings on upstream failures (flagged in the T-004 review).
+8. Frontend `minLength` was removed from the register/reset password inputs in favour of the JS check, so the translated message (not the browser tooltip) is shown.
+
+---
+
+### T-005 — review — 2026-10-08T17:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed rate limits, trust proxy, login timing, password policy, safe redirect, CSP/security headers, non-root backend and pinned workflows; all criteria met by inspection and tests, container not started by the reviewer. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-005 — implement — 2026-10-08T17:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-005 after review PASS_WITH_NOTES: auth rate limits, password policy, safe login redirects, security headers with a verified CSP, non-root backend and pinned least-privilege workflows. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-005 implementation files |
+| Commit | `feat(security): rate-limit auth endpoints, enforce a password policy and ship security headers` |
+| Next Role | none |
+
+---

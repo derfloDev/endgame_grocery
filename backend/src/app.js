@@ -1,5 +1,6 @@
 import express from "express";
 import { createRequireApiKey, createRequireAuthFn } from "./middleware/auth.js";
+import { createRateLimiters } from "./middleware/rateLimit.js";
 import pinoHttp from "pino-http";
 import authRoutes from "./routes/auth.js";
 import docsRoutes from "./routes/docs.js";
@@ -40,13 +41,25 @@ export function createApp(options = {}) {
     createRequireApiKey({
       pool
     });
+  // One set of in-memory counters per app instance (the deployment is single-instance).
+  // The E2E suite (the only user of the opt-in test routes) registers and fails logins from a
+  // single IP, so limiting is skipped there. Production never enables test routes.
+  const rateLimiters =
+    options.rateLimiters ??
+    createRateLimiters(options.rateLimits, { disabled: config.enableTestRoutes === true });
   const routerOptions = {
     ...options,
     config,
     pool,
+    rateLimiters,
     requireApiKey,
     sseManager
   };
+
+  // nginx is the only proxy in front of the backend; trusting exactly one hop makes req.ip the
+  // address nginx saw, which the rate limiters key on. Clients cannot spoof it via X-Forwarded-For.
+  app.set("trust proxy", 1);
+  app.disable("x-powered-by");
 
   app.use(
     pinoHttp({
