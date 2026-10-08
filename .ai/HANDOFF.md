@@ -328,3 +328,43 @@ Notes for review: the local gitignored `.env` still has `JWT_SECRET=change-me`, 
 | Next Role | none |
 
 ---
+
+### T-002 — implement — 2026-10-08T14:06:47Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Added a PostgreSQL integration-test harness (schema per test file, real migrations), owner/member/stranger access tests, an up→down→up migration round-trip and a Postgres service in the CI unit job. |
+| Files Changed | backend/src/integration/helpers.js, backend/src/integration/access.test.js, backend/src/integration/migrations.test.js, backend/package.json, package.json, .github/workflows/ci.yml, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run test:integration` against local postgres:16 (`TEST_DATABASE_URL`): 8/8 pass; without it the suites skip. `npm run lint` (0 errors, 1 pre-existing warning); `npm run build` ok; `npm test` backend 197/197, frontend 616/616 pass. |
+| Commit | `test(backend): add PostgreSQL integration harness with migration round-trip and access tests` |
+| Next Role | review |
+
+Notes for review: pgcrypto is created once in `public` by the harness (advisory-locked) so dropping a test schema never drops the extension; `noLock: true` is used for the runner because schemas are isolated. Integration tests use `*.test.js` names, so `npm test` also discovers them but they skip without `TEST_DATABASE_URL`. The CI service creates `endgame_grocery_test` via `POSTGRES_DB`. The route-level tests pass a real `createRequireAuth` bound to the test secret, since routers otherwise read the secret from the process env.
+
+---
+
+### T-002 — review — 2026-10-08T14:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the PostgreSQL integration harness, migration round-trip, access tests and CI Postgres service; criteria met by inspection, integration suite not executed by the reviewer. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-10-08T14:40:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-002 after review PASS_WITH_NOTES: PostgreSQL integration harness, migration round-trip, access tests and Postgres in the CI unit job. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-002 implementation files |
+| Commit | `test(backend): add PostgreSQL integration harness with migration round-trip and access tests` |
+| Next Role | none |
+
+---

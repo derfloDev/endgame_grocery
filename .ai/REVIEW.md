@@ -1310,3 +1310,37 @@ No blocker or major findings; no required fixes.
 ##### Risks
 - I could not run the real process to watch the exit (the shell blocked the env-prefixed command). The exit path is covered by `index.test.js` with an injected `exit`. PostgreSQL is unavailable locally, so the Playwright E2E and the CI change were not exercised; the CI diff is a one-line env change.
 - The implementer's note stands: a local gitignored `.env` with `JWT_SECRET=change-me` makes `npm run dev` and `npm run e2e` exit until replaced.
+
+## Task: T-002 (hardening cycle 2026-10-08 — PostgreSQL integration harness)
+
+Note: the task ID repeats the earlier cycle's T-002 section above; this section covers the current plan's T-002 only.
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `backend/src/integration/helpers.js`: `describeDb` skips by registering an empty `describe`, so `npm run test:integration` without the variable reports `tests 0 / skipped 0` and exits 0 rather than counting skipped tests. This satisfies "skip locally with a clear reason" (the reason is printed). Not a required fix.
+2. **minor** — `helpers.js` `createUser` stores the literal `"not-a-real-hash"` as password hash, so these users cannot log in. Fine for current tests; later tasks that need login must hash a real password. Not a required fix.
+3. **nit** — `helpers.js:138`: the `normalise` line exceeds the line length used elsewhere. Lint passes.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board and the diff: `helpers.js`, `access.test.js`, `migrations.test.js`, `backend/package.json`, root `package.json`, `ci.yml`, README.
+- `npm run lint`: 0 errors. `npm test` (backend): 197 pass, 0 fail. Without `TEST_DATABASE_URL`, `npm run test:integration` skips both suites with the reason "TEST_DATABASE_URL is not set" and exits 0.
+- Read the code against the acceptance criteria: schema-per-file isolation with random names, migrations applied through node-pg-migrate, `search_path` set on the pool, schema dropped in `close`, an advisory lock around the shared `pgcrypto` setup; the round-trip compares columns, indexes and constraints after up, down (asserted empty) and up; the access tests run owner/member/stranger/unknown-list SQL through `ensureListAccess` and the real entries route with real JWT verification (403 for the stranger).
+- CI: the unit-test job gains a `postgres:16` service with `POSTGRES_DB=endgame_grocery_test`, a health check, and runs `test:integration` with `TEST_DATABASE_URL` after `npm test`.
+
+##### Findings
+- All three acceptance criteria are met on inspection. The seed helpers required by the plan (`createUser`, `createList`, `addMember`, `createEntry`, `createInvite`) exist.
+- README documents the harness, the local setup, the skip behaviour and the new script.
+
+##### Risks
+- I could not execute the integration suite myself: the sandbox denied creating a scratch database and setting `TEST_DATABASE_URL`, although a `postgres:16` container is running. I relied on the implementer's recorded 8/8 pass against local postgres:16 plus code reading. The first CI run is the authoritative check, in particular the `endgame_grocery_test` database creation via `POSTGRES_DB` and the shared `pgcrypto` handling.
+- Integration files match `*.test.js`, so `npm test` also discovers them; they are skipped without the variable, but with it set in a developer shell `npm test` will run them too.

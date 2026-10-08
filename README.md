@@ -200,7 +200,30 @@ Run these checks before merging changes:
 - `npm run lint`
 - `npm run build`
 - `npm test`
+- `npm run test:integration` (needs `TEST_DATABASE_URL`, see below)
 - `npm run e2e`
+
+### Integration tests
+
+`backend/src/integration/` holds tests that run real SQL against PostgreSQL 16: access checks
+(owner, member, stranger) through `createApp({ pool })` and a migration round-trip
+(up → down → up with an identical column, index and constraint snapshot). `helpers.js` creates a
+uniquely named schema per test file, applies all migrations into it with node-pg-migrate, hands the
+tests a `pg.Pool` bound to that schema and drops the schema afterwards, so test files can run in
+parallel against one database. It also exports seed helpers (`createUser`, `createList`,
+`addMember`, `createEntry`, `createInvite`) and `signTestToken`. New SQL changes should add a test
+here.
+
+The tests need a database that is safe to create and drop schemas in. Create a separate one and
+point `TEST_DATABASE_URL` at it:
+
+```bash
+docker exec endgame_grocery_postgres createdb -U postgres endgame_grocery_test
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/endgame_grocery_test npm run test:integration
+```
+
+Without `TEST_DATABASE_URL` every integration suite is skipped with a clear reason, so `npm test`
+stays green on machines without PostgreSQL. CI always sets the variable.
 
 Frontend Vitest runs load `frontend/src/test/setup.ts` before each suite so component
 tests start with the i18next runtime initialized and the language reset to English.
@@ -239,13 +262,14 @@ The Playwright config reuses an already-running frontend or backend dev server w
 | `npm run build` | Builds the frontend production bundle and checks the backend entrypoint syntax. |
 | `npm run lint` | Runs ESLint across all workspaces. |
 | `npm test` | Runs frontend and backend test suites. |
+| `npm run test:integration` | Runs the backend PostgreSQL integration tests (requires `TEST_DATABASE_URL`). |
 | `npm run e2e` | Runs Playwright end-to-end tests against the full local stack. |
 | `npm run migrate` | Applies backend PostgreSQL migrations. |
 | `npm run db:seed` | Inserts demo data for local development. |
 
 ## CI/CD
 
-GitHub Actions runs lint, build, unit tests, and Playwright E2E tests on every push and pull request. The E2E job provisions PostgreSQL, writes CI test environment variables, applies migrations, installs Chromium, and uploads Playwright artifacts when a run fails.
+GitHub Actions runs lint, build, unit tests, and Playwright E2E tests on every push and pull request. The unit-test job starts a `postgres:16` service, creates the `endgame_grocery_test` database, runs `npm test`, and then runs `npm run test:integration` with `TEST_DATABASE_URL` set. The E2E job provisions PostgreSQL, writes CI test environment variables, applies migrations, installs Chromium, and uploads Playwright artifacts when a run fails.
 
 The workflow files pin current maintained major versions of the GitHub-hosted actions so the pipeline stays compatible with GitHub's Node.js runtime upgrades.
 
