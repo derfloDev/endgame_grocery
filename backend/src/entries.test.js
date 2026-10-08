@@ -102,16 +102,11 @@ describe("entry routes", () => {
         }
 
         if (callCount === 4) {
-          assert.match(sql, /SELECT id, items, fire_at\s+FROM pending_push_jobs/);
-          assert.deepEqual(params, ["list-1", "user-1"]);
-          return { rows: [] };
-        }
-
-        if (callCount === 5) {
-          assert.match(sql, /INSERT INTO pending_push_jobs/);
-          assert.deepEqual(params, ["list-1", "user-1", params[2], ["Milk"]]);
+          assert.match(sql, /INSERT INTO pending_push_jobs[\s\S]+ON CONFLICT/);
+          assert.deepEqual(params.slice(0, 2), ["list-1", "user-1"]);
           assert.equal(params[2] instanceof Date, true);
-          return { rows: [] };
+          assert.equal(params[3], '["Milk"]');
+          return { rows: [{ item_count: 1 }] };
         }
 
         assert.fail(`Unexpected query ${callCount}: ${sql}`);
@@ -129,7 +124,7 @@ describe("entry routes", () => {
     assert.equal(response.body.entry.status, "open");
     assert.equal(response.body.entry.icon, "🥛");
     await waitForQueuedPushInsert();
-    assert.equal(callCount, 5);
+    assert.equal(callCount, 4);
     assert.deepEqual(sseManager.calls, [
       ["list-1", "entry:created", { listId: "list-1", entryId: "entry-1" }]
     ]);
@@ -161,15 +156,11 @@ describe("entry routes", () => {
         }
 
         if (callCount === 4) {
-          assert.match(sql, /SELECT id, items, fire_at\s+FROM pending_push_jobs/);
-          return { rows: [] };
-        }
-
-        if (callCount === 5) {
-          assert.match(sql, /INSERT INTO pending_push_jobs/);
-          assert.deepEqual(params, ["list-1", "user-1", params[2], ["Milk"]]);
+          assert.match(sql, /INSERT INTO pending_push_jobs[\s\S]+ON CONFLICT/);
+          assert.deepEqual(params.slice(0, 2), ["list-1", "user-1"]);
           assert.equal(params[2] instanceof Date, true);
-          return { rows: [] };
+          assert.equal(params[3], '["Milk"]');
+          return { rows: [{ item_count: 1 }] };
         }
 
         assert.fail(`Unexpected query ${callCount}: ${sql}`);
@@ -183,7 +174,7 @@ describe("entry routes", () => {
     assert.equal(response.status, 201);
     assert.equal(response.body.entry.id, "entry-1");
     await waitForQueuedPushInsert();
-    assert.equal(callCount, 5);
+    assert.equal(callCount, 4);
   });
 
   it("stores and returns entry details on create", async () => {
@@ -221,15 +212,11 @@ describe("entry routes", () => {
         }
 
         if (callCount === 4) {
-          assert.match(sql, /SELECT id, items, fire_at\s+FROM pending_push_jobs/);
-          return { rows: [] };
-        }
-
-        if (callCount === 5) {
-          assert.match(sql, /INSERT INTO pending_push_jobs/);
-          assert.deepEqual(params, ["list-1", "user-1", params[2], ["Milk"]]);
+          assert.match(sql, /INSERT INTO pending_push_jobs[\s\S]+ON CONFLICT/);
+          assert.deepEqual(params.slice(0, 2), ["list-1", "user-1"]);
           assert.equal(params[2] instanceof Date, true);
-          return { rows: [] };
+          assert.equal(params[3], '["Milk"]');
+          return { rows: [{ item_count: 1 }] };
         }
 
         assert.fail(`Unexpected query ${callCount}: ${sql}`);
@@ -252,7 +239,7 @@ describe("entry routes", () => {
       details: "2L"
     });
     await waitForQueuedPushInsert();
-    assert.equal(callCount, 5);
+    assert.equal(callCount, 4);
   });
 
   it("rejects entry creation when the list already has 1000 open entries", async () => {

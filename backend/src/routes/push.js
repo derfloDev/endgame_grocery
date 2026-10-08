@@ -1,8 +1,51 @@
+import { isIP } from "node:net";
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
+
+// Hostnames (and their subdomains) of the push services used by browsers. The server later POSTs
+// to every stored endpoint, so accepting arbitrary URLs would turn the worker into an SSRF proxy.
+const ALLOWED_PUSH_HOSTS = [
+  "fcm.googleapis.com",
+  "push.services.mozilla.com",
+  "notify.windows.com",
+  "push.apple.com",
+  "web.push.apple.com"
+];
+
+/**
+ * Checks that a subscription endpoint points to a known browser push service.
+ *
+ * Only `https:` URLs without credentials, whose hostname is not an IP literal and equals or is a
+ * subdomain of an allowed push service host, are accepted.
+ *
+ * @param {string} endpoint Endpoint submitted by the client.
+ * @returns {boolean} Whether the endpoint may be stored.
+ */
+export function isAllowedPushEndpoint(endpoint) {
+  let url;
+
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+
+  if (url.protocol !== "https:" || url.username || url.password) {
+    return false;
+  }
+
+  const hostname = url.hostname.toLowerCase();
+
+  // URL keeps IPv6 literals in brackets; isIP covers IPv4 literals.
+  if (hostname.startsWith("[") || isIP(hostname)) {
+    return false;
+  }
+
+  return ALLOWED_PUSH_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+}
 
 /**
  * Creates the push notification router.
@@ -33,6 +76,11 @@ export function createPushRouter({
 
     if (!endpoint || !p256dh || !auth) {
       res.status(400).json({ error: "endpoint, keys.p256dh, and keys.auth are required." });
+      return;
+    }
+
+    if (!isAllowedPushEndpoint(endpoint)) {
+      res.status(400).json({ error: "endpoint must be an https URL of a supported browser push service." });
       return;
     }
 

@@ -43,7 +43,7 @@ describe("push routes", () => {
     };
 
     const response = await request(createAuthedApp(pool, { logger })).post("/api/push/subscribe").send({
-      endpoint: "https://push.example.com/subscriptions/1",
+      endpoint: "https://fcm.googleapis.com/fcm/send/1",
       keys: {
         p256dh: "p256dh-key",
         auth: "auth-key"
@@ -54,7 +54,7 @@ describe("push routes", () => {
     assert.deepEqual(response.body, { message: "Push subscription saved." });
     assert.deepEqual(insertParams, [
       "user-1",
-      "https://push.example.com/subscriptions/1",
+      "https://fcm.googleapis.com/fcm/send/1",
       "p256dh-key",
       "auth-key"
     ]);
@@ -62,8 +62,58 @@ describe("push routes", () => {
     const subscriptionLog = getEntries().find((entry) => entry.msg === "Push subscription saved");
 
     assert.equal(subscriptionLog.userId, "user-1");
-    assert.equal(subscriptionLog.endpoint, "https://push.example.com/subscriptions/1");
+    assert.equal(subscriptionLog.endpoint, "https://fcm.googleapis.com/fcm/send/1");
   });
+
+  for (const endpoint of [
+    "https://fcm.googleapis.com/fcm/send/abc",
+    "https://updates.push.services.mozilla.com/wpush/v2/abc",
+    "https://wns2-par02p.notify.windows.com/w/?token=abc",
+    "https://web.push.apple.com/abc",
+    "https://push.apple.com/abc"
+  ]) {
+    it(`accepts the push service endpoint ${endpoint}`, async () => {
+      const pool = { async query() { return { rows: [] }; } };
+
+      const response = await request(createAuthedApp(pool)).post("/api/push/subscribe").send({
+        endpoint,
+        keys: { p256dh: "p256dh-key", auth: "auth-key" }
+      });
+
+      assert.equal(response.status, 201);
+    });
+  }
+
+  for (const endpoint of [
+    "https://10.0.0.1/x",
+    "https://[::1]/x",
+    "http://fcm.googleapis.com/x",
+    "https://push.example.com/subscriptions/1",
+    "https://evilfcm.googleapis.com/x",
+    "https://fcm.googleapis.com.evil.test/x",
+    "https://user:pass@fcm.googleapis.com/x",
+    "ftp://fcm.googleapis.com/x",
+    "not a url"
+  ]) {
+    it(`rejects the endpoint ${endpoint} with 400 and stores nothing`, async () => {
+      let queried = false;
+      const pool = {
+        async query() {
+          queried = true;
+          return { rows: [] };
+        }
+      };
+
+      const response = await request(createAuthedApp(pool)).post("/api/push/subscribe").send({
+        endpoint,
+        keys: { p256dh: "p256dh-key", auth: "auth-key" }
+      });
+
+      assert.equal(response.status, 400);
+      assert.match(response.body.error, /push service/i);
+      assert.equal(queried, false);
+    });
+  }
 
   it("removes a stored push subscription", async () => {
     const { logger, getEntries } = createLogCapture();

@@ -368,3 +368,43 @@ Notes for review: pgcrypto is created once in `public` by the harness (advisory-
 | Next Role | none |
 
 ---
+
+### T-003 — implement — 2026-10-08T14:35:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Push jobs are now enqueued and claimed with single atomic SQL statements and a jsonb array, a failing subscription no longer aborts delivery to the others, ticks never overlap, and subscribe only accepts https endpoints of known push services. |
+| Files Changed | backend/src/workers/pushWorker.js, backend/src/routes/push.js, backend/src/pushWorker.test.js, backend/src/push.test.js, backend/src/entries.test.js, backend/src/integration/push.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run test:integration` against local postgres:16: 16/16 pass (8 new push tests incl. concurrent enqueue and concurrent workers). `npm run lint` (0 errors, 1 pre-existing warning); `npm run build` ok; `npm test` backend 216/216, frontend 616/616 pass. |
+| Commit | `fix(push): deliver push notifications reliably and accept only known push-service endpoints` |
+| Next Role | review |
+
+Notes for review: existing unit tests were adapted because the SQL changed on purpose (enqueue is one `INSERT … ON CONFLICT` so `entries.test.js` now sees 4 queries instead of 5; the claim query is `DELETE … FOR UPDATE SKIP LOCKED` so the worker mocks match `SKIP LOCKED` and the old "job deleted" assertions became "no separate delete follows"). No log message or logged field was changed; a new warn "Push notification failed" is emitted for non-404/410 errors. The allowlist matches the host or a subdomain on a dot boundary (so `evilfcm.googleapis.com` is rejected) and also rejects credentials in the URL. The worker does not re-validate stored endpoints at send time (rows saved before this change are not purged); noted rather than added because the plan does not require it. A claimed job is lost if the process crashes mid-delivery (accepted trade-off of claim-by-delete).
+
+---
+
+### T-003 — review — 2026-10-08T14:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the push pipeline fix (atomic enqueue and claim, per-subscription errors, non-overlapping ticks, endpoint allowlist); criteria met by inspection and unit tests, integration suite not executed by the reviewer. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-10-08T15:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-003 after review PASS_WITH_NOTES: atomic push enqueue and claim, per-subscription error handling, non-overlapping ticks and endpoint allowlist. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-003 implementation files |
+| Commit | `fix(push): deliver push notifications reliably and accept only known push-service endpoints` |
+| Next Role | none |
+
+---

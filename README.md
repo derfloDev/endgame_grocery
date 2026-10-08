@@ -128,6 +128,9 @@ VAPID_CONTACT=mailto:you@example.com
 - `VAPID_PRIVATE_KEY` is a secret — treat it like a password and never commit it to version control.
 - `VAPID_CONTACT` must be a reachable `mailto:` address (or a URL). Push services use it to contact you if your endpoint misbehaves. Use a real address in production.
 - If `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, or `VAPID_CONTACT` are missing, the backend starts normally but the push worker logs a warning and skips delivery. Users can still use the app; they simply will not receive push notifications.
+- Push subscriptions are only accepted for `https` endpoints of the browser push services (`fcm.googleapis.com`, `push.services.mozilla.com`, `notify.windows.com`, `push.apple.com`, `web.push.apple.com` and their subdomains); other URLs and IP literals are rejected with `400`, because the backend sends a request to every stored endpoint.
+- A push subscription whose push service answers `404` or `410` is deleted. Any other delivery error is logged as a warning for that subscription only and does not stop delivery to the others.
+- The push worker runs inside the backend process and the SSE fan-out is in-memory, so run **one backend instance**. Jobs are enqueued and claimed with single SQL statements (`INSERT … ON CONFLICT`, `DELETE … FOR UPDATE SKIP LOCKED`), so entries added at the same moment are merged into one notification and a job is never sent twice by overlapping ticks.
 - Push delivery logs include job enqueue/fire events, recipient and subscription counts, sent counts, and expired subscription cleanup so production notification issues can be traced from the backend logs.
 
 ### 8. Verify the setup
@@ -152,6 +155,8 @@ docker compose up -d
 ```
 
 Compose pulls the app image from `ghcr.io/derfloDev/endgame-grocery`. The app listens on `http://localhost:80`. Nginx serves the built React app, proxies `/api/*` requests to the Node.js backend inside the same container, and returns the SPA `index.html` for deep-link routes. Database migrations run automatically when the app container starts.
+
+Run exactly one app container: the push worker and the live-update (SSE) fan-out live inside the backend process, so scaling the service to several replicas would split live updates between them and run several push workers.
 
 Container startup logs also print the app version twice: once from `docker/entrypoint.sh` before migrations and once in the backend JSON startup log entry.
 

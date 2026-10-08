@@ -1344,3 +1344,38 @@ No blocker or major findings; no required fixes.
 ##### Risks
 - I could not execute the integration suite myself: the sandbox denied creating a scratch database and setting `TEST_DATABASE_URL`, although a `postgres:16` container is running. I relied on the implementer's recorded 8/8 pass against local postgres:16 plus code reading. The first CI run is the authoritative check, in particular the `endgame_grocery_test` database creation via `POSTGRES_DB` and the shared `pgcrypto` handling.
 - Integration files match `*.test.js`, so `npm test` also discovers them; they are skipped without the variable, but with it set in a developer shell `npm test` will run them too.
+
+## Task: T-003 (hardening cycle 2026-10-08 — push pipeline)
+
+Note: the task ID repeats an earlier cycle's T-003 section above; this section covers the current plan's T-003 only.
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `backend/src/workers/pushWorker.js` (claim-by-delete): a job is removed before delivery, so a crash mid-delivery loses that notification. This is the accepted trade-off in the plan and is documented in the handoff. Not a required fix.
+2. **minor** — `backend/src/routes/push.js`: endpoints already stored before this change are not re-validated at send time. The plan did not ask for it; the allowlist guards new subscriptions only. Not a required fix, but worth a purge/re-check if existing data is untrusted.
+3. **nit** — the allowlist is a hard-coded list; a new browser push service host would need a code change. Documented in the README.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board, the full diff (`pushWorker.js`, `routes/push.js`, adapted unit tests, new `integration/push.test.js`, README).
+- Confirmed the `(list_id, actor_user_id)` unique constraint that `ON CONFLICT` relies on exists (`pending_push_jobs_list_actor_key` in the push-tables migration).
+- Enqueue is one `INSERT … ON CONFLICT DO UPDATE` with `$4::jsonb` and a JSON-stringified array, merging only while the window is open. The claim is `DELETE … WHERE id IN (… FOR UPDATE SKIP LOCKED LIMIT 50) RETURNING`, so concurrent workers get disjoint jobs and late items create a new row. 404 and 410 delete the subscription; other errors log a warning and the loop continues; the cooldown upsert runs after each job. Ticks use a `setTimeout` chain and the stop function clears the timer. The allowlist requires https, no credentials, no IP literal and a dot-boundary host match.
+- `npm run lint`: 0 errors. `npm run build`: ok. `npm test` (backend): 216 pass, 0 fail.
+- Read the integration tests: single-row JSON array, concurrent enqueue merge, window expiry, exactly-once delivery with two concurrent workers, no loss of items enqueued after the claim, 404/410 cleanup and continued delivery after a server error.
+
+##### Findings
+- Every acceptance criterion is covered by a test and matches the code. The adapted unit tests changed because the SQL changed on purpose, not because assertions were weakened (the old "job deleted" checks became "no separate delete follows").
+- README documents the allowlist, the 404/410 behaviour and the single-instance requirement.
+
+##### Risks
+- I could not run the integration suite: the sandbox blocks setting `TEST_DATABASE_URL`. I relied on the implementer's recorded 16/16 pass against postgres:16, the code reading and the constraint check. CI is the authoritative run.
+- The allowlist could reject a legitimate push service host not in the list (for example a self-hosted or regional endpoint); Web Push on the main browsers (Chrome, Firefox, Edge, Safari) is covered.
