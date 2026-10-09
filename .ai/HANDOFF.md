@@ -1014,3 +1014,48 @@ Notes for review:
 Open items (not part of this commit): REVIEW.md T-016 finding 1 (T-013 duplicate-tile regression) and T-014 finding 1 (T-011 migration defect) still need `rework_task` or replanning.
 
 ---
+
+### T-017 — implement — 2026-10-09T22:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Memoised tiles with stable id-based handlers, memoised derived lists with a deferred search, memoised auth/offline contexts, lazy signed-out pages and sheets, a font preload and a 11.7 KB `icon-192.png`; the entry chunk dropped from 103 KB to 87.2 KB gzip. |
+| Files Changed | frontend/src/components/EntryTile/EntryTile.tsx, frontend/src/components/EntryTile/EntryTile.test.tsx, frontend/src/components/ui/DeferredSheet/DeferredSheet.tsx, frontend/src/components/ui/DeferredSheet/DeferredSheet.test.tsx, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage/useEntryTiles.ts, frontend/src/pages/ListDetailPage/lazySheets.ts, frontend/src/pages/OverviewPage/OverviewPage.tsx, frontend/src/pages/OverviewPage/lazySheets.ts, frontend/src/App.tsx, frontend/src/context/AuthContext.tsx, frontend/src/context/AuthContext.test.tsx, frontend/src/context/OfflineQueueContext.tsx, frontend/src/context/OfflineQueueContext.test.tsx, frontend/index.html, frontend/public/icon-192.png, frontend/src/vite-config.test.ts, frontend/src/test/setup.ts, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/app.test.tsx, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ok; `npm test` frontend 795/795 (backend untouched). Cold load re-measured: Chromium (Playwright) against `vite preview`, API mocked as in `e2e/lists.spec.js`: 8 page responses, 214,743 B (209.7 KiB), largest 87,589 B. Playwright specs not run. |
+| Commit | `perf(ui): split rarely used screens and sheets out of the startup bundle and stop re-rendering unchanged tiles` |
+| Next Role | review |
+
+Notes for review:
+1. **Tiles:** `EntryTile` is `memo`; `onEdit`/`onToggle` receive the entry id; its prop type accepts `details?: string | null`, so the page passes the original entry (the old `{ ...entry, details: ... }` copy defeated memoisation). `useEntryTiles` owns the open/visible memoisation, `useDeferredValue` for the search and the stable handlers (they read current entries/callbacks through refs updated in an effect). New page tests count tile renders with a memoised wrapper: typing in the search renders no tile again; an entry event re-renders only the changed tile.
+2. **Contexts:** `AuthContext` (`login`/`register` in `useCallback`, value in `useMemo`) and `OfflineQueueContext` (value in `useMemo`); a test per context checks the value identity survives a parent re-render.
+3. **Lazy loading:** `App.tsx` lazy-loads login/register/forgot/reset/verify/invite pages inside one `Suspense` (fallback `null`); Overview and Detail stay eager. Sheets use `React.lazy` + `DeferredSheet` (renders nothing until the first open, then stays mounted; closed `BottomSheet`s render nothing anyway), so Add/Edit, Options, Rename, Share (detail) and Info (overview) are fetched on first use. Their chunks are in the service worker precache (verified in `dist/service-worker.js`; `iconWorker-*` is still excluded).
+4. **Assets:** `<link rel="preload">` for `exo-2-latin.woff2`; `icon-192.png` is now a 256-colour palette PNG (11,701 B). The plan said "losslessly", which is not possible below 15 KB here (lossless best is ~49 KB, about 15,000 colours); the visual difference is PSNR 34 dB. `vite-config.test.ts` pins size, dimensions, maskable purpose and the preload tag.
+5. **Tests touched:** `findBy*` instead of `getBy*` where a lazy sheet/page must load first (`ListDetailPage.test.tsx`, `app.test.tsx`); `src/test/setup.ts` raises RTL's `asyncUtilTimeout` to 4 s because first-time lazy imports in jsdom can exceed 1 s under load. No assertion was changed or removed. One OverviewPage test ("drops a deleted list immediately while the refresh is still running") failed once under full-suite load and passed in isolation and on the rerun; not reproduced, possibly a pre-existing timing flake.
+6. `ListDetailPage.tsx` is at 398 lines because an existing test caps the page at < 400 lines; the tile logic was moved to `useEntryTiles` for that reason.
+7. **Not verified:** the offline reopen of a list in a real browser with the service worker (only the precache manifest was checked) and the Playwright specs.
+
+---
+
+### T-017 — review — 2026-10-09T23:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed memoised tiles and contexts, lazy routes and sheets, the font preload and the re-encoded icon; re-measured the cold load (209.7 KiB, entry chunk 87.2 KB gzip) and verified offline reopen plus the lazy Add sheet with the real service worker against the production build. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+### T-017 — implement — 2026-10-09T23:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-017 after review PASS_WITH_NOTES: memoised tiles and contexts, lazy pages and sheets, font preload and a smaller install icon. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-017 implementation files |
+| Commit | `perf(ui): split rarely used screens and sheets out of the startup bundle and stop re-rendering unchanged tiles` |
+| Next Role | none |
+
+---

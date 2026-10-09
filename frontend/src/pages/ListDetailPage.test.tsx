@@ -27,6 +27,20 @@ vi.mock("../workers/iconWorkerClient", () => ({
   requestIconMatch: vi.fn().mockResolvedValue({ iconName: null, score: 0, topMatches: [] })
 }));
 
+// Counts how often a tile is rendered *with changed props*: the wrapper is memoised exactly like
+// the real tile, so it re-renders only when the page hands over a new prop value.
+const tileRenders = vi.hoisted(() => ({ ids: [] as string[] }));
+vi.mock("../components/EntryTile/EntryTile", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../components/EntryTile/EntryTile")>();
+  const { createElement, memo } = await import("react");
+  const Real = actual.default as unknown as (props: Record<string, unknown>) => unknown;
+  const Counting = memo(function CountingTile(props: { entry: { id: string } } & Record<string, unknown>) {
+    tileRenders.ids.push(props.entry.id);
+    return createElement(Real as never, props as never);
+  });
+  return { ...actual, default: Counting };
+});
+
 const streamState = vi.hoisted(() => ({ resyncVersion: 0 }));
 const queueState = vi.hoisted(() => ({ syncVersion: 0, resolvedIds: {} as Record<string, string> }));
 vi.mock("../context/EventSourceContext", () => ({ useEventSource: () => streamState }));
@@ -201,6 +215,50 @@ function createDeferred<T = unknown>() {
 
   return { promise, resolve, reject };
 }
+
+describe("ListDetailPage render cost", () => {
+  beforeEach(() => { vi.clearAllMocks(); tileRenders.ids = []; });
+  afterEach(cleanup);
+
+  it("does not re-render unchanged tiles while typing in the search field", async () => {
+    mockListDetailData({
+      entries: [
+        { id: "entry-1", text: "Milk", status: "open" },
+        { id: "entry-2", text: "Mango", status: "open" },
+        { id: "entry-3", text: "Bread", status: "open" }
+      ] as Entry[]
+    });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    tileRenders.ids = [];
+
+    await userEvent.type(screen.getByLabelText("Search items…"), "m");
+
+    // "Milk" and "Mango" match and stay on screen untouched; "Bread" disappears.
+    await waitFor(() => { expect(screen.queryByText("Bread")).toBeNull(); });
+    expect(tileRenders.ids).toEqual([]);
+  });
+
+  it("re-renders only the tile whose entry changed", async () => {
+    mockListDetailData({
+      entries: [
+        { id: "entry-1", text: "Milk", status: "open" },
+        { id: "entry-2", text: "Bread", status: "open" }
+      ] as Entry[]
+    });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    tileRenders.ids = [];
+    const handler = useListEventsMock.mock.calls.filter(([eventType]) => eventType === "entry:updated").at(-1)?.[2];
+
+    await act(async () => {
+      handler?.({ listId: "list-1", entryId: "entry-1", actorId: "someone-else", entry: { id: "entry-1", list_id: "list-1", text: "Oat milk", status: "open", last_updated_by: "someone-else" } });
+    });
+
+    expect(await screen.findByText("Oat milk")).toBeTruthy();
+    expect(new Set(tileRenders.ids)).toEqual(new Set(["entry-1"]));
+  });
+});
 
 describe("ListDetailPage cache-first loading", () => {
   beforeEach(() => { vi.clearAllMocks(); });
@@ -390,8 +448,9 @@ describe("ListDetailPage initial loading", () => {
     expect(screen.queryByLabelText("Loading")).toBeNull();
     expectOneLoad();
     await userEvent.click(screen.getByRole("button", { name: "List options" }));
-    await userEvent.click(screen.getByRole("button", { name: /Share list/ }));
-    expect(screen.getByLabelText("Loading")).toBeTruthy();
+    // The options and share sheets are lazy chunks, fetched when first opened.
+    await userEvent.click(await screen.findByRole("button", { name: /Share list/ }));
+    expect(await screen.findByLabelText("Loading")).toBeTruthy();
 
     const member = { id: "member-1", user_id: "member-1", display_name: "Jane Doe", email: "jane@example.com" };
     await act(async () => {

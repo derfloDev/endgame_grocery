@@ -1888,3 +1888,41 @@ No required fixes for T-016.
 ##### Risks
 - `app.test.tsx` fixtures still match URLs by order (T-024 replaces them).
 - Finding 1 affects every user who adds an item while connected; it should be fixed before release even though T-016 is not the cause.
+
+## Task: T-017 (hardening cycle 2026-10-08 — render cost and bundle size)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `frontend/src/App.tsx`, `DeferredSheet.tsx`: lazy routes and sheets are wrapped in `Suspense` but there is no error boundary and no `vite:preloadError` handler. A chunk that fails to load (for example a tab that stays open across a deployment: the new service worker drops the old hashed chunks, and the old page then asks for one) makes React throw out of `Suspense` and the app goes blank until a manual reload. The existing `UpdateBanner` usually prompts a reload first, so the window is small; a small boundary around the lazy parts that offers "Reload" would close it. Not a required fix.
+2. **minor** — the plan asked for a lossless `icon-192.png` below 15 KB. The implementer showed that is not reachable here (lossless best is about 49 KB) and used a 256-colour palette PNG (11,701 B, was 55,883 B; PSNR 34 dB). Viewed it: 192×192, the cart badge is clean with no visible banding. Acceptance criteria only demand < 15 KB, 192×192 and maskable, so this is accepted; the deviation is documented in the handoff.
+3. **minor** — one full-suite run showed a single failure in `AddItemSheet.test.tsx` ("expands the inline icon browser…"); it passed in isolation and in three further full runs (795/795). The implementer saw a similar one-off in an `OverviewPage` test and raised RTL's `asyncUtilTimeout` to 4 s in `src/test/setup.ts`. Lazy imports in jsdom make these tests load-sensitive; worth watching in CI.
+4. **nit** — `useEntryTiles.ts` refreshes its refs in `useEffect` rather than during render, so a handler invoked between a render and its effect would see the previous entries. Practically impossible with user input timing; the pattern is common.
+5. **nit** — `App.tsx` has two blank lines after the lazy declarations.
+
+No blocker or major findings; no required fixes. (The T-013 duplicate-tile regression and the T-011 migration defect reported in the T-016 and T-014 sections are unchanged and not caused by this task.)
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the staged diff: `EntryTile` (memo, id-based handlers), `useEntryTiles` (memoised open/visible lists, `useDeferredValue`), `DeferredSheet` and `lazySheets` for the detail page and overview, lazy signed-out pages in `App.tsx`, memoised `AuthContext` and `OfflineQueueContext` values, `index.html` font preload, `icon-192.png`, `vite-config.test.ts`, README.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok (entry chunk `index-*.js` 311 KB raw / 87.15 KB gzip, `react-vendor` 60.7 KB gzip, `AddItemSheet` 12.3 KB gzip as its own chunk; precache 38 entries). `npm test`: backend 367/367, frontend 795/795 (one non-reproducing failure, finding 3).
+- Production build served with `vite preview`, driven in Chromium against the real backend (embedded PostgreSQL 18, migrated to the migration before the broken T-011 one):
+  - cold load of a list detail page, signed in, no service worker, empty HTTP cache: 8 static responses, **209.7 KiB**, largest 85.5 KiB (the entry chunk); no sheet, signed-out page or icon-worker chunk was fetched. That matches the implementer's figure and meets the 500 KiB total and 150 KiB per-response budgets;
+  - with the real service worker active (controlling after one reload), switched offline and reopened the list: title, owner and the entry came from the cache with the offline banner; the Add Item sheet (a lazy chunk) opened offline from the precache.
+- Viewed `icon-192.png` (see finding 2) and confirmed the manifest entry still says `purpose: "any maskable"`.
+- Read the new tests for the render-cost criterion: typing in the search renders no tile again and an entry event re-renders only the changed tile (memoised wrapper render counts), plus identity tests for both contexts.
+- I did not profile renders in a browser; that criterion rests on the unit tests.
+
+##### Findings
+- Every acceptance criterion is met: typing in the search does not re-render unchanged tiles; the entry chunk is under 100 KB gzip (87.2 KB); `icon-192.png` is 11.7 KB, 192×192 and maskable; the cold-load budget is met; offline list reopen works.
+- Test changes are `findBy*` instead of `getBy*` where a lazy chunk must load first; no assertion was removed or weakened.
+
+##### Risks
+- Signed-out screens now cost one extra request on first use (a few KB gzip each), and are served from the precache offline.
+- Not executed: the Playwright specs against this build (the dev-server specs were exercised in earlier reviews).

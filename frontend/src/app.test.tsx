@@ -596,7 +596,8 @@ describe("authentication shell", () => {
 
     renderApp(["/reset-password?token=expired-reset"]);
 
-    await userEvent.type(screen.getByLabelText("New password"), "new-password-123");
+    // Signed-out pages are lazy chunks.
+    await userEvent.type(await screen.findByLabelText("New password"), "new-password-123");
     await userEvent.click(screen.getByRole("button", { name: "Update password" }));
 
     expect(await screen.findByText("Password reset link is invalid or has expired.")).toBeTruthy();
@@ -1298,8 +1299,8 @@ describe("authentication shell", () => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "List options" }));
-    await userEvent.click(screen.getByRole("button", { name: /^Share list/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "List options" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Share list/ }));
     expect(await screen.findByText(/SQUAD \(1\)/)).toBeTruthy();
 
     MockEventSource.instances[0].emit("entry:created", { listId: "list-1", entryId: "entry-2" });
@@ -1555,7 +1556,7 @@ describe("authentication shell", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "List options" }));
     expect(await screen.findByRole("dialog", { name: "List Options" })).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: /^Share list/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Share list/ }));
 
     expect(await screen.findByRole("dialog", { name: "Share List" })).toBeTruthy();
     expect(screen.getByText("SQUAD (2)")).toBeTruthy();

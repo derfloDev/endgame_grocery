@@ -210,8 +210,25 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
     };
   }, [cancelRetry, checkAndDrain, refreshQueuedCount]);
 
+  // Memoised so that consumers only re-render when the queue state actually changes.
+  const value = useMemo(
+    () =>
+      ({
+        isOffline,
+        queuedCount,
+        isSyncing,
+        syncError,
+        syncErrorKey,
+        syncVersion,
+        resolvedIds,
+        failedMutationId,
+        discardFailedMutation
+      }) satisfies OfflineQueueContextValue,
+    [isOffline, queuedCount, isSyncing, syncError, syncErrorKey, syncVersion, resolvedIds, failedMutationId, discardFailedMutation]
+  );
+
   return (
-    <OfflineQueueContext.Provider value={{ isOffline, queuedCount, isSyncing, syncError, syncErrorKey, syncVersion, resolvedIds, failedMutationId, discardFailedMutation } satisfies OfflineQueueContextValue}>
+    <OfflineQueueContext.Provider value={value}>
       {children}
     </OfflineQueueContext.Provider>
   );

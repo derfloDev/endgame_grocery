@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchCurrentUser, loginUser, registerUser } from "../api/auth";
@@ -149,24 +149,26 @@ export function AuthProvider({ children }: AuthProviderProps): ReactElement {
     };
   }, [token, user?.display_name, setAuthToken]);
 
-  async function login(credentials: LoginCredentials): Promise<LoginResult> {
-    const result = await loginUser(credentials);
-    setAuthToken(result.token, result.user ?? null);
-    return result;
-  }
+  const login = useCallback(
+    async (credentials: LoginCredentials): Promise<LoginResult> => {
+      const result = await loginUser(credentials);
+      setAuthToken(result.token, result.user ?? null);
+      return result;
+    },
+    [setAuthToken]
+  );
 
-  async function register(payload: unknown): Promise<unknown> {
-    return registerUser(payload as Parameters<typeof registerUser>[0]);
-  }
+  const register = useCallback(
+    async (payload: unknown): Promise<unknown> => registerUser(payload as Parameters<typeof registerUser>[0]),
+    []
+  );
 
-  const value: AuthContextValue = {
-    token,
-    user,
-    login,
-    register,
-    setAuthToken,
-    logout
-  };
+  // Stable between renders that change neither the session nor the user, so consumers (nearly the
+  // whole app) are not re-rendered by unrelated parent updates.
+  const value = useMemo<AuthContextValue>(
+    () => ({ token, user, login, register, setAuthToken, logout }),
+    [token, user, login, register, setAuthToken, logout]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

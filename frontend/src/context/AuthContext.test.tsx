@@ -71,6 +71,27 @@ describe("AuthProvider", () => {
     cleanup();
   });
 
+  it("keeps the context value stable across re-renders that change neither session nor user", () => {
+    const values: unknown[] = [];
+    function ValueProbe() {
+      values.push(useAuth());
+      return null;
+    }
+    const tree = () => (
+      <MemoryRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <AuthProvider>
+          <ValueProbe />
+        </AuthProvider>
+      </MemoryRouter>
+    );
+    const view = render(tree());
+    const first = values.at(-1);
+
+    view.rerender(tree());
+
+    expect(values.at(-1)).toBe(first);
+  });
+
   it("hydrates the current user when only a persisted token is available", async () => {
     const token = createFakeJwt("user-1");
     fetchCurrentUserMock.mockResolvedValue({

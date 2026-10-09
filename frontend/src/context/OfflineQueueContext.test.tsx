@@ -60,6 +60,23 @@ describe("OfflineQueueProvider", () => {
     vi.unstubAllGlobals();
   });
 
+  it("keeps the context value stable while the queue state does not change", async () => {
+    const values: unknown[] = [];
+    function ValueProbe() {
+      values.push(useOfflineQueue());
+      return null;
+    }
+    const view = renderProvider(<ValueProbe />);
+    await waitFor(() => { expect(values.length).toBeGreaterThan(0); });
+    await act(async () => { await Promise.resolve(); });
+    const settled = values.at(-1);
+
+    // A parent re-render with the same state must hand consumers the identical object.
+    view.rerender(<OfflineQueueProvider><ValueProbe /></OfflineQueueProvider>);
+
+    expect(values.at(-1)).toBe(settled);
+  });
+
   it("drains queued mutations when the page becomes visible while online", async () => {
     renderProvider();
 

@@ -5,9 +5,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AuthExpiredError, createTemporaryId } from "../../api/client";
 import { writeCachedResource } from "../../api/offlineStore";
 import { createList, deleteList, fetchLists, renameList } from "../../api/lists";
-import InfoSheet from "../../components/InfoSheet/InfoSheet";
 import ListCardHome from "../../components/ListCardHome/ListCardHome";
 import NewListSheet from "../../components/NewListSheet/NewListSheet";
+import DeferredSheet from "../../components/ui/DeferredSheet/DeferredSheet";
 import EmptyState from "../../components/ui/EmptyState/EmptyState";
 import ErrorState from "../../components/ui/ErrorState/ErrorState";
 import FAB from "../../components/ui/FAB/FAB";
@@ -20,6 +20,7 @@ import { useListEvents } from "../../hooks/useListEvents";
 import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 import type { List } from "../../types";
 import { leaveSharedList } from "../leaveListAction";
+import { InfoSheet } from "./lazySheets";
 import styles from "./OverviewPage.module.css";
 import {
   DEFAULT_OVERVIEW_SORT,
@@ -336,7 +337,9 @@ export default function OverviewPage(): ReactElement {
       </div>
 
       <FAB onClick={() => setShowNew(true)} />
-      <InfoSheet open={showInfo} onClose={() => setShowInfo(false)} />
+      <DeferredSheet open={showInfo}>
+        <InfoSheet open={showInfo} onClose={() => setShowInfo(false)} />
+      </DeferredSheet>
       <NewListSheet
         open={showNew}
         onAdd={(name) => void createListByName(name)}
