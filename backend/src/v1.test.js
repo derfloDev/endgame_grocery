@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
+import { hashToken } from "./tokens.js";
 
 const LIST_ID = "11111111-1111-4111-8111-111111111111";
 const SECOND_LIST_ID = "22222222-2222-4222-8222-222222222222";
@@ -72,8 +73,8 @@ describe("external v1 API routes", () => {
 
     assert.equal(response.status, 401);
     assert.deepEqual(response.body, { error: "Invalid API key." });
-    assert.match(queryArgs[0], /SELECT id FROM users WHERE api_key = \$1 LIMIT 1/);
-    assert.deepEqual(queryArgs[1], ["unknown-api-key"]);
+    assert.match(queryArgs[0], /SELECT id FROM users WHERE api_key_hash = \$1 LIMIT 1/);
+    assert.deepEqual(queryArgs[1], [hashToken("unknown-api-key")]);
   });
 
   const listAccessEndpoints = [

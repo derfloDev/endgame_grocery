@@ -5,6 +5,7 @@ import { describe } from "node:test";
 import jwt from "jsonwebtoken";
 import { runner } from "node-pg-migrate";
 import pg from "pg";
+import { generateToken, hashToken } from "../tokens.js";
 
 /**
  * Shared harness for integration tests that run against a real PostgreSQL server.
@@ -70,7 +71,7 @@ async function ensureSharedExtensions(connectionString) {
  * @returns {Promise<{
  *   pool: import("pg").Pool,
  *   schema: string,
- *   migrate: (direction: "up" | "down") => Promise<void>,
+ *   migrate: (direction: "up" | "down", count?: number) => Promise<void>,
  *   snapshot: () => Promise<{ columns: unknown[], indexes: unknown[], constraints: unknown[] }>,
  *   close: () => Promise<void>
  * }>} Test database handle.
@@ -92,7 +93,7 @@ export async function createTestDatabase() {
     options: `-c search_path=${schema},public`
   });
 
-  async function migrate(direction) {
+  async function migrate(direction, count = Infinity) {
     const client = new Client({
       connectionString: TEST_DATABASE_URL,
       options: `-c search_path=${schema},public`
@@ -104,8 +105,8 @@ export async function createTestDatabase() {
         dbClient: client,
         dir: MIGRATIONS_DIR,
         direction,
-        // Apply or revert every migration.
-        count: Infinity,
+        // Apply or revert every migration unless a count is given.
+        count,
         migrationsTable: MIGRATIONS_TABLE,
         schema,
         // Schemas are isolated per test file, so the global migration lock is unnecessary.
@@ -246,22 +247,24 @@ export async function createEntry(pool, { listId, text = "Milk", status = "open"
  *
  * @param {import("pg").Pool} pool Database pool.
  * @param {{ listId: string, invitedEmail: string, invitedBy: string, expiresAt?: Date }} options Invite fields.
- * @returns {Promise<{ id: string, token: string }>} Created invite.
+ * @returns {Promise<{ id: string, token: string }>} Created invite; `token` is the plaintext value
+ *   (only its hash is stored).
  */
 export async function createInvite(
   pool,
   { listId, invitedEmail, invitedBy, expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }
 ) {
+  const token = generateToken();
   const result = await pool.query(
     `
-      INSERT INTO list_invites (list_id, invited_email, invited_by, expires_at)
-      VALUES ($1, LOWER($2), $3, $4)
-      RETURNING id, token
+      INSERT INTO list_invites (list_id, invited_email, invited_by, token_hash, expires_at)
+      VALUES ($1, LOWER($2), $3, $4, $5)
+      RETURNING id
     `,
-    [listId, invitedEmail, invitedBy, expiresAt]
+    [listId, invitedEmail, invitedBy, hashToken(token), expiresAt]
   );
 
-  return result.rows[0];
+  return { id: result.rows[0].id, token };
 }
 
 /**

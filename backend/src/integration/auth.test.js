@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import pino from "pino";
 import request from "supertest";
 import { createApp } from "../app.js";
+import { hashToken } from "../tokens.js";
 import {
   TEST_JWT_SECRET,
   createTestDatabase,
@@ -33,8 +34,8 @@ describeDb("session revocation and password reset (PostgreSQL)", () => {
   async function createResetToken(userId, { expiresInMs = 60 * 60 * 1000, used = false } = {}) {
     const token = randomUUID();
     await db.pool.query(
-      "INSERT INTO password_reset_tokens (user_id, token, expires_at, used) VALUES ($1, $2, $3, $4)",
-      [userId, token, new Date(Date.now() + expiresInMs), used]
+      "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, used) VALUES ($1, $2, $3, $4)",
+      [userId, hashToken(token), new Date(Date.now() + expiresInMs), used]
     );
     return token;
   }
@@ -133,12 +134,13 @@ describeDb("session revocation and password reset (PostgreSQL)", () => {
 
     it("clears the API key", async () => {
       const user = await createUser(db.pool);
-      await db.pool.query("UPDATE users SET api_key = $1 WHERE id = $2", [randomUUID(), user.id]);
+      await db.pool.query("UPDATE users SET api_key_hash = $1, api_key_hint = $2 WHERE id = $3", [hashToken(randomUUID()), "abcd", user.id]);
 
       assert.equal((await reset(await createResetToken(user.id))).status, 200);
 
-      const { rows } = await db.pool.query("SELECT api_key FROM users WHERE id = $1", [user.id]);
-      assert.equal(rows[0].api_key, null);
+      const { rows } = await db.pool.query("SELECT api_key_hash, api_key_hint FROM users WHERE id = $1", [user.id]);
+      assert.equal(rows[0].api_key_hash, null);
+      assert.equal(rows[0].api_key_hint, null);
     });
 
     it("rejects expired and already used tokens without changing the user", async () => {

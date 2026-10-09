@@ -33,9 +33,9 @@ describe("InfoSheet", () => {
   beforeEach(() => {
     mocks.logout.mockReset();
     mocks.fetchApiKey.mockReset();
-    mocks.fetchApiKey.mockResolvedValue({ api_key: "api-key-1" });
+    mocks.fetchApiKey.mockResolvedValue({ has_key: true, hint: "ey-1", created_at: "2026-10-01T10:00:00.000Z" });
     mocks.regenerateApiKey.mockReset();
-    mocks.regenerateApiKey.mockResolvedValue({ api_key: "api-key-2" });
+    mocks.regenerateApiKey.mockResolvedValue({ api_key: "api-key-2", hint: "ey-2", created_at: "2026-10-09T10:00:00.000Z" });
     mocks.authState.token = "jwt-token";
     mocks.authState.user = {
       id: "user-1",
@@ -129,23 +129,31 @@ describe("InfoSheet", () => {
     expect(mocks.logout).not.toHaveBeenCalled();
   });
 
-  it("fetches the API key when the sheet opens", async () => {
+  async function generateKey() {
+    mocks.fetchApiKey.mockResolvedValue({ has_key: false, hint: null, created_at: null });
+    const view = render(<InfoSheet open onClose={() => {}} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Generate key" }));
+    return view;
+  }
+
+  it("fetches the API key status when the sheet opens", async () => {
     render(<InfoSheet open onClose={() => {}} />);
 
-    expect(await screen.findByText("api-key-1")).toBeTruthy();
+    expect(await screen.findByText("•••• ey-1")).toBeTruthy();
     expect(mocks.fetchApiKey).toHaveBeenCalledWith("jwt-token");
   });
 
-  it("shows the current API key and copy action", async () => {
+  it("shows only the hint of an existing key, with no copy action", async () => {
     render(<InfoSheet open onClose={() => {}} />);
 
-    expect(await screen.findByText("api-key-1")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+    expect(await screen.findByText("•••• ey-1")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Regenerate" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+    expect(screen.queryByText(/shown only once/i)).toBeNull();
   });
 
   it("shows an empty state and generate action when no API key exists", async () => {
-    mocks.fetchApiKey.mockResolvedValue({ api_key: null });
+    mocks.fetchApiKey.mockResolvedValue({ has_key: false, hint: null, created_at: null });
 
     render(<InfoSheet open onClose={() => {}} />);
 
@@ -153,19 +161,40 @@ describe("InfoSheet", () => {
     expect(screen.getByRole("button", { name: "Generate key" })).toBeTruthy();
   });
 
-  it("copies the API key to the clipboard", async () => {
+  it("shows a newly generated key once, with a warning and a copy action", async () => {
+    await generateKey();
+
+    expect(mocks.regenerateApiKey).toHaveBeenCalledWith("jwt-token");
+    expect(await screen.findByText("api-key-2")).toBeTruthy();
+    expect(screen.getByText(/shown only once/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+  });
+
+  it("falls back to the hint after the sheet is closed and reopened", async () => {
+    const view = await generateKey();
+    await screen.findByText("api-key-2");
+
+    view.rerender(<InfoSheet open={false} onClose={() => {}} />);
+    mocks.fetchApiKey.mockResolvedValue({ has_key: true, hint: "ey-2", created_at: "2026-10-09T10:00:00.000Z" });
+    view.rerender(<InfoSheet open onClose={() => {}} />);
+
+    expect(await screen.findByText("•••• ey-2")).toBeTruthy();
+    expect(screen.queryByText("api-key-2")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+  });
+
+  it("copies the new API key to the clipboard", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("navigator", {
       ...navigator,
       clipboard: { writeText }
     });
 
-    render(<InfoSheet open onClose={() => {}} />);
-
-    await screen.findByText("api-key-1");
+    await generateKey();
+    await screen.findByText("api-key-2");
     await userEvent.click(screen.getByRole("button", { name: "Copy" }));
 
-    expect(writeText).toHaveBeenCalledWith("api-key-1");
+    expect(writeText).toHaveBeenCalledWith("api-key-2");
     expect(screen.getByText("Copied!")).toBeTruthy();
   });
 
@@ -176,16 +205,14 @@ describe("InfoSheet", () => {
       clipboard: { writeText }
     });
 
-    render(<InfoSheet open onClose={() => {}} />);
-
-    await screen.findByText("api-key-1");
+    await generateKey();
+    await screen.findByText("api-key-2");
     const copyButton = screen.getByRole("button", { name: "Copy" });
 
     await userEvent.click(copyButton);
 
-    expect(writeText).toHaveBeenCalledWith("api-key-1");
+    expect(writeText).toHaveBeenCalledWith("api-key-2");
     expect(screen.queryByText("Copied!")).toBeNull();
-    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
 
     await userEvent.click(copyButton);
 
@@ -193,13 +220,22 @@ describe("InfoSheet", () => {
     expect(screen.getByText("Copied!")).toBeTruthy();
   });
 
-  it("regenerates the API key and shows the new value", async () => {
+  it("asks for confirmation before replacing an existing key", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+
     render(<InfoSheet open onClose={() => {}} />);
 
-    await screen.findByText("api-key-1");
+    await userEvent.click(await screen.findByRole("button", { name: "Regenerate" }));
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(mocks.regenerateApiKey).not.toHaveBeenCalled();
+    expect(screen.getByText("•••• ey-1")).toBeTruthy();
+
+    confirm.mockReturnValue(true);
     await userEvent.click(screen.getByRole("button", { name: "Regenerate" }));
 
     expect(mocks.regenerateApiKey).toHaveBeenCalledWith("jwt-token");
     expect(await screen.findByText("api-key-2")).toBeTruthy();
+    confirm.mockRestore();
   });
 });

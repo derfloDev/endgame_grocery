@@ -570,3 +570,47 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-007 — implement — 2026-10-09T06:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | API keys and the email-verification, password-reset and invite tokens are stored only as SHA-256 hashes (existing values converted in place), `GET /api/auth/api-key` returns only `has_key`/`hint`/`created_at`, and the InfoSheet shows a new key once with a warning. |
+| Files Changed | backend/src/tokens.js, backend/src/tokens.test.js, backend/src/db/migrations/1779979000003_hash_credentials.cjs, backend/src/db/migrations.test.js, backend/src/middleware/auth.js, backend/src/routes/auth.js, backend/src/routes/sharing.js, backend/src/inviteService.js, backend/src/auth.test.js, backend/src/sessionRevocation.test.js, backend/src/sharing.test.js, backend/src/invites.test.js, backend/src/v1.test.js, backend/src/integration/helpers.js, backend/src/integration/auth.test.js, backend/src/integration/credentials.test.js, backend/src/openapi/v1.yaml, frontend/src/api/auth.ts, frontend/src/components/InfoSheet/InfoSheet.tsx, frontend/src/components/InfoSheet/InfoSheet.module.css, frontend/src/components/InfoSheet/InfoSheet.test.tsx, frontend/src/locales/en/translation.json, frontend/src/locales/de/translation.json, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ok; `npm test` backend 315/315, frontend 669/669 pass. Integration suite (`integration/credentials.test.js`, updated `integration/auth.test.js`, migration round-trip) NOT executed locally: no PostgreSQL and the Docker daemon is not running; CI runs it. |
+| Commit | `feat(security): store API keys and one-time tokens hashed and show a new API key only once` |
+| Next Role | review |
+
+Notes for review:
+1. **Migration `1779979000003_hash_credentials`:** adds `users.api_key_hash/hint/created_at` and `token_hash` (NOT NULL, UNIQUE) on the three token tables, fills them with `encode(sha256(convert_to(col::text,'UTF8')),'hex')` of the lower-case uuid text, then drops the plaintext columns. `down` re-creates them (tokens get fresh random values, API keys are empty) and says so in a comment. Not run against PostgreSQL locally; the round-trip and "pre-migration key still authenticates" integration tests will exercise it in CI.
+2. **`hashToken`** trims and lower-cases before hashing so the case-insensitive behaviour of the old `uuid` columns is kept. `migrate(direction, count)` in the integration helper gained an optional count so a test can roll back one migration.
+3. **API:** `POST /api/auth/api-key` replaces the key and returns `{ api_key, hint, created_at }` once; reset-password also nulls hash, hint and created_at.
+4. **UI:** the plaintext is held in component state only and dropped when the sheet closes; an existing key shows `•••• <hint>`; replacing an existing key asks `window.confirm`. DE/EN strings `settings.apiKeyShownOnce` and `settings.apiKeyRegenerateConfirm` added.
+5. Existing unit tests only changed where the SQL/params now use hashes (`token_hash`, `api_key_hash`); no assertion weakened. InfoSheet API-key tests were rewritten for the new flow (key shown only after generation).
+6. `testRouter.js` needed no change (it does not touch these columns). Invite acceptance by the owner is still allowed here; T-008 covers it.
+
+---
+
+### T-007 — review — 2026-10-09T07:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed hashed API keys and one-time tokens plus the show-once API key UI; verified against a real PostgreSQL (integration 31/31, HTTP end-to-end, legacy plaintext rows converted and still usable). |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+### T-007 — implement — 2026-10-09T07:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-007 after review PASS_WITH_NOTES: API keys and one-time tokens stored hashed, API key shown once. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-007 implementation files |
+| Commit | `feat(security): store API keys and one-time tokens hashed and show a new API key only once` |
+| Next Role | none |
+
+---

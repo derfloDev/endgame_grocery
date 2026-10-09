@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { createApp } from "./app.js";
+import { hashToken } from "./tokens.js";
 
 function createAuthedApp(pool, options = {}) {
   return createApp({
@@ -49,7 +50,7 @@ describe("invite routes", () => {
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { listId: "list-1" });
     assert.match(queries[0][0], /FROM list_invites/);
-    assert.equal(queries[0][1][0], "invite-token-1");
+    assert.equal(queries[0][1][0], hashToken("invite-token-1"));
     assert.equal(queries[0][1][1] instanceof Date, true);
     assert.match(queries[1][0], /SELECT user_id FROM list_members/);
     assert.deepEqual(queries[1][1], ["list-1", "user-1"]);

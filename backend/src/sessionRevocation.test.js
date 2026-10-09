@@ -6,6 +6,7 @@ import request from "supertest";
 import { createApp } from "./app.js";
 import { createRequireAuth, createRequireAuthFn } from "./middleware/auth.js";
 import { withTransaction } from "./db/client.js";
+import { hashToken } from "./tokens.js";
 
 const secret = "revocation-test-secret-0123456789abcdef0123456789";
 const config = { jwtSecret: secret, jwtExpiresIn: "7d" };
@@ -255,9 +256,9 @@ describe("password reset", () => {
     assert.equal(statements[0][0], "BEGIN");
     assert.match(
       statements[1][0],
-      /^UPDATE password_reset_tokens SET used = true WHERE token = \$1 AND used = false AND expires_at > \$2 RETURNING user_id$/
+      /^UPDATE password_reset_tokens SET used = true WHERE token_hash = \$1 AND used = false AND expires_at > \$2 RETURNING user_id$/
     );
-    assert.deepEqual(statements[1][1], ["reset-token", new Date("2026-04-28T10:00:00Z")]);
+    assert.deepEqual(statements[1][1], [hashToken("reset-token"), new Date("2026-04-28T10:00:00Z")]);
     assert.equal(statements.at(-1)[0], "COMMIT");
     assert.equal(released(), 1);
   });
@@ -268,7 +269,7 @@ describe("password reset", () => {
     await reset(app);
 
     const update = statements.find(([sql]) => sql.startsWith("UPDATE users"));
-    assert.match(update[0], /SET password_hash = \$1, token_version = token_version \+ 1, api_key = NULL WHERE id = \$2/);
+    assert.match(update[0], /SET password_hash = \$1, token_version = token_version \+ 1, api_key_hash = NULL, api_key_hint = NULL, api_key_created_at = NULL WHERE id = \$2/);
     assert.deepEqual(update[1], ["new-hash", "user-1"]);
   });
 
@@ -278,8 +279,8 @@ describe("password reset", () => {
     await reset(app);
 
     const cleanup = statements.find(([sql]) => sql.startsWith("DELETE FROM password_reset_tokens"));
-    assert.match(cleanup[0], /WHERE user_id = \$1 AND token <> \$2/);
-    assert.deepEqual(cleanup[1], ["user-1", "reset-token"]);
+    assert.match(cleanup[0], /WHERE user_id = \$1 AND token_hash <> \$2/);
+    assert.deepEqual(cleanup[1], ["user-1", hashToken("reset-token")]);
   });
 
   it("answers 400 without changing anything when the token was already claimed", async () => {

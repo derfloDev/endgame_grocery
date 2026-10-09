@@ -6,6 +6,7 @@ import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { createRequireApiKey, createRequireAuth } from "./middleware/auth.js";
+import { getApiKeyHint, hashToken } from "./tokens.js";
 
 describe("authentication routes", () => {
   it("returns 404 when registration is disabled", async () => {
@@ -117,7 +118,8 @@ describe("authentication routes", () => {
     ]);
     assert.match(queries[1][0], /INSERT INTO email_verification_tokens/);
     assert.equal(queries[1][1][0], "user-1");
-    assert.equal(queries[1][1][1], "verification-token-1");
+    // Only the hash of the token is stored; the plaintext goes into the mail.
+    assert.equal(queries[1][1][1], hashToken("verification-token-1"));
     assert.equal(queries[1][1][2].toISOString(), "2026-04-22T00:00:00.000Z");
     assert.deepEqual(findLogEntry(getEntries(), "User registered"), {
       email: "demo@example.com",
@@ -204,7 +206,7 @@ describe("authentication routes", () => {
     });
     assert.equal(sentMessages.length, 0);
     assert.match(queries[0][0], /FROM list_invites/);
-    assert.equal(queries[0][1][0], "invite-token-1");
+    assert.equal(queries[0][1][0], hashToken("invite-token-1"));
     assert.equal(queries[0][1][1] instanceof Date, true);
     assert.match(queries[1][0], /INSERT INTO users/);
     assert.deepEqual(queries[1][1], [
@@ -450,7 +452,7 @@ describe("authentication routes", () => {
     const pool = {
       async query(text, params) {
         apiKeyQuery = [normalizeSql(text), params];
-        return { rows: [{ api_key: null }] };
+        return { rows: [{ api_key_hash: null, api_key_hint: null, api_key_created_at: null }] };
       }
     };
 
@@ -467,16 +469,24 @@ describe("authentication routes", () => {
       .set("Authorization", `Bearer ${token}`);
 
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { api_key: null });
-    assert.match(apiKeyQuery[0], /SELECT api_key FROM users/);
+    assert.deepEqual(response.body, { has_key: false, hint: null, created_at: null });
+    assert.match(apiKeyQuery[0], /SELECT api_key_hash, api_key_hint, api_key_created_at FROM users/);
     assert.deepEqual(apiKeyQuery[1], ["user-1"]);
   });
 
-  it("returns the current API key for the authenticated user", async () => {
+  it("never returns the API key again, only whether one exists, its hint and creation time", async () => {
     const token = jwt.sign({ sub: "user-1" }, "test-secret", { expiresIn: "7d" });
     const pool = {
       async query() {
-        return { rows: [{ api_key: "11111111-1111-4111-8111-111111111111" }] };
+        return {
+          rows: [
+            {
+              api_key_hash: hashToken("11111111-1111-4111-8111-111111111111"),
+              api_key_hint: "1111",
+              api_key_created_at: "2026-04-21T00:00:00.000Z"
+            }
+          ]
+        };
       }
     };
 
@@ -494,8 +504,11 @@ describe("authentication routes", () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      api_key: "11111111-1111-4111-8111-111111111111"
+      has_key: true,
+      hint: "1111",
+      created_at: "2026-04-21T00:00:00.000Z"
     });
+    assert.equal(JSON.stringify(response.body).includes("11111111-1111-4111-8111-111111111111"), false);
   });
 
   it("generates an API key for the authenticated user", async () => {
@@ -504,7 +517,7 @@ describe("authentication routes", () => {
     const pool = {
       async query(text, params) {
         updateQuery = [normalizeSql(text), params];
-        return { rows: [{ api_key: params[0] }] };
+        return { rows: [{ api_key_hint: params[1], api_key_created_at: params[2] }] };
       }
     };
 
@@ -514,6 +527,7 @@ describe("authentication routes", () => {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
       },
+      now: () => new Date("2026-04-21T00:00:00Z"),
       generateApiKey() {
         return "22222222-2222-4222-8222-222222222222";
       }
@@ -524,14 +538,24 @@ describe("authentication routes", () => {
       .set("Authorization", `Bearer ${token}`);
 
     assert.equal(response.status, 200);
+    // The plaintext key is returned exactly once, together with its hint and creation time.
     assert.deepEqual(response.body, {
-      api_key: "22222222-2222-4222-8222-222222222222"
+      api_key: "22222222-2222-4222-8222-222222222222",
+      hint: "2222",
+      created_at: "2026-04-21T00:00:00.000Z"
     });
-    assert.match(updateQuery[0], /UPDATE users SET api_key = \$1 WHERE id = \$2 RETURNING api_key/);
+    assert.match(
+      updateQuery[0],
+      /UPDATE users SET api_key_hash = \$1, api_key_hint = \$2, api_key_created_at = \$3 WHERE id = \$4 RETURNING api_key_hint, api_key_created_at/
+    );
+    // Only the hash and the hint reach the database, never the key itself.
     assert.deepEqual(updateQuery[1], [
-      "22222222-2222-4222-8222-222222222222",
+      hashToken("22222222-2222-4222-8222-222222222222"),
+      getApiKeyHint("22222222-2222-4222-8222-222222222222"),
+      new Date("2026-04-21T00:00:00Z"),
       "user-1"
     ]);
+    assert.equal(JSON.stringify(updateQuery[1]).includes("22222222-2222-4222-8222-222222222222"), false);
   });
 
   it("regenerates an API key for the authenticated user", async () => {
@@ -544,7 +568,7 @@ describe("authentication routes", () => {
     const pool = {
       async query(_text, params) {
         updates.push(params);
-        return { rows: [{ api_key: params[0] }] };
+        return { rows: [{ api_key_hint: params[1], api_key_created_at: params[2] }] };
       }
     };
 
@@ -554,6 +578,7 @@ describe("authentication routes", () => {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
       },
+      now: () => new Date("2026-04-21T00:00:00Z"),
       generateApiKey() {
         return generatedKeys.shift();
       }
@@ -570,11 +595,13 @@ describe("authentication routes", () => {
     assert.equal(secondResponse.status, 200);
     assert.notEqual(firstResponse.body.api_key, secondResponse.body.api_key);
     assert.deepEqual(secondResponse.body, {
-      api_key: "44444444-4444-4444-8444-444444444444"
+      api_key: "44444444-4444-4444-8444-444444444444",
+      hint: "4444",
+      created_at: "2026-04-21T00:00:00.000Z"
     });
     assert.deepEqual(updates, [
-      ["33333333-3333-4333-8333-333333333333", "user-1"],
-      ["44444444-4444-4444-8444-444444444444", "user-1"]
+      [hashToken("33333333-3333-4333-8333-333333333333"), "3333", new Date("2026-04-21T00:00:00Z"), "user-1"],
+      [hashToken("44444444-4444-4444-8444-444444444444"), "4444", new Date("2026-04-21T00:00:00Z"), "user-1"]
     ]);
   });
 
@@ -661,7 +688,7 @@ describe("authentication routes", () => {
     const pool = {
       async query(text, params) {
         if (text.includes("SELECT evt.user_id")) {
-          assert.equal(params[0], "valid-token");
+          assert.equal(params[0], hashToken("valid-token"));
           assert.ok(params[1] instanceof Date);
           return {
             rows: [
@@ -707,7 +734,7 @@ describe("authentication routes", () => {
       display_name: "Demo User"
     });
     assert.equal(updatedUserId, "user-1");
-    assert.equal(deletedToken, "valid-token");
+    assert.equal(deletedToken, hashToken("valid-token"));
     assert.deepEqual(findLogEntry(getEntries(), "Email verified"), {
       level: 30,
       msg: "Email verified",
@@ -793,7 +820,7 @@ describe("authentication routes", () => {
     assert.equal(deletedUserId, "user-1");
     assert.deepEqual(insertedValues, [
       "user-1",
-      "verification-token-2",
+      hashToken("verification-token-2"),
       new Date("2026-04-22T00:00:00.000Z")
     ]);
     assert.equal(sentMessages.length, 1);
@@ -880,7 +907,7 @@ describe("authentication routes", () => {
     assert.deepEqual(response.body, { message: "If an account exists, you will receive an email." });
     assert.deepEqual(insertedValues, [
       "user-1",
-      "reset-token-1",
+      hashToken("reset-token-1"),
       new Date("2026-04-21T01:00:00.000Z")
     ]);
     assert.deepEqual(sentMessages, [
@@ -991,7 +1018,7 @@ describe("authentication routes", () => {
     assert.deepEqual(response.body, { message: "Password updated." });
     assert.equal(updatedPasswordParams[1], "user-1");
     assert.notEqual(updatedPasswordParams[0], "new-password-123");
-    assert.equal(markedToken, "valid-reset-token");
+    assert.equal(markedToken, hashToken("valid-reset-token"));
     assert.deepEqual(findLogEntry(getEntries(), "Password reset completed"), {
       level: 30,
       msg: "Password reset completed",
@@ -1102,8 +1129,8 @@ describe("requireApiKey middleware", () => {
 
     assert.equal(res.statusCode, 401);
     assert.equal(res.body.error, "Invalid API key.");
-    assert.match(apiKeyQuery[0], /SELECT id FROM users WHERE api_key = \$1 LIMIT 1/);
-    assert.deepEqual(apiKeyQuery[1], ["missing-api-key"]);
+    assert.match(apiKeyQuery[0], /SELECT id FROM users WHERE api_key_hash = \$1 LIMIT 1/);
+    assert.deepEqual(apiKeyQuery[1], [hashToken("missing-api-key")]);
     assert.equal(nextCalled, false);
   });
 
@@ -1111,7 +1138,7 @@ describe("requireApiKey middleware", () => {
     const middleware = createRequireApiKey({
       pool: {
         async query(_text, params) {
-          assert.deepEqual(params, ["valid-api-key"]);
+          assert.deepEqual(params, [hashToken("valid-api-key")]);
           return { rows: [{ id: "user-1" }] };
         }
       }

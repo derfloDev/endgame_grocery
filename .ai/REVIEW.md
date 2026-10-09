@@ -1517,3 +1517,45 @@ No blocker or major findings; no required fixes.
 ##### Risks
 - I could not run the integration suite (the sandbox blocks setting `TEST_DATABASE_URL`); I relied on the implementer's 25/25 run against postgres:16 and on reading the tests, which target the right behaviours. CI is the authoritative run, in particular the concurrent-reset test.
 - Authenticated requests now fail with 500 if the database lookup fails (by design — not an auth result), so a database outage turns into API-wide errors instead of 401s.
+
+## Task: T-007 (hardening cycle 2026-10-08 — hashed credentials, API key shown once)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `backend/src/integration/helpers.js:29` (pre-existing, T-002): `SHARED_EXTENSIONS` lists only `pgcrypto`, but migration `1713902400000` creates `pg_trgm`. On a database that does not have `pg_trgm` yet, test files that run in parallel race on `CREATE EXTENSION IF NOT EXISTS` and fail with `pg_extension_name_index` (seen once on the first run against a fresh database: 13 tests cancelled; the next two runs were 31/31). Not caused by T-007 and not a required fix. Adding `pg_trgm` to `SHARED_EXTENSIONS` (or T-011's explicit extension handling) removes the flake. It matters only if CI runs test files concurrently.
+2. **minor** — `GET /api/invites/:token` still adds the member (a state change on a GET) and still allows the owner to accept. Out of scope here; the plan assigns both to T-008.
+3. **nit** — `hashToken` is an unsalted SHA-256. This is acceptable because every value is a 122-bit random UUID (documented in `tokens.js` and the migration), so the digest cannot be brute-forced.
+4. **nit** — `InfoSheet.tsx`: a key with `has_key: true` but a `null` hint renders `•••• `. Only possible for hand-edited rows, since the migration and `POST` always write a hint.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the full diff: migration `1779979000003_hash_credentials.cjs` (with `down`), `tokens.js`, `middleware/auth.js`, `routes/auth.js`, `routes/sharing.js`, `inviteService.js`, OpenAPI, README, `api/auth.ts`, `InfoSheet.tsx` and CSS, DE/EN locales, adapted and new tests.
+- `rg` for leftover plaintext column use (`api_key`, `token` in SQL) outside migrations and tests: none; `invites.js`, `v1.js` and `testRouter.js` need no change.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok. `npm test`: backend 315/315, frontend 669/669.
+- Integration suite run against a real PostgreSQL (embedded PostgreSQL 18 in the scratchpad, since Docker is not running): `npm run test:integration` gives 31/31 including `credentials.test.js` and the migration round-trip. This was the second run; the first failed on finding 1.
+- Manual HTTP end-to-end against that database (`createApp` with a capturing mailer; script kept in the scratchpad, repository untouched):
+  - register → only `token_hash` stored, differing from the mailed token; verify with an upper-case token → 200; garbage token → 400.
+  - `POST /api/auth/api-key` returns `api_key`, `hint`, `created_at`; `GET` returns `{has_key, hint, created_at}` only; `/api/v1/lists` with the key → 200, garbage key → 401.
+  - forgot → reset → 200, second use → 400; the old API key and the old JWT → 401 afterwards.
+  - invite → `list_invites.token_hash == hashToken(mailed token)`; register with that invite token → 201 with `listId`.
+  - legacy data: rolled the migration back one step, inserted a plaintext verification token, an upper-case reset token, an invite and a key, migrated up: the verification link, the reset link, the invite and the key all still work; no `token` or `api_key` column remains in the schema.
+- InfoSheet flows read against the tests: no key → Generate; generated → full key, copy button and "shown only once" warning (`role="status"`); reopened → `•••• hint` with a confirmed Regenerate. `--color-warning` exists in `tokens.css`. I did not drive the sheet in a browser.
+
+##### Findings
+- Every acceptance criterion is met: no plaintext API key or token column in the schema; a pre-migration key authenticates; `GET /api/auth/api-key` exposes only `has_key`/`hint`/`created_at`; the key is shown once.
+- Existing tests changed only where SQL parameters became hashes. InfoSheet API-key tests were rewritten for the new flow, not weakened. Verifying with a malformed token now returns 400 instead of a 500 from the old `uuid` cast.
+
+##### Risks
+- `down` cannot restore plaintext: pending links stop working and API keys are empty (documented in the migration and README).
+- Anyone holding a key must read it at generation time. A lost key means regenerating it and re-keying Home Assistant.
+- The plaintext key stays in the InfoSheet component state until the sheet closes.
+- Not executed: Playwright E2E and a browser pass over the InfoSheet.

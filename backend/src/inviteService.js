@@ -1,5 +1,8 @@
+import { hashToken } from "./tokens.js";
+
 /**
- * Finds a pending, unexpired invite by token.
+ * Finds a pending, unexpired invite by token. Invite tokens are stored hashed, so the presented
+ * plaintext is hashed before the lookup.
  *
  * @param {import("pg").Pool} pool Database pool.
  * @param {string} token Invite token.
@@ -11,12 +14,12 @@ export async function getPendingInviteByToken(pool, token, now) {
     `
       SELECT id, list_id, invited_email, status
       FROM list_invites
-      WHERE token = $1
+      WHERE token_hash = $1
         AND status = 'pending'
         AND expires_at > $2
       LIMIT 1
     `,
-    [token, now]
+    [hashToken(token), now]
   );
 
   return result.rows[0] ?? null;

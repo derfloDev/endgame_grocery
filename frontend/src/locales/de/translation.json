@@ -32,6 +32,8 @@
   "settings.apiKeyCopy": "Kopieren",
   "settings.apiKeyCopied": "Kopiert!",
   "settings.apiKeyRegenerate": "Neu generieren",
+  "settings.apiKeyRegenerateConfirm": "Neuen API-Schlüssel generieren? Der aktuelle Schlüssel funktioniert sofort nicht mehr, aktualisiere ihn in Home Assistant.",
+  "settings.apiKeyShownOnce": "Kopiere diesen Schlüssel jetzt. Er wird nur einmal angezeigt, danach nur noch die letzten Zeichen. Bei Verlust generierst du einen neuen.",
   "settings.apiKeyHint": "Verwende diesen Schlüssel für die Home Assistant Integration.",
   "offline.cached": "Offline-Modus: gespeicherte Daten werden angezeigt.",
   "offline.queued": "Offline-Modus: {count, plural, one {# Änderung} other {# Änderungen}} warten auf Synchronisierung.",

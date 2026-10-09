@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { randomUUID } from "node:crypto";
+import { generateToken, getApiKeyHint, hashToken } from "../tokens.js";
 import { Router } from "express";
 import { getPool, withTransaction } from "../db/client.js";
 import { getConfig } from "../env.js";
@@ -56,9 +56,9 @@ export function createAuthRouter({
   logger = defaultLogger,
   sseManager = defaultSseManager,
   mailer = createMailer({ config, logger }),
-  generateVerificationToken = randomUUID,
-  generatePasswordResetToken = randomUUID,
-  generateApiKey = randomUUID,
+  generateVerificationToken = generateToken,
+  generatePasswordResetToken = generateToken,
+  generateApiKey = generateToken,
   now = () => new Date(),
   rateLimiters = createRateLimiters(),
   requireAuthMiddleware = createRequireAuth({ jwtLib, config, pool })
@@ -147,13 +147,13 @@ export function createAuthRouter({
       const verificationToken = generateVerificationToken();
       const expiresAt = addHours(now(), 24);
 
+      // Only the hash is stored; the plaintext leaves the server in the verification mail.
       await pool.query(
         `
-          INSERT INTO email_verification_tokens (user_id, token, expires_at)
+          INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
           VALUES ($1, $2, $3)
-          RETURNING token
         `,
-        [result.rows[0].id, verificationToken, expiresAt]
+        [result.rows[0].id, hashToken(verificationToken), expiresAt]
       );
 
       await sendVerificationEmail({
@@ -265,11 +265,11 @@ export function createAuthRouter({
           SELECT evt.user_id, u.email, u.display_name, u.token_version
           FROM email_verification_tokens evt
           JOIN users u ON u.id = evt.user_id
-          WHERE evt.token = $1
+          WHERE evt.token_hash = $1
             AND evt.expires_at > $2
           LIMIT 1
         `,
-        [verificationToken, now()]
+        [hashToken(verificationToken), now()]
       );
       const verification = result.rows[0];
 
@@ -289,9 +289,9 @@ export function createAuthRouter({
       await pool.query(
         `
           DELETE FROM email_verification_tokens
-          WHERE token = $1
+          WHERE token_hash = $1
         `,
-        [verificationToken]
+        [hashToken(verificationToken)]
       );
 
       logger.info({ userId: verification.user_id }, "Email verified");
@@ -351,11 +351,10 @@ export function createAuthRouter({
         );
         await pool.query(
           `
-            INSERT INTO email_verification_tokens (user_id, token, expires_at)
+            INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
             VALUES ($1, $2, $3)
-            RETURNING token
           `,
-          [user.id, verificationToken, expiresAt]
+          [user.id, hashToken(verificationToken), expiresAt]
         );
 
         await sendVerificationEmail({
@@ -403,11 +402,10 @@ export function createAuthRouter({
 
         await pool.query(
           `
-            INSERT INTO password_reset_tokens (user_id, token, expires_at)
+            INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
             VALUES ($1, $2, $3)
-            RETURNING token
           `,
-          [user.id, resetToken, expiresAt]
+          [user.id, hashToken(resetToken), expiresAt]
         );
 
         await sendPasswordResetEmail({
@@ -452,12 +450,12 @@ export function createAuthRouter({
           `
             UPDATE password_reset_tokens
             SET used = true
-            WHERE token = $1
+            WHERE token_hash = $1
               AND used = false
               AND expires_at > $2
             RETURNING user_id
           `,
-          [token, now()]
+          [hashToken(token), now()]
         );
         const resetRequest = claim.rows[0];
 
@@ -474,7 +472,9 @@ export function createAuthRouter({
             UPDATE users
             SET password_hash = $1,
                 token_version = token_version + 1,
-                api_key = NULL
+                api_key_hash = NULL,
+                api_key_hint = NULL,
+                api_key_created_at = NULL
             WHERE id = $2
           `,
           [passwordHash, resetRequest.user_id]
@@ -483,9 +483,9 @@ export function createAuthRouter({
           `
             DELETE FROM password_reset_tokens
             WHERE user_id = $1
-              AND token <> $2
+              AND token_hash <> $2
           `,
-          [resetRequest.user_id, token]
+          [resetRequest.user_id, hashToken(token)]
         );
 
         return resetRequest.user_id;
@@ -539,9 +539,10 @@ export function createAuthRouter({
     }
 
     try {
+      // The key itself is not stored (only its hash), so it can no longer be read back.
       const result = await pool.query(
         `
-          SELECT api_key
+          SELECT api_key_hash, api_key_hint, api_key_created_at
           FROM users
           WHERE id = $1
           LIMIT 1
@@ -555,7 +556,11 @@ export function createAuthRouter({
         return;
       }
 
-      res.json({ api_key: user.api_key });
+      res.json({
+        has_key: Boolean(user.api_key_hash),
+        hint: user.api_key_hint ?? null,
+        created_at: user.api_key_created_at ?? null
+      });
     } catch (error) {
       next(error);
     }
@@ -572,11 +577,13 @@ export function createAuthRouter({
       const result = await pool.query(
         `
           UPDATE users
-          SET api_key = $1
-          WHERE id = $2
-          RETURNING api_key
+          SET api_key_hash = $1,
+              api_key_hint = $2,
+              api_key_created_at = $3
+          WHERE id = $4
+          RETURNING api_key_hint, api_key_created_at
         `,
-        [apiKey, req.user.sub]
+        [hashToken(apiKey), getApiKeyHint(apiKey), now(), req.user.sub]
       );
       const user = result.rows[0];
 
@@ -585,7 +592,12 @@ export function createAuthRouter({
         return;
       }
 
-      res.json({ api_key: user.api_key });
+      // The only time the plaintext key is returned; afterwards just the hint is available.
+      res.json({
+        api_key: apiKey,
+        hint: user.api_key_hint,
+        created_at: user.api_key_created_at
+      });
     } catch (error) {
       next(error);
     }

@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { getConfig } from "../env.js";
+import { hashToken } from "../tokens.js";
 
 // Pin the algorithm so tokens with alg "none" or another HMAC variant are never accepted.
 export const JWT_ALGORITHM = "HS256";
@@ -107,10 +108,10 @@ export function createRequireApiKey({ pool } = {}) {
         `
           SELECT id
           FROM users
-          WHERE api_key = $1
+          WHERE api_key_hash = $1
           LIMIT 1
         `,
-        [apiKey]
+        [hashToken(apiKey)]
       );
       const user = result.rows[0];
 

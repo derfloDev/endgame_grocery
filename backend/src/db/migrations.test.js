@@ -37,6 +37,9 @@ const listViewsMigrationPath = path.resolve(
 const tokenVersionMigrationPath = path.resolve(
   "src/db/migrations/1779979000002_add_token_version_to_users.cjs"
 );
+const hashCredentialsMigrationPath = path.resolve(
+  "src/db/migrations/1779979000003_hash_credentials.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -70,6 +73,12 @@ function createPgmSpy() {
     },
     dropExtension(...args) {
       calls.push(["dropExtension", ...args]);
+    },
+    alterColumn(...args) {
+      calls.push(["alterColumn", ...args]);
+    },
+    sql(statement) {
+      calls.push(["sql", statement.replace(/\s+/g, " ").trim()]);
     }
   };
 
@@ -710,5 +719,54 @@ describe("database migrations", () => {
 
     assert.doesNotThrow(() => migration.down(pgm));
     assert.deepEqual(calls, [["dropColumns", "users", ["token_version"]]]);
+  });
+
+  it("replaces plaintext tokens and the API key with SHA-256 hashes in place", async () => {
+    const migration = await import(pathToFileURL(hashCredentialsMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+
+    // API key: new columns are filled from the old one before it is dropped.
+    const names = calls.map(([name]) => name);
+    assert.deepEqual(calls[0], [
+      "addColumns",
+      "users",
+      {
+        api_key_hash: { type: "text", unique: true },
+        api_key_hint: { type: "text" },
+        api_key_created_at: { type: "timestamptz" }
+      }
+    ]);
+    assert.match(calls[1][1], /UPDATE users SET api_key_hash = encode\(sha256\(convert_to\(api_key::text, 'UTF8'\)\), 'hex'\), api_key_hint = right\(api_key::text, 4\)/);
+    assert.deepEqual(calls[2], ["dropColumns", "users", ["api_key"]]);
+
+    // Every token table gets a populated, NOT NULL, unique hash column before token is dropped.
+    for (const table of ["email_verification_tokens", "password_reset_tokens", "list_invites"]) {
+      const position = (name, ...rest) =>
+        calls.findIndex((call) => call[0] === name && call[1] === table && rest.every((value, i) => JSON.stringify(call[2 + i]) === JSON.stringify(value)));
+      const added = position("addColumns", { token_hash: { type: "text" } });
+      const populated = calls.findIndex((call) => call[0] === "sql" && call[1].startsWith(`UPDATE ${table} SET token_hash = encode(sha256(convert_to(token::text, 'UTF8')), 'hex')`));
+      const notNull = position("alterColumn", "token_hash", { notNull: true });
+      const unique = position("addConstraint", `${table}_token_hash_key`, { unique: ["token_hash"] });
+      const dropped = position("dropColumns", ["token"]);
+
+      assert.ok(added >= 0 && populated > added && notNull > populated && unique > notNull && dropped > unique, table);
+    }
+    assert.equal(names.filter((name) => name === "sql").length, 4);
+
+    calls.length = 0;
+
+    // down() re-creates the plaintext columns (with fresh values) and drops the hashes.
+    assert.doesNotThrow(() => migration.down(pgm));
+    const restoredTokens = calls.filter((call) => call[0] === "addColumns" && call[2].token);
+    assert.equal(restoredTokens.length, 3);
+    assert.ok(restoredTokens.every((call) => call[2].token.type === "uuid" && call[2].token.notNull === true));
+    assert.deepEqual(
+      calls.filter((call) => call[0] === "alterColumn").map((call) => call[1]),
+      ["email_verification_tokens", "password_reset_tokens"]
+    );
+    assert.deepEqual(calls.at(-2), ["addColumns", "users", { api_key: { type: "uuid", unique: true } }]);
+    assert.deepEqual(calls.at(-1), ["dropColumns", "users", ["api_key_hash", "api_key_hint", "api_key_created_at"]]);
   });
 });

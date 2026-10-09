@@ -32,6 +32,8 @@
   "settings.apiKeyCopy": "Copy",
   "settings.apiKeyCopied": "Copied!",
   "settings.apiKeyRegenerate": "Regenerate",
+  "settings.apiKeyRegenerateConfirm": "Generate a new API key? The current key stops working immediately, so update it in Home Assistant.",
+  "settings.apiKeyShownOnce": "Copy this key now. It is shown only once; afterwards only its last characters are displayed. If you lose it, generate a new one.",
   "settings.apiKeyHint": "Use this key for the Home Assistant integration.",
   "offline.cached": "Offline mode: cached data is available.",
   "offline.queued": "Offline mode: {count, plural, one {# change} other {# changes}} waiting to sync.",

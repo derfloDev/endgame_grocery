@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { generateToken, hashToken } from "../tokens.js";
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
@@ -29,7 +29,7 @@ export function createSharingRouter({
   logger = defaultLogger,
   sseManager = defaultSseManager,
   mailer = createMailer({ config }),
-  generateInviteToken = randomUUID,
+  generateInviteToken = generateToken,
   now = () => new Date(),
   rateLimiters = createRateLimiters()
 } = {}) {
@@ -149,16 +149,16 @@ export function createSharingRouter({
       const expiresAt = addDays(now(), 7);
       const inviteResult = await pool.query(
         `
-          INSERT INTO list_invites (list_id, invited_email, invited_by, token, expires_at)
+          INSERT INTO list_invites (list_id, invited_email, invited_by, token_hash, expires_at)
           VALUES ($1, LOWER($2), $3, $4, $5)
           ON CONFLICT (list_id, invited_email) WHERE status = 'pending'
           DO UPDATE SET
             invited_by = EXCLUDED.invited_by,
-            token = EXCLUDED.token,
+            token_hash = EXCLUDED.token_hash,
             expires_at = EXCLUDED.expires_at
           RETURNING id, invited_email, status, expires_at
         `,
-        [req.params.id, email, req.user.sub, inviteToken, expiresAt]
+        [req.params.id, email, req.user.sub, hashToken(inviteToken), expiresAt]
       );
 
       await sendInviteEmail({

@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { createApp } from "./app.js";
+import { hashToken } from "./tokens.js";
 
 function createAuthedApp(pool, options = {}) {
   return createApp({
@@ -146,7 +147,7 @@ describe("sharing routes", () => {
       "list-1",
       "alex@example.com",
       "user-1",
-      "invite-token-1",
+      hashToken("invite-token-1"),
       new Date("2026-04-28T00:00:00.000Z")
     ]);
     assert.deepEqual(sentMessages, [
@@ -327,7 +328,7 @@ describe("sharing routes", () => {
       "list-1",
       "alex@example.com",
       "user-1",
-      "fresh-invite-token",
+      hashToken("fresh-invite-token"),
       new Date("2026-04-28T00:00:00.000Z")
     ]);
     assert.equal(sentMessages[0].context.ctaUrl, "https://app.example.com/invite/fresh-invite-token");

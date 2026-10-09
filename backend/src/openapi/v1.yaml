@@ -178,6 +178,10 @@ components:
       type: apiKey
       in: header
       name: X-Api-Key
+      description: >-
+        Personal API key generated in the app (Info & Settings). The server stores only a SHA-256
+        hash of the key, so it is shown exactly once, right after it is generated. Generating a new
+        key invalidates the previous one; a password reset removes the key.
   parameters:
     ListId:
       name: listId

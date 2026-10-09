@@ -21,7 +21,10 @@ function getAppVersion(): string {
 export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactElement {
   const { t } = useTranslation();
   const { logout, token, user } = useAuth();
-  const [apiKey, setApiKey] = useState<string | null>(null);
+  // Hint of the stored key (null when there is none) and the plaintext of a key generated in this
+  // session. The server only returns the plaintext once, so it is dropped when the sheet closes.
+  const [apiKeyHint, setApiKeyHint] = useState<string | null>(null);
+  const [newApiKey, setNewApiKey] = useState<string | null>(null);
   const [apiKeyLoaded, setApiKeyLoaded] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -30,6 +33,7 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
 
   useEffect(() => {
     if (!open || !token) {
+      setNewApiKey(null);
       return;
     }
 
@@ -40,13 +44,13 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
     fetchApiKey(token)
       .then((result) => {
         if (!cancelled) {
-          setApiKey(result.api_key);
+          setApiKeyHint(result.has_key ? (result.hint ?? "") : null);
           setApiKeyLoaded(true);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setApiKey(null);
+          setApiKeyHint(null);
           setApiKeyLoaded(true);
         }
       });
@@ -76,12 +80,12 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
   }
 
   async function handleCopyApiKey() {
-    if (!apiKey) {
+    if (!newApiKey) {
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(apiKey);
+      await navigator.clipboard.writeText(newApiKey);
       setCopySuccess(true);
     } catch {
       // Clipboard writes can fail in insecure contexts or when permission is denied.
@@ -93,11 +97,17 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
       return;
     }
 
+    // Replacing a key breaks every client that still uses the old one.
+    if (apiKeyHint !== null && !window.confirm(t("settings.apiKeyRegenerateConfirm"))) {
+      return;
+    }
+
     setRegenerating(true);
     setCopySuccess(false);
     try {
       const result = await regenerateApiKey(token);
-      setApiKey(result.api_key);
+      setNewApiKey(result.api_key);
+      setApiKeyHint(result.hint);
       setApiKeyLoaded(true);
     } finally {
       setRegenerating(false);
@@ -120,14 +130,25 @@ export default function InfoSheet({ open, onClose }: InfoSheetProps): ReactEleme
       <div className={`${styles["info-sheet-section"]} ${styles["info-sheet-api-key"]}`}>
         <div className={styles["info-sheet-section-label"]}>{t("settings.apiKey")}</div>
         <p className={styles["info-sheet-api-key-hint"]}>{t("settings.apiKeyHint")}</p>
-        {apiKey ? (
+        {apiKeyHint !== null ? (
           <>
-            <div className={styles["info-sheet-api-key-row"]}>
-              <code className={styles["info-sheet-api-key-value"]}>{apiKey}</code>
-              <button className="eg-btn-secondary" type="button" onClick={handleCopyApiKey}>
-                {t("settings.apiKeyCopy")}
-              </button>
-            </div>
+            {newApiKey ? (
+              <>
+                <div className={styles["info-sheet-api-key-row"]}>
+                  <code className={styles["info-sheet-api-key-value"]}>{newApiKey}</code>
+                  <button className="eg-btn-secondary" type="button" onClick={handleCopyApiKey}>
+                    {t("settings.apiKeyCopy")}
+                  </button>
+                </div>
+                <p className={styles["info-sheet-api-key-warning"]} role="status">
+                  {t("settings.apiKeyShownOnce")}
+                </p>
+              </>
+            ) : (
+              <div className={styles["info-sheet-api-key-row"]}>
+                <code className={styles["info-sheet-api-key-value"]}>{`•••• ${apiKeyHint}`}</code>
+              </div>
+            )}
             {copySuccess ? (
               <span className={styles["info-sheet-api-key-status"]} aria-live="polite">
                 {t("settings.apiKeyCopied")}

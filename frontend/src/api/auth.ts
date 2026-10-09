@@ -21,8 +21,18 @@ interface MessageResult {
   message?: string;
 }
 
-interface ApiKeyResult {
-  api_key: string | null;
+/** Status of the user's API key. The key itself is never returned again after generation. */
+interface ApiKeyStatus {
+  has_key: boolean;
+  hint: string | null;
+  created_at: string | null;
+}
+
+/** Result of generating a key: the only response that contains the plaintext key. */
+interface GeneratedApiKey {
+  api_key: string;
+  hint: string;
+  created_at: string;
 }
 
 function sendAuthRequest(path: string, payload: unknown): Promise<unknown> {
@@ -44,12 +54,12 @@ export function fetchCurrentUser(token: string): Promise<User> {
   return sendJsonRequest("/api/auth/me", { token }) as Promise<User>;
 }
 
-export function fetchApiKey(token: string): Promise<ApiKeyResult> {
-  return sendJsonRequest("/api/auth/api-key", { token }) as Promise<ApiKeyResult>;
+export function fetchApiKey(token: string): Promise<ApiKeyStatus> {
+  return sendJsonRequest("/api/auth/api-key", { token }) as Promise<ApiKeyStatus>;
 }
 
-export function regenerateApiKey(token: string): Promise<{ api_key: string }> {
-  return sendJsonRequest("/api/auth/api-key", { token, method: "POST" }) as Promise<{ api_key: string }>;
+export function regenerateApiKey(token: string): Promise<GeneratedApiKey> {
+  return sendJsonRequest("/api/auth/api-key", { token, method: "POST" }) as Promise<GeneratedApiKey>;
 }
 
 export function verifyEmail(token: string): Promise<AuthResult> {
