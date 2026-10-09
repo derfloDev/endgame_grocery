@@ -702,3 +702,47 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-010 — implement — 2026-10-09T11:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | The app entries API and v1 now share one entry service (access, limits, last_updated_by, SSE, push), so v1 writes record the actor, enforce the 422 cap and queue pushes; OpenAPI drops the stale history text and 3.0 `nullable`. |
+| Files Changed | backend/src/services/entryService.js, backend/src/routes/entries.js, backend/src/routes/v1.js, backend/src/openapi/v1.yaml, backend/src/v1.test.js, backend/src/docs.test.js, backend/src/integration/entryService.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ok; `npm test` backend 350/350 (frontend untouched). `integration/entryService.test.js` NOT executed locally (no PostgreSQL, Docker daemon not running); CI runs it. |
+| Commit | `feat(api): make Home Assistant item changes record the actor, honour list limits and notify like the app` |
+| Next Role | review |
+
+Notes for review:
+1. **Service API** (`listEntries`, `createEntry`, `updateEntry`, `deleteEntry`) takes `{ pool, sseManager, logger, userId, listId }` and returns `{ status: "ok" | "forbidden" | "not_found" | "limit_open", ... }`; routes map statuses to their own HTTP texts. The SQL and statement order of the app routes moved over unchanged, so `entries.test.js` passes without edits.
+2. **Toggle:** `updateEntry({ toggle: true })` flips the status inside the locked transaction (list + entry `FOR UPDATE`) instead of v1's old read-then-write; eviction at the done cap only for open → done.
+3. **v1 behaviour changes (intended):** create/toggle/rename set `last_updated_by`; create enforces the 1,000-open cap with 422 and queues a push; `description` is normalised like the app API (blank → null) and a non-string, non-null value gives 400 `Item description must be a string.`; a non-string `name` now gives 400 (was a possible 500). Toggling to open does not re-check the open cap (same as the app PATCH); rename/toggle do not push (as in the app API).
+4. **v1 tests:** the 13 order-dependent fixtures were rewritten around a statement-shape fake (`createEntriesPool`) because the query sequence changed; assertions were kept or strengthened (actor, cap, eviction, blank description). Tests for 400/401/403/404 paths are unchanged.
+5. **OpenAPI:** removed the autocomplete-history sentence (toggle now documents the 200-done eviction), `nullable: true` → `type: [string, "null"]`, added a 422 `LimitReached` response on create; `docs.test.js` pins all three.
+6. SSE broadcast errors are caught inside the service for both APIs; the app API's push-failure log text changed from "Failed to enqueue push notification job" to "Failed to queue push notification job" (no test depended on it).
+
+---
+
+### T-010 — review — 2026-10-09T12:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the shared entry service used by the app API and v1 plus the OpenAPI drift fixes; verified with real SQL (integration 46/46 serially) and a manual v1 run covering create, rename, toggle, delete, 403/404/400 paths and push/SSE side effects. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+### T-010 — implement — 2026-10-09T12:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-010 after review PASS_WITH_NOTES: shared entry service for the app API and v1, OpenAPI drift fixed. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-010 implementation files |
+| Commit | `feat(api): make Home Assistant item changes record the actor, honour list limits and notify like the app` |
+| Next Role | none |
+
+---

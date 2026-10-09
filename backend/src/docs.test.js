@@ -46,6 +46,12 @@ describe("API docs routes", () => {
     assert.match(response.text, /- done/);
     assert.doesNotMatch(response.text, /needs_action/);
     assert.doesNotMatch(response.text, /completed/);
+    // OpenAPI 3.1 uses type arrays instead of the 3.0 `nullable` keyword, and the autocomplete
+    // history table no longer exists.
+    assert.doesNotMatch(response.text, /nullable/);
+    assert.doesNotMatch(response.text, /autocomplete/i);
+    assert.match(response.text, /type: \[string, "null"\]/);
+    assert.match(response.text, /'422':\s+\$ref: '#\/components\/responses\/LimitReached'/);
 
     for (const path of [
       "/lists:",

@@ -1634,3 +1634,38 @@ No blocker or major findings; no required fixes. Scope additions beyond the plan
 - Mail is fire-and-forget: a process exit right after the response can drop a notification, and a failed invite mail now returns 201 without telling the owner (logged only). This is the requested behaviour.
 - Taking the list-row lock on every create and completion serialises writes per list; fine for list sizes here.
 - Not executed: Playwright E2E.
+
+## Task: T-010 (hardening cycle 2026-10-08 — shared entry service, OpenAPI drift)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `backend/src/services/entryService.js` (`updateEntry`): moving an entry back to `open` (app PATCH `status: "open"` and v1 toggle from done) still does not check the 1,000 open-entry cap, so the cap can be exceeded by reopening. This is the same gap noted for T-009 (finding 1). Now that both APIs share one service it is a single place to fix: lock the list row and count open entries when the next status is `open` and the current one is `done`. Not required by the T-010 criteria, which name create only.
+2. **nit** — `backend/src/routes/v1.js:7-11` keeps its own `UUID_RE`/`isValidUuid` although `middleware/validateUuid.js` (`isUuid`) now exists. Using the shared helper would remove the duplicate.
+3. **nit** — `backend/src/routes/entries.js` POST: a non-string `text` (for example a number) makes `text?.trim()` throw and answers 500. Pre-existing; v1 now rejects a non-string `name` with 400, so the app API is the odd one out.
+4. **nit** — the push-failure log text changed from "Failed to enqueue push notification job" to "Failed to queue push notification job". No test or doc depends on it; mentioned only because log text is sometimes alerted on.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the diff: new `services/entryService.js` (`listEntries`, `createEntry`, `updateEntry`, `deleteEntry`), the slimmed `routes/entries.js` and `routes/v1.js`, `openapi/v1.yaml`, README, `v1.test.js`, `docs.test.js` and the new `integration/entryService.test.js`.
+- Compared the moved SQL and statement order with the T-009 versions: the list/entry row locks, eviction rule (`id <> $2`, only open → done) and the 422 cap are unchanged; the v1 toggle now flips inside the locked transaction instead of a read-then-write.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok. `npm test`: backend 350/350, frontend 674/674. `entries.test.js` passes without edits, which confirms the app API behaviour is unchanged.
+- Integration suite against an embedded PostgreSQL 18 (Docker not running), run serially because of the known `pg_trgm` race: 46/46, including the four `entryService` tests (v1 create sets `last_updated_by` and queues a push; v1 toggle and rename set `last_updated_by`; 422 at the cap; v1 and the app API agree on the same entry).
+- Manual v1 run against that database with API keys: blank description stored as null; numeric description and numeric name → 400; rename with a description, then rename without one keeps the description; toggle → done, toggle back → open; a stranger's list and toggle → 403; unknown valid item → 404; delete 204, second delete 404; a push job was enqueued on create; the SSE sequence was `entry:created`, four `entry:updated`, `entry:deleted`.
+- OpenAPI: confirmed the removed autocomplete-history sentence, `nullable` replaced by `type: [string, "null"]` in the request bodies and the `Item` schema, the new 422 `LimitReached` response, and the pins in `docs.test.js`.
+
+##### Findings
+- Every acceptance criterion is met: v1 create/toggle/rename set `last_updated_by`, enforce the limits (422) and enqueue pushes on create; v1 description handling matches the app API; the OpenAPI has no dropped-table text and no 3.0 `nullable`.
+- v1 test fixtures were rewritten around a statement-shape fake because the query sequence changed; assertions were kept or strengthened (actor, cap, eviction, blank description).
+
+##### Risks
+- v1 clients now see new behaviour: 422 at the cap, 400 for a non-string name or description, and pushes to other members when a Home Assistant automation adds items. These are the intended parity changes; worth mentioning in release notes.
+- Not executed: Playwright E2E.
