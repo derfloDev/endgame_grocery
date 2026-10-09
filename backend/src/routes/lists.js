@@ -95,6 +95,59 @@ export function createListRouter({
     }
   });
 
+  // Single-list metadata for the detail page, so it does not have to load every list.
+  router.get("/:id", async (req, res, next) => {
+    if (!pool) {
+      next(new Error("Database connection is not configured."));
+      return;
+    }
+
+    try {
+      const hasAccess = await ensureListAccess(pool, req.params.id, req.user.sub);
+
+      if (!hasAccess) {
+        res.status(403).json({ error: "You do not have access to this list." });
+        return;
+      }
+
+      const result = await pool.query(
+        `
+          SELECT
+            l.id,
+            l.name,
+            l.owner_id,
+            owner.display_name AS owner_name,
+            (l.owner_id = $1) AS is_owner,
+            l.created_at
+          FROM lists l
+          JOIN users owner ON owner.id = l.owner_id
+          WHERE l.id = $2
+          LIMIT 1
+        `,
+        [req.user.sub, req.params.id]
+      );
+      const list = result.rows[0];
+
+      if (!list) {
+        res.status(404).json({ error: "List not found." });
+        return;
+      }
+
+      res.json({
+        list: {
+          id: list.id,
+          name: list.name,
+          owner_id: list.owner_id,
+          owner_name: list.owner_name,
+          is_owner: list.is_owner,
+          created_at: list.created_at
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/", async (req, res, next) => {
     const { name } = req.body ?? {};
 

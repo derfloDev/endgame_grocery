@@ -4,6 +4,11 @@ import type { List, QueueMeta } from "../types";
 
 const LISTS_CACHE_KEY = createCacheKey("lists");
 
+/** Cache key of the metadata of one list (name, owner, ...). */
+export function createListCacheKey(listId: string): string {
+  return createCacheKey("list", listId);
+}
+
 interface ListRequestOptions extends CachedReadOptions<ListsResponse> {
   method?: string;
   payload?: unknown;
@@ -21,6 +26,11 @@ interface ListPayload {
 
 interface ListsResponse {
   lists: List[];
+  offline?: boolean;
+}
+
+interface ListResponse {
+  list: List;
   offline?: boolean;
 }
 
@@ -46,6 +56,23 @@ function sendListRequest(path: string, token: string, options: ListRequestOption
 
 export function fetchLists(token: string, options: CachedReadOptions<ListsResponse> = {}): Promise<ListsResponse> {
   return sendListRequest("", token, options) as Promise<ListsResponse>;
+}
+
+/**
+ * Loads the metadata of a single list. Cached under `list:<id>`, so the detail page can show the
+ * title from the cache while the request is still in flight or the device is offline.
+ */
+export function fetchList(
+  token: string,
+  listId: string,
+  options: CachedReadOptions<ListResponse> = {}
+): Promise<ListResponse> {
+  return sendJsonRequest(`/api/lists/${listId}`, {
+    token,
+    cacheKey: createListCacheKey(listId),
+    onCachedValue: options.onCachedValue,
+    offlineFallbackMessage: "Offline list data is unavailable."
+  }) as Promise<ListResponse>;
 }
 
 export function createList(

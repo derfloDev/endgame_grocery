@@ -1669,3 +1669,40 @@ No blocker or major findings; no required fixes.
 ##### Risks
 - v1 clients now see new behaviour: 422 at the cap, 400 for a non-string name or description, and pushes to other members when a Home Assistant automation adds items. These are the intended parity changes; worth mentioning in release notes.
 - Not executed: Playwright E2E.
+
+## Task: T-011 (hardening cycle 2026-10-08 — query indexes, pool settings, single-list endpoint)
+
+Note: the task ID repeats an earlier cycle's T-011 section, if any; this section covers the current plan's T-011 only.
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES` — with the database-backed part **not verified by anyone yet** (see Risks). Run the integration suite before `commit_task`.
+
+#### Findings
+
+1. **minor (verification gap)** — `backend/src/integration/indexes.test.js` and the migration round-trip with the new migration were not executed by the implementer (no PostgreSQL) or by me (Docker daemon is not running, no embedded PostgreSQL could be located, and the sandbox blocks setting `TEST_DATABASE_URL`). The central acceptance criterion — `EXPLAIN` shows no Seq Scan on `entries` for entries, history, suggestions and overview — therefore rests on code reading only. Not a code defect found, but it must be confirmed before or by CI.
+2. **minor** — `backend/src/integration/helpers.js`: the harness rewrites `DROP EXTENSION` statements to `SELECT 1` by wrapping `client.query`. This is a test-only workaround for the older migration `1713902400000`, whose `down` drops `pg_trgm` and would break parallel test files. It also means the round-trip test no longer exercises that extension drop. Acceptable and documented; keep an eye on it if migrations start issuing `DROP EXTENSION` in other forms.
+3. **minor** — the suggestions query's `similarity(...) > 0.25` branch is not index-assisted (documented by the implementer). The test only demands no sequential scan on `entries`; the `list_id` index must carry it, and a planner choice on a small table can differ from a large one. Watch this test for flakiness in CI.
+4. **nit** — `backend/src/db/migrations.test.js` moved the `createExtension` spy method and left a stray blank line and a missing blank line before the new `it`; no assertion changed.
+5. **nit** — nothing calls `fetchList` yet (T-016 will); the helper is covered by `lists.test.ts`.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board, the handoff and the staged diff: migration `1779979000004_add_query_indexes.cjs`, `db/client.js` (`getPoolOptions`), `env.js` (`pgPoolMax` parsing), `routes/lists.js` (`GET /:id`), `integration/helpers.js`, `indexes.test.js`, unit tests, frontend `api/lists.ts` and `types.ts`, `.env.example`, compose example, README.
+- `npm run lint`: 0 errors. `npm run build`: ok. `npm test`: backend 357 pass, 0 fail (frontend 677 per the board entry).
+- Migration: `CREATE EXTENSION IF NOT EXISTS pg_trgm`, the six btree indexes and the GIN `gin_trgm_ops` index on `entries(text)` as planned; `down` drops every index (7) and keeps the extension. A unit test pins both directions.
+- Pool: `max` from `PG_POOL_MAX` (default 10; empty, non-numeric, zero, negative and fractional values fall back to 10), `connectionTimeoutMillis` 5000, `idleTimeoutMillis` 30000; documented in the README table, `.env.example` and the compose example.
+- `GET /api/lists/:id`: access check first (403 for strangers), then a single owner/meta query; 404 for a missing list and for malformed ids via the existing UUID param check; response shape matches the plan. `fetchList` caches under `list:<id>`.
+
+##### Findings
+- Unit-level behaviour matches every acceptance criterion except the ones that need PostgreSQL.
+- The integration test design is sound: it records the SQL the real endpoints run and `EXPLAIN`s exactly those statements on a seeded database (41 lists, about 12k entries, `ANALYZE`).
+
+##### Risks
+- Unverified against PostgreSQL: the migration (up, down, round-trip), all `EXPLAIN` assertions (the overview aggregate and the suggestions query are the likeliest to surprise) and the single-list 403. A planner that still chooses a Seq Scan on about 12k rows would fail the test.
+- Please run `npm run test:integration` against PostgreSQL 16 (for example once Docker is up, with `TEST_DATABASE_URL` set) before `commit_task`; if it fails, send it back through `rework_task`.

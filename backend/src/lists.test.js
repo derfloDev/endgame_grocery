@@ -15,7 +15,77 @@ function createAuthedApp(pool, options = {}) {
   });
 }
 
+const LIST_ONE = "10000000-0000-4000-8000-000000000001";
+
 describe("list routes", () => {
+  it("returns one list with owner details for an accessible list", async () => {
+    const queries = [];
+    const pool = {
+      async query(sql, params) {
+        queries.push([sql.replace(/\s+/g, " ").trim(), params]);
+
+        if (queries.length === 1) {
+          return { rows: [{ id: LIST_ONE }] };
+        }
+
+        return {
+          rows: [
+            {
+              id: LIST_ONE,
+              name: "Weekly groceries",
+              owner_id: "user-2",
+              owner_name: "Alex",
+              is_owner: false,
+              created_at: new Date("2026-04-21T00:00:00.000Z")
+            }
+          ]
+        };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool)).get(`/api/lists/${LIST_ONE}`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, {
+      list: {
+        id: LIST_ONE,
+        name: "Weekly groceries",
+        owner_id: "user-2",
+        owner_name: "Alex",
+        is_owner: false,
+        created_at: "2026-04-21T00:00:00.000Z"
+      }
+    });
+    assert.match(queries[0][0], /FROM lists l LEFT JOIN list_members lm/);
+    assert.deepEqual(queries[0][1], [LIST_ONE, "user-1"]);
+    assert.match(queries[1][0], /JOIN users owner ON owner\.id = l\.owner_id WHERE l\.id = \$2/);
+    assert.deepEqual(queries[1][1], ["user-1", LIST_ONE]);
+  });
+
+  it("answers 403 for a list the user cannot access", async () => {
+    const queries = [];
+    const pool = {
+      async query(sql) {
+        queries.push(sql);
+        return { rows: [] };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool)).get(`/api/lists/${LIST_ONE}`);
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(response.body, { error: "You do not have access to this list." });
+    assert.equal(queries.length, 1);
+  });
+
+  it("answers 404 for a malformed list id", async () => {
+    const response = await request(createAuthedApp({ async query() { throw new Error("no query"); } })).get(
+      "/api/lists/not-a-uuid"
+    );
+
+    assert.equal(response.status, 404);
+  });
+
   it("returns all owned and shared lists", async () => {
     const pool = {
       async query() {

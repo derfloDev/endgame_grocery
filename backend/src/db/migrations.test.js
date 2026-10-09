@@ -37,6 +37,9 @@ const listViewsMigrationPath = path.resolve(
 const tokenVersionMigrationPath = path.resolve(
   "src/db/migrations/1779979000002_add_token_version_to_users.cjs"
 );
+const queryIndexesMigrationPath = path.resolve(
+  "src/db/migrations/1779979000004_add_query_indexes.cjs"
+);
 const hashCredentialsMigrationPath = path.resolve(
   "src/db/migrations/1779979000003_hash_credentials.cjs"
 );
@@ -47,9 +50,7 @@ function createPgmSpy() {
     func(value) {
       return { value };
     },
-    createExtension(...args) {
-      calls.push(["createExtension", ...args]);
-    },
+
     createTable(...args) {
       calls.push(["createTable", ...args]);
     },
@@ -73,6 +74,9 @@ function createPgmSpy() {
     },
     dropExtension(...args) {
       calls.push(["dropExtension", ...args]);
+    },
+    createExtension(...args) {
+      calls.push(["createExtension", ...args]);
     },
     alterColumn(...args) {
       calls.push(["alterColumn", ...args]);
@@ -768,5 +772,32 @@ describe("database migrations", () => {
     );
     assert.deepEqual(calls.at(-2), ["addColumns", "users", { api_key: { type: "uuid", unique: true } }]);
     assert.deepEqual(calls.at(-1), ["dropColumns", "users", ["api_key_hash", "api_key_hint", "api_key_created_at"]]);
+  });
+  it("creates pg_trgm explicitly and indexes the hot read paths, and down keeps the extension", async () => {
+    const migration = await import(pathToFileURL(queryIndexesMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+
+    assert.deepEqual(calls[0], ["createExtension", "pg_trgm", { ifNotExists: true }]);
+    const created = calls.filter((call) => call[0] === "createIndex");
+    assert.deepEqual(
+      created.map((call) => [call[1], call[2], call[3].name]),
+      [
+        ["entries", ["list_id", "status", "created_at"], "entries_list_status_created_idx"],
+        ["entries", ["list_id", "updated_at"], "entries_list_updated_idx"],
+        ["lists", ["owner_id"], "lists_owner_idx"],
+        ["list_members", ["user_id"], "list_members_user_idx"],
+        ["pending_push_jobs", ["fire_at"], "pending_push_jobs_fire_at_idx"],
+        ["push_subscriptions", ["endpoint"], "push_subscriptions_endpoint_idx"],
+        ["entries", "text", "entries_text_trgm_idx"]
+      ]
+    );
+    assert.deepEqual(created.at(-1)[3], { name: "entries_text_trgm_idx", method: "gin", opclass: "gin_trgm_ops" });
+
+    calls.length = 0;
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.equal(calls.filter((call) => call[0] === "dropIndex").length, 7);
+    assert.equal(calls.some((call) => call[0] === "dropExtension"), false);
   });
 });

@@ -11,9 +11,25 @@ if (existsSync(envFilePath)) {
   dotenv.config({ path: envFilePath });
 }
 
+const DEFAULT_PG_POOL_MAX = 10;
+
+/**
+ * Parses a positive integer setting; invalid or non-positive values fall back to the default.
+ *
+ * @param {string | undefined} value Raw environment value.
+ * @param {number} fallback Value used when `value` is unset or invalid.
+ * @returns {number} Parsed setting.
+ */
+function parsePositiveInt(value, fallback) {
+  const parsed = value?.trim() ? Number(value) : Number.NaN;
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export function getConfig() {
   return {
     databaseUrl: process.env.DATABASE_URL ?? "",
+    pgPoolMax: parsePositiveInt(process.env.PG_POOL_MAX, DEFAULT_PG_POOL_MAX),
     jwtSecret: process.env.JWT_SECRET ?? "",
     port: Number(process.env.PORT ?? 4000),
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",

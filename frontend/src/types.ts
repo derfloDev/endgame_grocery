@@ -16,6 +16,8 @@ export interface Entry {
 export interface List {
   id: string;
   name?: string;
+  owner_id?: string;
+  owner_name?: string;
   is_owner?: boolean;
   changed_count?: number;
   created_at?: string;

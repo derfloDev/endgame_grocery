@@ -26,7 +26,7 @@ const MIGRATIONS_TABLE = "pgmigrations";
 const SETUP_LOCK_ID = 7241865325823965;
 // Extensions that migrations create. They live in `public` so that dropping one test schema
 // never drops an extension that other test files still use.
-const SHARED_EXTENSIONS = ["pgcrypto"];
+const SHARED_EXTENSIONS = ["pgcrypto", "pg_trgm"];
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 export const TEST_JWT_SECRET = "integration-test-secret-0123456789abcdef0123456789";
@@ -99,6 +99,12 @@ export async function createTestDatabase() {
       options: `-c search_path=${schema},public`
     });
     await client.connect();
+
+    // Extensions are shared between test schemas (see SHARED_EXTENSIONS), so a migration rolling
+    // back must not drop one that other test files are still using.
+    const query = client.query.bind(client);
+    client.query = (config, ...rest) =>
+      typeof config === "string" && /^\s*DROP EXTENSION/i.test(config) ? query("SELECT 1") : query(config, ...rest);
 
     try {
       await runner({
