@@ -98,7 +98,15 @@ Render cost and bundle size: the signed-out pages (login, register, forgot/reset
 
 Re-measured cold load of `/lists/<id>` (Chromium via Playwright against `vite preview` of the production build, API mocked, page requests only, measured with CDP `encodedDataLength`): 8 responses, 214,743 bytes (209.7 KiB), largest response 87,589 bytes (85.5 KiB; the entry chunk), so both the 500 KiB total and the 150 KiB per-response budget are met. This measurement does not include the service worker's precache requests, which the previous measurement counted; those are served from the HTTP cache for assets the page already fetched when the immutable cache headers of the production Nginx configuration apply.
 
-The production Nginx configuration in docker/nginx.conf enables gzip and serves hashed JavaScript, CSS, images and fonts with Cache-Control: public, immutable. Those immutable headers let the service-worker install reuse the browser's cached response for each asset already fetched by the page. Counting each path once gives 427,883 bytes (417.9 KiB); adjusting the text assets from preview's gzip level 6 to Nginx's default gzip level 1 gives a modeled production cold load of about 446 KiB, with an estimated largest response of 116,614 bytes (113.9 KiB). This is a model based on the repository's Nginx configuration, not a measurement against a running Nginx image, and the under-500-KiB target depends on those immutable cache headers.
+The production Nginx configuration in docker/nginx.conf enables gzip (level 5, `Vary: Accept-Encoding`; text, JSON, web manifest, SVG and WASM types, but not the already compressed WOFF2 fonts) and sets one explicit `Cache-Control` header per kind of file:
+
+| Location | `Cache-Control` | Why |
+| --- | --- | --- |
+| `/assets/*` | `public, max-age=31536000, immutable` | Vite content-hashes every file name, so a changed file has a new URL |
+| `/service-worker.js`, `/index.html` and the SPA fallback | `no-cache` | Must be revalidated on every load so users never stay on an old shell or on chunk names that no longer exist |
+| `/fonts/*`, `/icon-*.png`, `/manifest.webmanifest` | `public, max-age=86400` | File names are not hashed, so a change reaches users within a day |
+
+Every one of these locations repeats the shared security headers (`docker/security-headers.conf`), because nginx does not inherit `add_header` into a location that sets its own; the `/api/` proxy sets none and keeps the server-level headers. `backend/src/nginxCaching.test.js` checks these rules against the configuration text (nginx itself is not started in the unit tests). The hashed assets are what lets the service-worker install reuse the browser's cached response for each asset already fetched by the page; the fonts and icons are no longer immutable, but their one-day lifetime serves the same reuse during a cold load. The hashed `/assets/*` files are what lets the service-worker install reuse the browser's cached response for each asset the page already fetched; fonts and icons are no longer immutable, but their one-day lifetime serves the same reuse during a cold load. An earlier model of the production cold load (427,883 bytes counting each path once, about 446 KiB with level 1 gzip) predates the startup bundle split described above and is superseded by the measurement given there; level 5 compression only lowers such figures. None of these numbers was measured against a running Nginx image.
 
 The frontend initializes i18next before React renders, detects English or German from local storage and the browser, and keeps the document `<html lang>` attribute aligned with the active language. Translation catalogs live in `frontend/src/locales/{en,de}/translation.json` and are delivered through Vite code splitting; JSON assets are included in the service worker precache patterns for offline-first locale support.
 
@@ -198,6 +206,8 @@ PWA can install correctly:
 | --- | --- |
 | `/service-worker.js` | Service worker script — fetched without credentials by the browser's SW registration API |
 | `/workbox-*.js` | Workbox runtime chunks loaded by the service worker |
+
+Cloudflare caches by file extension unless told otherwise. The origin now sends `Cache-Control: no-cache` for `/service-worker.js` and `/index.html` and a one-year `immutable` lifetime only for the content-hashed `/assets/*`, so no "cache everything" rule is needed; if you add one, exclude `/service-worker.js` and `/index.html`, or users can stay on an old version after a deploy.
 
 The manifest (`/manifest.webmanifest`) does not need a bypass policy: the app already
 sets `crossorigin="use-credentials"` on the manifest link so the browser sends the

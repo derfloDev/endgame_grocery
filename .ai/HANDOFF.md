@@ -1103,3 +1103,46 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-019 — implement — 2026-10-10T10:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | nginx now caches by file kind (hashed assets immutable for a year, service worker and app shell never reused without revalidation, fonts/icons/manifest for a day) and compresses at level 5 with `Vary`, including WASM and manifest types. |
+| Files Changed | docker/nginx.conf, backend/src/nginxCaching.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); backend `npm test` 377/377 (frontend untouched). **nginx itself was not run**: no nginx binary and the Docker daemon is not running, so the configuration syntax and the real response headers are unverified; the tests parse `docker/nginx.conf` as text. |
+| Commit | `perf(nginx): cache hashed assets for a year, revalidate the app shell and compress at level 5` |
+| Next Role | review |
+
+Notes for review:
+1. **Bug fixed on the way:** the old catch-all `location ~* \.(js|css|png|jpg|svg|ico|woff2?)$` also matched `/service-worker.js` and the unhashed fonts/icons and gave them `expires 1y` + `immutable` — a deployed service worker could stay cached for a year. It is removed; nothing else in `dist` root needs a rule (`index.html`, `manifest.webmanifest`, `service-worker.js`, `icon-192/512.png`, `fonts/`, `assets/`).
+2. **Locations (exact precedence):** `^~ /assets/` (1 y immutable), `= /service-worker.js` and `= /index.html` (`no-cache`), `^~ /fonts/`, `~ ^/icon-[0-9]+\.png$` and `= /manifest.webmanifest` (`max-age=86400`), `/api/` unchanged, `/` SPA fallback with `no-cache` (SPA routes are answered via an internal redirect to `/index.html`, which hits the exact location anyway). Each static location has exactly one `add_header Cache-Control`, no `expires` (it would add a second `Cache-Control`), and re-includes `security-headers.conf`; the `/api/` proxy has no `add_header` and so keeps the server-level headers.
+3. **gzip:** `gzip_vary on`, `gzip_comp_level 5`, `gzip_types` plus `application/manifest+json` and `application/wasm`; WOFF2 intentionally omitted. `.bin` (icon embeddings, 300 KB) is `application/octet-stream` and is not compressed; adding that type would shave little (float data) and is left out.
+4. **README:** the cold-load paragraph now has a table of the cache rules and drops the claim that fonts are immutable; the old modeled cold-load figures are marked as superseded by the T-017 measurement; the Cloudflare section warns not to add a "cache everything" rule that would catch `/service-worker.js` and `/index.html`.
+5. **Not verifiable here:** `nginx -t`, header output via `curl -I` against a running container, and whether the Alpine nginx `mime.types` maps `.webmanifest` to `application/manifest+json` so the gzip type applies (it does in current nginx releases).
+
+---
+
+### T-019 — review — 2026-10-10T11:15:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the nginx caching and compression rules; ran real nginx 1.28.0 against the production build and checked headers per path, gzip, 304 revalidation and the security headers on every response; found the manifest served as application/octet-stream (no webmanifest MIME mapping). |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+### T-019 — implement — 2026-10-10T11:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-019 after review PASS_WITH_NOTES: nginx caching by file kind and level-5 compression. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-019 implementation files |
+| Commit | `perf(nginx): cache hashed assets for a year, revalidate the app shell and compress at level 5` |
+| Next Role | none |
+
+---

@@ -1964,3 +1964,51 @@ No blocker or major findings; no required fixes.
 ##### Risks
 - A worker running while jsDelivr is unreachable cannot start the model; the model download from Hugging Face would fail in the same situation, so nothing new breaks.
 - Not executed: the Playwright specs against this build, and a stale-asset test run after editing `ICON_DB` (read, not mutated).
+
+## Task: T-019 (hardening cycle 2026-10-08 — nginx caching and compression)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `docker/nginx.conf`: `/manifest.webmanifest` is served as `Content-Type: application/octet-stream` and is not compressed. nginx 1.28.0's stock `mime.types` has no `webmanifest` mapping (it has `wasm`, which is why that type works), so the `application/manifest+json` entry the task added to `gzip_types` never applies and browsers/Lighthouse see a manifest with the wrong media type. The handoff's claim that "current nginx releases" map it is not true for 1.28.0; I could not run the Alpine package, but it ships the same upstream `mime.types`. Fix: add `types { application/manifest+json webmanifest; }` (or `default_type` in that location) and keep the gzip entry. Not a required fix; the manifest is small and browsers accept it.
+2. **nit** — the `application/wasm` entry in `gzip_types` is currently untestable: after T-018 `dist` contains no `.wasm` file. Harmless to keep.
+3. **nit** — `backend/src/nginxCaching.test.js` parses the config as text. It guards the structure (one `Cache-Control` per location, re-included security headers) but cannot catch a wrong MIME mapping like finding 1; the real-nginx check below did.
+4. **nit** — the invite-token masking from T-004 keys on `$uri`; for SPA routes `$uri` is already `/index.html` after `try_files`, so `/invite/<token>` is logged as `/index.html` (nothing leaks). The masked log only matters for `/api/invites/<token>`. Unchanged by this task.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the diff: `docker/nginx.conf`, `backend/src/nginxCaching.test.js`, README (cache table, Cloudflare note, superseded cold-load model).
+- `npm run lint`: 0 errors. `npm test`: backend 377/377 (the implementer's run; frontend untouched). I did not rerun the unit suites because the change is one nginx file, a text-parsing test and README; I ran the real server instead.
+- **Ran real nginx 1.28.0** (the Windows build, downloaded into the scratchpad) with this configuration (only paths, port and log targets changed in a copy), serving the current production `dist`: `nginx -t` succeeds, then `curl -I -H "Accept-Encoding: gzip"` per path:
+
+  | Path | Result |
+  | --- | --- |
+  | `/assets/index-*.js` | `public, max-age=31536000, immutable`, gzip, `Vary: Accept-Encoding` (87,875 B on the wire, 311,123 B plain) |
+  | `/assets/iconEmbeddings-*.bin` | immutable, `application/octet-stream`, not compressed (as stated) |
+  | `/service-worker.js` | `no-cache`, gzip; `If-None-Match` revalidation answers 304 |
+  | `/index.html`, `/`, `/lists/abc123` | `no-cache`, gzip (SPA fallback works) |
+  | `/fonts/exo-2-latin.woff2` | `public, max-age=86400`, `font/woff2`, not compressed |
+  | `/icon-192.png` | `public, max-age=86400` |
+  | `/manifest.webmanifest` | `public, max-age=86400`, **`application/octet-stream`, not compressed** (finding 1) |
+  | `/assets/missing-abc.js` | 404, no `Cache-Control`, no SPA fallback |
+  | `/api/health` (no backend running) | 502 with the security headers |
+
+  Every response, including the 404 and 502, carried the CSP, `X-Content-Type-Options`, `Referrer-Policy` and `Permissions-Policy`; each static location sent exactly one `Cache-Control`.
+- Access-log masking: `/reset-password?token=abc` and `/invite/secret-token-123?x=1` were both logged as `GET /index.html` without query or token.
+- Stopped nginx afterwards; the repository is untouched.
+
+##### Findings
+- Every acceptance criterion is met except the manifest media type nuance: `/assets/*` immutable for a year; `/service-worker.js` and `/index.html` `no-cache`; fonts, PWA icons and manifest one day; `gzip_vary on` and level 5; wasm and manifest types listed; security headers present on every location.
+- The old catch-all regex location that gave `/service-worker.js` and unhashed fonts/icons a one-year `immutable` lifetime is gone, which closes a real stale-service-worker hazard.
+
+##### Risks
+- Production runs Alpine's nginx, not the Windows build I tested; the directives are standard and the Alpine `mime.types` is upstream's, but the final proof is a `curl -I` against the built image.
+- A Cloudflare "cache everything" rule would still override these headers; the README now warns about it.
