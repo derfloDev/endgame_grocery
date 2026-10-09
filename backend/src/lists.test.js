@@ -243,16 +243,16 @@ describe("list routes", () => {
     const sseManager = createSseManagerSpy();
     let callCount = 0;
     const pool = {
-      async query() {
+      async query(sql) {
         callCount += 1;
 
         if (callCount === 1) {
           return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
-        assert.deepEqual(sseManager.calls, [
-          ["10000000-0000-4000-8000-000000000001", "list:deleted", { listId: "10000000-0000-4000-8000-000000000001" }]
-        ]);
+        // The recipients were read before the delete, but nobody is notified until it succeeded.
+        assert.match(sql, /DELETE FROM lists/);
+        assert.deepEqual(sseManager.direct, []);
         return { rows: [] };
       }
     };
@@ -261,6 +261,61 @@ describe("list routes", () => {
 
     assert.equal(response.status, 204);
     assert.equal(callCount, 2);
+    assert.deepEqual(sseManager.calls, []);
+    assert.deepEqual(sseManager.direct, [
+      [["user-1", "user-2"], "list:deleted", { listId: "10000000-0000-4000-8000-000000000001" }]
+    ]);
+  });
+
+  it("deletes the list even when the recipients cannot be read or the notification fails", async () => {
+    for (const failure of ["recipients", "send"]) {
+      const sseManager = createSseManagerSpy();
+      if (failure === "recipients") {
+        sseManager.getListRecipients = () => Promise.reject(new Error("database busy"));
+      } else {
+        sseManager.sendToUsers = () => {
+          throw new Error("socket closed");
+        };
+      }
+      let deleted = false;
+      let callCount = 0;
+      const pool = {
+        async query(sql) {
+          callCount += 1;
+          if (callCount === 1) {
+            return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
+          }
+          if (/DELETE FROM lists/.test(sql)) {
+            deleted = true;
+          }
+          return { rows: [] };
+        }
+      };
+
+      const response = await request(createAuthedApp(pool, { sseManager })).delete("/api/lists/10000000-0000-4000-8000-000000000001");
+
+      assert.equal(response.status, 204, failure);
+      assert.equal(deleted, true, failure);
+    }
+  });
+
+  it("does not notify anyone when the delete itself fails", async () => {
+    const sseManager = createSseManagerSpy();
+    let callCount = 0;
+    const pool = {
+      async query() {
+        callCount += 1;
+        if (callCount === 1) {
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
+        }
+        throw new Error("delete failed");
+      }
+    };
+
+    const response = await request(createAuthedApp(pool, { sseManager })).delete("/api/lists/10000000-0000-4000-8000-000000000001");
+
+    assert.equal(response.status, 500);
+    assert.deepEqual(sseManager.direct, []);
   });
 
   it("does not broadcast delete events when the caller is not the owner", async () => {
@@ -324,6 +379,11 @@ describe("list routes", () => {
     assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
       ["10000000-0000-4000-8000-000000000001", "member:removed", { listId: "10000000-0000-4000-8000-000000000001", userId: "user-1" }]
+    ]);
+    // The leaving user is no longer a member, so the list broadcast cannot reach them; they get
+    // the event directly (for their other tabs and devices).
+    assert.deepEqual(sseManager.direct, [
+      [["user-1"], "member:removed", { listId: "10000000-0000-4000-8000-000000000001", userId: "user-1" }]
     ]);
     assert.deepEqual(sentMessages, [
       {
@@ -401,13 +461,20 @@ describe("list routes", () => {
   });
 });
 
-function createSseManagerSpy() {
+function createSseManagerSpy({ recipients = ["user-1", "user-2"] } = {}) {
   return {
     calls: [],
+    direct: [],
     broadcastToList(pool, listId, eventType, data) {
       void pool;
       this.calls.push([listId, eventType, data]);
       return Promise.resolve();
+    },
+    sendToUsers(userIds, eventType, data) {
+      this.direct.push([Array.from(userIds), eventType, data]);
+    },
+    getListRecipients() {
+      return Promise.resolve(recipients);
     }
   };
 }

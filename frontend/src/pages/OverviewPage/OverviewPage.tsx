@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AuthExpiredError, createTemporaryId } from "../../api/client";
 import { writeCachedResource } from "../../api/offlineStore";
 import { createList, deleteList, fetchLists, renameList } from "../../api/lists";
@@ -37,13 +37,29 @@ interface OverviewList extends List {
   is_pending_sync?: boolean;
 }
 
+function readNotice(state: unknown): string {
+  const notice = (state as { notice?: unknown } | null)?.notice;
+
+  return typeof notice === "string" ? notice : "";
+}
+
 export default function OverviewPage(): ReactElement {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const location = useLocation();
+  const { token, user } = useAuth();
+  const currentUserId = user?.id;
   const { syncVersion } = useOfflineQueue();
   const { resyncVersion } = useEventSource();
+  // The detail page hands over why it sent the user back (list deleted, user removed).
+  const [notice] = useState<string>(() => readNotice(location.state));
   const [lists, setLists] = useState<OverviewList[]>([]);
+  // Event handlers read the current lists without re-subscribing on every change.
+  const listsRef = useRef<OverviewList[]>(lists);
+
+  useEffect(() => {
+    listsRef.current = lists;
+  }, [lists]);
   const [error, setError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showInfo, setShowInfo] = useState<boolean>(false);
@@ -53,6 +69,15 @@ export default function OverviewPage(): ReactElement {
     return isOverviewSortMode(storedSort) ? storedSort : DEFAULT_OVERVIEW_SORT;
   });
   const isMountedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    // Show the notice once: drop it from the history entry so a reload does not repeat it.
+    if (notice) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // Only the notice read on mount matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -91,8 +116,44 @@ export default function OverviewPage(): ReactElement {
     void loadLists();
   }, [loadLists]);
 
+  // Drops a list that is gone for this user without waiting for (or showing) a reload.
+  const removeListById = useCallback((listId: unknown) => {
+    if (typeof listId !== "string") {
+      return;
+    }
+
+    const remainingLists = listsRef.current.filter((list) => list.id !== listId);
+
+    if (remainingLists.length === listsRef.current.length) {
+      return;
+    }
+
+    listsRef.current = remainingLists;
+    setLists(remainingLists);
+    void writeCachedResource(LISTS_CACHE_KEY, { lists: remainingLists });
+  }, []);
+
+  const handleListDeleted = useCallback(
+    (data: Record<string, unknown>) => {
+      removeListById(data.listId);
+      void loadLists();
+    },
+    [loadLists, removeListById]
+  );
+
+  // The removed user is no longer a member, so the server sends this event to them directly.
+  const handleMemberRemoved = useCallback(
+    (data: Record<string, unknown>) => {
+      if (currentUserId && data.userId === currentUserId) {
+        removeListById(data.listId);
+      }
+    },
+    [currentUserId, removeListById]
+  );
+
   useListEvents("list:updated", null, handleListChange);
-  useListEvents("list:deleted", null, handleListChange);
+  useListEvents("list:deleted", null, handleListDeleted);
+  useListEvents("member:removed", null, handleMemberRemoved);
 
   async function updateLists(updater: (currentLists: OverviewList[]) => OverviewList[]): Promise<void> {
     let nextLists: OverviewList[] = [];
@@ -220,6 +281,7 @@ export default function OverviewPage(): ReactElement {
       </div>
 
       <div className={styles["overview-content"]}>
+        {notice ? <p className="eg-success-banner" role="status">{notice}</p> : null}
         {error && !shouldSuppressError ? <ErrorState onRetry={() => void loadLists()} /> : null}
         {isLoading ? <LoadingState rows={3} /> : null}
         {!isLoading && !error && lists.length === 0 ? (

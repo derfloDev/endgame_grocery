@@ -71,6 +71,8 @@
   "list.fallbackTitle": "List",
   "list.changedCount": "{count, plural, one {# changed item} other {# changed items}}",
   "detail.accessError": "You no longer have access to this list.",
+  "detail.listDeleted": "This list was deleted.",
+  "detail.removedFromList": "You were removed from this list.",
   "detail.openItems": "Open items",
   "detail.noOpenItems": "No open items. Add one with the + button.",
   "detail.allClearTitle": "All clear",

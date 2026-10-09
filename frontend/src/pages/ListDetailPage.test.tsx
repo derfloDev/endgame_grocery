@@ -5,14 +5,14 @@ import userEvent from "@testing-library/user-event";
 import { createInstance } from "i18next";
 import type { i18n, ReadCallback } from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../i18n";
 import enTranslations from "../locales/en/translation.json";
 import deTranslations from "../locales/de/translation.json";
 import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
-import { fetchLists, markListViewed } from "../api/lists";
+import { fetchList, fetchLists, markListViewed } from "../api/lists";
 import { fetchListMembers, leaveList } from "../api/sharing";
 import { writeCachedResource } from "../api/offlineStore";
 import { useListEvents } from "../hooks/useListEvents";
@@ -53,6 +53,7 @@ vi.mock("../api/history", () => ({
 }));
 
 vi.mock("../api/lists", () => ({
+  fetchList: vi.fn(),
   fetchLists: vi.fn(),
   markListViewed: vi.fn(),
   renameList: vi.fn()
@@ -70,7 +71,7 @@ vi.mock("../api/offlineStore", () => ({
 }));
 
 vi.mock("../context/AuthContext", () => ({
-  useAuth: () => ({ token: "test-token" })
+  useAuth: () => ({ token: "test-token", user: { id: "user-1" } })
 }));
 
 vi.mock("../hooks/useListEvents", () => ({
@@ -95,6 +96,7 @@ const createEntryMock = vi.mocked(createEntry);
 const deleteFromHistoryMock = vi.mocked(deleteFromHistory);
 const fetchEntriesMock = vi.mocked(fetchEntries);
 const fetchRecentlyUsedMock = vi.mocked(fetchRecentlyUsed);
+const fetchListMock = vi.mocked(fetchList);
 const fetchListsMock = vi.mocked(fetchLists);
 const markListViewedMock = vi.mocked(markListViewed);
 const fetchListMembersMock = vi.mocked(fetchListMembers);
@@ -102,6 +104,12 @@ const leaveListMock = vi.mocked(leaveList);
 const useListEventsMock = vi.mocked(useListEvents);
 const updateEntryMock = vi.mocked(updateEntry);
 const writeCachedResourceMock = vi.mocked(writeCachedResource);
+
+/** Stands in for the overview and exposes the notice the detail page hands over via router state. */
+function OverviewLanding() {
+  const state = useLocation().state as { notice?: string } | null;
+  return <div>Overview landing{state?.notice ? <p role="status">{state.notice}</p> : null}</div>;
+}
 
 function renderListDetailPage(translations?: i18n) {
   const tree = () => (
@@ -114,7 +122,7 @@ function renderListDetailPage(translations?: i18n) {
     >
       <Routes>
         <Route element={<ListDetailPage />} path="/lists/:id" />
-        <Route element={<div>Overview landing</div>} path="/" />
+        <Route element={<OverviewLanding />} path="/" />
       </Routes>
     </MemoryRouter>
   );
@@ -479,6 +487,105 @@ describe("ListDetailPage resync", () => {
     expect(within(getOpenItemsSection()).getByText("Queued")).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Recently Used" })).getByText("Eggs")).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Recently Used" })).queryByText("Bread")).toBeNull();
+  });
+});
+
+describe("ListDetailPage lifecycle events", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  function getEventHandler(type: string) {
+    // The most recent registration wins: the page re-registers handlers when its callbacks change.
+    const calls = useListEventsMock.mock.calls.filter(([eventType]) => eventType === type);
+    return calls[calls.length - 1]![2];
+  }
+
+  it("leaves with a translated notice when the list was deleted", async () => {
+    mockListDetailData();
+    renderListDetailPage();
+    await screen.findByText("Weekly groceries");
+
+    act(() => { getEventHandler("list:deleted")({ listId: "list-1" }); });
+
+    expect(await screen.findByText("Overview landing")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("This list was deleted.");
+  });
+
+  it("leaves with a translated notice when the current user was removed from the list", async () => {
+    mockListDetailData();
+    renderListDetailPage();
+    await screen.findByText("Weekly groceries");
+
+    act(() => { getEventHandler("member:removed")({ listId: "list-1", userId: "user-1" }); });
+
+    expect(await screen.findByText("Overview landing")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("You were removed from this list.");
+  });
+
+  it("stays on the list and refreshes the members when somebody else was removed", async () => {
+    mockListDetailData();
+    renderListDetailPage();
+    await screen.findByText("Weekly groceries");
+    const membersBefore = fetchListMembersMock.mock.calls.length;
+
+    act(() => { getEventHandler("member:removed")({ listId: "list-1", userId: "user-2" }); });
+
+    await waitFor(() => { expect(fetchListMembersMock.mock.calls.length).toBeGreaterThanOrEqual(membersBefore); });
+    expect(screen.queryByText("Overview landing")).toBeNull();
+    expect(screen.getByText("Weekly groceries")).toBeTruthy();
+  });
+
+  it("renames the list in place on list:updated without reloading the page content", async () => {
+    mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" } as Entry] });
+    fetchListMock.mockResolvedValue({
+      list: { id: "list-1", name: "Renamed groceries", owner_name: "Demo User", is_owner: false } as List
+    });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const entryRequests = fetchEntriesMock.mock.calls.length;
+
+    act(() => { getEventHandler("list:updated")({ listId: "list-1" }); });
+
+    expect(await screen.findByText("Renamed groceries")).toBeTruthy();
+    expect(fetchListMock).toHaveBeenCalledWith("test-token", "list-1");
+    expect(screen.getByText("Milk")).toBeTruthy();
+    expect(fetchEntriesMock.mock.calls.length).toBe(entryRequests);
+    expect(screen.queryByText("Overview landing")).toBeNull();
+  });
+
+  it("keeps the current title when the list:updated refresh fails", async () => {
+    mockListDetailData();
+    fetchListMock.mockRejectedValue(new Error("offline"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    renderListDetailPage();
+    await screen.findByText("Weekly groceries");
+
+    act(() => { getEventHandler("list:updated")({ listId: "list-1" }); });
+
+    await waitFor(() => { expect(fetchListMock).toHaveBeenCalled(); });
+    expect(screen.getByText("Weekly groceries")).toBeTruthy();
+  });
+
+  it("shows the notice in German too", async () => {
+    mockListDetailData();
+    const german = createInstance();
+    await german.init({
+      lng: "de",
+      fallbackLng: "en",
+      resources: { en: { translation: enTranslations }, de: { translation: deTranslations } },
+      interpolation: { escapeValue: false }
+    });
+    renderListDetailPage(german);
+    await screen.findByText("Weekly groceries");
+
+    act(() => { getEventHandler("list:deleted")({ listId: "list-1" }); });
+
+    expect((await screen.findByRole("status")).textContent).toBe("Diese Liste wurde gelöscht.");
   });
 });
 

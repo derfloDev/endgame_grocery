@@ -435,6 +435,14 @@ describe("sharing routes", () => {
     assert.deepEqual(sseManager.calls, [
       ["10000000-0000-4000-8000-000000000001", "member:removed", { listId: "10000000-0000-4000-8000-000000000001", userId: "30000000-0000-4000-8000-000000000002" }]
     ]);
+    // The removed user is no longer a member, so the list broadcast cannot reach them.
+    assert.deepEqual(sseManager.direct, [
+      [
+        ["30000000-0000-4000-8000-000000000002"],
+        "member:removed",
+        { listId: "10000000-0000-4000-8000-000000000001", userId: "30000000-0000-4000-8000-000000000002" }
+      ]
+    ]);
   });
 
   it("rejects removing the owner from their own list", async () => {
@@ -465,13 +473,20 @@ describe("sharing routes", () => {
   });
 });
 
-function createSseManagerSpy() {
+function createSseManagerSpy({ recipients = ["user-1", "user-2"] } = {}) {
   return {
     calls: [],
+    direct: [],
     broadcastToList(pool, listId, eventType, data) {
       void pool;
       this.calls.push([listId, eventType, data]);
       return Promise.resolve();
+    },
+    sendToUsers(userIds, eventType, data) {
+      this.direct.push([Array.from(userIds), eventType, data]);
+    },
+    getListRecipients() {
+      return Promise.resolve(recipients);
     }
   };
 }

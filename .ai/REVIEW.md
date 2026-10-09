@@ -1706,3 +1706,36 @@ No blocker or major findings; no required fixes.
 ##### Risks
 - Unverified against PostgreSQL: the migration (up, down, round-trip), all `EXPLAIN` assertions (the overview aggregate and the suggestions query are the likeliest to surprise) and the single-list 403. A planner that still chooses a Seq Scan on about 12k rows would fail the test.
 - Please run `npm run test:integration` against PostgreSQL 16 (for example once Docker is up, with `TEST_DATABASE_URL` set) before `commit_task`; if it fails, send it back through `rework_task`.
+
+## Task: T-012 (hardening cycle 2026-10-08 — membership and list lifecycle events)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `useListLifecycleEvents.ts`: the owner who deletes a list from a page that is still open on another tab/device sees "This list was deleted." on the overview; on the tab that performed the delete the page has already navigated, so nothing is shown twice. Acceptable and consistent with the acceptance criteria.
+2. **minor** — `OverviewPage.tsx`: `handleListDeleted` removes the list and still refetches (the existing app test expects the refetch). One redundant request per delete; harmless.
+3. **minor** — the broadcast to the remaining members and the direct `member:removed` to the removed user are two separate sends, so the removed user's own `member:removed` is not duplicated, but a user who leaves voluntarily also gets the event on their other tabs (documented in the handoff).
+4. **nit** — `OverviewPage.tsx` keeps a `// eslint-disable-next-line react-hooks/exhaustive-deps` for the mount-only notice cleanup; justified by the comment.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board, the handoff and the diff: `routes/sharing.js`, `routes/lists.js` (leave and delete), `sseManager.js` (`getListRecipients`), `ListDetailPage.tsx`, new `useListLifecycleEvents.ts`, `OverviewPage.tsx`, DE/EN locales, README, backend and frontend tests including the new `listLifecycleEvents.test.js`.
+- Root cause confirmed: `broadcastToList` read recipients after the membership delete, so the removed or leaving user was never in the result; the routes now also call `sendToUsers([userId], "member:removed", …)` directly.
+- List delete now reads recipients first, deletes, then sends `list:deleted`; the lookup and the send are try/caught and logged, so a failing broadcast never blocks (or precedes) the delete. Previously a rejecting broadcast returned 500 and announced a deletion that never happened.
+- `npm run lint`: 0 errors. `npm run build`: ok. `npm test`: backend 365 pass, 0 fail; frontend 47 files pass.
+- Both new translation keys exist in DE and EN.
+
+##### Findings
+- All acceptance criteria are met: removed or leaving member receives `member:removed`; delete is never blocked by a broadcast failure; the detail page leaves with a translated notice on `list:deleted` or own removal and renames in place on `list:updated` (metadata only, entries untouched); the overview drops the list on `list:deleted` and on own removal.
+- Existing tests were changed only where behaviour changed (spies gained `sendToUsers`/`getListRecipients`; the delete test no longer expects the broadcast before the DELETE). No assertion was weakened.
+
+##### Risks
+- Frontend behaviour was verified through unit/component tests only; no browser or E2E run (no two-user E2E exists until T-023). No SQL changed, so no integration test was needed.

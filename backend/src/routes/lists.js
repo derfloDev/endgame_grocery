@@ -317,11 +317,12 @@ export function createListRouter({
         return;
       }
 
+      // The leaving user is no longer a member, so the list broadcast below cannot reach them;
+      // tell them directly so their other tabs and devices leave the list too.
+      const removedPayload = { listId: req.params.id, userId: req.user.sub };
+      sseManager.sendToUsers([req.user.sub], "member:removed", removedPayload);
       void sseManager
-        .broadcastToList(pool, req.params.id, "member:removed", {
-          listId: req.params.id,
-          userId: req.user.sub
-        })
+        .broadcastToList(pool, req.params.id, "member:removed", removedPayload)
         .catch((broadcastError) => {
           logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
         });
@@ -356,10 +357,25 @@ export function createListRouter({
         return;
       }
 
-      await sseManager.broadcastToList(pool, req.params.id, "list:deleted", {
-        listId: req.params.id
-      });
+      // Read the recipients first: once the list is gone nobody can be looked up any more. A
+      // failing lookup or notification must never keep the list from being deleted.
+      let recipients = [];
+
+      try {
+        recipients = await sseManager.getListRecipients(pool, req.params.id);
+      } catch (recipientError) {
+        logger.error({ err: recipientError }, "Failed to read list recipients before deletion");
+      }
+
       await pool.query("DELETE FROM lists WHERE id = $1", [req.params.id]);
+
+      // Only announce a deletion that really happened.
+      try {
+        sseManager.sendToUsers(recipients, "list:deleted", { listId: req.params.id });
+      } catch (broadcastError) {
+        logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+      }
+
       res.status(204).send();
     } catch (error) {
       next(error);

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +6,7 @@ import "../../i18n";
 import { fetchLists } from "../../api/lists";
 import { writeCachedResource } from "../../api/offlineStore";
 import { leaveList } from "../../api/sharing";
+import { useListEvents } from "../../hooks/useListEvents";
 import OverviewPage from "./OverviewPage";
 
 const streamState = vi.hoisted(() => ({ resyncVersion: 0 }));
@@ -28,7 +29,7 @@ vi.mock("../../api/sharing", () => ({
 }));
 
 vi.mock("../../context/AuthContext", () => ({
-  useAuth: () => ({ token: "test-token" })
+  useAuth: () => ({ token: "test-token", user: { id: "user-1" } })
 }));
 
 vi.mock("../../hooks/useListEvents", () => ({
@@ -40,6 +41,7 @@ vi.mock("../../hooks/useOfflineQueue", () => ({
 }));
 
 const fetchListsMock = vi.mocked(fetchLists);
+const useListEventsMock = vi.mocked(useListEvents);
 const leaveListMock = vi.mocked(leaveList);
 const writeCachedResourceMock = vi.mocked(writeCachedResource);
 
@@ -87,6 +89,81 @@ describe("OverviewPage leave list", () => {
     });
     expect(window.confirm).toHaveBeenCalledWith("Leave this shared list?");
     expect(writeCachedResourceMock).toHaveBeenCalledWith("lists", { lists: [] });
+  });
+});
+
+describe("OverviewPage list lifecycle events", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    fetchListsMock.mockResolvedValue({
+      lists: [
+        { id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false },
+        { id: "list-2", name: "Party supplies", owner_name: "Alex", is_owner: false }
+      ]
+    });
+    writeCachedResourceMock.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  function getEventHandler(type: string) {
+    const calls = useListEventsMock.mock.calls.filter(([eventType]) => eventType === type);
+    return calls[calls.length - 1]![2];
+  }
+
+  function renderOverview(initialEntries: Array<string | { pathname: string; state?: unknown }> = ["/"]) {
+    return render(
+      <MemoryRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }} initialEntries={initialEntries}>
+        <Routes>
+          <Route element={<OverviewPage />} path="/" />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  it("drops the list when the current user was removed from it, without reloading", async () => {
+    renderOverview();
+    await screen.findByText("Weekly groceries");
+    const requests = fetchListsMock.mock.calls.length;
+
+    act(() => { getEventHandler("member:removed")({ listId: "list-1", userId: "user-1" }); });
+
+    await waitFor(() => { expect(screen.queryByText("Weekly groceries")).toBeNull(); });
+    expect(screen.getByText("Party supplies")).toBeTruthy();
+    expect(fetchListsMock.mock.calls.length).toBe(requests);
+    expect(writeCachedResourceMock).toHaveBeenCalledWith("lists", {
+      lists: [{ id: "list-2", name: "Party supplies", owner_name: "Alex", is_owner: false }]
+    });
+  });
+
+  it("keeps the list when somebody else was removed from it", async () => {
+    renderOverview();
+    await screen.findByText("Weekly groceries");
+
+    act(() => { getEventHandler("member:removed")({ listId: "list-1", userId: "user-2" }); });
+
+    expect(screen.getByText("Weekly groceries")).toBeTruthy();
+  });
+
+  it("drops a deleted list immediately while the refresh is still running", async () => {
+    renderOverview();
+    await screen.findByText("Weekly groceries");
+    fetchListsMock.mockReturnValueOnce(new Promise(() => undefined));
+
+    act(() => { getEventHandler("list:deleted")({ listId: "list-1" }); });
+
+    await waitFor(() => { expect(screen.queryByText("Weekly groceries")).toBeNull(); });
+    expect(fetchListsMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows the notice handed over by the detail page", async () => {
+    renderOverview([{ pathname: "/", state: { notice: "This list was deleted." } }]);
+
+    expect((await screen.findByRole("status")).textContent).toBe("This list was deleted.");
+    await screen.findByText("Weekly groceries");
   });
 });
 

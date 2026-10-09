@@ -789,3 +789,49 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-012 — implement — 2026-10-09T09:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | A removed or leaving member now receives `member:removed` directly, `list:deleted` is sent after a successful delete to recipients read beforehand and can no longer block it, and the detail page leaves with a translated notice or renames in place while the overview drops the list. |
+| Files Changed | backend/src/sseManager.js, backend/src/routes/sharing.js, backend/src/routes/lists.js, backend/src/lists.test.js, backend/src/sharing.test.js, backend/src/listLifecycleEvents.test.js, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage/useListLifecycleEvents.ts, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/pages/OverviewPage/OverviewPage.tsx, frontend/src/pages/OverviewPage/OverviewPage.test.tsx, frontend/src/locales/en/translation.json, frontend/src/locales/de/translation.json, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` (0 errors, 1 pre-existing warning); `npm run build` ok; `npm test` backend 365/365, frontend 687/687 pass. No SQL changed, so no integration run; Docker/PostgreSQL was not available this session anyway. |
+| Commit | `fix(sharing): tell removed members and everyone on a deleted list so their pages leave it` |
+| Next Role | review |
+
+Notes for review:
+1. **Root cause:** `broadcastToList` queries the *remaining* recipients after the membership delete, so the removed or leaving user was never in the result. The routes now also call `sseManager.sendToUsers([userId], "member:removed", …)` directly; the remaining owner/members still get the list broadcast. New `SseManager.getListRecipients(pool, listId)` (the old query, now shared by `broadcastToList`).
+2. **List delete order:** recipients are read first, the `DELETE` runs, then `list:deleted` is sent synchronously via `sendToUsers`; both the lookup and the send are try/caught and logged, so neither blocks the delete (previously the broadcast was awaited before the delete, so a rejection returned 500 and announced a deletion that had not happened).
+3. **Detail page:** the three handlers live in the new `useListLifecycleEvents` hook (the page is capped below 400 lines by an existing structure test, which I kept as is). Own removal / `list:deleted` navigate to `/` with `state.notice` (translated at the moment of navigation); `list:updated` calls the existing `fetchList` (T-011) and merges the result into `list`, leaving entries untouched; a failed refresh keeps the title and logs.
+4. **Overview:** drops lists on `list:deleted` (still refetches, as the existing app test expects) and on `member:removed` for the current user (no refetch); shows `state.notice` once in a `role=status` banner and clears the router state on mount.
+5. **Existing tests changed because behaviour changed:** the sharing/lists spies gained `sendToUsers`/`getListRecipients`; the list-delete test no longer expects the broadcast before the DELETE; revoke/leave tests additionally expect the direct send; `ListDetailPage.test.tsx`/`OverviewPage.test.tsx` mocks gained `user.id`, `fetchList` and a landing probe for the notice.
+6. A user who leaves voluntarily is also sent `member:removed`; their own page already navigated away, so only their other tabs show the "removed" notice.
+
+---
+
+### T-012 — review — 2026-10-09T09:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed membership and list lifecycle events: removed/leaving members now receive member:removed, list delete is not blocked by broadcast failures, detail page and overview react; all criteria met. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-012 — implement — 2026-10-09T07:04:16Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-012 after review PASS_WITH_NOTES: removed and leaving members and everyone on a deleted list now receive the lifecycle events, and the detail page and overview react. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-012 implementation files |
+| Commit | `fix(sharing): tell removed members and everyone on a deleted list so their pages leave it` |
+| Next Role | none |
+
+---

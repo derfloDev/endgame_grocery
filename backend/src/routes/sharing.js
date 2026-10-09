@@ -222,11 +222,12 @@ export function createSharingRouter({
         return;
       }
 
+      // The removed user is no longer a member, so the list broadcast below cannot reach them;
+      // tell them directly so their open pages leave the list.
+      const removedPayload = { listId: req.params.id, userId: req.params.uid };
+      sseManager.sendToUsers([req.params.uid], "member:removed", removedPayload);
       void sseManager
-        .broadcastToList(pool, req.params.id, "member:removed", {
-          listId: req.params.id,
-          userId: req.params.uid
-        })
+        .broadcastToList(pool, req.params.id, "member:removed", removedPayload)
         .catch((broadcastError) => {
           logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
         });

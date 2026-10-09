@@ -27,6 +27,7 @@ import { leaveSharedList } from "../leaveListAction";
 import styles from "./ListDetailPage.module.css";
 import { getChangeKind, getErrorMessage, getInitials, isShareInviteResult } from "./listDetailUtils";
 import { useListDetailData } from "./useListDetailData";
+import { useListLifecycleEvents } from "./useListLifecycleEvents";
 import type { DetailEntry, DetailMember } from "./useListDetailData";
 
 export default function ListDetailPage(): ReactElement {
@@ -34,7 +35,7 @@ export default function ListDetailPage(): ReactElement {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const listId = id ?? "";
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { syncVersion } = useOfflineQueue();
   const { resyncVersion } = useEventSource();
   const lastResyncRef = useRef(resyncVersion);
@@ -116,7 +117,8 @@ export default function ListDetailPage(): ReactElement {
   useListEvents("entry:deleted", listId, handleEntryChange);
   useListEvents("history:updated", listId, handleHistoryChange);
   useListEvents("member:added", listId, handleMemberChange);
-  useListEvents("member:removed", listId, handleMemberChange);
+  // Deleted list, own removal (back to the overview with a notice) and rename (title in place).
+  useListLifecycleEvents({ currentUserId: user?.id, listId, onOtherMemberRemoved: handleMemberChange, setList, token });
 
   async function updateMembers(updater: (currentMembers: DetailMember[]) => DetailMember[]): Promise<void> {
     let nextMembers: DetailMember[] = [];
