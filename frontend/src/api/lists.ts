@@ -1,4 +1,5 @@
-import { createCacheKey, sendJsonRequest } from "./client";
+import { AuthExpiredError, createCacheKey, HttpError, sendJsonRequest } from "./client";
+import { readCachedResource } from "./offlineStore";
 import type { CachedReadOptions } from "./client";
 import type { List, QueueMeta } from "../types";
 
@@ -62,17 +63,32 @@ export function fetchLists(token: string, options: CachedReadOptions<ListsRespon
  * Loads the metadata of a single list. Cached under `list:<id>`, so the detail page can show the
  * title from the cache while the request is still in flight or the device is offline.
  */
-export function fetchList(
+export async function fetchList(
   token: string,
   listId: string,
   options: CachedReadOptions<ListResponse> = {}
 ): Promise<ListResponse> {
-  return sendJsonRequest(`/api/lists/${listId}`, {
-    token,
-    cacheKey: createListCacheKey(listId),
-    onCachedValue: options.onCachedValue,
-    offlineFallbackMessage: "Offline list data is unavailable."
-  }) as Promise<ListResponse>;
+  try {
+    return (await sendJsonRequest(`/api/lists/${listId}`, {
+      token,
+      cacheKey: createListCacheKey(listId),
+      onCachedValue: options.onCachedValue,
+      offlineFallbackMessage: "Offline list data is unavailable."
+    })) as ListResponse;
+  } catch (error) {
+    // Offline and never opened before: the overview cache still knows the list's title and owner.
+    // Server answers (403/404) must stay visible, so only non-HTTP failures fall back.
+    if (!(error instanceof HttpError) && !(error instanceof AuthExpiredError)) {
+      const cachedLists = (await readCachedResource(LISTS_CACHE_KEY).catch(() => null)) as ListsResponse | null;
+      const cachedList = cachedLists?.lists?.find((candidate) => candidate.id === listId);
+
+      if (cachedList) {
+        return { list: cachedList, offline: true };
+      }
+    }
+
+    throw error;
+  }
 }
 
 export function createList(

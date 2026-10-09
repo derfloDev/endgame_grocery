@@ -1847,3 +1847,44 @@ No blocker or major findings; no required fixes.
 ##### Risks
 - The sheet fix and the server change must ship together: with `icon: null` now clearing, an old client that sends `null` for an unresolved suggestion would remove icons (same release, same bundle, so low risk).
 - Offline-queued edits replay `icon: null` verbatim, so an edit queued with a transiently empty suggestion clears the icon when it syncs (finding 1).
+
+## Task: T-016 (hardening cycle 2026-10-08 — cache-first overview, single-list metadata on the detail page)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+T-016 itself has no blocker or major findings. Finding 1 is a regression in the already committed **T-013** that the Playwright run exposed; it is reproducible without T-016's changes.
+
+#### Findings
+
+1. **major (out of scope — T-013, committed in `80d05f5`)** — adding an entry right after opening a list shows the new tile **twice, with the same entry id**. Race in `useListDetailData.ts` `addEntryByText` plus T-013's own-event handling: the server broadcasts `entry:created` before the HTTP response arrives; `applyEntryEvent` upserts the real entry (the temporary entry has another id, so nothing matches), and then the POST response maps the temporary entry to the same real entry, leaving two entries with the real id (React duplicate-key warning, two tiles, one row on the server). Reproduced against the real backend on a copy of `HEAD` (before T-016): 2 matching tiles in 5 of 6 runs; the server holds exactly one entry. `e2e/lists.spec.js` › "adds an item to a shopping list" fails on it (strict-mode violation: `getByText` resolves to 2 elements). The T-013 acceptance criteria say events are idempotent, which this path breaks. Needs a T-013 rework: when the create response arrives, drop the temporary entry if the real id is already present (the existing `reconcileResolvedEntries` logic does this for the offline path), or skip own-event upserts for ids the tab is still creating. The unit tests miss it because they do not interleave the event and the response.
+2. **minor** — `useListDetailData.ts` now has two import statements from `../../api/client` (`createTemporaryId` and `HttpError`). Lint passes; merging them would be tidier.
+3. **minor** — `OverviewPage.tsx`: an empty cached list array counts as "lists on screen" (`hasListsRef = true`), so a user with no lists never sees the skeleton on a later visit and the empty state can briefly show before the first response. That is the intended cache-first behaviour; only noting it.
+4. **nit** — `api/lists.ts` `fetchList`: the fallback to the overview cache re-reads `lists` on every non-HTTP failure; negligible.
+
+No required fixes for T-016.
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the staged diff: `OverviewPage.tsx` (`hasListsRef`, `loadedForTokenRef`, `onCachedValue`), `useListDetailData.ts` (`fetchList` with 403/404 mapped to the access error), `api/lists.ts` (overview-cache fallback), tests, `lists.spec.js`/`resync.spec.js` fixtures and README.
+- Checked that `GET /api/lists/:id` returns every field the detail page reads (`name`, `owner_name`, `is_owner`).
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok. `npm test`: backend 367/367, frontend 784/784.
+- Playwright against the real stack (backend with test routes, Vite, embedded PostgreSQL 18 migrated to the migration before the T-011 one, which still fails — see the T-014 section): `lists.spec.js`, `resync.spec.js`, `queue-retry.spec.js` 8 of 9 pass; the one failure is finding 1.
+- Manual browser run against the real backend:
+  - the overview rendered the cached lists 0.7 s after a reload while `GET /api/lists` was held for 4 s;
+  - opening a list requested `GET /api/lists/:id`, entries, history, members and the stream, and never `GET /api/lists` itself;
+  - with the API blocked, reloading an already visited list showed its title and owner from the cache with the offline banner;
+  - user B on the same browser saw none of user A's lists, and A's list answered "You do not have access to this list." (403 mapped to the access error).
+- I did not exercise the in-place event reload of the overview in a browser; it is covered by the new unit test.
+
+##### Findings
+- Every acceptance criterion is met: cached lists render before the network answers; event reloads do not show the loader; the detail page no longer requests `/api/lists`.
+- Detail-page fixtures moved from `lists: [...]` to `list: {...}`; the cases that relied on a missing list now reject with a 403 `HttpError`. No assertion was weakened, and tests now also assert that `fetchLists` is never called by the detail page.
+
+##### Risks
+- `app.test.tsx` fixtures still match URLs by order (T-024 replaces them).
+- Finding 1 affects every user who adds an item while connected; it should be fixed before release even though T-016 is not the cause.

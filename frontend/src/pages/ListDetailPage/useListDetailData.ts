@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createTemporaryId } from "../../api/client";
 import { createEntry, fetchEntries, updateEntry } from "../../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../../api/history";
-import { fetchLists, markListViewed } from "../../api/lists";
+import { HttpError } from "../../api/client";
+import { fetchList, markListViewed } from "../../api/lists";
 import { listOfflineMutations, writeCachedResource } from "../../api/offlineStore";
 import { fetchListMembers } from "../../api/sharing";
 import type { Entry, List, Member, Suggestion } from "../../types";
@@ -495,13 +496,19 @@ export function useListDetailData({
       onLoadStart?.();
 
       try {
-        const [listsResult, entriesResult, historyResult] = await Promise.all([
-          fetchLists(token, {
+        const [listResult, entriesResult, historyResult] = await Promise.all([
+          // Only this list's metadata is needed, not every list the user has.
+          fetchList(token, listId, {
             onCachedValue: (cached) => {
               if (!active || networkFinished) return;
-              const cachedList = cached.lists?.find((candidate) => candidate.id === listId);
-              if (cachedList) setList(cachedList);
+              if (cached.list) setList(cached.list);
             }
+          }).catch((listError: unknown) => {
+            // 403/404: the list is gone or not shared with this user. Shown as the access error.
+            if (listError instanceof HttpError && (listError.status === 403 || listError.status === 404)) {
+              return { list: null };
+            }
+            throw listError;
           }),
           fetchEntries(listId, token, {
             onCachedValue: (cached) => {
@@ -518,7 +525,7 @@ export function useListDetailData({
           })
         ]);
         networkFinished = true;
-        const activeList = ((listsResult.lists ?? []) as DetailList[]).find((candidate) => candidate.id === listId);
+        const activeList = (listResult.list ?? undefined) as DetailList | undefined;
         const isStillPending = await createPendingFilter();
 
         if (!active) {

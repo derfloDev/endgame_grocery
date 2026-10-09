@@ -218,7 +218,7 @@ describe("authentication shell", () => {
       const url = String(input);
       const method = init.method ?? "GET";
 
-      if (url === "/api/lists" && !didRejectExpiredSession) {
+      if (url === "/api/lists/list-1" && !didRejectExpiredSession) {
         didRejectExpiredSession = true;
         return {
           ok: false,
@@ -237,11 +237,11 @@ describe("authentication shell", () => {
         };
       }
 
-      if (url === "/api/lists") {
+      if (url === "/api/lists/list-1") {
         return {
           ok: true,
           json: async () => ({
-            lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+            list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
           })
         };
       }
@@ -479,7 +479,7 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }]
+          list: { id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }
         })
       })
       .mockResolvedValueOnce({
@@ -920,7 +920,7 @@ describe("authentication shell", () => {
       {
         ok: true,
         json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+          list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
         })
       },
       {
@@ -1054,7 +1054,7 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+          list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
         })
       })
       .mockResolvedValueOnce({
@@ -1236,11 +1236,11 @@ describe("authentication shell", () => {
     fetch.mockImplementation(async (input, init) => {
       const url = String(input);
 
-      if (url === "/api/lists") {
+      if (url === "/api/lists/list-1") {
         return {
           ok: true,
           json: async () => ({
-            lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+            list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
           })
         };
       }
@@ -1333,7 +1333,7 @@ describe("authentication shell", () => {
       expect(screen.queryByText("Tomatoes")).toBeNull();
     });
 
-    expect(fetch.mock.calls.filter(([url]) => url === "/api/lists")).toHaveLength(1);
+    expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1")).toHaveLength(1);
     expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1/entries")).toHaveLength(4);
     expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1/members")).toHaveLength(3);
   }, 10000);
@@ -1354,11 +1354,11 @@ describe("authentication shell", () => {
         };
       }
 
-      if (url === "/api/lists") {
+      if (url === "/api/lists/list-1") {
         return {
           ok: true,
           json: async () => ({
-            lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+            list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
           })
         };
       }
@@ -1503,7 +1503,7 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+          list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
         })
       })
       .mockResolvedValueOnce({
@@ -1598,7 +1598,7 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          lists: [{ id: "list-1", name: "Solo groceries", owner_name: "Demo User", is_owner: true }]
+          list: { id: "list-1", name: "Solo groceries", owner_name: "Demo User", is_owner: true }
         })
       })
       .mockResolvedValueOnce({
@@ -1638,7 +1638,7 @@ describe("authentication shell", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          lists: [{ id: "list-2", name: "BBQ party", owner_name: "Alex", is_owner: false }]
+          list: { id: "list-2", name: "BBQ party", owner_name: "Alex", is_owner: false }
         })
       })
       .mockResolvedValueOnce({

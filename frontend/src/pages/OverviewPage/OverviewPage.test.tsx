@@ -232,6 +232,71 @@ describe("OverviewPage sorting", () => {
   });
 });
 
+describe("OverviewPage cache-first loading", () => {
+  afterEach(cleanup);
+
+  it("renders the cached lists before the network answers, without a loading skeleton", async () => {
+    fetchListsMock.mockReset();
+    let resolveNetwork: (value: Awaited<ReturnType<typeof fetchLists>>) => void = () => undefined;
+    fetchListsMock.mockImplementation((_token, options) => {
+      options?.onCachedValue?.({ lists: [{ id: "list-1", name: "Cached pantry" }] });
+      return new Promise((resolve) => { resolveNetwork = resolve; });
+    });
+
+    renderOverviewPage();
+
+    expect(await screen.findByText("Cached pantry")).toBeTruthy();
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+
+    await act(async () => { resolveNetwork({ lists: [{ id: "list-1", name: "Fresh pantry" }] }); });
+
+    expect(await screen.findByText("Fresh pantry")).toBeTruthy();
+    expect(screen.queryByText("Cached pantry")).toBeNull();
+  });
+
+  it("shows the skeleton on the very first load, when nothing is cached", async () => {
+    fetchListsMock.mockReset();
+    fetchListsMock.mockReturnValue(new Promise(() => undefined));
+
+    renderOverviewPage();
+
+    expect(await screen.findByLabelText("Loading")).toBeTruthy();
+  });
+
+  it("refreshes in place after a list event instead of showing the loader again", async () => {
+    fetchListsMock.mockReset();
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Before rename" }] });
+    renderOverviewPage();
+    await screen.findByText("Before rename");
+    let resolveReload: (value: Awaited<ReturnType<typeof fetchLists>>) => void = () => undefined;
+    fetchListsMock.mockReturnValue(new Promise((resolve) => { resolveReload = resolve; }));
+    const calls = useListEventsMock.mock.calls.filter(([eventType]) => eventType === "list:updated");
+
+    act(() => { calls[calls.length - 1]![2]({}); });
+
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    expect(screen.getByText("Before rename")).toBeTruthy();
+
+    await act(async () => { resolveReload({ lists: [{ id: "list-1", name: "After rename" }] }); });
+
+    expect(await screen.findByText("After rename")).toBeTruthy();
+  });
+
+  it("keeps the shown lists and no loader when a refresh fails", async () => {
+    fetchListsMock.mockReset();
+    fetchListsMock.mockResolvedValueOnce({ lists: [{ id: "list-1", name: "Kept list" }] });
+    renderOverviewPage();
+    await screen.findByText("Kept list");
+    fetchListsMock.mockRejectedValue(new Error("offline"));
+    const calls = useListEventsMock.mock.calls.filter(([eventType]) => eventType === "list:updated");
+
+    await act(async () => { calls[calls.length - 1]![2]({}); });
+
+    expect(screen.getByText("Kept list")).toBeTruthy();
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+  });
+});
+
 describe("OverviewPage resync", () => {
   afterEach(cleanup);
 

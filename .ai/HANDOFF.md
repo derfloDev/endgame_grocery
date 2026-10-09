@@ -969,3 +969,48 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-016 — implement — 2026-10-09T19:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | The overview renders cached lists immediately and refreshes in place without the skeleton, and the detail page loads its metadata through `GET /api/lists/:id` instead of every list. |
+| Files Changed | frontend/src/pages/OverviewPage/OverviewPage.tsx, frontend/src/pages/OverviewPage/OverviewPage.test.tsx, frontend/src/pages/ListDetailPage/useListDetailData.ts, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/api/lists.ts, frontend/src/api/lists.test.ts, frontend/src/app.test.tsx, e2e/lists.spec.js, e2e/resync.spec.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ok; `npm test` frontend 784/784 (backend untouched). Playwright specs not run locally (fixtures for `/api/lists/list-1` added to `lists.spec.js` and `resync.spec.js`). |
+| Commit | `perf(ui): show cached lists instantly and load only the open list's details` |
+| Next Role | review |
+
+Notes for review:
+1. **Overview:** `loadLists` passes `onCachedValue` to `fetchLists`; `hasListsRef` makes only the first load with nothing on screen show the skeleton, later reloads (events, resync, sync) run in place, and a failed refresh keeps the lists and only reports an error when nothing is shown. A change of token (another session) clears the lists and shows the skeleton again so a previous user's lists never linger.
+2. **Detail page:** `useListDetailData` calls `fetchList(token, listId, { onCachedValue })`; 403/404 `HttpError`s become the existing "no access" state (same translated message, still reacts to language changes without refetching); other errors behave as before. The component no longer imports `fetchLists`.
+3. **Offline fallback (small addition):** `fetchList` falls back to the entry in the `lists` overview cache when the request fails with a non-HTTP error and `list:<id>` was never cached, so reopening a list offline right after this upgrade (or from the overview) keeps working. HTTP errors (403/404/401) are never masked by cached data; both cases have tests in `lists.test.ts`.
+4. **Test churn (no assertions weakened):** detail-page fixtures moved from `lists: [...]` to `list: {...}` and from `fetchLists` to `fetchList` mocks; where a test relied on "list missing from the response" it now rejects with a 403 `HttpError`. The `app.test.tsx` URL-matching fixtures for the detail page now match `/api/lists/list-1` (T-024 will replace those order-dependent fixtures). Added assertions that `fetchLists` is never called by the detail page.
+5. Acceptance mapping: cached lists before the network answers (new Overview test), event reloads without loader (new test), detail page no longer requests `/api/lists` (`fetchLists` not called in the detail tests and the app test counts only `/api/lists/list-1`).
+
+---
+
+### T-016 — review — 2026-10-09T20:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the cache-first overview and the single-list metadata load on the detail page; verified in a browser against the real backend, and found that the committed T-013 own-event handling shows a duplicate tile (same id) when an entry is added while connected, which fails e2e/lists.spec.js. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none for T-016; T-013 duplicate-tile regression (REVIEW.md T-016 finding 1) and the T-011 migration defect (T-014 finding 1) need `rework_task`/replanning |
+| Next Role | implement |
+
+### T-016 — implement — 2026-10-09T20:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-016 after review PASS_WITH_NOTES: cache-first overview and single-list metadata on the detail page. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-016 implementation files |
+| Commit | `perf(ui): show cached lists instantly and load only the open list's details` |
+| Next Role | none |
+
+Open items (not part of this commit): REVIEW.md T-016 finding 1 (T-013 duplicate-tile regression) and T-014 finding 1 (T-011 migration defect) still need `rework_task` or replanning.
+
+---

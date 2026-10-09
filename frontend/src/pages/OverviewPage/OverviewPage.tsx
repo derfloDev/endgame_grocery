@@ -87,18 +87,47 @@ export default function OverviewPage(): ReactElement {
     };
   }, []);
 
+  // True once lists are on screen (from the cache or the network). Only the very first load shows the
+  // skeleton; later reloads (events, reconnects, sync) refresh in place.
+  const hasListsRef = useRef<boolean>(false);
+  const loadedForTokenRef = useRef<string>(token);
+
   const loadLists = useCallback(async (): Promise<void> => {
+    if (loadedForTokenRef.current !== token) {
+      // Another session: never keep showing the previous user's lists while loading.
+      loadedForTokenRef.current = token;
+      hasListsRef.current = false;
+      setLists([]);
+      setIsLoading(true);
+    }
+
     setError(null);
-    setIsLoading(true);
+
+    if (!hasListsRef.current) {
+      setIsLoading(true);
+    }
 
     try {
-      const result = await fetchLists(token);
+      const result = await fetchLists(token, {
+        // Cached lists are shown right away while the request is in flight.
+        onCachedValue: (cached) => {
+          if (!isMountedRef.current || loadedForTokenRef.current !== token) {
+            return;
+          }
 
-      if (isMountedRef.current) {
+          hasListsRef.current = true;
+          setLists((cached.lists ?? []) as OverviewList[]);
+          setIsLoading(false);
+        }
+      });
+
+      if (isMountedRef.current && loadedForTokenRef.current === token) {
+        hasListsRef.current = true;
         setLists((result.lists ?? []) as OverviewList[]);
       }
     } catch (loadError) {
-      if (isMountedRef.current) {
+      // A failed refresh keeps what is on screen; only an empty page reports the error.
+      if (isMountedRef.current && !hasListsRef.current) {
         setError(loadError);
       }
     } finally {

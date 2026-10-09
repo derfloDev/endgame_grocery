@@ -12,6 +12,7 @@ import enTranslations from "../locales/en/translation.json";
 import deTranslations from "../locales/de/translation.json";
 import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
+import { HttpError } from "../api/client";
 import { fetchList, fetchLists, markListViewed } from "../api/lists";
 import { fetchListMembers, leaveList } from "../api/sharing";
 import { listOfflineMutations, writeCachedResource } from "../api/offlineStore";
@@ -149,11 +150,7 @@ interface MockListDetailDataOptions {
 }
 
 function mockListDetailData({ entries = [], history = [] }: MockListDetailDataOptions = {}) {
-  fetchListsMock.mockResolvedValue({
-    lists: [
-      { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List
-    ]
-  });
+  fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List });
   fetchEntriesMock.mockResolvedValue({ entries });
   fetchRecentlyUsedMock.mockResolvedValue({ history });
   fetchListMembersMock.mockResolvedValue({ members: [] });
@@ -211,16 +208,16 @@ describe("ListDetailPage cache-first loading", () => {
 
   function pendingDetail() {
     mockListDetailData();
-    const lists = createDeferred<Awaited<ReturnType<typeof fetchLists>>>();
+    const lists = createDeferred<Awaited<ReturnType<typeof fetchList>>>();
     const entries = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
-    fetchListsMock.mockReturnValue(lists.promise);
+    fetchListMock.mockReturnValue(lists.promise);
     fetchEntriesMock.mockReturnValue(entries.promise);
     return { lists, entries };
   }
 
   async function deliverCache(entries: Entry[] = [{ id: "cached-1", text: "Cached Milk", status: "open" }]) {
     await act(async () => {
-      fetchListsMock.mock.calls[0][1]?.onCachedValue?.({ lists: [{ id: "list-1", name: "Cached pantry", is_owner: true }] });
+      fetchListMock.mock.calls[0][2]?.onCachedValue?.({ list: { id: "list-1", name: "Cached pantry", is_owner: true } });
       fetchEntriesMock.mock.calls[0][2]?.onCachedValue?.({ entries });
     });
   }
@@ -235,14 +232,15 @@ describe("ListDetailPage cache-first loading", () => {
     expect(markListViewedMock).not.toHaveBeenCalled();
     expect(fetchListMembersMock).not.toHaveBeenCalled();
     await act(async () => {
-      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: true }] });
+      network.lists.resolve({ list: { id: "list-1", name: "Fresh pantry", is_owner: true } });
       network.entries.resolve({ entries: [{ id: "fresh-1", text: "Fresh Bread", status: "open" }] });
     });
     expect(screen.getByText("Fresh Bread")).toBeTruthy();
     expect(screen.getByText("Fresh pantry")).toBeTruthy();
     expect(screen.queryByText("Cached Milk")).toBeNull();
     expect(screen.queryByLabelText("Loading")).toBeNull();
-    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMock).toHaveBeenCalledTimes(1);
+    expect(fetchListsMock).not.toHaveBeenCalled();
     expect(fetchEntriesMock).toHaveBeenCalledTimes(1);
     expect(markListViewedMock).toHaveBeenCalledTimes(1);
     expect(fetchListMembersMock).toHaveBeenCalledTimes(1);
@@ -256,7 +254,7 @@ describe("ListDetailPage cache-first loading", () => {
     renderListDetailPage();
     expect(screen.getByLabelText("Loading")).toBeTruthy();
     await act(async () => {
-      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: false }] });
+      network.lists.resolve({ list: { id: "list-1", name: "Fresh pantry", is_owner: false } });
       network.entries.resolve({ entries: [{ id: "fresh-1", text: "Fresh Bread", status: "open" }] });
     });
     expect(screen.getByText("Fresh Bread")).toBeTruthy();
@@ -273,7 +271,7 @@ describe("ListDetailPage cache-first loading", () => {
     await deliverCache([pending]);
     expect(screen.getByText("Queued Bread")).toBeTruthy();
     await act(async () => {
-      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: false }] });
+      network.lists.resolve({ list: { id: "list-1", name: "Fresh pantry", is_owner: false } });
       network.entries.resolve({ entries: [{ id: "fresh-1", text: "Fresh Milk", status: "open" }] });
     });
     expect(within(getOpenItemsSection()).getByText("Queued Bread")).toBeTruthy();
@@ -292,7 +290,7 @@ describe("ListDetailPage cache-first loading", () => {
     await userEvent.click(screen.getByRole("button", { name: "Mark Cached Milk done" }));
     await screen.findByText("Done");
     await act(async () => {
-      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: false }] });
+      network.lists.resolve({ list: { id: "list-1", name: "Fresh pantry", is_owner: false } });
       network.entries.resolve({ entries: [doneEntry] });
     });
     expect(screen.getByText("Done")).toBeTruthy();
@@ -305,7 +303,7 @@ describe("ListDetailPage cache-first loading", () => {
     await deliverCache();
     expect(screen.getByText("Cached Milk")).toBeTruthy();
     await act(async () => {
-      network.lists.resolve({ lists: [] });
+      network.lists.reject(new HttpError("You do not have access to this list.", 403));
       network.entries.resolve({ entries: [] });
     });
     expect(screen.getByText(enTranslations["detail.accessError"])).toBeTruthy();
@@ -325,7 +323,7 @@ describe("ListDetailPage cache-first loading", () => {
     await screen.findByText("Fresh Bread");
     await deliverCache();
     await act(async () => {
-      oldNetwork.lists.resolve({ lists: [{ id: "list-1", name: "Old pantry", is_owner: true }] });
+      oldNetwork.lists.resolve({ list: { id: "list-1", name: "Old pantry", is_owner: true } });
       oldNetwork.entries.resolve({ entries: [{ id: "old-1", text: "Old Bread", status: "open" }] });
     });
     expect(screen.getByText("Fresh Bread")).toBeTruthy();
@@ -342,7 +340,7 @@ describe("ListDetailPage cache-first loading", () => {
     const pending = { id: "temp-entry", text: "First list only", status: "open" as const, is_pending_sync: true };
     await deliverCache([pending]);
     expect(view.result.current.entries).toEqual([pending]);
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-2", name: "Other list", is_owner: false }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-2", name: "Other list", is_owner: false } });
     fetchEntriesMock.mockResolvedValue({ entries: [] });
     view.rerender({ listId: "list-2" });
     await waitFor(() => { expect(view.result.current.list?.id).toBe("list-2"); });
@@ -355,7 +353,7 @@ describe("ListDetailPage initial loading", () => {
   afterEach(cleanup);
 
   function expectOneLoad() {
-    for (const request of [fetchListsMock, fetchEntriesMock, fetchRecentlyUsedMock, fetchListMembersMock, markListViewedMock]) {
+    for (const request of [fetchListMock, fetchEntriesMock, fetchRecentlyUsedMock, fetchListMembersMock, markListViewedMock]) {
       expect(request).toHaveBeenCalledTimes(1);
     }
   }
@@ -366,7 +364,7 @@ describe("ListDetailPage initial loading", () => {
     translations.use({ type: "backend", read: backendRead });
     const initialized = translations.init({ lng: "en", fallbackLng: false, react: { useSuspense: false } });
     mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", is_owner: true } });
     renderListDetailPage(translations);
     await screen.findByText("Milk");
     expect(translations.t("detail.accessError")).toBe("detail.accessError");
@@ -384,7 +382,7 @@ describe("ListDetailPage initial loading", () => {
 
   it("renders entries while members are pending and keeps the sharing spinner until they arrive", async () => {
     mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", is_owner: true } });
     const members = createDeferred<Awaited<ReturnType<typeof fetchListMembers>>>();
     fetchListMembersMock.mockReturnValue(members.promise);
     renderListDetailPage();
@@ -408,14 +406,15 @@ describe("ListDetailPage initial loading", () => {
     const translations = createInstance();
     await translations.init({ lng: "en", resources: { en: { translation: enTranslations }, de: { translation: deTranslations } } });
     mockListDetailData();
-    fetchListsMock.mockResolvedValue({ lists: [] });
+    fetchListMock.mockRejectedValue(new HttpError("You do not have access to this list.", 403));
     renderListDetailPage(translations);
     await screen.findByText(enTranslations["detail.accessError"]);
 
     await act(async () => { await translations.changeLanguage("de"); });
     expect(screen.getByText(deTranslations["detail.accessError"])).toBeTruthy();
     expect(screen.queryByText(enTranslations["detail.accessError"])).toBeNull();
-    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMock).toHaveBeenCalledTimes(1);
+    expect(fetchListsMock).not.toHaveBeenCalled();
     expect(fetchEntriesMock).toHaveBeenCalledTimes(1);
     expect(fetchRecentlyUsedMock).toHaveBeenCalledTimes(1);
     expect(fetchListMembersMock).not.toHaveBeenCalled();
@@ -424,7 +423,7 @@ describe("ListDetailPage initial loading", () => {
 
   it("shows member-load errors without clearing entries or the list", async () => {
     mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", is_owner: true } });
     const members = createDeferred<Awaited<ReturnType<typeof fetchListMembers>>>();
     fetchListMembersMock.mockReturnValue(members.promise);
     renderListDetailPage();
@@ -458,7 +457,7 @@ describe("ListDetailPage resync", () => {
 
   it("refreshes entries, history and members without clearing content or running the full loader", async () => {
     mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", is_owner: true } });
     const view = renderListDetailPage();
     await screen.findByText("Milk");
     expect(fetchEntriesMock).toHaveBeenCalledTimes(1);
@@ -479,7 +478,8 @@ describe("ListDetailPage resync", () => {
     await screen.findByText("Eggs");
     await screen.findByTitle("Jane Doe");
     expect(screen.queryByText("Milk")).toBeNull();
-    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMock).toHaveBeenCalledTimes(1);
+    expect(fetchListsMock).not.toHaveBeenCalled();
     expect(markListViewedMock).toHaveBeenCalledTimes(1);
     expect(fetchEntriesMock).toHaveBeenCalledTimes(2);
     expect(fetchRecentlyUsedMock).toHaveBeenCalledTimes(2);
@@ -619,7 +619,7 @@ describe("ListDetailPage offline reconciliation", () => {
     fetchEntriesMock.mockReturnValueOnce(slow.promise);
     let staleLoad: Promise<unknown> = Promise.resolve();
     act(() => { staleLoad = view.result.current.loadEntries(); });
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-2", name: "Other", is_owner: false }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-2", name: "Other", is_owner: false } });
     fetchEntriesMock.mockResolvedValue({ entries: [{ id: "b1", text: "From list two", status: "open" } as Entry] });
 
     view.rerender({ listId: "list-2" });
@@ -889,10 +889,10 @@ describe("ListDetailPage lifecycle events", () => {
 
   it("keeps the current title when the list:updated refresh fails", async () => {
     mockListDetailData();
-    fetchListMock.mockRejectedValue(new Error("offline"));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     renderListDetailPage();
     await screen.findByText("Weekly groceries");
+    fetchListMock.mockRejectedValue(new Error("offline"));
 
     act(() => { getEventHandler("list:updated")({ listId: "list-1" }); });
 
@@ -980,11 +980,7 @@ describe("ListDetailPage optimistic updates", () => {
   });
 
   it("preserves the Done badge after an SSE-triggered entry reload", async () => {
-    fetchListsMock.mockResolvedValue({
-      lists: [
-        { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List
-      ]
-    });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List });
     fetchEntriesMock
       .mockResolvedValueOnce({
         entries: [
@@ -1319,11 +1315,7 @@ describe("ListDetailPage optimistic updates", () => {
   });
 
   it("re-fetches recently used history when an entry update SSE event arrives", async () => {
-    fetchListsMock.mockResolvedValue({
-      lists: [
-        { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List
-      ]
-    });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List });
     fetchEntriesMock
       .mockResolvedValueOnce({
         entries: [

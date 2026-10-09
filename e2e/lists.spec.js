@@ -71,6 +71,7 @@ test.describe("shopping lists", () => {
         "/api/events/ticket": { ticket: "e2e-ticket" },
         "/api/auth/me": { id: "user-1", display_name: "Cold Load Tester" },
         "/api/lists": { lists: [{ id: "list-1", name: "Cold Pantry", is_owner: true }] },
+        "/api/lists/list-1": { list: { id: "list-1", name: "Cold Pantry", is_owner: true } },
         "/api/lists/list-1/entries": { entries: [{ id: "entry-1", text: "Milk", status: "open" }] },
         "/api/lists/list-1/history": { history: [] },
         "/api/lists/list-1/members": { members: [] }

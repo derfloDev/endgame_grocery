@@ -55,6 +55,8 @@ async function setupResyncPage(page) {
       state.counts.lists += 1;
       data = { lists: state.lists };
     }
+    // The detail page loads only its own list's metadata.
+    if (pathname === "/api/lists/list-1") data = { list: state.lists[0] };
     if (pathname === "/api/lists/list-1/entries") {
       state.counts.entries += 1;
       data = { entries: state.entries };

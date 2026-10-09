@@ -52,4 +52,24 @@ describe("fetchList", () => {
 
     await expect(fetchList("jwt", "list-1")).resolves.toEqual({ ...cached, offline: true });
   });
+  it("falls back to the list from the overview cache when offline and the list itself was never cached", async () => {
+    const overview = { lists: [{ id: "list-0", name: "Other" }, { id: "list-1", name: "From overview" }] };
+    vi.spyOn(offlineStore, "readCachedResource").mockImplementation(async (key) => (key === "lists" ? overview : null));
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    await expect(fetchList("jwt", "list-1")).resolves.toEqual({
+      list: { id: "list-1", name: "From overview" },
+      offline: true
+    });
+  });
+
+  it("does not hide a 403 behind cached data", async () => {
+    vi.spyOn(offlineStore, "readCachedResource").mockResolvedValue({ lists: [{ id: "list-1", name: "Stale" }] });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ error: "You do not have access to this list." }) })
+    );
+
+    await expect(fetchList("jwt", "list-1")).rejects.toMatchObject({ status: 403 });
+  });
 });
