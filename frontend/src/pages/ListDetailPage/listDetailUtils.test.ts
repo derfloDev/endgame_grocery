@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyEntryEvent, sortEntries } from "./listDetailUtils";
+import { applyEntryEvent, mergePendingEntries, reconcileResolvedEntries, sortEntries } from "./listDetailUtils";
 import type { DetailEntry } from "./useListDetailData";
 
 const ME = "user-me";
@@ -208,6 +208,67 @@ describe("applyEntryEvent", () => {
     ] as const)("returns null for %s with %j so the caller refetches", (type, data) => {
       expect(applyEntryEvent([entry({ id: "e1" })], type, data as Record<string, unknown>, options)).toBeNull();
     });
+  });
+});
+
+describe("mergePendingEntries", () => {
+  const pending = (id: string) => entry({ id, is_pending_sync: true });
+
+  it("keeps queued entries the server does not know yet", () => {
+    const merged = mergePendingEntries([entry({ id: "s1" })], [pending("temp-entry-1700000000000-a")]);
+
+    expect(merged.map((candidate) => candidate.id)).toEqual(["s1", "temp-entry-1700000000000-a"]);
+  });
+
+  it("does not duplicate an entry the server already returns", () => {
+    const merged = mergePendingEntries([entry({ id: "s1" })], [pending("s1")]);
+
+    expect(merged.map((candidate) => candidate.id)).toEqual(["s1"]);
+  });
+
+  it("drops queued entries the caller no longer considers pending", () => {
+    const merged = mergePendingEntries(
+      [entry({ id: "s1" })],
+      [pending("temp-entry-1700000000000-gone"), pending("temp-entry-1700000000001-kept")],
+      (candidate) => candidate.id.endsWith("kept")
+    );
+
+    expect(merged.map((candidate) => candidate.id)).toEqual(["s1", "temp-entry-1700000000001-kept"]);
+  });
+});
+
+describe("reconcileResolvedEntries", () => {
+  const temp = (id: string, overrides: Partial<DetailEntry> = {}) => entry({ id, is_pending_sync: true, ...overrides });
+
+  it("turns a resolved temporary entry into the entry with its real id", () => {
+    const result = reconcileResolvedEntries([temp("temp-entry-1", { text: "Bread" })], { "temp-entry-1": "real-1" });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "real-1", text: "Bread", is_pending_sync: false });
+  });
+
+  it("drops the temporary entry when the real one is already present", () => {
+    const current = [temp("temp-entry-1"), entry({ id: "real-1" })];
+
+    const result = reconcileResolvedEntries(current, { "temp-entry-1": "real-1" });
+
+    expect(result.map((candidate) => candidate.id)).toEqual(["real-1"]);
+  });
+
+  it("returns the same array when nothing was resolved for these entries", () => {
+    const current = [temp("temp-entry-2"), entry({ id: "s1" })];
+
+    expect(reconcileResolvedEntries(current, { "temp-entry-1": "real-1" })).toBe(current);
+    expect(reconcileResolvedEntries(current, {})).toBe(current);
+  });
+
+  it("maps several temporary ids independently", () => {
+    const result = reconcileResolvedEntries([temp("temp-entry-1"), temp("temp-entry-10")], {
+      "temp-entry-1": "real-A",
+      "temp-entry-10": "real-B"
+    });
+
+    expect(result.map((candidate) => candidate.id).sort()).toEqual(["real-A", "real-B"]);
   });
 });
 

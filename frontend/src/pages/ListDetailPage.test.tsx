@@ -14,7 +14,7 @@ import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
 import { fetchList, fetchLists, markListViewed } from "../api/lists";
 import { fetchListMembers, leaveList } from "../api/sharing";
-import { writeCachedResource } from "../api/offlineStore";
+import { listOfflineMutations, writeCachedResource } from "../api/offlineStore";
 import { useListEvents } from "../hooks/useListEvents";
 import ListDetailPage from "./ListDetailPage/ListDetailPage";
 import { useListDetailData } from "./ListDetailPage/useListDetailData";
@@ -27,9 +27,9 @@ vi.mock("../workers/iconWorkerClient", () => ({
 }));
 
 const streamState = vi.hoisted(() => ({ resyncVersion: 0 }));
-const queueState = vi.hoisted(() => ({ syncVersion: 0 }));
+const queueState = vi.hoisted(() => ({ syncVersion: 0, resolvedIds: {} as Record<string, string> }));
 vi.mock("../context/EventSourceContext", () => ({ useEventSource: () => streamState }));
-beforeEach(() => { streamState.resyncVersion = 0; queueState.syncVersion = 0; });
+beforeEach(() => { streamState.resyncVersion = 0; queueState.syncVersion = 0; queueState.resolvedIds = {}; });
 
 const cssSource = [
   "./ListDetailPage/ListDetailPage.module.css",
@@ -67,6 +67,7 @@ vi.mock("../api/sharing", () => ({
 }));
 
 vi.mock("../api/offlineStore", () => ({
+  listOfflineMutations: vi.fn(async () => []),
   writeCachedResource: vi.fn()
 }));
 
@@ -104,6 +105,7 @@ const leaveListMock = vi.mocked(leaveList);
 const useListEventsMock = vi.mocked(useListEvents);
 const updateEntryMock = vi.mocked(updateEntry);
 const writeCachedResourceMock = vi.mocked(writeCachedResource);
+const listOfflineMutationsMock = vi.mocked(listOfflineMutations);
 
 /** Stands in for the overview and exposes the notice the detail page hands over via router state. */
 function OverviewLanding() {
@@ -157,7 +159,29 @@ function mockListDetailData({ entries = [], history = [] }: MockListDetailDataOp
   fetchListMembersMock.mockResolvedValue({ members: [] });
   markListViewedMock.mockResolvedValue(undefined);
   writeCachedResourceMock.mockResolvedValue(undefined);
+  listOfflineMutationsMock.mockResolvedValue([]);
   deleteFromHistoryMock.mockResolvedValue(null);
+}
+
+function queuedCreate(tempId: string) {
+  return {
+    id: `queued-${tempId}`,
+    url: "/api/lists/list-1/entries",
+    method: "POST",
+    createdAt: "2026-04-01T10:00:00.000Z",
+    userId: "user-1",
+    queueMeta: { resourceType: "entry", tempId }
+  };
+}
+
+/** Entry creates answer "queued" and show up in the offline queue like the real store would list them. */
+function queueEntryCreates() {
+  const tempIds: string[] = [];
+  createEntryMock.mockImplementation(async (_listId, _token, _payload, options) => {
+    tempIds.push(options?.tempId ?? "");
+    return { queued: true } as Awaited<ReturnType<typeof createEntry>>;
+  });
+  listOfflineMutationsMock.mockImplementation(async () => tempIds.map((tempId) => queuedCreate(tempId)));
 }
 
 function getOpenItemsSection() {
@@ -242,6 +266,8 @@ describe("ListDetailPage cache-first loading", () => {
   it("preserves cached pending entries and filters history when fresh entries replace the cache", async () => {
     const network = pendingDetail();
     fetchRecentlyUsedMock.mockResolvedValue({ history: [{ text: "Queued Bread" }, { text: "Eggs" }] });
+    // The cached entry is still waiting in the offline queue, so it must survive the reload.
+    listOfflineMutationsMock.mockResolvedValue([queuedCreate("temp-entry")]);
     renderListDetailPage();
     const pending = { id: "temp-entry", text: "Queued Bread", status: "open" as const, is_pending_sync: true, details: "Whole wheat" };
     await deliverCache([pending]);
@@ -464,7 +490,7 @@ describe("ListDetailPage resync", () => {
 
   it.each(["resync", "SSE"])("keeps an entry queued during an in-flight %s reload", async (trigger) => {
     mockListDetailData({ history: [{ text: "Bread", icon: "IconBread", details: "Whole wheat" }, { text: "Eggs" }] });
-    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    queueEntryCreates();
     const view = renderListDetailPage();
     await screen.findByRole("button", { name: "Bread" });
     const request = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
@@ -487,6 +513,141 @@ describe("ListDetailPage resync", () => {
     expect(within(getOpenItemsSection()).getByText("Queued")).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Recently Used" })).getByText("Eggs")).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Recently Used" })).queryByText("Bread")).toBeNull();
+  });
+});
+
+describe("ListDetailPage offline reconciliation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  type HookProps = { listId: string; resolvedIds?: Record<string, string> };
+
+  function renderData(initialProps: HookProps = { listId: "list-1" }) {
+    return renderHook(
+      ({ listId, resolvedIds }: HookProps) => useListDetailData({ listId, resolvedIds, token: "test-token", syncVersion: 0 }),
+      { initialProps }
+    );
+  }
+
+  async function loadedHook(initial?: HookProps) {
+    mockListDetailData();
+    const view = renderData(initial);
+    await waitFor(() => { expect(view.result.current.isLoading).toBe(false); });
+    return view;
+  }
+
+  it("shows an offline-added entry once after the queue synced it", async () => {
+    const view = await loadedHook();
+    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    await act(async () => { await view.result.current.addEntryByText("Bread", null); });
+    const [pending] = view.result.current.entries;
+    expect(pending).toMatchObject({ text: "Bread", is_pending_sync: true });
+    const tempId = pending.id;
+
+    // The drain accepted the create: the queue is empty, the id is resolved and the server has the entry.
+    listOfflineMutationsMock.mockResolvedValue([]);
+    fetchEntriesMock.mockResolvedValue({ entries: [{ id: "real-1", text: "Bread", status: "open" } as Entry] });
+    view.rerender({ listId: "list-1", resolvedIds: { [tempId]: "real-1" } });
+    await act(async () => { await view.result.current.loadEntries(); });
+
+    expect(view.result.current.entries.map((entry) => [entry.id, entry.text])).toEqual([["real-1", "Bread"]]);
+  });
+
+  it("swaps the temporary id for the real one as soon as the queue reports it, before any reload", async () => {
+    const view = await loadedHook();
+    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    await act(async () => { await view.result.current.addEntryByText("Bread", null); });
+    const tempId = view.result.current.entries[0].id;
+
+    view.rerender({ listId: "list-1", resolvedIds: { [tempId]: "real-1" } });
+
+    await waitFor(() => { expect(view.result.current.entries.map((entry) => entry.id)).toEqual(["real-1"]); });
+    expect(view.result.current.entries[0].is_pending_sync).toBe(false);
+  });
+
+  it("keeps a queued entry across a reload while its change is still in the queue", async () => {
+    const view = await loadedHook();
+    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    await act(async () => { await view.result.current.addEntryByText("Bread", null); });
+    const tempId = view.result.current.entries[0].id;
+    listOfflineMutationsMock.mockResolvedValue([
+      { id: "m1", url: "/api/lists/list-1/entries", method: "POST", createdAt: "now", userId: "user-1", queueMeta: { resourceType: "entry", tempId } }
+    ]);
+
+    await act(async () => { await view.result.current.loadEntries(); });
+
+    expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["Bread"]);
+  });
+
+  it("drops a queued entry on reload once its change was discarded from the queue", async () => {
+    const view = await loadedHook();
+    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    await act(async () => { await view.result.current.addEntryByText("Bread", null); });
+    listOfflineMutationsMock.mockResolvedValue([]);
+
+    await act(async () => { await view.result.current.loadEntries(); });
+
+    expect(view.result.current.entries).toEqual([]);
+  });
+
+  it("keeps an entry whose create request is still in flight across a reload", async () => {
+    const view = await loadedHook();
+    const request = createDeferred<Awaited<ReturnType<typeof createEntry>>>();
+    createEntryMock.mockReturnValue(request.promise);
+    let adding: Promise<boolean> = Promise.resolve(false);
+    act(() => { adding = view.result.current.addEntryByText("Bread", null); });
+    await waitFor(() => { expect(view.result.current.entries).toHaveLength(1); });
+
+    await act(async () => { await view.result.current.loadEntries(); });
+    expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["Bread"]);
+
+    await act(async () => {
+      request.resolve({ entry: { id: "real-1", text: "Bread", status: "open" } } as Awaited<ReturnType<typeof createEntry>>);
+      await adding;
+    });
+    expect(view.result.current.entries.map((entry) => entry.id)).toEqual(["real-1"]);
+  });
+
+  it("ignores the result of a load that finishes after the user moved to another list", async () => {
+    const view = await loadedHook({ listId: "list-1" });
+    const slow = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
+    fetchEntriesMock.mockReturnValueOnce(slow.promise);
+    let staleLoad: Promise<unknown> = Promise.resolve();
+    act(() => { staleLoad = view.result.current.loadEntries(); });
+    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-2", name: "Other", is_owner: false }] });
+    fetchEntriesMock.mockResolvedValue({ entries: [{ id: "b1", text: "From list two", status: "open" } as Entry] });
+
+    view.rerender({ listId: "list-2" });
+    await waitFor(() => { expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["From list two"]); });
+    await act(async () => {
+      slow.resolve({ entries: [{ id: "a1", text: "From list one", status: "open" } as Entry] });
+      await staleLoad;
+    });
+
+    expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["From list two"]);
+  });
+
+  it("does not reload everything when the stream counter resets after a token change", async () => {
+    mockListDetailData({ entries: [{ id: "e1", text: "Milk", status: "open" } as Entry] });
+    const view = renderListDetailPage();
+    await screen.findByText("Milk");
+    streamState.resyncVersion = 2;
+    view.rerenderPage();
+    await waitFor(() => { expect(fetchEntriesMock).toHaveBeenCalledTimes(2); });
+
+    streamState.resyncVersion = 0;
+    view.rerenderPage();
+    await act(async () => { await Promise.resolve(); });
+    expect(fetchEntriesMock).toHaveBeenCalledTimes(2);
+
+    streamState.resyncVersion = 1;
+    view.rerenderPage();
+    await waitFor(() => { expect(fetchEntriesMock).toHaveBeenCalledTimes(3); });
   });
 });
 

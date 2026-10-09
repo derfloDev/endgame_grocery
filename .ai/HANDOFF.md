@@ -881,3 +881,49 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-014 — implement — 2026-10-09T15:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | The offline queue now sends the current token, pauses on 401 without discarding, is scoped per user (cache and queue), refuses changes that depend on a discarded temporary id, replaces ids exactly, and the detail page reconciles resolved entries and ignores stale loads. |
+| Files Changed | frontend/src/api/authSession.ts, frontend/src/api/authSession.test.ts, frontend/src/api/offlineQueueDrain.ts, frontend/src/api/offlineQueueDrain.test.ts, frontend/src/api/offlineStore.ts, frontend/src/api/offlineStore.test.ts, frontend/src/api/client.ts, frontend/src/api/client.test.ts, frontend/src/context/AuthContext.tsx, frontend/src/context/AuthContext.test.tsx, frontend/src/context/OfflineQueueContext.tsx, frontend/src/context/OfflineQueueContext.test.tsx, frontend/src/components/OfflineBanner/OfflineBanner.tsx, frontend/src/components/OfflineBanner/OfflineBanner.test.tsx, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage/useListDetailData.ts, frontend/src/pages/ListDetailPage/listDetailUtils.ts, frontend/src/pages/ListDetailPage/listDetailUtils.test.ts, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/types.ts, frontend/src/locales/en/translation.json, frontend/src/locales/de/translation.json, e2e/queue-retry.spec.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ok; `npm test` frontend 774/774 (backend untouched). Playwright specs not run locally. `tsc --noEmit` still reports the two pre-existing errors (`ListDetailPage.tsx` details type, `iconWorker.ts`), which T-021 owns. |
+| Commit | `fix(offline): keep queued changes per user, survive session expiry and never double-add or resend dead changes` |
+| Next Role | review |
+
+Notes for review:
+1. **Session module:** `api/authSession.ts` holds token and user id as plain module state; `AuthProvider` publishes it during render (silent, so children's first effects see the right user) and notifies subscribers from an effect. The drain and the store read it; `OfflineQueueContext` subscribes to end an auth pause.
+2. **Drain:** reads `getAuthToken()` at send time (no token stored on new mutations; `OfflineMutation.token` is kept optional/deprecated for rows queued by older versions and never used). No token or a 401 → `authExpired`: nothing discarded, queue paused, `auth:expired` dispatched once; the next session notification resumes. Unresolved `temp-<resource>-<ts>-<rand>` ids in URL or payload → `failed` with `code: "dependency"`; the banner shows `offline.dependencyDiscarded` (DE/EN) and the discard action. `replaceTemporaryIds` matches whole path segments/whole string values.
+3. **Per-user scope:** cache keys are prefixed with the user id; `enqueueOfflineMutation` stamps `userId`; `listOfflineMutations` / `completeOfflineMutation` only touch the signed-in user's rows. Legacy rows without `userId` are never replayed. Explicit logout calls `clearCachedResources()`; an `auth:expired` end of session keeps the cache (planner decision allowed either; this keeps a re-login seamless).
+4. **Detail page:** `OfflineQueueContext` exposes `resolvedIds` (temp → real) next to `syncVersion`; `reconcileResolvedEntries` swaps or drops temporary entries; full reloads drop temporary entries that are neither queued nor in flight (`createPendingFilter`); `currentListIdRef` discards late results for another list; a decreasing `resyncVersion` (token change) no longer triggers a reload.
+5. **E2E seed:** `queue-retry.spec.js` no longer stores a `token` on seeded mutations; the store stamps the user from the JWT subject (`user-1`). Not executed here.
+6. Not covered by tests: an expired session with the *browser closed* followed by another user signing in (covered only through the unit-level scope tests).
+
+---
+
+### T-014 — review — 2026-10-09T16:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the offline queue rework (current token, 401 pause, per-user cache and queue, dependency failure, exact id replacement, stale-load guards); verified in a real browser against the real backend, and found that the committed T-011 migration fails on PostgreSQL (needs a T-011 rework). |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none for T-014; T-011 migration defect (REVIEW.md T-014 finding 1) needs `rework_task`/replanning |
+| Next Role | implement |
+
+### T-014 — implement — 2026-10-09T16:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-014 after review PASS_WITH_NOTES: per-user offline cache and queue, 401 pause, exact temp-id replacement, dependency-discard handling and detail-page reconciliation. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-014 implementation files |
+| Commit | `fix(offline): keep queued changes per user, survive session expiry and never double-add or resend dead changes` |
+| Next Role | none |
+
+Open item (not part of this commit): REVIEW.md T-014 finding 1 reports that the committed T-011 migration `1779979000004_add_query_indexes.cjs` generates invalid SQL for the GIN index and fails on a fresh database; it needs a separate fix before CI integration jobs or deploys can pass.
+
+---

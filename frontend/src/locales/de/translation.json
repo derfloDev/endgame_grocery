@@ -40,6 +40,7 @@
   "offline.syncing": "{count, plural, one {# ausstehende Änderung} other {# ausstehende Änderungen}} werden synchronisiert...",
   "offline.waiting": "{count, plural, one {# ausstehende Änderung} other {# ausstehende Änderungen}} warten weiter auf Synchronisierung.",
   "offline.discard": "Ausstehende Änderung verwerfen",
+  "offline.dependencyDiscarded": "Diese Änderung hängt von einer anderen Änderung ab, die verworfen wurde, und kann deshalb nicht synchronisiert werden. Verwirf sie ebenfalls.",
   "update.bannerText": "Neue Version verfügbar.",
   "update.bannerAction": "Neu laden",
   "overview.sortLabel": "Listen sortieren",

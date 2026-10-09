@@ -1,4 +1,5 @@
 import type { OfflineMutation } from "../types";
+import { getCurrentUserId } from "./authSession";
 
 const DATABASE_NAME = "endgame-grocery-offline";
 const DATABASE_VERSION = 1;
@@ -13,6 +14,25 @@ const memoryQueue = new Map<string, OfflineMutation>();
 interface CachedResourceEntry {
   key: string;
   value: unknown;
+}
+
+/**
+ * Cached resources are stored per user: another account on the same device must never read the
+ * lists of the previous one. A signed-out visitor gets a scope of its own that holds nothing.
+ */
+function scopedKey(key: string): string {
+  return `${getCurrentUserId()}\u0000${key}`;
+}
+
+/** The queue is shared storage; each user only ever sees and replays their own mutations. */
+function belongsToCurrentUser(mutation: OfflineMutation): boolean {
+  const userId = getCurrentUserId();
+
+  return Boolean(userId) && mutation.userId === userId;
+}
+
+function withOwner(mutation: OfflineMutation): OfflineMutation {
+  return mutation.userId ? mutation : { ...mutation, userId: getCurrentUserId() };
 }
 
 function supportsIndexedDb(): boolean {
@@ -85,8 +105,10 @@ function dispatchQueueChanged(): void {
 }
 
 export async function readCachedResource(key: string): Promise<unknown> {
+  const storageKey = scopedKey(key);
+
   if (!supportsIndexedDb()) {
-    return memoryCache.get(key) ?? null;
+    return memoryCache.get(storageKey) ?? null;
   }
 
   const database = await openDatabase();
@@ -97,33 +119,52 @@ export async function readCachedResource(key: string): Promise<unknown> {
 
   const transaction = database.transaction(CACHE_STORE, "readonly");
   const store = transaction.objectStore(CACHE_STORE);
-  const entry = await requestToPromise<CachedResourceEntry | undefined>(store.get(key));
+  const entry = await requestToPromise<CachedResourceEntry | undefined>(store.get(storageKey));
 
   return entry?.value ?? null;
 }
 
 export async function writeCachedResource(key: string, value: unknown): Promise<void> {
+  const storageKey = scopedKey(key);
+
   if (!supportsIndexedDb()) {
-    memoryCache.set(key, value);
+    memoryCache.set(storageKey, value);
     return;
   }
 
   await createTransactionPromise(CACHE_STORE, "readwrite", (store, resolve, reject) => {
-    requestToPromise(store.put({ key, value }))
+    requestToPromise(store.put({ key: storageKey, value }))
+      .then(() => resolve())
+      .catch(reject);
+  });
+}
+
+/** Removes every cached resource of every user. Queued mutations are kept. */
+export async function clearCachedResources(): Promise<void> {
+  memoryCache.clear();
+
+  if (!supportsIndexedDb()) {
+    return;
+  }
+
+  await createTransactionPromise(CACHE_STORE, "readwrite", (store, resolve, reject) => {
+    requestToPromise(store.clear())
       .then(() => resolve())
       .catch(reject);
   });
 }
 
 export async function enqueueOfflineMutation(mutation: OfflineMutation): Promise<void> {
+  const owned = withOwner(mutation);
+
   if (!supportsIndexedDb()) {
-    memoryQueue.set(mutation.id, mutation);
+    memoryQueue.set(owned.id, owned);
     dispatchQueueChanged();
     return;
   }
 
   await createTransactionPromise(QUEUE_STORE, "readwrite", (store, resolve, reject) => {
-    requestToPromise(store.put(mutation))
+    requestToPromise(store.put(owned))
       .then(() => {
         dispatchQueueChanged();
         resolve();
@@ -132,9 +173,12 @@ export async function enqueueOfflineMutation(mutation: OfflineMutation): Promise
   });
 }
 
+/** Lists the queued mutations of the signed-in user, oldest first. */
 export async function listOfflineMutations(): Promise<OfflineMutation[]> {
   if (!supportsIndexedDb()) {
-    return [...memoryQueue.values()].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    return [...memoryQueue.values()]
+      .filter(belongsToCurrentUser)
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
   }
 
   const database = await openDatabase();
@@ -147,7 +191,7 @@ export async function listOfflineMutations(): Promise<OfflineMutation[]> {
   const store = transaction.objectStore(QUEUE_STORE);
   const entries = await requestToPromise<OfflineMutation[]>(store.getAll());
 
-  return entries.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  return entries.filter(belongsToCurrentUser).sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 
 export async function removeOfflineMutation(id: string): Promise<void> {
@@ -167,12 +211,17 @@ export async function removeOfflineMutation(id: string): Promise<void> {
   });
 }
 
-/** Commit acceptance and carry temporary IDs forward atomically before another drain can read them. */
+/**
+ * Commit acceptance and carry temporary IDs forward atomically before another drain can read them.
+ * Only the signed-in user's remaining mutations receive the mappings.
+ */
 export async function completeOfflineMutation(id: string, resolvedIds: Record<string, string>): Promise<void> {
   if (!supportsIndexedDb()) {
     memoryQueue.delete(id);
     for (const [key, mutation] of memoryQueue) {
-      memoryQueue.set(key, { ...mutation, resolvedIds: { ...mutation.resolvedIds, ...resolvedIds } });
+      if (belongsToCurrentUser(mutation)) {
+        memoryQueue.set(key, { ...mutation, resolvedIds: { ...mutation.resolvedIds, ...resolvedIds } });
+      }
     }
   } else {
     const database = await openDatabase();
@@ -189,7 +238,9 @@ export async function completeOfflineMutation(id: string, resolvedIds: Record<st
         const cursor = request.result;
         if (!cursor) return;
         const mutation = cursor.value as OfflineMutation;
-        cursor.update({ ...mutation, resolvedIds: { ...mutation.resolvedIds, ...resolvedIds } });
+        if (belongsToCurrentUser(mutation)) {
+          cursor.update({ ...mutation, resolvedIds: { ...mutation.resolvedIds, ...resolvedIds } });
+        }
         cursor.continue();
       };
     });

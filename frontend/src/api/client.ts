@@ -128,7 +128,8 @@ export async function sendJsonRequest<T = unknown>(
         url,
         method,
         payload: payload ?? null,
-        token,
+        // The owner is stamped by the store; the token is deliberately not stored (the drain
+        // sends whatever token is valid when it runs).
         createdAt: new Date().toISOString(),
         queueMeta
       });

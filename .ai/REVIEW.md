@@ -1772,3 +1772,42 @@ No blocker or major findings; no required fixes.
 ##### Risks
 - Not run: Playwright specs and the PostgreSQL integration suite (no SQL structure changed besides `RETURNING status`). Two-client behaviour is covered by unit/component tests only until T-023 adds a two-user E2E.
 - Clients and server are deployed together in one image, so the mixed-version fallback matters mainly for cached service-worker pages; it is covered.
+
+## Task: T-014 (hardening cycle 2026-10-08 — offline queue correctness and per-user scoping)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+T-014 itself has no blocker or major findings. Finding 1 is a defect in the already committed **T-011** that I found while verifying against a real database; it is outside T-014's scope but needs action before the next push to CI.
+
+#### Findings
+
+1. **major (out of scope — T-011, committed in `6c9a949`)** — `backend/src/db/migrations/1779979000004_add_query_indexes.cjs:28-32`: `pgm.createIndex("entries", "text", { method: "gin", opclass: "gin_trgm_ops" })` generates `CREATE INDEX "entries_text_trgm_idx" ON "entries" USING gin ("text");` — node-pg-migrate 8.0.4 ignores an index-level `opclass` (it is only honoured per column, as `{ name: "text", opclass: ... }`). PostgreSQL rejects it: `data type text has no default operator class for access method "gin"`. Result: `node-pg-migrate up` fails on a fresh database at the last migration, and every integration test file fails in `createTestDatabase()`. Confirmed on PostgreSQL 18; the same statement with `gin (text gin_trgm_ops)` succeeds. The unit test in `migrations.test.js:796` pins the options object passed to `createIndex`, not the generated SQL, so it cannot see this. The T-011 review recorded that no one had run the database part. Needs a `rework_task` for T-011 (per-column opclass, plus a check that the migration really runs). Until then deploys and CI integration jobs fail.
+2. **minor** — `frontend/src/api/offlineStore.ts` (`belongsToCurrentUser`): mutations queued by the previous app version carry no `userId` and are silently never replayed, shown or removed. A user who updates the PWA while changes are still queued loses them without notice. They do carry the old JWT in `token`, whose `sub` (`getTokenSubject` already exists in `authSession.ts`) identifies the owner, so adopting that owner would keep them. The handoff discloses this; the plan did not ask for a migration, so it is not a required fix.
+3. **minor** — `AuthProvider` calls `publishAuthSession(...)` during render. It is idempotent and documented, but it is a side effect in render; if React ever renders with a token that is not committed, the module state could briefly disagree with the committed state. Low risk in this app.
+4. **nit** — `TEMPORARY_ID_PATTERN` requires 1+ random characters, but `createTemporaryId` uses `Math.random().toString(36).slice(2, 8)`, which is empty for a result of exactly `0`. The odds are negligible, and such an id would simply be sent as before.
+5. **nit** — the dependency message exists twice (`DEPENDENCY_DISCARDED_MESSAGE` and `offline.dependencyDiscarded`); only the translated one is shown. Fine.
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the diff: new `api/authSession.ts`, `offlineQueueDrain.ts`, `offlineStore.ts`, `client.ts`, `AuthContext.tsx`, `OfflineQueueContext.tsx`, `OfflineBanner.tsx`, `ListDetailPage.tsx`, `useListDetailData.ts`, `listDetailUtils.ts`, `types.ts`, locales, README and the new/changed tests and `e2e/queue-retry.spec.js`.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok. `npm test`: backend 365/365, frontend 774/774.
+- Playwright against the real stack (dev backend with `ENABLE_TEST_ROUTES`, Vite, an embedded PostgreSQL 18 migrated to the migration before the broken one): `queue-retry.spec.js` and `resync.spec.js` 4/4 pass when run with one worker. A first parallel run had two cold-start timeouts in `page.goto` while Vite compiled; they did not repeat.
+- Manual browser checks against the real backend (scripts in the scratchpad, repository untouched):
+  - signed in as A, API blocked, "Milk" added → shown once with the pending state; API restored → server has exactly one "Milk" and the page shows one;
+  - A queues "Eggs" offline; the stored mutation has `userId` and no `token`; B signs in on the same browser, sees an empty queue and no banner, and the server never receives "Eggs"; A signs in again → "Eggs" syncs;
+  - A queues "Bread", then the server bumps A's `token_version`; the replay gets 401 → the app goes to `/login` with nothing sent; after A logs in again, "Bread" syncs.
+- Read the unit tests for the remaining criteria (unresolved temporary id → `dependency` failure with the discard action; `temp-1` and `temp-10` resolve independently; stale list loads ignored; resync counter reset no longer reloads).
+
+##### Findings
+- Every acceptance criterion is met: offline add + sync leaves exactly one entry; a mutation with an unresolved temporary id shows discard instead of retrying; the drain uses the current token and a 401 pauses without discarding; `temp-1`/`temp-10` resolve independently; another user never sees or replays a previous user's cache or queue; stale list loads are ignored.
+- Existing tests were adapted (no stored token, user stamping) and extended; nothing was weakened.
+
+##### Risks
+- Mutations queued before the update are stranded (finding 2).
+- Explicit logout wipes the whole read cache for all users, so an offline relaunch after logout shows no cached lists. Intended by the plan.
+- Not executed: the remaining Playwright specs (`auth`, `lists`), and the integration suite, which cannot start because of finding 1.

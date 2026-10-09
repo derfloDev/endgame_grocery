@@ -36,7 +36,7 @@ export default function ListDetailPage(): ReactElement {
   const { id } = useParams<{ id: string }>();
   const listId = id ?? "";
   const { token, user } = useAuth();
-  const { syncVersion } = useOfflineQueue();
+  const { resolvedIds, syncVersion } = useOfflineQueue();
   const { resyncVersion } = useEventSource();
   const lastResyncRef = useRef(resyncVersion);
   const [shareEmail, setShareEmail] = useState<string>("");
@@ -85,6 +85,7 @@ export default function ListDetailPage(): ReactElement {
     listId,
     onLoadStart: resetShareFeedback,
     onNonOwnerList: closeOwnerOnlySheets,
+    resolvedIds,
     syncVersion,
     token
   });
@@ -106,6 +107,7 @@ export default function ListDetailPage(): ReactElement {
 
   useEffect(() => {
     // Mount already loads the page. Later versions refresh in place without clearing it.
+    if (resyncVersion < lastResyncRef.current) lastResyncRef.current = resyncVersion; // token change reset the counter
     if (lastResyncRef.current === resyncVersion || isLoading) return;
     lastResyncRef.current = resyncVersion;
     void loadEntries().then((nextEntries) => Promise.all([

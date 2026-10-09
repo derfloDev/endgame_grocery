@@ -3,11 +3,11 @@ import { createTemporaryId } from "../../api/client";
 import { createEntry, fetchEntries, updateEntry } from "../../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../../api/history";
 import { fetchLists, markListViewed } from "../../api/lists";
-import { writeCachedResource } from "../../api/offlineStore";
+import { listOfflineMutations, writeCachedResource } from "../../api/offlineStore";
 import { fetchListMembers } from "../../api/sharing";
 import type { Entry, List, Member, Suggestion } from "../../types";
 import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "../recentlyUsedState";
-import { ListAccessError, applyEntryEvent, mergePendingEntries, sortEntries } from "./listDetailUtils";
+import { ListAccessError, applyEntryEvent, mergePendingEntries, reconcileResolvedEntries, sortEntries } from "./listDetailUtils";
 import type { EntryEventType } from "./listDetailUtils";
 
 // Several entries are often completed within a moment (shopping); one history reload covers them.
@@ -49,6 +49,8 @@ interface UseListDetailDataOptions {
   listId: string;
   onLoadStart?: () => void;
   onNonOwnerList?: () => void;
+  /** Temporary ids the offline queue resolved (temp id -> real id); matching entries are swapped. */
+  resolvedIds?: Record<string, string>;
   syncVersion: number;
   token: string;
 }
@@ -58,6 +60,7 @@ export function useListDetailData({
   listId,
   onLoadStart,
   onNonOwnerList,
+  resolvedIds,
   syncVersion,
   token
 }: UseListDetailDataOptions) {
@@ -72,6 +75,11 @@ export function useListDetailData({
   const [isSharingLoading, setIsSharingLoading] = useState<boolean>(false);
   const isMountedRef = useRef<boolean>(false);
   const locallyDoneIdsRef = useRef<Set<string>>(new Set());
+  // Temporary entries whose create request is running right now (not queued, not answered yet).
+  const inFlightTempIdsRef = useRef<Set<string>>(new Set());
+  // A response that arrives after the user opened another list must not touch the new list's state.
+  const currentListIdRef = useRef(listId);
+  currentListIdRef.current = listId;
 
   // Keep an immediate snapshot for async reloads: React may defer state updaters, but
   // both the merge and the following history refresh must see entries queued meanwhile.
@@ -97,10 +105,36 @@ export function useListDetailData({
     };
   }, []);
 
+  /**
+   * Decides which queued local entries survive a full reload. A temporary entry stays only while
+   * its create is still queued or running; once the change was synced (the server returns the real
+   * entry) or discarded from the queue, keeping it would show a duplicate or a phantom entry.
+   */
+  const createPendingFilter = useCallback(async (): Promise<(entry: DetailEntry) => boolean> => {
+    let queuedTempIds: Set<string>;
+
+    try {
+      const queued = await listOfflineMutations();
+      queuedTempIds = new Set(queued.flatMap((mutation) => (mutation.queueMeta?.tempId ? [mutation.queueMeta.tempId] : [])));
+    } catch {
+      // Without the queue we cannot tell; keep everything rather than lose queued work from view.
+      return () => true;
+    }
+
+    return (entry) =>
+      !entry.id.startsWith("temp-") || queuedTempIds.has(entry.id) || inFlightTempIdsRef.current.has(entry.id);
+  }, []);
+
   const loadEntries = useCallback(
     async ({ historyItems = null, throwOnError = false }: LoadEntriesOptions = {}): Promise<DetailEntry[]> => {
       try {
         const entriesResult = await fetchEntries(listId, token);
+        const isStillPending = await createPendingFilter();
+
+        if (currentListIdRef.current !== listId) {
+          return entriesRef.current;
+        }
+
         const serverEntries = (entriesResult.entries ?? []).map((entry) => {
           const detailEntry = entry as DetailEntry;
 
@@ -108,7 +142,7 @@ export function useListDetailData({
             ? { ...detailEntry, is_changed: true }
             : detailEntry;
         });
-        const nextEntries = mergePendingEntries(serverEntries, entriesRef.current);
+        const nextEntries = mergePendingEntries(serverEntries, entriesRef.current, isStillPending);
 
         if (isMountedRef.current) {
           setEntries(nextEntries);
@@ -128,7 +162,7 @@ export function useListDetailData({
         return [];
       }
     },
-    [listId, token, setEntries]
+    [createPendingFilter, listId, token, setEntries]
   );
 
   const reloadHistory = useCallback(
@@ -136,7 +170,7 @@ export function useListDetailData({
       try {
         const historyResult = await fetchRecentlyUsed(listId, token);
 
-        if (isMountedRef.current) {
+        if (isMountedRef.current && currentListIdRef.current === listId) {
           setRecentlyUsed((currentItems) =>
             filterRecentlyUsedItems(historyResult?.history ?? currentItems, entriesOverride ?? entries)
           );
@@ -214,7 +248,7 @@ export function useListDetailData({
         const membersResult = await fetchListMembers(listId, token);
         const nextMembers = (membersResult.members ?? []) as DetailMember[];
 
-        if (isMountedRef.current) {
+        if (isMountedRef.current && currentListIdRef.current === listId) {
           setMembers(nextMembers);
         }
 
@@ -266,6 +300,7 @@ export function useListDetailData({
         is_pending_sync: true
       };
 
+      inFlightTempIdsRef.current.add(temporaryEntry.id);
       await updateEntries((currentEntries) => sortEntries([...currentEntries, temporaryEntry]));
 
       try {
@@ -295,6 +330,8 @@ export function useListDetailData({
         );
         setEntryError(getErrorMessage(submitError));
         return false;
+      } finally {
+        inFlightTempIdsRef.current.delete(temporaryEntry.id);
       }
     },
     [listId, token, updateEntries]
@@ -482,6 +519,7 @@ export function useListDetailData({
         ]);
         networkFinished = true;
         const activeList = ((listsResult.lists ?? []) as DetailList[]).find((candidate) => candidate.id === listId);
+        const isStillPending = await createPendingFilter();
 
         if (!active) {
           return;
@@ -505,7 +543,7 @@ export function useListDetailData({
             ? { ...entry, is_changed: true }
             : entry
         );
-        const nextEntries = mergePendingEntries(serverEntries, entriesRef.current);
+        const nextEntries = mergePendingEntries(serverEntries, entriesRef.current, isStillPending);
         setEntries(nextEntries);
         setRecentlyUsed(filterRecentlyUsedItems(historyResult?.history ?? [], nextEntries));
 
@@ -538,7 +576,25 @@ export function useListDetailData({
 
     void loadListDetail();
     return () => { active = false; };
-  }, [listId, loadMembers, onLoadStart, onNonOwnerList, syncVersion, token, setEntries]);
+  }, [createPendingFilter, listId, loadMembers, onLoadStart, onNonOwnerList, syncVersion, token, setEntries]);
+
+  // The offline queue resolved temporary ids: show the real entry instead of the queued one without
+  // waiting for the next reload (and never both).
+  useEffect(() => {
+    if (!resolvedIds || Object.keys(resolvedIds).length === 0) {
+      return;
+    }
+
+    const reconciled = reconcileResolvedEntries(entriesRef.current, resolvedIds);
+
+    if (reconciled !== entriesRef.current) {
+      const nextEntries = setEntries(reconciled);
+
+      Promise.resolve(writeCachedResource(`entries:${listId}`, { entries: nextEntries })).catch((error: unknown) => {
+        console.error("Failed to cache entries.", error);
+      });
+    }
+  }, [listId, resolvedIds, setEntries]);
 
   return {
     addEntryByText,

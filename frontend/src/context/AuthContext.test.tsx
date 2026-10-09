@@ -2,6 +2,8 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { fetchCurrentUser, loginUser, registerUser } from "../api/auth";
+import { getAuthToken, getCurrentUserId, resetAuthSessionForTests } from "../api/authSession";
+import { clearCachedResources } from "../api/offlineStore";
 import { AuthProvider, useAuth } from "./AuthContext";
 
 vi.mock("../api/auth", () => ({
@@ -10,6 +12,11 @@ vi.mock("../api/auth", () => ({
   registerUser: vi.fn()
 }));
 
+vi.mock("../api/offlineStore", () => ({
+  clearCachedResources: vi.fn(async () => undefined)
+}));
+
+const clearCachedResourcesMock = vi.mocked(clearCachedResources);
 const fetchCurrentUserMock = vi.mocked(fetchCurrentUser);
 const loginUserMock = vi.mocked(loginUser);
 const registerUserMock = vi.mocked(registerUser);
@@ -153,6 +160,75 @@ describe("AuthProvider", () => {
     expect(screen.getByTestId("token").textContent).toBe("");
     expect(window.localStorage.getItem("endgame_grocery.auth_token")).toBeNull();
     expect(window.localStorage.getItem("endgame_grocery.auth_user")).toBeNull();
+  });
+
+  describe("offline scope", () => {
+    function LogoutButton() {
+      const { logout, login } = useAuth();
+      return (
+        <>
+          <button onClick={logout} type="button">logout</button>
+          <button onClick={() => void login({ email: "b@example.com", password: "password123" })} type="button">login-b</button>
+        </>
+      );
+    }
+
+    function renderWithButtons() {
+      return render(
+        <MemoryRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }} initialEntries={["/"]}>
+          <AuthProvider>
+            <AuthState />
+            <LogoutButton />
+          </AuthProvider>
+        </MemoryRouter>
+      );
+    }
+
+    afterEach(() => resetAuthSessionForTests());
+
+    it("publishes the stored session to the offline cache and queue from the first render", () => {
+      const token = createFakeJwt("user-1");
+      window.localStorage.setItem("endgame_grocery.auth_token", token);
+      window.localStorage.setItem("endgame_grocery.auth_user", JSON.stringify({ id: "user-1", display_name: "Demo User" }));
+
+      renderAuthProvider();
+
+      expect(getAuthToken()).toBe(token);
+      expect(getCurrentUserId()).toBe("user-1");
+    });
+
+    it("switches the offline scope to the account that signs in", async () => {
+      loginUserMock.mockResolvedValue({ token: createFakeJwt("user-b"), user: { id: "user-b" } });
+      renderWithButtons();
+      expect(getCurrentUserId()).toBe("");
+
+      await act(async () => { screen.getByRole("button", { name: "login-b" }).click(); });
+
+      await waitFor(() => expect(getCurrentUserId()).toBe("user-b"));
+    });
+
+    it("clears the offline read cache and the session on an explicit logout", async () => {
+      window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+      window.localStorage.setItem("endgame_grocery.auth_user", JSON.stringify({ id: "user-1", display_name: "Demo User" }));
+      renderWithButtons();
+
+      await act(async () => { screen.getByRole("button", { name: "logout" }).click(); });
+
+      await waitFor(() => expect(getCurrentUserId()).toBe(""));
+      expect(getAuthToken()).toBe("");
+      expect(clearCachedResourcesMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the offline cache when the session merely expires", async () => {
+      window.localStorage.setItem("endgame_grocery.auth_token", createFakeJwt("user-1"));
+      window.localStorage.setItem("endgame_grocery.auth_user", JSON.stringify({ id: "user-1", display_name: "Demo User" }));
+      renderWithButtons();
+
+      act(() => { window.dispatchEvent(new Event("auth:expired")); });
+
+      await waitFor(() => expect(getCurrentUserId()).toBe(""));
+      expect(clearCachedResourcesMock).not.toHaveBeenCalled();
+    });
   });
 });
 

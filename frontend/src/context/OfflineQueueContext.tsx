@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { OFFLINE_SYNC_COMPLETE_EVENT } from "../api/client";
+import { getCurrentUserId, subscribeAuthSession } from "../api/authSession";
 import { listOfflineMutations, OFFLINE_QUEUE_CHANGED_EVENT, removeOfflineMutation } from "../api/offlineStore";
 import { drainOfflineQueue } from "../api/offlineQueueDrain";
 import type { AcceptedMutations } from "../api/offlineQueueDrain";
@@ -26,9 +27,13 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
   const [queuedCount, setQueuedCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState("");
+  const [syncErrorKey, setSyncErrorKey] = useState("");
   const [syncVersion, setSyncVersion] = useState(0);
+  const [resolvedIds, setResolvedIds] = useState<Record<string, string>>({});
   const [failedMutationId, setFailedMutationId] = useState("");
   const blockedRef = useRef("");
+  // Set when the server rejected the session: nothing is sent until the user signs in again.
+  const pausedForAuthRef = useRef(false);
   const mountedRef = useRef(false);
   const generationRef = useRef(0);
   const activeRun = useRef<ReturnType<typeof createTimeoutSignal> | null>(null);
@@ -55,7 +60,7 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
   }, []);
 
   const scheduleRetry = useCallback(() => {
-    if (!mountedRef.current || blockedRef.current || retryTimer.current !== undefined) return;
+    if (!mountedRef.current || blockedRef.current || pausedForAuthRef.current || retryTimer.current !== undefined) return;
     // Failed probes count as attempts too; keep retrying without requiring another browser event.
     const delay = Math.min(retryBase * 2 ** retryAttempt.current, retryMax);
     retryAttempt.current = Math.min(retryAttempt.current + 1, 32);
@@ -66,7 +71,7 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
   }, [retryBase, retryMax]);
 
   const drainQueue = useCallback(async (): Promise<void> => {
-    if (activeRun.current || blockedRef.current || !mountedRef.current) return;
+    if (activeRun.current || blockedRef.current || pausedForAuthRef.current || !mountedRef.current) return;
     cancelRetry();
     // The stall deadline aborts the current fetch before releasing ownership to a replacement run.
     const run = createTimeoutSignal(stallTimeout);
@@ -76,13 +81,24 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
     try {
       const result = await drainOfflineQueue(run.signal, requestTimeout, accepted.current);
       if (activeRun.current !== run) return;
-      if (result.failed) {
+      if (result.resolvedIds) {
+        const newIds = result.resolvedIds;
+        setResolvedIds((current) => ({ ...current, ...newIds }));
+      }
+      if (result.authExpired) {
+        // Keep every mutation. The login that follows (the same user) resumes the drain.
+        pausedForAuthRef.current = true;
+        if (result.count > 0) setSyncVersion((version) => version + 1);
+        window.dispatchEvent(new Event("auth:expired"));
+      } else if (result.failed) {
         blockedRef.current = result.failed.id;
         setFailedMutationId(result.failed.id);
         setSyncError(result.failed.error);
+        setSyncErrorKey(result.failed.code === "dependency" ? "offline.dependencyDiscarded" : "");
       } else {
         retryAttempt.current = 0;
         setSyncError("");
+        setSyncErrorKey("");
         if (result.count > 0) {
           setSyncVersion((version) => version + 1);
           window.dispatchEvent(new Event(OFFLINE_SYNC_COMPLETE_EVENT));
@@ -102,7 +118,7 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
   }, [cancelRetry, requestTimeout, stallTimeout, scheduleRetry, refreshQueuedCount]);
 
   const checkAndDrain = useCallback(async (): Promise<void> => {
-    if (!mountedRef.current || activeRun.current || blockedRef.current) return;
+    if (!mountedRef.current || activeRun.current || blockedRef.current || pausedForAuthRef.current) return;
     const generation = generationRef.current;
     // A real request or live stream already establishes reachability. Only queue work
     // needs an explicit probe, avoiding a health request on every empty-queue startup.
@@ -124,6 +140,7 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
     blockedRef.current = "";
     setFailedMutationId("");
     setSyncError("");
+    setSyncErrorKey("");
     void checkAndDrain();
   }, [checkAndDrain]);
 
@@ -134,6 +151,23 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
     setIsSyncing(false);
     void refreshQueuedCount();
     let previousOnline = getIsOnline();
+    let sessionUserId = getCurrentUserId();
+    // A new session (login, logout, another account) ends an authentication pause. The queue is
+    // per user, so a failed change of the previous account is forgotten here and the next drain
+    // only sees the new user's mutations.
+    const unsubscribeSession = subscribeAuthSession((session) => {
+      pausedForAuthRef.current = false;
+      if (session.userId !== sessionUserId) {
+        sessionUserId = session.userId;
+        blockedRef.current = "";
+        setFailedMutationId("");
+        setSyncError("");
+        setSyncErrorKey("");
+        setResolvedIds({});
+      }
+      void refreshQueuedCount();
+      void checkAndDrain();
+    });
     const unsubscribe = subscribe(() => {
       const online = getIsOnline();
       // Only confirmed reachability changes the banner; browser events just request a check.
@@ -166,6 +200,7 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
       run?.abort();
       run?.cancel();
       unsubscribe();
+      unsubscribeSession();
       window.removeEventListener("online", handleWake);
       window.removeEventListener("offline", handleWake);
       window.removeEventListener("pageshow", handleWake);
@@ -176,7 +211,7 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
   }, [cancelRetry, checkAndDrain, refreshQueuedCount]);
 
   return (
-    <OfflineQueueContext.Provider value={{ isOffline, queuedCount, isSyncing, syncError, syncVersion, failedMutationId, discardFailedMutation } satisfies OfflineQueueContextValue}>
+    <OfflineQueueContext.Provider value={{ isOffline, queuedCount, isSyncing, syncError, syncErrorKey, syncVersion, resolvedIds, failedMutationId, discardFailedMutation } satisfies OfflineQueueContextValue}>
       {children}
     </OfflineQueueContext.Provider>
   );

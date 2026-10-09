@@ -41,7 +41,7 @@ async function setup(page) {
 async function seedQueue(page) {
   await page.evaluate(async () => {
     const store = await import("/src/api/offlineStore.ts");
-    const common = { token: "token", method: "POST", payload: { name: "Recovered list" } };
+    const common = { method: "POST", payload: { name: "Recovered list" } };
     await store.enqueueOfflineMutation({ ...common, id: "parent", url: "/api/lists", createdAt: "2026-01-01T00:00:00Z", queueMeta: { tempId: "temp-list", resourceType: "list" } });
     await store.enqueueOfflineMutation({ ...common, id: "child", url: "/api/lists/temp-list/entries", createdAt: "2026-01-01T00:00:01Z" });
     window.dispatchEvent(new Event("pageshow"));

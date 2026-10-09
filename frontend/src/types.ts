@@ -54,7 +54,13 @@ export interface OfflineMutation {
   url: string;
   method: string;
   payload?: unknown;
-  token: string;
+  /**
+   * The user who queued the change. Only that user's session replays it, with the token that is
+   * valid at drain time (tokens are no longer stored with the mutation).
+   */
+  userId?: string;
+  /** @deprecated Only present on mutations queued by older versions; never used. */
+  token?: string;
   createdAt: string;
   queueMeta?: QueueMeta | null;
   // Accepted creates leave mappings on pending mutations so retries survive a page reload.
@@ -66,7 +72,11 @@ export interface OfflineQueueContextValue {
   queuedCount: number;
   isSyncing: boolean;
   syncError: string;
+  /** i18n key that explains `syncError` in the user's language; empty when the server's text is shown. */
+  syncErrorKey: string;
   syncVersion: number;
+  /** Temporary ids that received a real id during this session (temp id -> real id). */
+  resolvedIds: Record<string, string>;
   failedMutationId: string;
   discardFailedMutation: () => Promise<void>;
 }

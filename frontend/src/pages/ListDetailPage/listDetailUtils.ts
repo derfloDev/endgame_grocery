@@ -7,13 +7,47 @@ export class ListAccessError extends Error {
   }
 }
 
-/** Keep queued local entries absent from the server until sync can return their IDs. */
-export function mergePendingEntries(serverEntries: readonly DetailEntry[], currentEntries: readonly DetailEntry[]): DetailEntry[] {
+/**
+ * Keep queued local entries absent from the server until sync can return their IDs.
+ *
+ * `isStillPending` lets a full reload drop queued entries whose change is gone (discarded from the
+ * queue) instead of showing them forever; by default every queued entry is kept.
+ */
+export function mergePendingEntries(
+  serverEntries: readonly DetailEntry[],
+  currentEntries: readonly DetailEntry[],
+  isStillPending: (entry: DetailEntry) => boolean = () => true
+): DetailEntry[] {
   const serverIds = new Set(serverEntries.map((entry) => entry.id));
   return [
     ...serverEntries,
-    ...currentEntries.filter((entry) => entry.is_pending_sync && !serverIds.has(entry.id))
+    ...currentEntries.filter((entry) => entry.is_pending_sync && !serverIds.has(entry.id) && isStillPending(entry))
   ];
+}
+
+/**
+ * Replaces temporary entry ids that the offline queue resolved with their real ids. When the real
+ * entry is already in the list (the server's own event or a reload got there first) the temporary
+ * one is dropped, so a synced offline add never shows twice. Returns the same array when nothing
+ * applies.
+ */
+export function reconcileResolvedEntries(entries: DetailEntry[], resolvedIds: Readonly<Record<string, string>>): DetailEntry[] {
+  if (!entries.some((entry) => Object.hasOwn(resolvedIds, entry.id))) {
+    return entries;
+  }
+
+  const presentIds = new Set(entries.map((entry) => entry.id));
+  const reconciled = entries.flatMap((entry) => {
+    if (!Object.hasOwn(resolvedIds, entry.id)) {
+      return [entry];
+    }
+
+    const realId = resolvedIds[entry.id];
+
+    return presentIds.has(realId) ? [] : [{ ...entry, id: realId, is_pending_sync: false }];
+  });
+
+  return sortEntries(reconciled);
 }
 
 /** Open entries first, then by creation time. */
