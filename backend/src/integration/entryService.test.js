@@ -39,6 +39,25 @@ describeDb("entry service shared by the app API and v1 (PostgreSQL)", () => {
   const lastUpdatedBy = async (entryId) =>
     (await db.pool.query("SELECT last_updated_by FROM entries WHERE id = $1", [entryId])).rows[0].last_updated_by;
 
+  /** Runs `sql` until it returns a row, for work the server finishes after it has responded. */
+  async function waitForRows(sql, params, { timeoutMs = 5000, intervalMs = 25 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+
+    for (;;) {
+      const result = await db.pool.query(sql, params);
+
+      if (result.rowCount > 0) {
+        return result;
+      }
+
+      if (Date.now() >= deadline) {
+        assert.fail(`No row appeared within ${timeoutMs} ms for: ${sql}`);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+
   it("sets last_updated_by and queues a push for items created through v1", async () => {
     const { owner, list, apiKey } = await setup();
 
@@ -51,9 +70,9 @@ describeDb("entry service shared by the app API and v1 (PostgreSQL)", () => {
     assert.equal(response.body.item.description, "2%");
     assert.equal(await lastUpdatedBy(response.body.item.id), owner.id);
 
-    // The push job is queued without waiting for the response.
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    const jobs = await db.pool.query("SELECT items FROM pending_push_jobs WHERE list_id = $1", [list.id]);
+    // The push job is queued without waiting for the response, so poll for it instead of guessing a
+    // delay: how long the insert takes depends on how busy the (parallel) test run is.
+    const jobs = await waitForRows("SELECT items FROM pending_push_jobs WHERE list_id = $1", [list.id]);
     assert.deepEqual(jobs.rows[0].items, ["Milk"]);
   });
 

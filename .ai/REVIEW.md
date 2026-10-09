@@ -2084,3 +2084,65 @@ No blocker or major findings; no required fixes.
 
 ##### Risks
 - The integration suite still cannot run because of the T-011 migration defect, so SQL-backed error paths (for example unique-violation mapping) rely on the unit tests and my probe.
+
+### Review Round 2 (T-011 — rework of the migration defect)
+
+#### Verdict
+
+`FAIL`
+
+The migration repair is correct and verified. One required fix remains: the default `npm run test:integration` (the exact command CI runs) is red, because of a timing-dependent test from T-010.
+
+#### Findings
+
+1. **resolved (was the major finding in the T-014 review)** — `1779979000004_add_query_indexes.cjs` now passes the operator class on the column: `createIndex("entries", { name: "text", opclass: "gin_trgm_ops" }, { name: "entries_text_trgm_idx", method: "gin" })`. A unit test builds the real SQL with the installed `MigrationBuilder` (so an ignored option can no longer hide), and the integration test checks the stored index definition.
+2. **major — required fix** — `backend/src/integration/entryService.test.js:55-56` (T-010): "sets last_updated_by and queues a push for items created through v1" waits a fixed `setTimeout(…, 100)` and then reads the pending push job. With the default parallel runner the 100 ms is not enough: `npm run test:integration` fails this test in 3 of 3 runs here (52/53), while `--test-concurrency=1` passes 53/53. `.github/workflows/ci.yml:60` runs exactly `npm run test:integration`, and a GitHub runner has more than one core, so CI would be red. The implementer reported the same failure and left it, so the criterion "integration suite passes in CI" is not met. Fix by polling for the row (retry the query for a few seconds) instead of sleeping; do not change what is asserted. My T-010 review ran the suite serially and missed this; that was my gap. Only the wait changes, so it is a test-only rework.
+3. **minor** — `backend/src/integration/helpers.js`: the runner now gets `schema: [schema, "public"]` with `migrationsSchema: schema`. It works (all migrations, down and up, run on the test schemas), but it is a harness-wide change driven by one migration; worth a sentence in the README, which the implementer added.
+4. **nit** — `credentials.test.js` now rolls back two migrations (`down` 2) before inserting a legacy key; correct but couples the test to the migration order (it will need updating when another migration is added after the hash migration).
+
+#### Required Fixes
+
+1. Make `npm run test:integration` pass with the default (parallel) runner: replace the fixed 100 ms wait in `backend/src/integration/entryService.test.js` with polling, then run the default command several times.
+
+#### Verification
+
+##### Steps performed
+- Re-read the rework: migration, `migrations.test.js` (new SQL-builder test; the old options-spy expectation changed to the new call shape, which is the behaviour being repaired), `integration/indexes.test.js` (index definition check), `integration/helpers.js`, `integration/credentials.test.js`, README.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok. `npm test`: backend 392/392, frontend 823/823.
+- Production path on a fresh PostgreSQL 18 (embedded): `node-pg-migrate up` applies all 16 migrations; the catalog shows `CREATE INDEX entries_text_trgm_idx ON public.entries USING gin (text gin_trgm_ops)`; `down 100` and `up` again both complete.
+- Integration suite: `node --test --test-concurrency=1` → 53/53; default `npm run test:integration` ×3 → 52/53 each time, always the test in finding 2. That includes the migration round-trip, the four EXPLAIN checks and the single-list 403 from the original T-011 criteria, which were unverified until now and pass.
+
+##### Findings
+- The original T-011 acceptance criteria are met and now verified against a real database: no Seq Scan on `entries` in the checked queries on the seeded database, pool timeouts and `PG_POOL_MAX` configured, `GET /api/lists/:id` answers 403 for strangers.
+
+##### Risks
+- Until finding 2 is fixed, CI's integration step fails on a multi-core runner.
+- PostgreSQL 16 (CI) was not available; I ran 18.
+
+### Review Round 3 (T-011 — rework of the round-2 finding)
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **resolved** — Round 2 blocker (fixed 100 ms wait in `integration/entryService.test.js`): the test now polls through `waitForRows` (retry every 25 ms, up to 5 s, failing with the SQL in the message). The assertion on the queued job's items is unchanged. The only other timer in `integration/` is `push.test.js:140`, a deliberate 50 ms hold to overlap two workers, not a data wait.
+2. **minor (verification gap)** — I could not re-run the suite: the sandbox refused to start the embedded PostgreSQL from the earlier session (cluster and binaries are still present under `test-results/t011-pgdata` and the scratchpad) and to set `TEST_DATABASE_URL`. The rework changed one test file only, and polling removes the timing dependency by construction, but the "default parallel run ×N" that Round 2 asked for is still unconfirmed.
+3. **nit** — the commit message names the earlier migration repair; the working tree contains both rework rounds together (as the handoff states), so that is fine for one commit.
+
+No required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the Round 2 findings, the two implement handoffs and the working-tree diff: migration (operator class on the column), migration unit tests (real `MigrationBuilder` SQL assertion), `helpers.js` (search_path `[schema, public]`, tracking table in the test schema), `credentials.test.js` (`down 2`), `indexes.test.js` (stored index definition check) and `entryService.test.js` (polling).
+- `npm run lint`: 0 errors. `npm run build`: ok. `npm test`: backend 392 pass, 0 fail, 0 skipped; frontend 54 files pass.
+- Searched `integration/` for remaining fixed waits: none besides the intentional one above.
+- Round 2 results still stand and are unaffected by the change: fresh up, full down and up on PostgreSQL 18, all four EXPLAIN checks and the single-list 403, 53/53 serially.
+
+##### Findings
+- The rework addresses the single required fix from Round 2 in the way it asked for.
+
+##### Risks
+- Please run `npm run test:integration` (parallel, default) against PostgreSQL a few times before `commit_task`; CI will do the same on PostgreSQL 16. If the parallel run fails again, send it back through `rework_task`.

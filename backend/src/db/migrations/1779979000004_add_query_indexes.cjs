@@ -24,10 +24,10 @@ function up(pgm) {
     pgm.createIndex(table, columns, { name });
   }
 
-  pgm.createIndex("entries", "text", {
+  // node-pg-migrate requires the operator class on the column, not the index options.
+  pgm.createIndex("entries", { name: "text", opclass: "gin_trgm_ops" }, {
     name: "entries_text_trgm_idx",
-    method: "gin",
-    opclass: "gin_trgm_ops"
+    method: "gin"
   });
 }
 

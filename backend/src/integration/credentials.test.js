@@ -55,8 +55,8 @@ describeDb("hashed credentials (PostgreSQL)", () => {
     const user = await createUser(db.pool);
     const legacyKey = randomUUID().toUpperCase();
 
-    // Roll the hash migration back, store a plaintext key the old way, then migrate forward again.
-    await db.migrate("down", 1);
+    // Roll back the query indexes and hash migration before storing a legacy plaintext key.
+    await db.migrate("down", 2);
     await db.pool.query("UPDATE users SET api_key = $1 WHERE id = $2", [legacyKey, user.id]);
     await db.migrate("up");
 

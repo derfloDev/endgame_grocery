@@ -114,7 +114,9 @@ export async function createTestDatabase() {
         // Apply or revert every migration unless a count is given.
         count,
         migrationsTable: MIGRATIONS_TABLE,
-        schema,
+        // The runner replaces search_path; retain public for the shared extension operators.
+        schema: [schema, "public"],
+        migrationsSchema: schema,
         // Schemas are isolated per test file, so the global migration lock is unnecessary.
         noLock: true,
         log: () => {}

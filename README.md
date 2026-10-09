@@ -255,6 +255,12 @@ parallel against one database. It also exports seed helpers (`createUser`, `crea
 `addMember`, `createEntry`, `createInvite`) and `signTestToken`. New SQL changes should add a test
 here.
 
+The query-index migration is also checked with the real node-pg-migrate SQL builder in the unit
+suite and against PostgreSQL's index catalog in the integration suite. Its GIN index must use
+`gin_trgm_ops` on the `text` column; node-pg-migrate ignores an index-level `opclass` option.
+The integration migration runner keeps `public` after the isolated test schema in its search
+path so it can resolve the shared extensions, while migration tracking stays in the test schema.
+
 The tests need a database that is safe to create and drop schemas in. Create a separate one and
 point `TEST_DATABASE_URL` at it:
 

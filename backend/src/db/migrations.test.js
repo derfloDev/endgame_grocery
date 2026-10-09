@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
+import { MigrationBuilder } from "node-pg-migrate";
 
 const autocompleteHistoryMigrationPath = path.resolve(
   "src/db/migrations/1713902400000_add_autocomplete_history.cjs"
@@ -790,14 +791,26 @@ describe("database migrations", () => {
         ["list_members", ["user_id"], "list_members_user_idx"],
         ["pending_push_jobs", ["fire_at"], "pending_push_jobs_fire_at_idx"],
         ["push_subscriptions", ["endpoint"], "push_subscriptions_endpoint_idx"],
-        ["entries", "text", "entries_text_trgm_idx"]
+        ["entries", { name: "text", opclass: "gin_trgm_ops" }, "entries_text_trgm_idx"]
       ]
     );
-    assert.deepEqual(created.at(-1)[3], { name: "entries_text_trgm_idx", method: "gin", opclass: "gin_trgm_ops" });
+    assert.deepEqual(created.at(-1)[3], { name: "entries_text_trgm_idx", method: "gin" });
 
     calls.length = 0;
     assert.doesNotThrow(() => migration.down(pgm));
     assert.equal(calls.filter((call) => call[0] === "dropIndex").length, 7);
     assert.equal(calls.some((call) => call[0] === "dropExtension"), false);
+  });
+
+  it("generates a trigram GIN index with its required operator class", async () => {
+    const migration = await import(pathToFileURL(queryIndexesMigrationPath));
+    // Use the installed SQL builder: a spy cannot detect ignored migration options.
+    const pgm = new MigrationBuilder({}, undefined, false, console);
+    migration.up(pgm);
+
+    assert.match(
+      pgm.getSql(),
+      /CREATE INDEX "entries_text_trgm_idx" ON "entries" USING gin \("text" "gin_trgm_ops"\);/
+    );
   });
 });

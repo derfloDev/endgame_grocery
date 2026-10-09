@@ -105,7 +105,7 @@ describeDb("query indexes and the single-list endpoint (PostgreSQL)", () => {
   }
 
   it("creates the expected indexes", async () => {
-    const { rows } = await db.pool.query("SELECT indexname FROM pg_indexes WHERE schemaname = $1", [db.schema]);
+    const { rows } = await db.pool.query("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = $1", [db.schema]);
     const names = rows.map((row) => row.indexname);
 
     for (const name of [
@@ -119,6 +119,10 @@ describeDb("query indexes and the single-list endpoint (PostgreSQL)", () => {
     ]) {
       assert.ok(names.includes(name), `${name} is missing`);
     }
+    assert.match(
+      rows.find((row) => row.indexname === "entries_text_trgm_idx").indexdef,
+      /USING gin \(text gin_trgm_ops\)/
+    );
   });
 
   it("reads the entries of a list without a sequential scan", async () => {
