@@ -1926,3 +1926,41 @@ No blocker or major findings; no required fixes. (The T-013 duplicate-tile regre
 ##### Risks
 - Signed-out screens now cost one extra request on first use (a few KB gzip each), and are served from the precache offline.
 - Not executed: the Playwright specs against this build (the dev-server specs were exercised in earlier reviews).
+
+## Task: T-018 (hardening cycle 2026-10-08 — precomputed icon embeddings, unused WASM dropped)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `frontend/vite.config.ts` (`dropUnusedOrtWasm`): the plugin removes `ort-wasm*.wasm` from every build on the assumption that transformers.js always points onnxruntime at the jsDelivr copy in a worker. That holds for the installed version (confirmed in the browser, see Verification), but the coupling is silent: a future `@huggingface/transformers` update that serves the WASM locally would make the model fail to start with no build error, because the file is simply gone. The plugin comment documents the condition; a unit or build check that fails when the worker's WASM source changes (or a short note in the dependency-update checklist) would make it safer. Not a required fix.
+2. **minor** — the embeddings asset (`iconEmbeddings-*.bin`, 307 KB) is not in the service worker precache, like the model itself, so semantic suggestions still need the network on first use. Same as before (the old worker needed the model download too), so no regression; stated in the handoff and README.
+3. **minor** — the reference vectors were generated with onnxruntime-node and the queries are embedded by the WASM runtime in the browser. I checked that this does not matter (see Verification), but the repository has no automated check for it; the regeneration script is the only place that runs the model in Node.
+4. **nit** — one full-suite run failed `OverviewPage.test.tsx` › "drops a deleted list immediately while the refresh is still running"; it passed in isolation and in the next two full runs (811/811). It is the same load-sensitive pattern noted in the T-017 review.
+5. **nit** — the task text said "Float32 vectors plus a SHA-256 of the input texts"; the hash lives in `iconEmbeddings.meta.json` next to the binary. Equivalent and documented.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the staged diff: the generator script and its shared helpers, `iconEmbeddingModel.ts`, `iconEmbeddingText.ts`, the asset parser, `iconWorker.ts` (reference vectors fetched once, `init` without inferences, `dtype: "q8"`), `vite.config.ts` plugin, `cosineSimilarity.ts`, the new tests and README. Confirmed the embedded text (`label` plus `tags`, joined by `", "`) is identical to what the old worker embedded.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok; `dist` is 1.8 MB (was about 25 MB), no `*.wasm` in `dist/assets`, the asset is emitted as a hashed `iconEmbeddings-*.bin`. `npm test`: backend 367/367, frontend 811/811 (one non-reproducing failure, finding 4).
+- Production build driven in Chromium (`vite preview`, API mocked) with the real icon worker:
+  - the Add sheet fetched `iconEmbeddings-*.bin` exactly once, the quantised model (`onnx/model_quantized.onnx`) from Hugging Face and the version-pinned `ort-wasm-simd-threaded` runtime from jsDelivr; no CSP violation and no page error;
+  - the first query ("kombucha") took 5.6 s including the model download; the next two ("birthday candles", "stapler") answered in about 0.4 s each, i.e. one inference per suggestion with no 200-vector warm-up;
+  - worker message order was `ready`, then three `matchResult`.
+- Compared the browser against the Node generator path: the best-match scores the browser returned (0.383, 0.331, 0.389) are identical to the scores I computed in Node with the same q8 model against the shipped vectors (0.383, 0.331, 0.389, to three decimals), and the matching rows are the same, so the WASM-versus-Node numeric difference the implementer could not check is negligible against the 0.5 threshold.
+- Read the staleness test (hash plus count plus unit norm, fails with `npm run build:icon-embeddings --workspace frontend`) and the worker tests (one inference for the first suggestion, one asset fetch for several, error replies for a wrong-sized or failed asset). Existing `iconRegistry` and client fixtures are unchanged and pass.
+
+##### Findings
+- Every acceptance criterion is met: the first semantic suggestion runs one inference; a stale asset fails a test with the regeneration command; existing suggestion fixtures are unchanged; `dist` has no unused 23.5 MB WASM and the reason is recorded.
+- The `quantized: true` option (ignored by the current library) became an explicit `dtype: "q8"`, which also removed a `tsc` error in that file.
+
+##### Risks
+- A worker running while jsDelivr is unreachable cannot start the model; the model download from Hugging Face would fail in the same situation, so nothing new breaks.
+- Not executed: the Playwright specs against this build, and a stale-asset test run after editing `ICON_DB` (read, not mutated).

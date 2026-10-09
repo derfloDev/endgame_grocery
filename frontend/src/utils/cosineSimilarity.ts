@@ -1,4 +1,4 @@
-export function cosineSimilarity(vecA: number[], vecB: number[]): number {
+export function cosineSimilarity(vecA: ArrayLike<number>, vecB: ArrayLike<number>): number {
   if (typeof vecA?.length !== "number" || typeof vecB?.length !== "number") {
     throw new TypeError("cosineSimilarity expects array-like inputs.");
   }

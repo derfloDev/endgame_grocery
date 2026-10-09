@@ -1059,3 +1059,47 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-018 — implement — 2026-10-10T08:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Icon database embeddings are precomputed and shipped as an asset, so the first semantic suggestion runs one inference instead of about 200, and the unused 23.5 MB ONNX WASM binary is no longer emitted into `dist`. |
+| Files Changed | frontend/scripts/build-icon-embeddings.mjs, frontend/scripts/iconEmbeddingsAsset.mjs, frontend/src/data/iconEmbeddingModel.ts, frontend/src/data/iconEmbeddingText.ts, frontend/src/data/iconEmbeddings.bin, frontend/src/data/iconEmbeddings.meta.json, frontend/src/data/iconEmbeddings.test.ts, frontend/src/workers/iconWorker.ts, frontend/src/workers/iconWorker.test.ts, frontend/src/workers/iconEmbeddingAsset.ts, frontend/src/workers/iconEmbeddingAsset.test.ts, frontend/src/utils/cosineSimilarity.ts, frontend/vite.config.ts, frontend/src/vite-config.test.ts, frontend/package.json, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ok; `npm test` frontend 811/811 (backend untouched). `npm run build:icon-embeddings` ran against the real model (downloaded from Hugging Face); a Node check of "milk/bananas/toothpaste/chicken breast" against the shipped vectors returned sensible icons. The worker was not exercised in a real browser; Playwright specs not run. |
+| Commit | `perf(icons): ship precomputed icon embeddings and drop the unused 23 MB ONNX WASM from the build` |
+| Next Role | review |
+
+Notes for review:
+1. **Asset:** `iconEmbeddings.bin` is 200 × 384 little-endian Float32 (307,200 B) plus `iconEmbeddings.meta.json` (model, dtype `q8`, dimensions, count, SHA-256 of the embedded texts). Generator: `npm run build:icon-embeddings --workspace frontend` (Node 24 imports the `.ts` database directly; needs network once for the model). It is emitted as a hashed asset (`?url` import), fetched once by the worker, and is not in the service worker precache (the model itself is not either), so semantic suggestions stay an online feature on first use. The task text said "Float32 vectors plus SHA-256": the hash lives in the meta file.
+2. **Single source of truth:** `iconEmbeddingModel.ts` (model, dtype, dimensions) is imported by the worker, the staleness test and the generator; `iconEmbeddingText.ts` defines the embedded text (label + tags); the generator and the test share `scripts/iconEmbeddingsAsset.mjs` (hash + packing).
+3. **Worker:** `getReferenceEmbeddings` fetches and parses the asset (size mismatch throws with the regeneration command; a failed fetch clears the cached promise so the next request retries); `init` now loads the model and the vectors without inferences; `matchIcon` embeds only the query. `pipeline` is called with `dtype: "q8"` instead of the ignored `quantized: true` — that is the default for the browser WASM backend, now explicit, and it also removes the earlier `tsc` error in this file (`tsc --noEmit` is clean for it now). `cosineSimilarity` accepts `ArrayLike<number>`.
+4. **Tests:** `iconEmbeddings.test.ts` fails with the command when `ICON_DB` changes (hash + count), checks model/dtype, byte length and unit norm; `iconWorker.test.ts` mocks the pipeline and `fetch` and proves: one inference for the first suggestion, one asset fetch for several suggestions, no inference on `init` or blank text, error replies for a wrong-sized or failed asset. Existing `iconRegistry`/client tests are unchanged.
+5. **WASM:** transformers.js sets `wasmPaths` to the jsDelivr copy for any non-service-worker context (checked in `backends/onnx.js`; CSP already allows the host), so onnxruntime's `new URL("…asyncify.wasm", import.meta.url)` fallback is dead code. The plugin `endgame:drop-unused-ort-wasm` deletes `ort-wasm*.wasm` from the bundle; `dist` went from about 25 MB to 1.8 MB. Residual risk: if the CDN is unreachable the model could not have loaded anyway (it also comes from Hugging Face), so nothing regresses; the reason and the removal condition are in the plugin comment and the README.
+6. Query vectors in the browser are produced by the WASM q8 runtime, while the reference vectors came from onnxruntime-node q8; tiny numeric differences are expected and irrelevant at the 0.5 threshold, but I could not compare browser output side by side.
+
+---
+
+### T-018 — review — 2026-10-10T09:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the precomputed icon embeddings asset, the leaner worker and the dropped ONNX WASM; verified the real worker in Chromium against the production build (one inference per suggestion, WASM from jsDelivr, no CSP violations) and that browser scores equal the Node generator path. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+### T-018 — implement — 2026-10-10T09:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-018 after review PASS_WITH_NOTES: precomputed icon embeddings shipped as an asset and the unused ONNX WASM dropped from the build. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-018 implementation files |
+| Commit | `perf(icons): ship precomputed icon embeddings and drop the unused 23 MB ONNX WASM from the build` |
+| Next Role | none |
+
+---
