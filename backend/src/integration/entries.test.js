@@ -115,6 +115,19 @@ describeDb("entry limits and input validation (PostgreSQL)", () => {
     assert.equal(await countEntries(list.id, "done"), 200);
   });
 
+  it("clears, keeps and replaces the icon depending on whether the request mentions it", async () => {
+    const { owner, list } = await setup();
+    const entry = (
+      await db.pool.query("INSERT INTO entries (list_id, text, status, icon) VALUES ($1, 'Milk', 'open', 'IconMilk') RETURNING id", [list.id])
+    ).rows[0];
+    const patch = (body) => request(app).patch(`/api/lists/${list.id}/entries/${entry.id}`).set(as(owner)).send(body);
+
+    assert.equal((await patch({ text: "Oat milk" })).body.entry.icon, "IconMilk");
+    assert.equal((await patch({ icon: "IconBottle" })).body.entry.icon, "IconBottle");
+    assert.equal((await patch({ icon: null })).body.entry.icon, null);
+    assert.equal((await patch({ text: "Milk again" })).body.entry.icon, null);
+  });
+
   it("answers malformed ids with 404 instead of a database error", async () => {
     const { owner, list } = await setup();
 

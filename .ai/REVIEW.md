@@ -1811,3 +1811,39 @@ T-014 itself has no blocker or major findings. Finding 1 is a defect in the alre
 - Mutations queued before the update are stranded (finding 2).
 - Explicit logout wipes the whole read cache for all users, so an offline relaunch after logout shows no cached lists. Intended by the plan.
 - Not executed: the remaining Playwright specs (`auth`, `lists`), and the integration suite, which cannot start because of finding 1.
+
+## Task: T-015 (hardening cycle 2026-10-08 — edit sheet keeps the chosen icon; icons can be cleared)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `frontend/src/components/AddItemSheet/AddItemSheet.tsx` (edit mode, changed text): after the text changes the selected icon follows `useIconSuggestion`, which resets to `null` while a new suggestion is resolving and stays `null` when nothing matches. Because the server now treats `icon: null` as "clear", saving during that window (the save button is only disabled for empty text) removes the stored icon, where the old `COALESCE` silently kept it. This matches "changing the text adopts the new suggestion" and the implementer's note 4, but a fast save can drop the icon before the suggestion arrives. Disabling save while `loading` in edit mode, or keeping the stored icon until a suggestion exists, would avoid it. Not a required fix.
+2. **minor** — there is still no explicit "remove icon" control in the sheet; clearing is only reachable through the text-change path or the API. Consistent with the acceptance criteria (the API supports it), but the feature is only partly user-visible.
+3. **nit** — `PATCH` with only `details` (no `text`, `status` or `icon`) still answers 400 ("At least one entry update field is required"). Pre-existing; the sheet always sends `text`, so the UI is unaffected.
+4. **nit** — `AddItemSheet.tsx`: the `manualIconRef` is a ref, so picking an icon does not itself re-render; it works because `setSelectedIconName` does. Fine.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the staged diff: `AddItemSheet.tsx` (+ tests), `routes/entries.js` (`hasIcon = "icon" in body`), `services/entryService.js` (`icon = CASE WHEN $9 THEN $3 ELSE icon END`), `entries.test.js`, `v1.test.js`, `integration/entries.test.js`, README.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok. `npm test`: backend 367/367, frontend 778/778.
+- Integration suite: could not be run as shipped, because the committed T-011 migration `1779979000004` fails on PostgreSQL (see the T-014 section, finding 1; still unfixed at this point). Instead I migrated an embedded PostgreSQL 18 to the migration before it and ran the new integration sequence through `createApp` with real SQL:
+  - `{text}` keeps the icon; `{icon: "IconBottle"}` replaces it; `{icon: null}` clears it (200, `icon: null`); a later `{text}` keeps it cleared; `{text, icon, status}` together all apply; `{status: "open", icon: null}` clears; `{}` → 400.
+  - a v1 rename (`PATCH /api/v1/lists/:id/items/:id` with `name` only) leaves the icon untouched.
+- Read the four new sheet tests: custom icon kept when only details change; new suggestion adopted after a text change; an icon picked from the browser is never overwritten by a later text change; an iconless entry stays iconless when only details change.
+- I did not open the edit sheet in a browser (long-press editing), so the interaction in finding 1 is from reading the code.
+
+##### Findings
+- Every acceptance criterion is met: editing only the details keeps a custom icon; changing the text adopts the new suggestion; `PATCH` with `icon: null` clears the icon (and omitting `icon` keeps it).
+- Existing expectations only gained the ninth SQL parameter; the icon test is stricter (`true`). Nothing was weakened.
+
+##### Risks
+- The sheet fix and the server change must ship together: with `icon: null` now clearing, an old client that sends `null` for an unresolved suggestion would remove icons (same release, same bundle, so low risk).
+- Offline-queued edits replay `icon: null` verbatim, so an edit queued with a transiently empty suggestion clears the icon when it syncs (finding 1).

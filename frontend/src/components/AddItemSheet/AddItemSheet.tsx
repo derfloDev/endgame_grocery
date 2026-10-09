@@ -45,6 +45,8 @@ export default function AddItemSheet({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputAnchorRef = useRef<HTMLDivElement | null>(null);
   const iconSearchRef = useRef<HTMLInputElement | null>(null);
+  // Set once the user picks an icon themselves; an automatic suggestion must never replace it.
+  const manualIconRef = useRef(false);
   const { iconName, topMatches, loading } = useIconSuggestion(text);
   const isEditMode = mode === "edit";
   const { suggestions } = useAutocomplete(listId, isEditMode ? "" : text, token);
@@ -73,14 +75,31 @@ export default function AddItemSheet({
     setText(initialText);
     setDetails(initialDetails);
     setSelectedIconName(resolveIconName(initialIconName));
+    manualIconRef.current = false;
     setShowIconBrowser(false);
     setIconBrowserSearchText("");
     setShowSuggestions(false);
   }, [initialDetails, initialIconName, initialText, open]);
 
   useEffect(() => {
-    setSelectedIconName(iconName);
-  }, [iconName]);
+    if (!isEditMode) {
+      setSelectedIconName(iconName);
+      return;
+    }
+
+    // Editing: the stored icon stays until the text changes (the suggestion for the unchanged text
+    // would silently swap a custom icon), and an icon picked in this session is never replaced.
+    if (manualIconRef.current) {
+      return;
+    }
+
+    setSelectedIconName(text === initialText ? resolveIconName(initialIconName) : iconName);
+  }, [iconName, initialIconName, initialText, isEditMode, text]);
+
+  function chooseIcon(nextIconName: string): void {
+    manualIconRef.current = true;
+    setSelectedIconName(nextIconName);
+  }
 
   useEffect(() => {
     if (!showSuggestions) {
@@ -259,7 +278,7 @@ export default function AddItemSheet({
                     selectedIconName === suggestedIconName && styles["add-item-icon-picker-btn--selected"]
                   )}
                   type="button"
-                  onClick={() => setSelectedIconName(suggestedIconName)}
+                  onClick={() => chooseIcon(suggestedIconName)}
                 >
                   <SuggestedIcon aria-hidden="true" size={20} stroke={1.6} />
                 </button>
@@ -332,7 +351,7 @@ export default function AddItemSheet({
                       )}
                       type="button"
                       onClick={() => {
-                        setSelectedIconName(browserIconName);
+                        chooseIcon(browserIconName);
                         setShowIconBrowser(false);
                         setIconBrowserSearchText("");
                       }}

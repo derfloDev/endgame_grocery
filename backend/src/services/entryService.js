@@ -165,12 +165,16 @@ export async function createEntry(context, { text, icon, details }) {
  * @param {string} [input.text] New text (trimmed, empty means unchanged).
  * @param {"open" | "done"} [input.status] New status.
  * @param {boolean} [input.toggle] Flip the current status instead of setting `status`.
- * @param {string | null} [input.icon] New icon (undefined/null keep the current one).
+ * @param {boolean} [input.hasIcon] Whether `icon` should be written; with `icon: null` this clears the icon.
+ * @param {string | null} [input.icon] New icon, written only when `hasIcon` is set.
  * @param {boolean} [input.hasDetails] Whether `details` should be written.
  * @param {unknown} [input.details] New details when `hasDetails` is set.
  * @returns {Promise<{ status: "ok", entry: object } | { status: "forbidden" } | { status: "not_found" }>} Result.
  */
-export async function updateEntry(context, { entryId, text, status, toggle = false, icon, hasDetails = false, details }) {
+export async function updateEntry(
+  context,
+  { entryId, text, status, toggle = false, hasIcon = false, icon, hasDetails = false, details }
+) {
   const { pool, userId, listId } = context;
 
   if (!(await ensureListAccess(pool, listId, userId))) {
@@ -184,7 +188,7 @@ export async function updateEntry(context, { entryId, text, status, toggle = fal
         SET
           text = COALESCE($1, text),
           status = COALESCE($2, status),
-          icon = COALESCE($3, icon),
+          icon = CASE WHEN $9 THEN $3 ELSE icon END,
           details = CASE WHEN $4 THEN $5 ELSE details END,
           last_updated_by = $6,
           updated_at = NOW()
@@ -199,7 +203,8 @@ export async function updateEntry(context, { entryId, text, status, toggle = fal
         hasDetails ? normalizeDetails(details) : null,
         userId,
         entryId,
-        listId
+        listId,
+        hasIcon
       ]
     );
 

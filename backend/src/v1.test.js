@@ -306,7 +306,7 @@ describe("external v1 API routes", () => {
     });
     const update = pool.find("UPDATE entries");
     assert.match(update[0], /last_updated_by = \$6/);
-    assert.deepEqual(update[1], [null, "done", null, false, null, "user-1", ITEM_ID, LIST_ID]);
+    assert.deepEqual(update[1], [null, "done", null, false, null, "user-1", ITEM_ID, LIST_ID, false]);
     assert.deepEqual(sseManager.calls, [
       [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "done",details: "2%",last_updated_by: "user-1"} }]
     ]);
@@ -468,7 +468,7 @@ describe("external v1 API routes", () => {
     assert.deepEqual(response.body, {
       item: { id: ITEM_ID, name: "Oat milk", status: "open", description: null }
     });
-    assert.deepEqual(pool.find("UPDATE entries")[1], ["Oat milk", null, null, false, null, "user-1", ITEM_ID, LIST_ID]);
+    assert.deepEqual(pool.find("UPDATE entries")[1], ["Oat milk", null, null, false, null, "user-1", ITEM_ID, LIST_ID, false]);
     assert.deepEqual(sseManager.calls, [
       [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Oat milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);

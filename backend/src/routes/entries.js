@@ -91,6 +91,8 @@ export function createEntryRouter({
   router.patch("/:entryId", async (req, res, next) => {
     const { text, status, icon, details } = req.body ?? {};
     const hasDetails = "details" in (req.body ?? {});
+    // `icon: null` is a deliberate "remove the icon"; an absent key leaves it alone.
+    const hasIcon = "icon" in (req.body ?? {});
 
     if (!text?.trim() && !status && icon === undefined) {
       res.status(400).json({ error: "At least one entry update field is required." });
@@ -112,6 +114,7 @@ export function createEntryRouter({
         entryId: req.params.entryId,
         text,
         status,
+        hasIcon,
         icon,
         hasDetails,
         details

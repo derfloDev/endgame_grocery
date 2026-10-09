@@ -927,3 +927,45 @@ Notes for review:
 Open item (not part of this commit): REVIEW.md T-014 finding 1 reports that the committed T-011 migration `1779979000004_add_query_indexes.cjs` generates invalid SQL for the GIN index and fails on a fresh database; it needs a separate fix before CI integration jobs or deploys can pass.
 
 ---
+
+### T-015 — implement — 2026-10-09T17:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Editing an entry keeps its custom icon until the text changes (and never overwrites an icon picked during the edit), and `PATCH` accepts `icon: null` to remove an icon. |
+| Files Changed | frontend/src/components/AddItemSheet/AddItemSheet.tsx, frontend/src/components/AddItemSheet/AddItemSheet.test.tsx, backend/src/services/entryService.js, backend/src/routes/entries.js, backend/src/entries.test.js, backend/src/v1.test.js, backend/src/integration/entries.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ok; `npm test` backend 367/367, frontend 778/778. The new case in `integration/entries.test.js` NOT executed locally (no PostgreSQL); CI runs it. |
+| Commit | `fix(items): keep a chosen icon when editing an item and allow removing icons` |
+| Next Role | review |
+
+Notes for review:
+1. **Root cause:** in edit mode `AddItemSheet` ran the icon suggestion for the unchanged text on mount and replaced the stored icon with it (or with `null`); the old `COALESCE($3, icon)` hid the `null` case on the server, so the UI showed the right icon until a reload. With `icon: null` now clearing, the sheet fix and the server change must ship together.
+2. **Sheet:** in edit mode the selected icon is the stored one while `text === initialText`, the suggestion once the text differs, and a `manualIconRef` (set by the suggested-icon and icon-browser clicks, reset when the sheet reopens or the initial values change) freezes it after a manual pick. Add mode behaviour is unchanged.
+3. **Server:** `updateEntry` takes `hasIcon`; the SQL is `icon = CASE WHEN $9 THEN $3 ELSE icon END` (9th parameter). The route sets `hasIcon = "icon" in body`; v1 never sets it, so v1 renames keep the icon. Existing expectations in `entries.test.js` / `v1.test.js` gained the extra parameter only (stricter `true` in the icon test); two new route tests cover `icon: null` and omission, and the integration test walks keep → replace → clear → keep-cleared.
+4. **Behaviour to know:** the edit flow always sends `icon` (possibly `null`), so an entry whose icon was removed in the sheet (no suggestion for new text) now really loses it, which the plan asks for. There is still no explicit "remove icon" button; only the text-change path yields `null`.
+
+---
+
+### T-015 — review — 2026-10-09T17:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the edit sheet keeping the chosen icon and the PATCH `icon: null` clearing; verified the keep/replace/clear semantics and v1 rename against a real PostgreSQL (the shipped integration suite still cannot run because of the T-011 migration defect). |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+### T-015 — implement — 2026-10-09T18:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-015 after review PASS_WITH_NOTES: edit sheet keeps the chosen icon and PATCH can clear icons. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-015 implementation files |
+| Commit | `fix(items): keep a chosen icon when editing an item and allow removing icons` |
+| Next Role | none |
+
+---

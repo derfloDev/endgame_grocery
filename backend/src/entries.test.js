@@ -328,7 +328,7 @@ describe("entry routes", () => {
         if (callCount === 5) {
           assert.match(sql, /UPDATE entries/);
           assert.match(sql, /last_updated_by = \$6/);
-          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
+          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001", false]);
 
           return {
             rows: [
@@ -403,7 +403,7 @@ describe("entry routes", () => {
 
         if (callCount === 6) {
           assert.match(sql, /UPDATE entries/);
-          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
+          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001", false]);
 
           return {
             rows: [
@@ -450,7 +450,7 @@ describe("entry routes", () => {
 
         if (callCount === 2) {
           assert.match(sql, /UPDATE entries/);
-          assert.deepEqual(params, ["Oat milk", "open", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
+          assert.deepEqual(params, ["Oat milk", "open", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001", false]);
 
           return {
             rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Oat milk", status: "open", icon: null, details: null }]
@@ -483,8 +483,8 @@ describe("entry routes", () => {
           return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
-        assert.match(sql, /icon = COALESCE\(\$3, icon\)/);
-        assert.deepEqual(params, [null, null, "🥛", false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
+        assert.match(sql, /icon = CASE WHEN \$9 THEN \$3 ELSE icon END/);
+        assert.deepEqual(params, [null, null, "🥛", false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001", true]);
 
         return {
           rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Milk", status: "open", icon: "🥛", details: null }]
@@ -503,6 +503,49 @@ describe("entry routes", () => {
     assert.equal(callCount, 2);
   });
 
+  it("clears the icon when the request sends icon null", async () => {
+    let updateParams = null;
+    const pool = {
+      async query(sql, params) {
+        if (sql.includes("FROM lists l")) return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
+        updateParams = params;
+        return {
+          rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Milk", status: "open", icon: null, details: null }]
+        };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool))
+      .patch("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001")
+      .send({ icon: null });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.entry.icon, null);
+    // icon (param 3) is null and the presence flag (param 9) is true, so the column is set to NULL.
+    assert.deepEqual(updateParams.slice(2, 3), [null]);
+    assert.equal(updateParams[8], true);
+  });
+
+  it("keeps the icon when the request does not mention it", async () => {
+    let updateParams = null;
+    const pool = {
+      async query(sql, params) {
+        if (sql.includes("FROM lists l")) return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
+        updateParams = params;
+        return {
+          rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Milk", status: "open", icon: "🥛", details: null }]
+        };
+      }
+    };
+
+    const response = await request(createAuthedApp(pool))
+      .patch("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001")
+      .send({ text: "Milk" });
+
+    assert.equal(response.status, 200);
+    assert.equal(updateParams[8], false);
+  });
+
   it("updates entry details when the details field is present", async () => {
     let callCount = 0;
     const pool = {
@@ -514,7 +557,7 @@ describe("entry routes", () => {
         }
 
         assert.match(sql, /details = CASE WHEN \$4 THEN \$5 ELSE details END/);
-        assert.deepEqual(params, [null, "open", null, true, "1kg", "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
+        assert.deepEqual(params, [null, "open", null, true, "1kg", "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001", false]);
 
         return {
           rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Rice", status: "open", icon: null, details: "1kg" }]
@@ -544,7 +587,7 @@ describe("entry routes", () => {
           return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
-        assert.deepEqual(params, ["Rice", "open", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
+        assert.deepEqual(params, ["Rice", "open", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001", false]);
 
         return {
           rows: [
@@ -583,7 +626,7 @@ describe("entry routes", () => {
           return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
-        assert.deepEqual(params, [null, "open", null, true, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
+        assert.deepEqual(params, [null, "open", null, true, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001", false]);
 
         return {
           rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Rice", status: "open", icon: null, details: null }]
