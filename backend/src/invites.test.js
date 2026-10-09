@@ -15,90 +15,121 @@ function createAuthedApp(pool, options = {}) {
   });
 }
 
+/**
+ * Pool fake for the acceptance flow. `claimRows` is the result of the atomic
+ * `UPDATE list_invites ... RETURNING list_id`; `insertedRows` that of the membership insert.
+ */
+function createInvitePool({
+  invitedEmail = "Guest@Example.com",
+  userEmail = "guest@example.com",
+  ownerId = "owner-1",
+  claimRows = [{ list_id: "list-1" }],
+  insertedRows = [{ user_id: "user-1" }]
+} = {}) {
+  const statements = [];
+  const run = async (text, params) => {
+    const sql = normalizeSql(text);
+    statements.push([sql, params]);
+
+    if (sql.includes("FROM list_invites") && sql.startsWith("SELECT")) {
+      return { rows: [{ id: "invite-1", list_id: "list-1", invited_email: invitedEmail, status: "pending" }] };
+    }
+    if (sql.startsWith("SELECT email FROM users")) {
+      return { rows: [{ email: userEmail }] };
+    }
+    if (sql.startsWith("SELECT owner_id FROM lists")) {
+      return { rows: [{ owner_id: ownerId }] };
+    }
+    if (sql.startsWith("UPDATE list_invites")) {
+      return { rows: claimRows };
+    }
+    if (sql.startsWith("INSERT INTO list_members")) {
+      return { rows: insertedRows };
+    }
+    return { rows: [] };
+  };
+
+  return {
+    statements,
+    query: run,
+    async connect() {
+      return { query: run, release() {} };
+    }
+  };
+}
+
 describe("invite routes", () => {
-  it("accepts a pending invite and grants access to the list", async () => {
+  it("accepts a pending invite for the invited email in one transaction", async () => {
     const sseManager = createSseManagerSpy();
-    const queries = [];
-    const pool = {
-      async query(text, params) {
-        queries.push([normalizeSql(text), params]);
+    const pool = createInvitePool();
 
-        if (text.includes("FROM list_invites")) {
-          return {
-            rows: [
-              {
-                id: "invite-1",
-                list_id: "list-1",
-                status: "pending"
-              }
-            ]
-          };
-        }
-
-        if (text.includes("SELECT user_id FROM list_members")) {
-          return { rows: [] };
-        }
-
-        return { rows: [] };
-      }
-    };
-
-    const response = await request(createAuthedApp(pool, { sseManager })).get(
-      "/api/invites/invite-token-1"
-    );
+    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/invite-token-1");
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { listId: "list-1" });
-    assert.match(queries[0][0], /FROM list_invites/);
-    assert.equal(queries[0][1][0], hashToken("invite-token-1"));
-    assert.equal(queries[0][1][1] instanceof Date, true);
-    assert.match(queries[1][0], /SELECT user_id FROM list_members/);
-    assert.deepEqual(queries[1][1], ["list-1", "user-1"]);
-    assert.match(queries[2][0], /INSERT INTO list_members/);
-    assert.deepEqual(queries[2][1], ["list-1", "user-1"]);
-    assert.match(queries[3][0], /UPDATE list_invites/);
-    assert.deepEqual(queries[3][1], ["invite-1"]);
-    assert.deepEqual(sseManager.calls, [
-      ["list-1", "member:added", { listId: "list-1", userId: "user-1" }]
+    const sql = pool.statements.map(([text]) => text.split(" ").slice(0, 3).join(" "));
+    assert.deepEqual(sql, [
+      "SELECT id, list_id,",
+      "SELECT email FROM",
+      "SELECT owner_id FROM",
+      "BEGIN",
+      "UPDATE list_invites SET",
+      "INSERT INTO list_members",
+      "COMMIT"
     ]);
+    const claim = pool.statements.find(([text]) => text.startsWith("UPDATE list_invites"));
+    assert.match(claim[0], /SET status = 'accepted' WHERE id = \$1 AND status = 'pending' AND expires_at > \$2 RETURNING list_id/);
+    assert.equal(claim[0].includes("token"), false);
+    assert.equal(claim[1][0], "invite-1");
+    assert.equal(claim[1][1] instanceof Date, true);
+    assert.equal(pool.statements[0][1][0], hashToken("invite-token-1"));
+    assert.deepEqual(sseManager.calls, [["list-1", "member:added", { listId: "list-1", userId: "user-1" }]]);
   });
 
-  it("returns the list id when the invited user is already a member", async () => {
+  it("answers 403 and changes nothing when the account has a different email", async () => {
     const sseManager = createSseManagerSpy();
-    let updateParams = null;
-    const pool = {
-      async query(text, params) {
-        if (text.includes("FROM list_invites")) {
-          return {
-            rows: [
-              {
-                id: "invite-2",
-                list_id: "list-9",
-                status: "pending"
-              }
-            ]
-          };
-        }
+    const pool = createInvitePool({ userEmail: "other@example.com" });
 
-        if (text.includes("SELECT user_id FROM list_members")) {
-          return { rows: [{ user_id: "user-1" }] };
-        }
+    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/invite-token-1");
 
-        if (text.includes("UPDATE list_invites")) {
-          updateParams = params;
-        }
+    assert.equal(response.status, 403);
+    assert.deepEqual(response.body, { error: "This invitation was sent to a different email address." });
+    assert.equal(pool.statements.some(([text]) => text.startsWith("UPDATE") || text.startsWith("INSERT")), false);
+    assert.deepEqual(sseManager.calls, []);
+  });
 
-        return { rows: [] };
-      }
-    };
+  it("answers 409 for the list owner and leaves the invite pending", async () => {
+    const sseManager = createSseManagerSpy();
+    const pool = createInvitePool({ ownerId: "user-1" });
 
-    const response = await request(createAuthedApp(pool, { sseManager })).get(
-      "/api/invites/already-member-token"
-    );
+    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/invite-token-1");
+
+    assert.equal(response.status, 409);
+    assert.deepEqual(response.body, { error: "You already own this list." });
+    assert.equal(pool.statements.some(([text]) => text.startsWith("UPDATE") || text.startsWith("INSERT")), false);
+    assert.deepEqual(sseManager.calls, []);
+  });
+
+  it("answers 400 when another request already used the invite", async () => {
+    const sseManager = createSseManagerSpy();
+    const pool = createInvitePool({ claimRows: [] });
+
+    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/invite-token-1");
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: "Invitation link is invalid or has expired." });
+    assert.equal(pool.statements.some(([text]) => text.startsWith("INSERT")), false);
+    assert.deepEqual(sseManager.calls, []);
+  });
+
+  it("returns the list id without a broadcast when the invited user is already a member", async () => {
+    const sseManager = createSseManagerSpy();
+    const pool = createInvitePool({ insertedRows: [] });
+
+    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/already-member-token");
 
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { listId: "list-9" });
-    assert.deepEqual(updateParams, ["invite-2"]);
+    assert.deepEqual(response.body, { listId: "list-1" });
     assert.deepEqual(sseManager.calls, []);
   });
 

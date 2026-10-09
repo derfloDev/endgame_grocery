@@ -136,8 +136,7 @@ describe("authentication routes", () => {
     const queries = [];
     const sseManager = createSseManagerSpy();
     const { logger, getEntries } = createLogCapture();
-    const pool = {
-      async query(text, params) {
+    const run = async (text, params) => {
         queries.push([normalizeSql(text), params]);
 
         if (text.includes("FROM list_invites")) {
@@ -166,7 +165,20 @@ describe("authentication routes", () => {
           };
         }
 
+        if (text.includes("UPDATE list_invites")) {
+          return { rows: [{ list_id: "list-1" }] };
+        }
+
+        if (text.includes("INSERT INTO list_members")) {
+          return { rows: [{ user_id: "user-9" }] };
+        }
+
         return { rows: [] };
+    };
+    const pool = {
+      query: run,
+      async connect() {
+        return { query: run, release() {} };
       }
     };
 
@@ -215,12 +227,13 @@ describe("authentication routes", () => {
       "Demo User",
       true
     ]);
-    assert.match(queries[2][0], /SELECT user_id FROM list_members/);
-    assert.deepEqual(queries[2][1], ["list-1", "user-9"]);
-    assert.match(queries[3][0], /INSERT INTO list_members/);
-    assert.deepEqual(queries[3][1], ["list-1", "user-9"]);
-    assert.match(queries[4][0], /UPDATE list_invites/);
-    assert.deepEqual(queries[4][1], ["invite-1"]);
+    // The invite is claimed and the membership inserted in one transaction.
+    assert.equal(queries[2][0], "BEGIN");
+    assert.match(queries[3][0], /UPDATE list_invites SET status = 'accepted' WHERE id = \$1 AND status = 'pending'/);
+    assert.equal(queries[3][1][0], "invite-1");
+    assert.match(queries[4][0], /INSERT INTO list_members/);
+    assert.deepEqual(queries[4][1], ["list-1", "user-9"]);
+    assert.equal(queries[5][0], "COMMIT");
     assert.deepEqual(sseManager.calls, [
       ["list-1", "member:added", { listId: "list-1", userId: "user-9" }]
     ]);
@@ -234,7 +247,54 @@ describe("authentication routes", () => {
     });
   });
 
-  it("falls back to the standard verification flow when the invite token is invalid", async () => {
+    it("does not auto-verify or join when the invite was sent to another email", async () => {
+    const queries = [];
+    const sseManager = createSseManagerSpy();
+    const pool = {
+      async query(text, params) {
+        queries.push([normalizeSql(text), params]);
+
+        if (text.includes("FROM list_invites")) {
+          return {
+            rows: [{ id: "invite-1", list_id: "list-1", invited_email: "someone-else@example.com", status: "pending" }]
+          };
+        }
+
+        if (text.includes("INSERT INTO users")) {
+          return {
+            rows: [{ id: "user-9", email: "demo@example.com", display_name: "Demo User", created_at: "2026-04-21T00:00:00Z" }]
+          };
+        }
+
+        return { rows: [] };
+      }
+    };
+    const app = createApp({
+      logger: createLogCapture().logger,
+      pool,
+      sseManager,
+      config: { jwtSecret: "test-secret", jwtExpiresIn: "7d", appBaseUrl: "https://app.example.com" },
+      mailer: { async send() {} },
+      now() {
+        return new Date("2026-04-21T00:00:00Z");
+      }
+    });
+
+    const response = await request(app).post("/api/auth/register").send({
+      email: "demo@example.com",
+      password: "password123",
+      display_name: "Demo User",
+      invite_token: "invite-token-1"
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(response.body.listId, undefined);
+    assert.equal(queries.find(([sql]) => sql.includes("INSERT INTO users"))[1][3], false);
+    assert.equal(queries.some(([sql]) => sql.includes("list_members") || sql.startsWith("UPDATE list_invites")), false);
+    assert.deepEqual(sseManager.calls, []);
+  });
+
+it("falls back to the standard verification flow when the invite token is invalid", async () => {
     const sentMessages = [];
     const queries = [];
     const pool = {

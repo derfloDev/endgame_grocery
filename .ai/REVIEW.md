@@ -1559,3 +1559,42 @@ No blocker or major findings; no required fixes.
 - Anyone holding a key must read it at generation time. A lost key means regenerating it and re-keying Home Assistant.
 - The plaintext key stays in the InfoSheet component state until the sheet closes.
 - Not executed: Playwright E2E and a browser pass over the InfoSheet.
+
+## Task: T-008 (hardening cycle 2026-10-08 — invites bound to the invited email)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `backend/src/integration/helpers.js:29` (pre-existing, also noted for T-007): the migration round-trip test runs `down`, which drops `pg_trgm` for the whole database, while `pg_trgm` is not in `SHARED_EXTENSIONS`. With test files running in parallel this races on `CREATE EXTENSION` (`pg_extension_name_index`) and cancels unrelated tests. It hit different files in each of two parallel runs against one database (`migrations`, then `credentials`); the suite passes 36/36 with `--test-concurrency=1`. Not caused by T-008. It stays a CI flake risk if the runner has more than two cores, so it is worth fixing in the harness (create `pg_trgm` up front and keep the migration from dropping a shared extension, or run integration files serially).
+2. **minor** — the plan asks for `accepted_at = now()`, but `list_invites` has no such column. The implementer did not invent a migration and recorded this in the handoff. Accepted; no requirement depends on it.
+3. **nit** — `GET /api/invites/:token` still changes state on a GET. It is the existing design, and the email binding now stops a forwarded link from being consumed by the wrong account.
+4. **nit** — `integration/invites.test.js`, registration test: the user lookup falls back to "latest created user" via `response.body.user?.id`. It works because each file has its own schema, but looking the user up by the registered email would be clearer.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the full diff: `inviteService.js` (transactional claim, `isInviteForEmail`), `routes/invites.js` (lookup → email check 403 → owner check 409 → claim, 400 when lost), `routes/auth.js` (register-with-invite), `client.ts` (`HttpError`), `InviteAcceptPage.tsx`, DE/EN locales, README, adapted unit tests, new `InviteAcceptPage.test.tsx` and `integration/invites.test.js`.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok. `npm test`: backend 319/319, frontend 674/674.
+- Integration suite against an embedded PostgreSQL 18 (Docker is not running): `integration/invites.test.js` alone 5/5; the whole suite 36/36 when run serially. Parallel runs are flaky for the reason in finding 1.
+- Manual HTTP check against that database with real SQL:
+  - a different account's registration with another address's invite → 201, `email_verified = false`, not a member, invite still pending;
+  - registration with the invite for the invited address (different letter case) → 201, verified, joined to the list;
+  - a second registration reusing the same invite token → unverified, falls back to the normal verification flow;
+  - the integration tests cover 403 for a stranger (no membership), 409 for the owner (invite stays pending), case-insensitive match, and two racing acceptances giving one 200 and one 400.
+- Checked the page flow: 403 shows a translated message with the signed-in email and a "sign out and switch account" action; logout clears the token so the page redirects to `/login?redirect=/invite/<token>`, so the invitee returns to the invite after signing in. 409 shows a translated "you already own this list".
+
+##### Findings
+- All acceptance criteria are met: a different account gets 403 with a translated message and no membership; the owner gets 409; a second acceptance fails; a registration with another address's invite is not auto-verified.
+- Existing invite tests were adapted to the transactional flow without weakening assertions.
+
+##### Risks
+- Every non-OK API response now throws `HttpError` (a subclass of `Error`), so existing callers behave the same; T-020 will replace it with error codes.
+- The invite lookup, email check, owner check and claim are separate queries; only the claim and membership insert are transactional. A race can only make the claim fail, which answers 400 without changing state.
+- Not executed: Playwright E2E and a browser pass over the invite page.

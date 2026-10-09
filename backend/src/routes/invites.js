@@ -2,7 +2,7 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
-import { acceptInviteForUser, getPendingInviteByToken } from "../inviteService.js";
+import { acceptInviteForUser, getPendingInviteByToken, isInviteForEmail } from "../inviteService.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
 export function createInvitesRouter({
@@ -30,11 +30,36 @@ export function createInvitesRouter({
         return;
       }
 
-      const { listId, memberAdded } = await acceptInviteForUser({
+      // An invite is only valid for the address it was sent to, so a forwarded link cannot be
+      // used by another account.
+      const userResult = await pool.query("SELECT email FROM users WHERE id = $1 LIMIT 1", [req.user.sub]);
+
+      if (!isInviteForEmail(invite.invited_email, userResult.rows[0]?.email)) {
+        res.status(403).json({ error: "This invitation was sent to a different email address." });
+        return;
+      }
+
+      // The owner already has full access; leave the invite pending for the person it was meant for.
+      const listResult = await pool.query("SELECT owner_id FROM lists WHERE id = $1 LIMIT 1", [invite.list_id]);
+
+      if (listResult.rows[0]?.owner_id === req.user.sub) {
+        res.status(409).json({ error: "You already own this list." });
+        return;
+      }
+
+      const accepted = await acceptInviteForUser({
         pool,
         invite,
-        userId: req.user.sub
+        userId: req.user.sub,
+        now: now()
       });
+
+      if (!accepted) {
+        res.status(400).json({ error: "Invitation link is invalid or has expired." });
+        return;
+      }
+
+      const { listId, memberAdded } = accepted;
 
       if (memberAdded) {
         void sseManager

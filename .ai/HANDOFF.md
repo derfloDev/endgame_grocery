@@ -614,3 +614,46 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-008 — implement — 2026-10-09T08:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Invite acceptance is bound to the invited email (403 otherwise), refuses the list owner (409) and is atomic and single use; the invite page shows translated messages with a switch-account action. |
+| Files Changed | backend/src/inviteService.js, backend/src/routes/invites.js, backend/src/routes/auth.js, backend/src/invites.test.js, backend/src/auth.test.js, backend/src/integration/invites.test.js, frontend/src/api/client.ts, frontend/src/pages/InviteAcceptPage/InviteAcceptPage.tsx, frontend/src/pages/InviteAcceptPage/InviteAcceptPage.test.tsx, frontend/src/locales/en/translation.json, frontend/src/locales/de/translation.json, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ok; `npm test` backend 319/319, frontend 674/674. `integration/invites.test.js` NOT executed locally (no PostgreSQL, Docker daemon not running); CI runs it. |
+| Commit | `feat(sharing): bind invitations to the invited email and make acceptance single-use` |
+| Next Role | review |
+
+Notes for review:
+1. **Service:** `acceptInviteForUser` now runs in `withTransaction`: `UPDATE list_invites SET status='accepted' WHERE id=$1 AND status='pending' AND expires_at>$2 RETURNING list_id`, then `INSERT … ON CONFLICT DO NOTHING RETURNING user_id` (`memberAdded` = a row came back). It returns `null` when the claim lost. The plan's `accepted_at` column does not exist in the schema and was not added (no requirement beyond status).
+2. **Route order:** invite lookup → email check (403) → owner check (409) → claim (400 when lost). A forwarded link therefore never changes state for the wrong account.
+3. **Register:** the existing email-match check already prevented auto-verification for foreign invites; a test now pins it. If the claim is lost to a race after the user insert, the account is set back to `email_verified = false` and uses the normal verification flow (T-009 will make register atomic).
+4. **Frontend:** `client.ts` throws a new `HttpError` (subclass of `Error`, adds `status`) so the page can map 403/409 to DE/EN texts; other failures still show the server message. Existing callers are unaffected. T-020 will replace this with error codes.
+5. Existing `invites.test.js`/`auth.test.js` invite tests were adapted to the transactional flow (no assertion weakened); the 'already a member' case still returns 200 without a broadcast.
+
+---
+
+### T-008 — review — 2026-10-09T08:40:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed email-bound, owner-excluding, atomic single-use invite acceptance and the invite page messages; verified with real SQL (integration 36/36 serially, manual register-with-invite scenarios). |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+### T-008 — implement — 2026-10-09T08:55:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-008 after review PASS_WITH_NOTES: invites bound to the invited email, owner excluded, acceptance atomic and single use. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-008 implementation files |
+| Commit | `feat(sharing): bind invitations to the invited email and make acceptance single-use` |
+| Next Role | none |
+
+---

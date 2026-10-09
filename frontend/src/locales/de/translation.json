@@ -171,6 +171,10 @@
   "invite.connecting": "Wir verbinden diese Einladung jetzt mit deinem Konto.",
   "invite.opening": "Deine geteilte Liste wird geöffnet...",
   "invite.invalidLink": "Einladungslink ist ungültig oder abgelaufen.",
+  "invite.wrongAccount": "Diese Einladung wurde an eine andere E-Mail-Adresse gesendet. Melde dich mit dem eingeladenen Konto an, um beizutreten.",
+  "invite.signedInAs": "Du bist angemeldet als {email}.",
+  "invite.switchAccount": "Abmelden und Konto wechseln",
+  "invite.ownList": "Diese Liste gehört dir bereits.",
   "listCard.renameLabel": "{name} umbenennen",
   "listCard.cancelRename": "Umbenennen abbrechen",
   "listCard.saveName": "Namen speichern"

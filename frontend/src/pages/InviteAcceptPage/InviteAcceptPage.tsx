@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import logo from "../../assets/endgame_grocery_logo.png";
+import { HttpError } from "../../api/client";
 import { acceptInvite } from "../../api/sharing";
 import { useAuth } from "../../context/AuthContext";
 import styles from "../../styles/auth.module.css";
@@ -10,9 +11,10 @@ import styles from "../../styles/auth.module.css";
 export default function InviteAcceptPage(): ReactElement {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, user, logout } = useAuth();
   const { token: inviteToken = "" } = useParams();
   const [error, setError] = useState<string>("");
+  const [wrongAccount, setWrongAccount] = useState(false);
 
   useEffect(() => {
     if (!inviteToken) {
@@ -29,6 +31,7 @@ export default function InviteAcceptPage(): ReactElement {
 
     async function submitInvite(): Promise<void> {
       setError("");
+      setWrongAccount(false);
 
       try {
         const result = await acceptInvite(inviteToken, token);
@@ -40,6 +43,18 @@ export default function InviteAcceptPage(): ReactElement {
         navigate(`/lists/${result.listId}`, { replace: true });
       } catch (acceptError) {
         if (cancelled) {
+          return;
+        }
+
+        if (acceptError instanceof HttpError && acceptError.status === 403) {
+          // The invite belongs to another email address: offer to switch accounts.
+          setWrongAccount(true);
+          setError(t("invite.wrongAccount"));
+          return;
+        }
+
+        if (acceptError instanceof HttpError && acceptError.status === 409) {
+          setError(t("invite.ownList"));
           return;
         }
 
@@ -72,8 +87,16 @@ export default function InviteAcceptPage(): ReactElement {
         </p>
         <div className={styles["auth-form"]}>
           {error ? <p className="eg-error-banner">{error}</p> : null}
+          {wrongAccount && user?.email ? (
+            <p>{t("invite.signedInAs", { email: user.email })}</p>
+          ) : null}
           {!error ? <p className="eg-success-banner">{t("invite.opening")}</p> : null}
           <div className="button-row">
+            {wrongAccount ? (
+              <button className="eg-btn-secondary" type="button" onClick={logout}>
+                {t("invite.switchAccount")}
+              </button>
+            ) : null}
             <Link className="eg-link" to="/login">
               {t("auth.backToLogin")}
             </Link>

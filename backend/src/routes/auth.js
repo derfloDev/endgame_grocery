@@ -110,12 +110,23 @@ export function createAuthRouter({
         [normalizedEmail, passwordHash, displayName, Boolean(pendingInvite)]
       );
 
-      if (pendingInvite) {
-        const { listId, memberAdded } = await acceptInviteForUser({
-          pool,
-          invite: pendingInvite,
-          userId: result.rows[0].id
-        });
+      const acceptedInvite = pendingInvite
+        ? await acceptInviteForUser({
+            pool,
+            invite: pendingInvite,
+            userId: result.rows[0].id,
+            now: now()
+          })
+        : null;
+
+      if (pendingInvite && !acceptedInvite) {
+        // The invite was used by someone else between the lookup and the insert, so the account
+        // was not vetted by it after all: fall back to the normal email verification.
+        await pool.query("UPDATE users SET email_verified = false WHERE id = $1", [result.rows[0].id]);
+      }
+
+      if (acceptedInvite) {
+        const { listId, memberAdded } = acceptedInvite;
 
         if (memberAdded) {
           void sseManager

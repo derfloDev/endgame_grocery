@@ -25,6 +25,17 @@ interface ErrorResponse {
   error?: string;
 }
 
+/** Error for a non-OK API response; `status` lets callers show a translated, status-specific message. */
+export class HttpError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
+
 export class AuthExpiredError extends Error {
   constructor(message = "session:expired") {
     super(message);
@@ -88,7 +99,7 @@ export async function sendJsonRequest<T = unknown>(
         throw new AuthExpiredError();
       }
 
-      throw new Error(data.error ?? "Request failed.");
+      throw new HttpError(data.error ?? "Request failed.", response.status);
     }
 
     if (method === "GET" && cacheKey) {

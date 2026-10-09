@@ -171,6 +171,10 @@
   "invite.connecting": "We are connecting this invite to your account now.",
   "invite.opening": "Opening your shared list...",
   "invite.invalidLink": "Invitation link is invalid or has expired.",
+  "invite.wrongAccount": "This invitation was sent to a different email address. Sign in with the invited account to join.",
+  "invite.signedInAs": "You are signed in as {email}.",
+  "invite.switchAccount": "Sign out and switch account",
+  "invite.ownList": "You already own this list.",
   "listCard.renameLabel": "Rename {name}",
   "listCard.cancelRename": "Cancel rename",
   "listCard.saveName": "Save name"
