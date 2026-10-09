@@ -137,7 +137,9 @@ export async function createEntry(context, { text, icon, details }) {
 
   const entry = created.rows[0];
 
-  broadcast(context, listId, "entry:created", { listId, entryId: entry.id });
+  // The event carries the row (same fields as the entries GET, minus `is_changed`) so clients can
+  // patch their state instead of refetching the whole list.
+  broadcast(context, listId, "entry:created", { listId, entryId: entry.id, actorId: userId, entry });
 
   void enqueuePushJob({
     pool,
@@ -256,9 +258,11 @@ export async function updateEntry(context, { entryId, text, status, toggle = fal
     return { status: "not_found" };
   }
 
-  broadcast(context, listId, "entry:updated", { listId, entryId });
+  const entry = result.rows[0];
 
-  return { status: "ok", entry: result.rows[0] };
+  broadcast(context, listId, "entry:updated", { listId, entryId, actorId: userId, entry });
+
+  return { status: "ok", entry };
 }
 
 /**
@@ -280,7 +284,7 @@ export async function deleteEntry(context, { entryId }) {
     `
       DELETE FROM entries
       WHERE id = $1 AND list_id = $2
-      RETURNING id
+      RETURNING id, status
     `,
     [entryId, listId]
   );
@@ -289,7 +293,13 @@ export async function deleteEntry(context, { entryId }) {
     return { status: "not_found" };
   }
 
-  broadcast(context, listId, "entry:deleted", { listId, entryId });
+  // The status tells clients whether the recently-used history has to be refreshed.
+  broadcast(context, listId, "entry:deleted", {
+    listId,
+    entryId,
+    actorId: userId,
+    entryStatus: result.rows[0].status
+  });
 
   return { status: "ok" };
 }

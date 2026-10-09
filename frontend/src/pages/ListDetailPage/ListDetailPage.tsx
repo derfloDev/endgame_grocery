@@ -61,6 +61,9 @@ export default function ListDetailPage(): ReactElement {
   const {
     entries,
     entryError,
+    handleEntryCreated,
+    handleEntryDeleted,
+    handleEntryUpdated,
     isLoading,
     isSharingLoading,
     list,
@@ -78,6 +81,7 @@ export default function ListDetailPage(): ReactElement {
     submitEditEntry,
     toggleStatus
   } = useListDetailData({
+    currentUserId: user?.id,
     listId,
     onLoadStart: resetShareFeedback,
     onNonOwnerList: closeOwnerOnlySheets,
@@ -96,8 +100,6 @@ export default function ListDetailPage(): ReactElement {
     token
   });
 
-  const handleEntryChange = useCallback(() => void loadEntries().then((nextEntries) => reloadHistory(nextEntries)), [loadEntries, reloadHistory]);
-
   const handleMemberChange = useCallback(() => void loadMembers({ isOwner: list?.is_owner ?? false }), [list?.is_owner, loadMembers]);
 
   const handleHistoryChange = useCallback(() => void reloadHistory(), [reloadHistory]);
@@ -112,9 +114,10 @@ export default function ListDetailPage(): ReactElement {
     ]));
   }, [resyncVersion, isLoading, loadEntries, reloadHistory, loadMembers, list?.is_owner]);
 
-  useListEvents("entry:created", listId, handleEntryChange);
-  useListEvents("entry:updated", listId, handleEntryChange);
-  useListEvents("entry:deleted", listId, handleEntryChange);
+  // Entry events patch the local entries from their payload; no entries request per event.
+  useListEvents("entry:created", listId, handleEntryCreated);
+  useListEvents("entry:updated", listId, handleEntryUpdated);
+  useListEvents("entry:deleted", listId, handleEntryDeleted);
   useListEvents("history:updated", listId, handleHistoryChange);
   useListEvents("member:added", listId, handleMemberChange);
   // Deleted list, own removal (back to the overview with a notice) and rename (title in place).

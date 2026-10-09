@@ -194,7 +194,7 @@ describe("external v1 API routes", () => {
     assert.match(insert[0], /INSERT INTO entries \(list_id, text, status, icon, details, last_updated_by\)/);
     assert.deepEqual(insert[1], [LIST_ID, "Milk", null, null, "user-1"]);
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);
     const push = pool.find("INSERT INTO pending_push_jobs");
     assert.deepEqual(push[1].slice(0, 2), [LIST_ID, "user-1"]);
@@ -274,7 +274,7 @@ describe("external v1 API routes", () => {
       item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
     });
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);
     assert.ok(getEntries().some((entry) => entry.msg === "Failed to broadcast SSE event"));
   });
@@ -308,7 +308,7 @@ describe("external v1 API routes", () => {
     assert.match(update[0], /last_updated_by = \$6/);
     assert.deepEqual(update[1], [null, "done", null, false, null, "user-1", ITEM_ID, LIST_ID]);
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "done",details: "2%",last_updated_by: "user-1"} }]
     ]);
     assert.deepEqual(order, ["broadcast"]);
   });
@@ -345,7 +345,7 @@ describe("external v1 API routes", () => {
     assert.equal(pool.find("DELETE FROM entries"), undefined);
     assert.equal(pool.find("UPDATE entries")[1][1], "open");
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);
   });
 
@@ -364,7 +364,7 @@ describe("external v1 API routes", () => {
       item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
     });
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);
     assert.ok(getEntries().some((entry) => entry.msg === "Failed to broadcast SSE event"));
   });
@@ -470,7 +470,7 @@ describe("external v1 API routes", () => {
     });
     assert.deepEqual(pool.find("UPDATE entries")[1], ["Oat milk", null, null, false, null, "user-1", ITEM_ID, LIST_ID]);
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Oat milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);
   });
 
@@ -533,7 +533,7 @@ describe("external v1 API routes", () => {
 
         assert.match(normalizeSql(sql), /DELETE FROM entries/);
         assert.deepEqual(params, [ITEM_ID, LIST_ID]);
-        return { rows: [{ id: ITEM_ID }] };
+        return { rows: [{ id: ITEM_ID, status: "done" }] };
       }
     };
 
@@ -545,7 +545,7 @@ describe("external v1 API routes", () => {
     assert.equal(response.text, "");
     assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:deleted", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:deleted", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entryStatus: "done" }]
     ]);
   });
 

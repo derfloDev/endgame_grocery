@@ -490,6 +490,174 @@ describe("ListDetailPage resync", () => {
   });
 });
 
+describe("ListDetailPage live entry patching", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  function getEventHandler(type: string) {
+    const calls = useListEventsMock.mock.calls.filter(([eventType]) => eventType === type);
+    return calls[calls.length - 1]![2];
+  }
+
+  function serverEntry(overrides: Partial<Entry> & { id: string }): Entry {
+    return {
+      list_id: "list-1",
+      text: "Milk",
+      status: "open",
+      icon: null,
+      details: null,
+      created_at: "2026-04-01T10:00:00.000Z",
+      updated_at: "2026-04-01T10:00:00.000Z",
+      last_updated_by: "user-2",
+      ...overrides
+    } as Entry;
+  }
+
+  it("patches an updated entry from the event without requesting the entries again", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const entryRequests = fetchEntriesMock.mock.calls.length;
+    const historyRequests = fetchRecentlyUsedMock.mock.calls.length;
+
+    act(() => {
+      getEventHandler("entry:updated")({
+        listId: "list-1",
+        entryId: "entry-1",
+        actorId: "user-2",
+        entry: serverEntry({ id: "entry-1", text: "Oat milk", updated_at: "2026-04-01T11:00:00.000Z" })
+      });
+    });
+
+    expect(await screen.findByText("Oat milk")).toBeTruthy();
+    expect(screen.queryByText("Milk")).toBeNull();
+    expect(fetchEntriesMock.mock.calls.length).toBe(entryRequests);
+    expect(fetchRecentlyUsedMock.mock.calls.length).toBe(historyRequests);
+  });
+
+  it("adds a created entry and removes a deleted one from the event payload alone", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const entryRequests = fetchEntriesMock.mock.calls.length;
+
+    act(() => {
+      getEventHandler("entry:created")({
+        listId: "list-1",
+        entryId: "entry-2",
+        actorId: "user-2",
+        entry: serverEntry({ id: "entry-2", text: "Bread", created_at: "2026-04-01T12:00:00.000Z" })
+      });
+    });
+    expect(await screen.findByText("Bread")).toBeTruthy();
+
+    act(() => {
+      getEventHandler("entry:deleted")({ listId: "list-1", entryId: "entry-1", actorId: "user-2", entryStatus: "open" });
+    });
+    await waitFor(() => { expect(screen.queryByText("Milk")).toBeNull(); });
+    expect(screen.getByText("Bread")).toBeTruthy();
+    expect(fetchEntriesMock.mock.calls.length).toBe(entryRequests);
+  });
+
+  it("applies the same event twice without changing anything", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const event = {
+      listId: "list-1",
+      entryId: "entry-2",
+      actorId: "user-2",
+      entry: serverEntry({ id: "entry-2", text: "Bread", created_at: "2026-04-01T12:00:00.000Z" })
+    };
+
+    act(() => { getEventHandler("entry:created")(event); });
+    await screen.findByText("Bread");
+    act(() => { getEventHandler("entry:created")(event); });
+
+    expect(screen.getAllByText("Bread")).toHaveLength(1);
+  });
+
+  it("falls back to a full reload when an event carries no entry payload", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const entryRequests = fetchEntriesMock.mock.calls.length;
+    fetchEntriesMock.mockResolvedValue({ entries: [serverEntry({ id: "entry-9", text: "Eggs" })] });
+
+    act(() => { getEventHandler("entry:updated")({ listId: "list-1", entryId: "entry-1" }); });
+
+    expect(await screen.findByText("Eggs")).toBeTruthy();
+    expect(fetchEntriesMock.mock.calls.length).toBe(entryRequests + 1);
+  });
+
+  it("reloads the recently used history once, debounced, after done transitions", async () => {
+    mockListDetailData({
+      entries: [
+        serverEntry({ id: "entry-1", text: "Milk" }),
+        serverEntry({ id: "entry-2", text: "Bread", created_at: "2026-04-01T11:00:00.000Z" })
+      ]
+    });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const historyRequests = fetchRecentlyUsedMock.mock.calls.length;
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const complete = (id: string, text: string) =>
+      getEventHandler("entry:updated")({
+        listId: "list-1",
+        entryId: id,
+        actorId: "user-2",
+        entry: serverEntry({ id, text, status: "done", updated_at: "2026-04-01T13:00:00.000Z" })
+      });
+
+    act(() => { complete("entry-1", "Milk"); });
+    act(() => { vi.advanceTimersByTime(100); });
+    act(() => { complete("entry-2", "Bread"); });
+    act(() => { vi.advanceTimersByTime(249); });
+    expect(fetchRecentlyUsedMock.mock.calls.length).toBe(historyRequests);
+
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(fetchRecentlyUsedMock.mock.calls.length).toBe(historyRequests + 1);
+  });
+
+  it("does not reload the history for edits of open entries", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const historyRequests = fetchRecentlyUsedMock.mock.calls.length;
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+    act(() => {
+      getEventHandler("entry:updated")({
+        listId: "list-1",
+        entryId: "entry-1",
+        actorId: "user-2",
+        entry: serverEntry({ id: "entry-1", text: "Oat milk" })
+      });
+    });
+    await act(async () => { vi.advanceTimersByTime(1000); });
+
+    expect(fetchRecentlyUsedMock.mock.calls.length).toBe(historyRequests);
+  });
+
+  it("still refetches everything on a resync", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    const view = renderListDetailPage();
+    await screen.findByText("Milk");
+    const entryRequests = fetchEntriesMock.mock.calls.length;
+
+    streamState.resyncVersion += 1;
+    view.rerenderPage();
+
+    await waitFor(() => { expect(fetchEntriesMock.mock.calls.length).toBe(entryRequests + 1); });
+  });
+});
+
 describe("ListDetailPage lifecycle events", () => {
   beforeEach(() => {
     vi.clearAllMocks();

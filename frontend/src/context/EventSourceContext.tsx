@@ -22,6 +22,13 @@ export type SseEventType =
   | "list:deleted"
   | "member:added"
   | "member:removed";
+/**
+ * Event payloads (all carry `listId`):
+ * - `entry:created` / `entry:updated`: `{ listId, entryId, actorId, entry }`, where `entry` has the
+ *   fields of the entries GET (without `is_changed`) so clients patch their state without refetching.
+ * - `entry:deleted`: `{ listId, entryId, actorId, entryStatus }`.
+ * - other events: `{ listId }` plus `userId` for member events.
+ */
 export type SseHandler = (data: Record<string, unknown>) => void;
 
 interface EventSourceContextValue {

@@ -1739,3 +1739,36 @@ No blocker or major findings; no required fixes.
 
 ##### Risks
 - Frontend behaviour was verified through unit/component tests only; no browser or E2E run (no two-user E2E exists until T-023). No SQL changed, so no integration test was needed.
+
+## Task: T-013 (hardening cycle 2026-10-08 — live entry updates patched from the SSE payload)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `listDetailUtils.ts` `applyEntryEvent`: an event for another user's change is always marked `is_changed = true`, whereas the entries GET derives the flag from `last_viewed_at`. For a user who has the page open this is the intended "someone else just changed it" badge, but a patched entry and a freshly fetched one can differ in that badge after a reload. Acceptable and in line with the plan.
+2. **minor** — when the server evicts the oldest done entry at the 200-done cap, other clients get no deletion event (as before); the history reload on the done transition covers the visible effect. Documented in the handoff.
+3. **minor** — the fall-back refetch for payload-less events (older server or malformed payload) keeps the old behaviour; it is the only path that still issues an `/entries` GET per event, which is intended.
+4. **nit** — `useListDetailData.ts` grows further (about 570 lines); T-022 is the planned split.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board, the handoff and the diff: `services/entryService.js`, `listDetailUtils.ts`, `useListDetailData.ts`, `ListDetailPage.tsx`, `EventSourceContext.tsx` payload docs, README and the changed tests (`entries.test.js`, `v1.test.js`, `listDetailUtils.test.ts`, `ListDetailPage.test.tsx`).
+- Backend: `entry:created` and `entry:updated` carry `{ listId, entryId, actorId, entry }` where `entry` is the `RETURNING ${ENTRY_COLUMNS}` row, the same columns as the entries GET minus `is_changed`; `entry:deleted` carries `{ listId, entryId, actorId, entryStatus }` through `DELETE … RETURNING id, status`. Old fields stay for compatibility. Both the app API and v1 go through `entryService`, so both emit the new payloads.
+- Frontend: `applyEntryEvent` is pure; it upserts or removes by id, returns the same array reference when nothing changes (idempotent, so the actor's own event is a no-op), never replaces or drops queued `is_pending_sync` entries, keeps the done badge for entries completed locally, re-sorts, and returns `null` for unusable payloads so the hook falls back to a refetch. History reload is scheduled (trailing 250 ms debounce, cleared on unmount) only when an entry moves to or from done or a done entry is deleted. Resync and `syncVersion` still do the full refetch; the patched entries are also written to the offline cache.
+- `npm run lint`: 0 errors. `npm run build`: ok. `npm test`: backend 365 pass, 0 fail; frontend 47 files pass (719 tests per the board entry).
+
+##### Findings
+- All acceptance criteria are met by the code and its tests: entry events carry `entry` and `actorId`; a toggle causes no `/entries` GET on other clients; patches are idempotent and preserve pending entries and done badges; history reloads only on done transitions, debounced; resync still refetches.
+- Existing assertions on the event payloads were updated because the payloads gained fields; the existing app test with payload-less events still passes through the fallback path, unchanged.
+
+##### Risks
+- Not run: Playwright specs and the PostgreSQL integration suite (no SQL structure changed besides `RETURNING status`). Two-client behaviour is covered by unit/component tests only until T-023 adds a two-user E2E.
+- Clients and server are deployed together in one image, so the mixed-version fallback matters mainly for cached service-worker pages; it is covered.

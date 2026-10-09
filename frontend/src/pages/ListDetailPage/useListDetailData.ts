@@ -7,7 +7,11 @@ import { writeCachedResource } from "../../api/offlineStore";
 import { fetchListMembers } from "../../api/sharing";
 import type { Entry, List, Member, Suggestion } from "../../types";
 import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "../recentlyUsedState";
-import { ListAccessError, mergePendingEntries } from "./listDetailUtils";
+import { ListAccessError, applyEntryEvent, mergePendingEntries, sortEntries } from "./listDetailUtils";
+import type { EntryEventType } from "./listDetailUtils";
+
+// Several entries are often completed within a moment (shopping); one history reload covers them.
+const HISTORY_RELOAD_DEBOUNCE_MS = 250;
 
 export interface DetailEntry extends Omit<Entry, "details"> {
   details?: string | null;
@@ -40,6 +44,8 @@ interface LoadMembersOptions {
 }
 
 interface UseListDetailDataOptions {
+  /** The signed-in user; changes made by other users are marked as changed. */
+  currentUserId?: string;
   listId: string;
   onLoadStart?: () => void;
   onNonOwnerList?: () => void;
@@ -48,6 +54,7 @@ interface UseListDetailDataOptions {
 }
 
 export function useListDetailData({
+  currentUserId,
   listId,
   onLoadStart,
   onNonOwnerList,
@@ -75,11 +82,18 @@ export function useListDetailData({
     return nextEntries;
   }, []);
 
+  const historyReloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     isMountedRef.current = true;
 
     return () => {
       isMountedRef.current = false;
+
+      if (historyReloadTimerRef.current !== null) {
+        clearTimeout(historyReloadTimerRef.current);
+        historyReloadTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -133,6 +147,53 @@ export function useListDetailData({
     },
     [entries, listId, token]
   );
+
+  const scheduleHistoryReload = useCallback((): void => {
+    if (historyReloadTimerRef.current !== null) {
+      clearTimeout(historyReloadTimerRef.current);
+    }
+
+    historyReloadTimerRef.current = setTimeout(() => {
+      historyReloadTimerRef.current = null;
+      void reloadHistory(entriesRef.current);
+    }, HISTORY_RELOAD_DEBOUNCE_MS);
+  }, [reloadHistory]);
+
+  /**
+   * Applies an SSE entry event by patching the local entries (no request). Only an event without
+   * a usable payload (an older server) falls back to refetching entries and history. The history
+   * is reloaded, debounced, only when an entry moved to or from done or a done entry was deleted.
+   */
+  const handleEntryEvent = useCallback(
+    (type: EntryEventType, data: Record<string, unknown>): void => {
+      const result = applyEntryEvent(entriesRef.current, type, data, {
+        currentUserId,
+        locallyDoneIds: locallyDoneIdsRef.current
+      });
+
+      if (!result) {
+        void loadEntries().then((nextEntries) => reloadHistory(nextEntries));
+        return;
+      }
+
+      if (result.entries !== entriesRef.current) {
+        const nextEntries = setEntries(result.entries);
+
+        setRecentlyUsed((currentItems) => filterRecentlyUsedItems(currentItems, nextEntries));
+        Promise.resolve(writeCachedResource(`entries:${listId}`, { entries: nextEntries })).catch((error: unknown) => {
+          console.error("Failed to cache entries.", error);
+        });
+      }
+
+      if (result.historyChanged) {
+        scheduleHistoryReload();
+      }
+    },
+    [currentUserId, listId, loadEntries, reloadHistory, scheduleHistoryReload, setEntries]
+  );
+  const handleEntryCreated = useCallback((data: Record<string, unknown>) => handleEntryEvent("entry:created", data), [handleEntryEvent]);
+  const handleEntryUpdated = useCallback((data: Record<string, unknown>) => handleEntryEvent("entry:updated", data), [handleEntryEvent]);
+  const handleEntryDeleted = useCallback((data: Record<string, unknown>) => handleEntryEvent("entry:deleted", data), [handleEntryEvent]);
 
   const loadMembers = useCallback(
     async ({ isOwner = false, throwOnError = false }: LoadMembersOptions = {}): Promise<DetailMember[]> => {
@@ -485,6 +546,9 @@ export function useListDetailData({
     dismissRecentlyUsedEntry,
     entries,
     entryError,
+    handleEntryCreated,
+    handleEntryDeleted,
+    handleEntryUpdated,
     isLoading,
     isSharingLoading,
     list,
@@ -501,16 +565,6 @@ export function useListDetailData({
     submitEditEntry,
     toggleStatus
   };
-}
-
-function sortEntries(entries: DetailEntry[]): DetailEntry[] {
-  return [...entries].sort((left, right) => {
-    if (left.status === right.status) {
-      return new Date(left.created_at ?? 0).getTime() - new Date(right.created_at ?? 0).getTime();
-    }
-
-    return left.status === "open" ? -1 : 1;
-  });
 }
 
 function normalizeEntryDetails(details: string): string | null {

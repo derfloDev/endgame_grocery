@@ -835,3 +835,49 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-013 — implement — 2026-10-09T07:12:43Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Entry events now carry the entry (and actor / deleted status) and the detail page patches its entries from them idempotently instead of refetching, reloading the history only on done transitions and debounced; resync and payload-less events still refetch. |
+| Files Changed | backend/src/services/entryService.js, backend/src/entries.test.js, backend/src/v1.test.js, frontend/src/pages/ListDetailPage/listDetailUtils.ts, frontend/src/pages/ListDetailPage/listDetailUtils.test.ts, frontend/src/pages/ListDetailPage/useListDetailData.ts, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/context/EventSourceContext.tsx, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` (0 errors, 1 pre-existing warning); `npm run build` ok; `npm test` backend 365/365, frontend 719/719 pass. `tsc --noEmit` shows only the two pre-existing errors (T-021). PostgreSQL integration not run (Docker Desktop off); the only SQL change is `DELETE … RETURNING id, status`. |
+| Commit | `perf(sse): patch live entry changes from the event payload instead of refetching the list` |
+| Next Role | review |
+
+Notes for review:
+1. **Payloads** (both app API and v1, since both go through `entryService`): `entry:created`/`entry:updated` = `{ listId, entryId, actorId, entry }` where `entry` is the `RETURNING` row (same columns as the entries GET without `is_changed`); `entry:deleted` = `{ listId, entryId, actorId, entryStatus }` via `DELETE … RETURNING id, status`. Existing fields are kept for compatibility. The 11 backend assertions on these payloads were updated (entries.test.js, v1.test.js).
+2. **`applyEntryEvent`** (pure, in `listDetailUtils.ts`, 29 unit tests): upsert/remove by id, same array reference when nothing changes (idempotent, so the actor's own event is a no-op on that tab), `is_changed = last_updated_by !== currentUserId` (kept `true` for entries completed on this client), queued (`is_pending_sync`) entries untouched, events about an entry with its own request still in flight are ignored (the response delivers the final state), result re-sorted. Returns `null` for unusable payloads → the hook refetches (old servers). `entry:deleted` without `entryStatus` also returns `null` because the history impact cannot be judged; this keeps the existing app test ("refetches entries and members … when SSE events arrive", payload-less events) unchanged.
+3. **History reload:** `historyChanged` is true when an entry moves to or from done (or arrives done and unknown) or a done entry is deleted; the hook debounces with a trailing 250 ms timer (cleared on unmount) and passes the latest entries to `reloadHistory`. The standalone `history:updated` event still reloads immediately.
+4. **Hook/page:** `useListDetailData` gets `currentUserId` and returns `handleEntryCreated/Updated/Deleted`; the patched entries are also written to the offline cache (`entries:<listId>`). `sortEntries` moved from the hook to `listDetailUtils.ts` (exported). The page shrank (the old `handleEntryChange` is gone), so the "< 400 lines" structure test is untouched.
+5. **Known limitation:** when the server evicts the oldest done entry at the 200-done cap, other clients are not told about that deletion (as before for open lists, since only open entries render); the history refresh on the done transition covers the visible effect.
+6. **Not run:** the Playwright specs and the PostgreSQL integration suite.
+
+---
+
+### T-013 — review — 2026-10-09T09:50:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed SSE entry events carrying the entry and actor, client-side idempotent patching and debounced history reload; all criteria met, two-client E2E not available yet. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-013 — implement — 2026-10-09T07:16:18Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-013 after review PASS_WITH_NOTES: entry events carry the entry and actor, and the detail page patches live changes idempotently instead of refetching. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-013 implementation files |
+| Commit | `perf(sse): patch live entry changes from the event payload instead of refetching the list` |
+| Next Role | none |
+
+---

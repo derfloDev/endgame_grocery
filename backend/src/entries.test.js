@@ -133,7 +133,7 @@ describe("entry routes", () => {
     await waitForQueuedPushInsert();
     assert.equal(callCount, 5);
     assert.deepEqual(sseManager.calls, [
-      ["10000000-0000-4000-8000-000000000001", "entry:created", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001" }]
+      ["10000000-0000-4000-8000-000000000001", "entry:created", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001", actorId: "user-1", entry: { id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Milk", status: "open", icon: "🥛", details: null } }]
     ]);
   });
 
@@ -361,7 +361,7 @@ describe("entry routes", () => {
     assert.equal(response.body.entry.details, "Barista");
     assert.equal(callCount, 5);
     assert.deepEqual(sseManager.calls, [
-      ["10000000-0000-4000-8000-000000000001", "entry:updated", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001" }]
+      ["10000000-0000-4000-8000-000000000001", "entry:updated", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001", actorId: "user-1", entry: { id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Oat milk", status: "done", icon: null, details: "Barista" } }]
     ]);
   });
 
@@ -434,7 +434,7 @@ describe("entry routes", () => {
     assert.equal(response.body.entry.status, "done");
     assert.equal(callCount, 6);
     assert.deepEqual(sseManager.calls, [
-      ["10000000-0000-4000-8000-000000000001", "entry:updated", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001" }]
+      ["10000000-0000-4000-8000-000000000001", "entry:updated", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001", actorId: "user-1", entry: { id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Oat milk", status: "done", icon: null, details: null } }]
     ]);
   });
 
@@ -618,7 +618,7 @@ describe("entry routes", () => {
           assert.match(sql, /DELETE FROM entries/);
           assert.deepEqual(params, ["20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
 
-          return { rows: [{ id: "20000000-0000-4000-8000-000000000001" }] };
+          return { rows: [{ id: "20000000-0000-4000-8000-000000000001", status: "done" }] };
         }
 
         assert.fail(`Unexpected query ${callCount}: ${sql}`);
@@ -632,7 +632,7 @@ describe("entry routes", () => {
     assert.equal(response.status, 204);
     assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
-      ["10000000-0000-4000-8000-000000000001", "entry:deleted", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001" }]
+      ["10000000-0000-4000-8000-000000000001", "entry:deleted", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001", actorId: "user-1", entryStatus: "done" }]
     ]);
   });
 
