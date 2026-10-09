@@ -2146,3 +2146,30 @@ No required fixes.
 
 ##### Risks
 - Please run `npm run test:integration` (parallel, default) against PostgreSQL a few times before `commit_task`; CI will do the same on PostgreSQL 16. If the parallel run fails again, send it back through `rework_task`.
+
+### Review Round 2 (T-013 — rework of the duplicate-tile regression)
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **resolved** — T-016 finding 1 (the same entry shown twice when `entry:created` beats the POST response). Two layers: `replaceTemporaryEntry` (`listDetailUtils.ts`) removes every entry carrying the temporary or the real id and then adds the server's entry, so the response can never leave a duplicate whichever order the event and response arrive in; `handleEntryEvent` additionally ignores an own `entry:created` whose text equals an entry this tab is creating right now (`inFlightTempIdsRef`, added before the request and removed in the `finally` path at line 361), which avoids a visible flash of two tiles.
+2. **minor** — trade-off of the second layer, noted by the implementer: if the same user creates an entry with exactly the same text in a second tab at the same moment as this tab, the second tab's event is skipped here until the next reload/resync. The entry is never lost on the server; the window is the duration of one request. Acceptable.
+3. **minor (verification gap)** — the Playwright spec that exposed the bug (`lists.spec.js › adds an item to a shopping list`) was not re-run by the implementer, and I could not run it either (no database/stack available in this session). The fix is covered by five new hook-level interleaving tests (event before response, response before event, a copy that slips past the guard is still collapsed, another user's concurrent entry still applied, another tab's own entry with different text applied) and four `replaceTemporaryEntry` unit tests, which are exactly the interleavings the earlier unit tests missed.
+
+No required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the T-016 finding, the rework handoff and the working-tree diff (`useListDetailData.ts`, `listDetailUtils.ts`, tests, README).
+- Traced both orderings by hand: event first → guard skips it while the temp entry is in flight, and if it slips through, `replaceTemporaryEntry` collapses temp and real into one; response first → temp replaced by the real entry and the later event is an idempotent no-op in `applyEntryEvent`. The queued/offline branch is unchanged.
+- `npm run lint`: 0 errors. `npm run build`: ok. `npm test`: backend 392 pass, 0 fail; frontend 54 files pass (832 tests per the board entry).
+
+##### Findings
+- The rework fixes the root cause rather than the symptom, keeps T-013's other acceptance criteria intact (idempotent patches, no per-event `/entries` GET, debounced history reload) and does not alter existing assertions.
+
+##### Risks
+- Please run `npx playwright test e2e/lists.spec.js` against the real stack (several repetitions; the bug showed in 5 of 6 runs before) before `commit_task`, since that is the end-to-end proof; CI runs it as well.

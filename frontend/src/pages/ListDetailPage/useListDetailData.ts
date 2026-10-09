@@ -9,7 +9,14 @@ import { listOfflineMutations, writeCachedResource } from "../../api/offlineStor
 import { fetchListMembers } from "../../api/sharing";
 import type { Entry, List, Member, Suggestion } from "../../types";
 import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "../recentlyUsedState";
-import { ListAccessError, applyEntryEvent, mergePendingEntries, reconcileResolvedEntries, sortEntries } from "./listDetailUtils";
+import {
+  ListAccessError,
+  applyEntryEvent,
+  mergePendingEntries,
+  reconcileResolvedEntries,
+  replaceTemporaryEntry,
+  sortEntries
+} from "./listDetailUtils";
 import type { EntryEventType } from "./listDetailUtils";
 
 // Several entries are often completed within a moment (shopping); one history reload covers them.
@@ -185,6 +192,21 @@ export function useListDetailData({
     [entries, listId, token]
   );
 
+  /** True for an `entry:created` event of this user whose text matches an entry this tab is creating right now. */
+  const isOwnInFlightCreate = useCallback(
+    (data: Record<string, unknown>): boolean => {
+      const payload = data.entry as { text?: unknown } | null | undefined;
+
+      return (
+        Boolean(currentUserId) &&
+        data.actorId === currentUserId &&
+        typeof payload?.text === "string" &&
+        entriesRef.current.some((entry) => inFlightTempIdsRef.current.has(entry.id) && entry.text === payload.text)
+      );
+    },
+    [currentUserId]
+  );
+
   const scheduleHistoryReload = useCallback((): void => {
     if (historyReloadTimerRef.current !== null) {
       clearTimeout(historyReloadTimerRef.current);
@@ -203,6 +225,12 @@ export function useListDetailData({
    */
   const handleEntryEvent = useCallback(
     (type: EntryEventType, data: Record<string, unknown>): void => {
+      // This tab's own create is still running: its response delivers the entry. Showing the
+      // event's copy now would render the same entry twice until the response arrives.
+      if (type === "entry:created" && isOwnInFlightCreate(data)) {
+        return;
+      }
+
       const result = applyEntryEvent(entriesRef.current, type, data, {
         currentUserId,
         locallyDoneIds: locallyDoneIdsRef.current
@@ -226,7 +254,7 @@ export function useListDetailData({
         scheduleHistoryReload();
       }
     },
-    [currentUserId, listId, loadEntries, reloadHistory, scheduleHistoryReload, setEntries]
+    [currentUserId, isOwnInFlightCreate, listId, loadEntries, reloadHistory, scheduleHistoryReload, setEntries]
   );
   const handleEntryCreated = useCallback((data: Record<string, unknown>) => handleEntryEvent("entry:created", data), [handleEntryEvent]);
   const handleEntryUpdated = useCallback((data: Record<string, unknown>) => handleEntryEvent("entry:updated", data), [handleEntryEvent]);
@@ -316,15 +344,11 @@ export function useListDetailData({
         );
 
         await updateEntries((currentEntries) =>
-          sortEntries(
-            currentEntries.map((currentEntry) =>
-              currentEntry.id === temporaryEntry.id
-                ? result?.queued
-                  ? temporaryEntry
-                  : (result.entry as DetailEntry)
-                : currentEntry
-            )
-          )
+          result?.queued
+            ? sortEntries(currentEntries.map((currentEntry) => (currentEntry.id === temporaryEntry.id ? temporaryEntry : currentEntry)))
+            // The server may have announced the entry (entry:created) before this response: never
+            // keep it twice.
+            : replaceTemporaryEntry(currentEntries, temporaryEntry.id, result.entry as DetailEntry)
         );
         return true;
       } catch (submitError) {

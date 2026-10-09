@@ -28,6 +28,19 @@ export function mergePendingEntries(
 }
 
 /**
+ * Replaces a temporary entry by the entry the server answered with. The server broadcasts
+ * `entry:created` before the HTTP response arrives, so the real entry may already be in the list
+ * (patched in from the event); keeping both would show one entry twice with the same id. Every
+ * entry carrying the temporary or the real id is removed first, then the server's entry is added.
+ */
+export function replaceTemporaryEntry(entries: DetailEntry[], temporaryId: string, serverEntry: DetailEntry): DetailEntry[] {
+  return sortEntries([
+    ...entries.filter((entry) => entry.id !== temporaryId && entry.id !== serverEntry.id),
+    serverEntry
+  ]);
+}
+
+/**
  * Replaces temporary entry ids that the offline queue resolved with their real ids. When the real
  * entry is already in the list (the server's own event or a reload got there first) the temporary
  * one is dropped, so a synced offline add never shows twice. Returns the same array when nothing

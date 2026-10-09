@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyEntryEvent, mergePendingEntries, reconcileResolvedEntries, sortEntries } from "./listDetailUtils";
+import { applyEntryEvent, mergePendingEntries, reconcileResolvedEntries, replaceTemporaryEntry, sortEntries } from "./listDetailUtils";
 import type { DetailEntry } from "./useListDetailData";
 
 const ME = "user-me";
@@ -269,6 +269,42 @@ describe("reconcileResolvedEntries", () => {
     });
 
     expect(result.map((candidate) => candidate.id).sort()).toEqual(["real-A", "real-B"]);
+  });
+});
+
+describe("replaceTemporaryEntry", () => {
+  const temp = entry({ id: "temp-entry-1", is_pending_sync: true, text: "Bread" });
+  const real = serverRow({ id: "real-1", text: "Bread" }) as DetailEntry;
+
+  it("swaps the temporary entry for the server's entry", () => {
+    const result = replaceTemporaryEntry([entry({ id: "s1" }), temp], "temp-entry-1", real);
+
+    expect(result.map((candidate) => candidate.id).sort()).toEqual(["real-1", "s1"]);
+    expect(result.find((candidate) => candidate.id === "real-1")).toBe(real);
+  });
+
+  it("leaves a single entry when the real one had already arrived through the event", () => {
+    const fromEvent = entry({ id: "real-1", text: "Bread", is_changed: false });
+
+    const result = replaceTemporaryEntry([temp, fromEvent], "temp-entry-1", real);
+
+    expect(result.filter((candidate) => candidate.id === "real-1")).toHaveLength(1);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBe(real);
+  });
+
+  it("keeps the other queued entries and the sort order", () => {
+    const other = entry({ id: "temp-entry-2", is_pending_sync: true, text: "Eggs", created_at: "2026-04-01T12:00:00.000Z" });
+
+    const result = replaceTemporaryEntry([temp, other], "temp-entry-1", real);
+
+    expect(result.map((candidate) => candidate.id)).toEqual(["real-1", "temp-entry-2"]);
+  });
+
+  it("just adds the entry when the temporary one is gone", () => {
+    const result = replaceTemporaryEntry([], "temp-entry-1", real);
+
+    expect(result).toEqual([real]);
   });
 });
 

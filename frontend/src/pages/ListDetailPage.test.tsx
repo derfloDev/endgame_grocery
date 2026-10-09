@@ -575,6 +575,104 @@ describe("ListDetailPage resync", () => {
   });
 });
 
+describe("ListDetailPage create response racing the entry:created event", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  const realEntry = (overrides: Partial<Entry> = {}) =>
+    ({
+      id: "real-1",
+      list_id: "list-1",
+      text: "Bread",
+      status: "open",
+      icon: null,
+      details: null,
+      created_at: "2026-04-01T10:00:00.000Z",
+      updated_at: "2026-04-01T10:00:00.000Z",
+      last_updated_by: "user-1",
+      ...overrides
+    }) as Entry;
+
+  async function loadedData() {
+    mockListDetailData();
+    const view = renderHook(() => useListDetailData({ currentUserId: "user-1", listId: "list-1", token: "test-token", syncVersion: 0 }));
+    await waitFor(() => { expect(view.result.current.isLoading).toBe(false); });
+    return view;
+  }
+
+  const created = (entry: Entry, actorId = "user-1") => ({ listId: "list-1", entryId: entry.id, actorId, entry });
+
+  async function startAdding(view: Awaited<ReturnType<typeof loadedData>>) {
+    const request = createDeferred<Awaited<ReturnType<typeof createEntry>>>();
+    createEntryMock.mockReturnValue(request.promise);
+    let adding: Promise<boolean> = Promise.resolve(false);
+    act(() => { adding = view.result.current.addEntryByText("Bread", null); });
+    await waitFor(() => { expect(view.result.current.entries).toHaveLength(1); });
+    return { request, finish: async (entry: Entry) => { await act(async () => { request.resolve({ entry } as Awaited<ReturnType<typeof createEntry>>); await adding; }); } };
+  }
+
+  it("shows the new entry once when its own event arrives before the response", async () => {
+    const view = await loadedData();
+    const { finish } = await startAdding(view);
+
+    act(() => { view.result.current.handleEntryCreated(created(realEntry())); });
+    // While the request runs the user sees only the queued entry, never a second tile.
+    expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["Bread"]);
+
+    await finish(realEntry());
+
+    expect(view.result.current.entries.map((entry) => entry.id)).toEqual(["real-1"]);
+    expect(view.result.current.entries[0].is_pending_sync).toBeUndefined();
+  });
+
+  it("keeps exactly one entry when the response comes first and the event follows", async () => {
+    const view = await loadedData();
+    const { finish } = await startAdding(view);
+
+    await finish(realEntry());
+    act(() => { view.result.current.handleEntryCreated(created(realEntry())); });
+
+    expect(view.result.current.entries.map((entry) => entry.id)).toEqual(["real-1"]);
+  });
+
+  it("collapses a duplicate that slipped in (event applied, then response) into one entry", async () => {
+    const view = await loadedData();
+    const { finish } = await startAdding(view);
+    // Same text but typed differently at the event's end: the guard does not apply, the response must still dedupe.
+    act(() => { view.result.current.handleEntryCreated(created(realEntry({ text: "Bread " }))); });
+    expect(view.result.current.entries).toHaveLength(2);
+    expect(view.result.current.entries.map((entry) => entry.id)).toContain("real-1");
+
+    await finish(realEntry());
+
+    expect(view.result.current.entries.map((entry) => entry.id)).toEqual(["real-1"]);
+  });
+
+  it("still applies an event about an entry another user created while this client is adding", async () => {
+    const view = await loadedData();
+    const { finish } = await startAdding(view);
+
+    act(() => { view.result.current.handleEntryCreated(created(realEntry({ id: "other-1", last_updated_by: "user-2" }), "user-2")); });
+
+    expect(view.result.current.entries.map((entry) => entry.id)).toContain("other-1");
+    await finish(realEntry());
+    expect(view.result.current.entries.map((entry) => entry.id).sort()).toEqual(["other-1", "real-1"]);
+  });
+
+  it("applies the own event of another tab when this client is not creating that entry", async () => {
+    const view = await loadedData();
+
+    act(() => { view.result.current.handleEntryCreated(created(realEntry({ id: "tab-2", text: "Milk" }))); });
+
+    expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["Milk"]);
+  });
+});
+
 describe("ListDetailPage offline reconciliation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
