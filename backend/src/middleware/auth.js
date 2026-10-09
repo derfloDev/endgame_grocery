@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { getConfig } from "../env.js";
 import { hashToken } from "../tokens.js";
+import { isUuid } from "./validateUuid.js";
 
 // Pin the algorithm so tokens with alg "none" or another HMAC variant are never accepted.
 export const JWT_ALGORITHM = "HS256";
@@ -95,6 +96,12 @@ export function createRequireApiKey({ pool } = {}) {
 
     if (!apiKey) {
       res.status(401).json({ error: "API key is required." });
+      return;
+    }
+
+    // Keys are generated as UUIDs, so anything else cannot match and needs no query.
+    if (!isUuid(apiKey)) {
+      res.status(401).json({ error: "Invalid API key." });
       return;
     }
 

@@ -16,7 +16,7 @@ function createAuthedApp(pool, options = {}) {
     generateInviteToken: options.generateInviteToken,
     now: options.now,
     requireAuthMiddleware(req, _res, next) {
-      req.user = { sub: "user-1" };
+      req.user = { sub: "30000000-0000-4000-8000-000000000001" };
       next();
     }
   });
@@ -33,9 +33,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -47,7 +47,7 @@ describe("sharing routes", () => {
         return {
           rows: [
             {
-              user_id: "user-2",
+              user_id: "30000000-0000-4000-8000-000000000002",
               display_name: "Alex",
               email: "alex@example.com",
               joined_at: "2026-04-21T01:00:00Z"
@@ -57,7 +57,7 @@ describe("sharing routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/lists/list-1/members");
+    const response = await request(createAuthedApp(pool)).get("/api/lists/10000000-0000-4000-8000-000000000001/members");
 
     assert.equal(response.status, 200);
     assert.equal(response.body.members.length, 2);
@@ -77,9 +77,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -90,7 +90,7 @@ describe("sharing routes", () => {
 
         if (callCount === 2) {
           return {
-            rows: [{ id: "user-2", display_name: "Alex", email: "alex@example.com" }]
+            rows: [{ id: "30000000-0000-4000-8000-000000000002", display_name: "Alex", email: "alex@example.com" }]
           };
         }
 
@@ -124,14 +124,14 @@ describe("sharing routes", () => {
           }
         },
         generateInviteToken() {
-          return "invite-token-1";
+          return "40000000-0000-4000-8000-000000000001";
         },
         now() {
           return new Date("2026-04-21T00:00:00Z");
         }
       })
     )
-      .post("/api/lists/list-1/members")
+      .post("/api/lists/10000000-0000-4000-8000-000000000001/members")
       .send({ email: "alex@example.com" });
 
     assert.equal(response.status, 201);
@@ -144,10 +144,10 @@ describe("sharing routes", () => {
       }
     });
     assert.deepEqual(inviteInsertParams, [
-      "list-1",
+      "10000000-0000-4000-8000-000000000001",
       "alex@example.com",
-      "user-1",
-      hashToken("invite-token-1"),
+      "30000000-0000-4000-8000-000000000001",
+      hashToken("40000000-0000-4000-8000-000000000001"),
       new Date("2026-04-28T00:00:00.000Z")
     ]);
     assert.deepEqual(sentMessages, [
@@ -160,7 +160,7 @@ describe("sharing routes", () => {
           intro: "Hi Alex,",
           body: "Open the invite below to access the shared list \"Weekly groceries\".",
           ctaLabel: "View list",
-          ctaUrl: "https://app.example.com/invite/invite-token-1",
+          ctaUrl: "https://app.example.com/invite/40000000-0000-4000-8000-000000000001",
           listName: "Weekly groceries",
           inviterName: "Demo User"
         }
@@ -179,9 +179,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -219,14 +219,14 @@ describe("sharing routes", () => {
           }
         },
         generateInviteToken() {
-          return "invite-token-new";
+          return "40000000-0000-4000-8000-000000000005";
         },
         now() {
           return new Date("2026-04-21T00:00:00Z");
         }
       })
     )
-      .post("/api/lists/list-1/members")
+      .post("/api/lists/10000000-0000-4000-8000-000000000001/members")
       .send({ email: "new@example.com" });
 
     assert.equal(response.status, 201);
@@ -248,7 +248,7 @@ describe("sharing routes", () => {
           intro: "Hi there,",
           body: "Create your account to join the shared list \"Weekly groceries\".",
           ctaLabel: "Register",
-          ctaUrl: "https://app.example.com/register?invite=invite-token-new",
+          ctaUrl: "https://app.example.com/register?invite=40000000-0000-4000-8000-000000000005",
           listName: "Weekly groceries",
           inviterName: "Demo User"
         }
@@ -268,9 +268,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -281,7 +281,7 @@ describe("sharing routes", () => {
 
         if (callCount === 2) {
           return {
-            rows: [{ id: "user-2", display_name: "Alex", email: "alex@example.com" }]
+            rows: [{ id: "30000000-0000-4000-8000-000000000002", display_name: "Alex", email: "alex@example.com" }]
           };
         }
 
@@ -311,27 +311,27 @@ describe("sharing routes", () => {
           }
         },
         generateInviteToken() {
-          return "fresh-invite-token";
+          return "40000000-0000-4000-8000-000000000006";
         },
         now() {
           return new Date("2026-04-21T00:00:00Z");
         }
       })
     )
-      .post("/api/lists/list-1/members")
+      .post("/api/lists/10000000-0000-4000-8000-000000000001/members")
       .send({ email: "alex@example.com" });
 
     assert.equal(response.status, 201);
     assert.equal(response.body.invite.id, "invite-1");
     assert.equal(response.body.invite.status, "pending");
     assert.deepEqual(inviteInsertParams, [
-      "list-1",
+      "10000000-0000-4000-8000-000000000001",
       "alex@example.com",
-      "user-1",
-      hashToken("fresh-invite-token"),
+      "30000000-0000-4000-8000-000000000001",
+      hashToken("40000000-0000-4000-8000-000000000006"),
       new Date("2026-04-28T00:00:00.000Z")
     ]);
-    assert.equal(sentMessages[0].context.ctaUrl, "https://app.example.com/invite/fresh-invite-token");
+    assert.equal(sentMessages[0].context.ctaUrl, "https://app.example.com/invite/40000000-0000-4000-8000-000000000006");
   });
 
   it("returns 409 when the user already has access", async () => {
@@ -344,9 +344,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -357,16 +357,16 @@ describe("sharing routes", () => {
 
         if (callCount === 2) {
           return {
-            rows: [{ id: "user-2", display_name: "Alex", email: "alex@example.com" }]
+            rows: [{ id: "30000000-0000-4000-8000-000000000002", display_name: "Alex", email: "alex@example.com" }]
           };
         }
 
-        return { rows: [{ user_id: "user-2" }] };
+        return { rows: [{ user_id: "30000000-0000-4000-8000-000000000002" }] };
       }
     };
 
     const response = await request(createAuthedApp(pool))
-      .post("/api/lists/list-1/members")
+      .post("/api/lists/10000000-0000-4000-8000-000000000001/members")
       .send({ email: "alex@example.com" });
 
     assert.equal(response.status, 409);
@@ -384,9 +384,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -398,7 +398,7 @@ describe("sharing routes", () => {
         return {
           rows: [
             {
-              user_id: "user-2",
+              user_id: "30000000-0000-4000-8000-000000000002",
               email: "alex@example.com",
               display_name: "Alex"
             }
@@ -416,7 +416,7 @@ describe("sharing routes", () => {
         },
         sseManager
       })
-    ).delete("/api/lists/list-1/members/user-2");
+    ).delete("/api/lists/10000000-0000-4000-8000-000000000001/members/30000000-0000-4000-8000-000000000002");
 
     assert.equal(response.status, 204);
     assert.deepEqual(sentMessages, [
@@ -433,7 +433,7 @@ describe("sharing routes", () => {
       }
     ]);
     assert.deepEqual(sseManager.calls, [
-      ["list-1", "member:removed", { listId: "list-1", userId: "user-2" }]
+      ["10000000-0000-4000-8000-000000000001", "member:removed", { listId: "10000000-0000-4000-8000-000000000001", userId: "30000000-0000-4000-8000-000000000002" }]
     ]);
   });
 
@@ -444,9 +444,9 @@ describe("sharing routes", () => {
         return {
           rows: [
             {
-              id: "list-1",
+              id: "10000000-0000-4000-8000-000000000001",
               name: "Weekly groceries",
-              owner_id: "user-1",
+              owner_id: "30000000-0000-4000-8000-000000000001",
               owner_display_name: "Demo User",
               owner_email: "demo@example.com",
               created_at: "2026-04-21T00:00:00Z"
@@ -457,7 +457,7 @@ describe("sharing routes", () => {
     };
 
     const response = await request(createAuthedApp(pool, { sseManager })).delete(
-      "/api/lists/list-1/members/user-1"
+      "/api/lists/10000000-0000-4000-8000-000000000001/members/30000000-0000-4000-8000-000000000001"
     );
 
     assert.equal(response.status, 400);

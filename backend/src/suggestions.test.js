@@ -21,7 +21,7 @@ describe("suggestion routes", () => {
       }
     };
 
-    const response = await request(createApp({ pool })).get("/api/lists/list-1/suggestions?q=to");
+    const response = await request(createApp({ pool })).get("/api/lists/10000000-0000-4000-8000-000000000001/suggestions?q=to");
 
     assert.equal(response.status, 401);
   });
@@ -33,7 +33,7 @@ describe("suggestion routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/lists/list-1/suggestions?q=a");
+    const response = await request(createAuthedApp(pool)).get("/api/lists/10000000-0000-4000-8000-000000000001/suggestions?q=a");
 
     assert.equal(response.status, 400);
     assert.equal(response.body.error, "Suggestion query must be at least 2 characters.");
@@ -43,13 +43,13 @@ describe("suggestion routes", () => {
     const pool = {
       async query(sql, params) {
         assert.match(sql, /SELECT l.id/);
-        assert.deepEqual(params, ["list-1", "user-1"]);
+        assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "user-1"]);
 
         return { rows: [] };
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/lists/list-1/suggestions?q=to");
+    const response = await request(createAuthedApp(pool)).get("/api/lists/10000000-0000-4000-8000-000000000001/suggestions?q=to");
 
     assert.equal(response.status, 403);
     assert.equal(response.body.error, "You do not have access to this list.");
@@ -63,9 +63,9 @@ describe("suggestion routes", () => {
 
         if (callCount === 1) {
           assert.match(sql, /SELECT l.id/);
-          assert.deepEqual(params, ["list-1", "user-1"]);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "user-1"]);
 
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         assert.match(sql, /FROM entries/);
@@ -74,7 +74,7 @@ describe("suggestion routes", () => {
         assert.match(sql, /similarity\(text, \$3\) > 0\.25/);
         assert.match(sql, /ORDER BY use_count DESC, max\(updated_at\) DESC/);
         assert.match(sql, /LIMIT 5/);
-        assert.deepEqual(params, ["list-1", "%Schokollade%", "Schokollade"]);
+        assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "%Schokollade%", "Schokollade"]);
 
         return {
           rows: [
@@ -86,7 +86,7 @@ describe("suggestion routes", () => {
     };
 
     const response = await request(createAuthedApp(pool)).get(
-      "/api/lists/list-1/suggestions?q=Schokollade"
+      "/api/lists/10000000-0000-4000-8000-000000000001/suggestions?q=Schokollade"
     );
 
     assert.equal(response.status, 200);
@@ -105,14 +105,14 @@ describe("suggestion routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         return { rows: [] };
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/lists/list-1/suggestions?q=to");
+    const response = await request(createAuthedApp(pool)).get("/api/lists/10000000-0000-4000-8000-000000000001/suggestions?q=to");
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { suggestions: [] });

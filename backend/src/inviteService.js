@@ -1,4 +1,5 @@
 import { withTransaction } from "./db/client.js";
+import { isUuid } from "./middleware/validateUuid.js";
 import { hashToken } from "./tokens.js";
 
 /**
@@ -11,6 +12,11 @@ import { hashToken } from "./tokens.js";
  * @returns {Promise<object | null>} Pending invite row, or null when not found.
  */
 export async function getPendingInviteByToken(pool, token, now) {
+  // Invite tokens are generated as UUIDs; anything else cannot match, so skip the query.
+  if (!isUuid(token)) {
+    return null;
+  }
+
   const result = await pool.query(
     `
       SELECT id, list_id, invited_email, status
@@ -35,15 +41,18 @@ export async function getPendingInviteByToken(pool, token, now) {
  *
  * @param {object} options Invite acceptance options.
  * @param {import("pg").Pool} options.pool Database pool.
+ * @param {{ query: Function }} [options.client] Client of a transaction the caller already opened
+ *   (for example registration); the claim and the membership insert then join it instead of
+ *   starting their own.
  * @param {{ id: string, list_id: string }} options.invite Invite row.
  * @param {string} options.userId User accepting the invite.
  * @param {Date} [options.now] Current time, used for the expiry check.
  * @returns {Promise<{ listId: string, memberAdded: boolean } | null>} Acceptance result, or null
  *   when the invite was already used or has expired in the meantime.
  */
-export async function acceptInviteForUser({ pool, invite, userId, now = new Date() }) {
-  return withTransaction(pool, async (client) => {
-    const claim = await client.query(
+export async function acceptInviteForUser({ pool, client, invite, userId, now = new Date() }) {
+  const run = async (executor) => {
+    const claim = await executor.query(
       `
         UPDATE list_invites
         SET status = 'accepted'
@@ -60,7 +69,7 @@ export async function acceptInviteForUser({ pool, invite, userId, now = new Date
       return null;
     }
 
-    const membership = await client.query(
+    const membership = await executor.query(
       `
         INSERT INTO list_members (list_id, user_id)
         VALUES ($1, $2)
@@ -74,7 +83,9 @@ export async function acceptInviteForUser({ pool, invite, userId, now = new Date
       listId: claimed.list_id,
       memberAdded: membership.rows.length > 0
     };
-  });
+  };
+
+  return client ? run(client) : withTransaction(pool, run);
 }
 
 /**

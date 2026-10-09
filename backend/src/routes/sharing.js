@@ -3,9 +3,10 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { logger as defaultLogger } from "../logger.js";
-import createMailer from "../mail/mailer.js";
+import createMailer, { sendMailInBackground } from "../mail/mailer.js";
 import { requireAuth } from "../middleware/auth.js";
 import { createRateLimiters } from "../middleware/rateLimit.js";
+import { uuidParam } from "../middleware/validateUuid.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
 /**
@@ -36,6 +37,7 @@ export function createSharingRouter({
   const router = Router({ mergeParams: true });
 
   router.use(requireAuthMiddleware);
+  router.param("uid", uuidParam("That member does not have access to this list."));
 
   router.get("/", async (req, res, next) => {
     if (!pool) {
@@ -161,15 +163,20 @@ export function createSharingRouter({
         [req.params.id, email, req.user.sub, hashToken(inviteToken), expiresAt]
       );
 
-      await sendInviteEmail({
-        config,
-        inviteToken,
-        invitedEmail: email.toLowerCase(),
-        inviterName: list.owner_display_name,
-        listName: list.name,
-        mailer,
-        recipientName: user?.display_name ?? ""
-      });
+      // The invite is stored; a mail outage must not turn that into an error response.
+      sendMailInBackground(
+        () =>
+          sendInviteEmail({
+            config,
+            inviteToken,
+            invitedEmail: email.toLowerCase(),
+            inviterName: list.owner_display_name,
+            listName: list.name,
+            mailer,
+            recipientName: user?.display_name ?? ""
+          }),
+        logger
+      );
 
       res.status(201).json({
         invite: inviteResult.rows[0]
@@ -224,11 +231,15 @@ export function createSharingRouter({
           logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
         });
 
-      await sendRevocationEmail({
-        listName: list.name,
-        mailer,
-        member: deleteResult.rows[0]
-      });
+      sendMailInBackground(
+        () =>
+          sendRevocationEmail({
+            listName: list.name,
+            mailer,
+            member: deleteResult.rows[0]
+          }),
+        logger
+      );
 
       res.status(204).send();
     } catch (error) {

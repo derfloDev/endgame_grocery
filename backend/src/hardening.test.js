@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
+import { withTransactions } from "./testHelpers.js";
 
 const silentLogger = pino({ level: "silent" });
 
@@ -14,7 +15,7 @@ function emptyPool() {
 
 function createTestApp({ pool, bcryptLib, rateLimits, requireAuthMiddleware, mailer } = {}) {
   return createApp({
-    pool: pool ?? emptyPool(),
+    pool: withTransactions(pool ?? emptyPool()),
     startWorkers: false,
     logger: silentLogger,
     config: { jwtSecret: "test-secret-0123456789abcdef0123456789", jwtExpiresIn: "7d", registrationEnabled: true },
@@ -94,7 +95,7 @@ describe("login rate limit", () => {
       }
     };
     const app = createTestApp({
-      pool,
+      pool: withTransactions(pool),
       bcryptLib: { async compare() { return true; }, async hash() { return "hash"; } }
     });
 
@@ -219,7 +220,7 @@ describe("mail endpoint rate limits", () => {
     };
     const app = createTestApp({ requireAuthMiddleware, rateLimits: { invite: { limit: 2 } } });
     const invite = (user) =>
-      request(app).post("/api/lists/list-1/members").set("X-Test-User", user).send({});
+      request(app).post("/api/lists/10000000-0000-4000-8000-000000000001/members").set("X-Test-User", user).send({});
 
     assert.notEqual((await invite("user-1")).status, 429);
     assert.notEqual((await invite("user-1")).status, 429);

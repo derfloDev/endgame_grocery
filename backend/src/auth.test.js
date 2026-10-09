@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
+import { withTransactions } from "./testHelpers.js";
 import { createRequireApiKey, createRequireAuth } from "./middleware/auth.js";
 import { getApiKeyHint, hashToken } from "./tokens.js";
 
@@ -69,7 +70,7 @@ describe("authentication routes", () => {
 
     const app = createApp({
       logger,
-      pool,
+      pool: withTransactions(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d",
@@ -184,7 +185,7 @@ describe("authentication routes", () => {
 
     const app = createApp({
       logger,
-      pool,
+      pool: withTransactions(pool),
       sseManager,
       config: {
         jwtSecret: "test-secret",
@@ -205,7 +206,7 @@ describe("authentication routes", () => {
       email: "demo@example.com",
       password: "password123",
       display_name: "Demo User",
-      invite_token: "invite-token-1"
+      invite_token: "40000000-0000-4000-8000-000000000001"
     });
 
     assert.equal(response.status, 201);
@@ -218,17 +219,17 @@ describe("authentication routes", () => {
     });
     assert.equal(sentMessages.length, 0);
     assert.match(queries[0][0], /FROM list_invites/);
-    assert.equal(queries[0][1][0], hashToken("invite-token-1"));
+    assert.equal(queries[0][1][0], hashToken("40000000-0000-4000-8000-000000000001"));
     assert.equal(queries[0][1][1] instanceof Date, true);
-    assert.match(queries[1][0], /INSERT INTO users/);
-    assert.deepEqual(queries[1][1], [
+    // User insert, invite claim and membership share one transaction.
+    assert.equal(queries[1][0], "BEGIN");
+    assert.match(queries[2][0], /INSERT INTO users/);
+    assert.deepEqual(queries[2][1], [
       "demo@example.com",
-      queries[1][1][1],
+      queries[2][1][1],
       "Demo User",
       true
     ]);
-    // The invite is claimed and the membership inserted in one transaction.
-    assert.equal(queries[2][0], "BEGIN");
     assert.match(queries[3][0], /UPDATE list_invites SET status = 'accepted' WHERE id = \$1 AND status = 'pending'/);
     assert.equal(queries[3][1][0], "invite-1");
     assert.match(queries[4][0], /INSERT INTO list_members/);
@@ -271,7 +272,7 @@ describe("authentication routes", () => {
     };
     const app = createApp({
       logger: createLogCapture().logger,
-      pool,
+      pool: withTransactions(pool),
       sseManager,
       config: { jwtSecret: "test-secret", jwtExpiresIn: "7d", appBaseUrl: "https://app.example.com" },
       mailer: { async send() {} },
@@ -284,7 +285,7 @@ describe("authentication routes", () => {
       email: "demo@example.com",
       password: "password123",
       display_name: "Demo User",
-      invite_token: "invite-token-1"
+      invite_token: "40000000-0000-4000-8000-000000000001"
     });
 
     assert.equal(response.status, 201);
@@ -331,7 +332,7 @@ it("falls back to the standard verification flow when the invite token is invali
     };
 
     const app = createApp({
-      pool,
+      pool: withTransactions(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d",
@@ -354,7 +355,7 @@ it("falls back to the standard verification flow when the invite token is invali
       email: "demo@example.com",
       password: "password123",
       display_name: "Demo User",
-      invite_token: "expired-invite-token"
+      invite_token: "40000000-0000-4000-8000-000000000003"
     });
 
     assert.equal(response.status, 201);
@@ -392,7 +393,7 @@ it("falls back to the standard verification flow when the invite token is invali
 
     const app = createApp({
       logger,
-      pool,
+      pool: withTransactions(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -777,7 +778,7 @@ it("falls back to the standard verification flow when the invite token is invali
 
     const app = createApp({
       logger,
-      pool,
+      pool: withTransactions(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -812,7 +813,7 @@ it("falls back to the standard verification flow when the invite token is invali
 
     const app = createApp({ pool });
 
-    const response = await request(app).get("/api/auth/verify-email").query({ token: "expired-token" });
+    const response = await request(app).get("/api/auth/verify-email").query({ token: "40000000-0000-4000-8000-000000000002" });
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body, {
@@ -854,7 +855,7 @@ it("falls back to the standard verification flow when the invite token is invali
     };
 
     const app = createApp({
-      pool,
+      pool: withTransactions(pool),
       config: {
         appBaseUrl: "https://app.example.com"
       },
@@ -897,7 +898,7 @@ it("falls back to the standard verification flow when the invite token is invali
     };
 
     const app = createApp({
-      pool,
+      pool: withTransactions(pool),
       mailer: {
         async send() {
           mailSent = true;
@@ -942,7 +943,7 @@ it("falls back to the standard verification flow when the invite token is invali
     };
 
     const app = createApp({
-      pool,
+      pool: withTransactions(pool),
       config: {
         appBaseUrl: "https://app.example.com"
       },
@@ -995,7 +996,7 @@ it("falls back to the standard verification flow when the invite token is invali
     };
 
     const app = createApp({
-      pool,
+      pool: withTransactions(pool),
       mailer: {
         async send() {
           mailSent = true;
@@ -1168,6 +1169,28 @@ describe("requireApiKey middleware", () => {
     assert.equal(nextCalled, false);
   });
 
+  it("rejects a key that is not a UUID without querying the database", async () => {
+    const middleware = createRequireApiKey({
+      pool: {
+        async query() {
+          throw new Error("API key query should not run");
+        }
+      }
+    });
+
+    const req = { headers: { "x-api-key": "not-a-uuid" } };
+    const res = createResponse();
+    let nextCalled = false;
+
+    await middleware(req, res, () => {
+      nextCalled = true;
+    });
+
+    assert.equal(res.statusCode, 401);
+    assert.equal(res.body.error, "Invalid API key.");
+    assert.equal(nextCalled, false);
+  });
+
   it("returns 401 when the API key is unknown", async () => {
     let apiKeyQuery = null;
     const middleware = createRequireApiKey({
@@ -1179,7 +1202,7 @@ describe("requireApiKey middleware", () => {
       }
     });
 
-    const req = { headers: { "x-api-key": "missing-api-key" } };
+    const req = { headers: { "x-api-key": "50000000-0000-4000-8000-000000000001" } };
     const res = createResponse();
     let nextCalled = false;
 
@@ -1190,7 +1213,7 @@ describe("requireApiKey middleware", () => {
     assert.equal(res.statusCode, 401);
     assert.equal(res.body.error, "Invalid API key.");
     assert.match(apiKeyQuery[0], /SELECT id FROM users WHERE api_key_hash = \$1 LIMIT 1/);
-    assert.deepEqual(apiKeyQuery[1], [hashToken("missing-api-key")]);
+    assert.deepEqual(apiKeyQuery[1], [hashToken("50000000-0000-4000-8000-000000000001")]);
     assert.equal(nextCalled, false);
   });
 
@@ -1198,13 +1221,13 @@ describe("requireApiKey middleware", () => {
     const middleware = createRequireApiKey({
       pool: {
         async query(_text, params) {
-          assert.deepEqual(params, [hashToken("valid-api-key")]);
+          assert.deepEqual(params, [hashToken("50000000-0000-4000-8000-000000000002")]);
           return { rows: [{ id: "user-1" }] };
         }
       }
     });
 
-    const req = { headers: { "x-api-key": "valid-api-key" } };
+    const req = { headers: { "x-api-key": "50000000-0000-4000-8000-000000000002" } };
     const res = createResponse();
     let nextCalled = false;
 

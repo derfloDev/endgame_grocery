@@ -2,10 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { createApp } from "./app.js";
+import { withTransactions } from "./testHelpers.js";
 
 function createAuthedApp(pool, options = {}) {
   return createApp({
-    pool,
+    pool: withTransactions(pool),
     sseManager: options.sseManager ?? createSseManagerSpy(),
     requireAuthMiddleware(req, _res, next) {
       req.user = { sub: "user-1" };
@@ -22,20 +23,20 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         assert.match(sql, /SELECT\s+e\.id,\s+e\.list_id,\s+e\.text,\s+e\.status,\s+e\.icon,\s+e\.details,\s+e\.created_at,\s+e\.updated_at,\s+e\.last_updated_by,/);
         assert.match(sql, /LEFT JOIN list_views lv/);
         assert.match(sql, /lv\.last_viewed_at IS NOT NULL/);
         assert.match(sql, /AS is_changed/);
-        assert.deepEqual(params, ["list-1", "user-1"]);
+        assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "user-1"]);
 
         return {
           rows: [
             {
-              id: "entry-1",
-              list_id: "list-1",
+              id: "20000000-0000-4000-8000-000000000001",
+              list_id: "10000000-0000-4000-8000-000000000001",
               text: "Milk",
               status: "open",
               icon: "🥛",
@@ -43,8 +44,8 @@ describe("entry routes", () => {
               is_changed: true
             },
             {
-              id: "entry-2",
-              list_id: "list-1",
+              id: "20000000-0000-4000-8000-000000000002",
+              list_id: "10000000-0000-4000-8000-000000000001",
               text: "Bread",
               status: "done",
               icon: null,
@@ -56,13 +57,13 @@ describe("entry routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/lists/list-1/entries");
+    const response = await request(createAuthedApp(pool)).get("/api/lists/10000000-0000-4000-8000-000000000001/entries");
 
     assert.equal(response.status, 200);
     assert.equal(response.body.entries.length, 2);
     assert.deepEqual(response.body.entries, [
-      { id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛", details: "2L", is_changed: true },
-      { id: "entry-2", list_id: "list-1", text: "Bread", status: "done", icon: null, details: null, is_changed: false }
+      { id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Milk", status: "open", icon: "🥛", details: "2L", is_changed: true },
+      { id: "20000000-0000-4000-8000-000000000002", list_id: "10000000-0000-4000-8000-000000000001", text: "Bread", status: "done", icon: null, details: null, is_changed: false }
     ]);
   });
 
@@ -74,24 +75,30 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         if (callCount === 2) {
-          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
-          assert.deepEqual(params, ["list-1"]);
-          return { rows: [{ cnt: "999" }] };
+          assert.match(sql, /SELECT 1 FROM lists WHERE id = \$1 FOR UPDATE/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{}] };
         }
 
         if (callCount === 3) {
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{ cnt: "999" }] };
+        }
+
+        if (callCount === 4) {
           assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details, last_updated_by\)/);
-          assert.deepEqual(params, ["list-1", "Milk", "🥛", null, "user-1"]);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "Milk", "🥛", null, "user-1"]);
 
           return {
             rows: [
               {
-                id: "entry-1",
-                list_id: "list-1",
+                id: "20000000-0000-4000-8000-000000000001",
+                list_id: "10000000-0000-4000-8000-000000000001",
                 text: "Milk",
                 status: "open",
                 icon: "🥛",
@@ -101,9 +108,9 @@ describe("entry routes", () => {
           };
         }
 
-        if (callCount === 4) {
+        if (callCount === 5) {
           assert.match(sql, /INSERT INTO pending_push_jobs[\s\S]+ON CONFLICT/);
-          assert.deepEqual(params.slice(0, 2), ["list-1", "user-1"]);
+          assert.deepEqual(params.slice(0, 2), ["10000000-0000-4000-8000-000000000001", "user-1"]);
           assert.equal(params[2] instanceof Date, true);
           assert.equal(params[3], '["Milk"]');
           return { rows: [{ item_count: 1 }] };
@@ -114,7 +121,7 @@ describe("entry routes", () => {
     };
 
     const response = await request(createAuthedApp(pool, { sseManager }))
-      .post("/api/lists/list-1/entries")
+      .post("/api/lists/10000000-0000-4000-8000-000000000001/entries")
       .send({
       text: "Milk",
       icon: "🥛"
@@ -124,9 +131,9 @@ describe("entry routes", () => {
     assert.equal(response.body.entry.status, "open");
     assert.equal(response.body.entry.icon, "🥛");
     await waitForQueuedPushInsert();
-    assert.equal(callCount, 4);
+    assert.equal(callCount, 5);
     assert.deepEqual(sseManager.calls, [
-      ["list-1", "entry:created", { listId: "list-1", entryId: "entry-1" }]
+      ["10000000-0000-4000-8000-000000000001", "entry:created", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001" }]
     ]);
   });
 
@@ -137,27 +144,33 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         if (callCount === 2) {
-          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
-          assert.deepEqual(params, ["list-1"]);
-          return { rows: [{ cnt: "999" }] };
+          assert.match(sql, /SELECT 1 FROM lists WHERE id = \$1 FOR UPDATE/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{}] };
         }
 
         if (callCount === 3) {
-          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details, last_updated_by\)/);
-          assert.deepEqual(params, ["list-1", "Milk", null, null, "user-1"]);
-
-          return {
-            rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: null, details: null }]
-          };
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{ cnt: "999" }] };
         }
 
         if (callCount === 4) {
+          assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details, last_updated_by\)/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "Milk", null, null, "user-1"]);
+
+          return {
+            rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Milk", status: "open", icon: null, details: null }]
+          };
+        }
+
+        if (callCount === 5) {
           assert.match(sql, /INSERT INTO pending_push_jobs[\s\S]+ON CONFLICT/);
-          assert.deepEqual(params.slice(0, 2), ["list-1", "user-1"]);
+          assert.deepEqual(params.slice(0, 2), ["10000000-0000-4000-8000-000000000001", "user-1"]);
           assert.equal(params[2] instanceof Date, true);
           assert.equal(params[3], '["Milk"]');
           return { rows: [{ item_count: 1 }] };
@@ -167,14 +180,14 @@ describe("entry routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).post("/api/lists/list-1/entries").send({
+    const response = await request(createAuthedApp(pool)).post("/api/lists/10000000-0000-4000-8000-000000000001/entries").send({
       text: "Milk"
     });
 
     assert.equal(response.status, 201);
-    assert.equal(response.body.entry.id, "entry-1");
+    assert.equal(response.body.entry.id, "20000000-0000-4000-8000-000000000001");
     await waitForQueuedPushInsert();
-    assert.equal(callCount, 4);
+    assert.equal(callCount, 5);
   });
 
   it("stores and returns entry details on create", async () => {
@@ -184,24 +197,30 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         if (callCount === 2) {
-          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
-          assert.deepEqual(params, ["list-1"]);
-          return { rows: [{ cnt: "999" }] };
+          assert.match(sql, /SELECT 1 FROM lists WHERE id = \$1 FOR UPDATE/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{}] };
         }
 
         if (callCount === 3) {
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{ cnt: "999" }] };
+        }
+
+        if (callCount === 4) {
           assert.match(sql, /INSERT INTO entries \(list_id, text, status, icon, details, last_updated_by\)/);
-          assert.deepEqual(params, ["list-1", "Milk", "🥛", "2L", "user-1"]);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "Milk", "🥛", "2L", "user-1"]);
 
           return {
             rows: [
               {
-                id: "entry-1",
-                list_id: "list-1",
+                id: "20000000-0000-4000-8000-000000000001",
+                list_id: "10000000-0000-4000-8000-000000000001",
                 text: "Milk",
                 status: "open",
                 icon: "🥛",
@@ -211,9 +230,9 @@ describe("entry routes", () => {
           };
         }
 
-        if (callCount === 4) {
+        if (callCount === 5) {
           assert.match(sql, /INSERT INTO pending_push_jobs[\s\S]+ON CONFLICT/);
-          assert.deepEqual(params.slice(0, 2), ["list-1", "user-1"]);
+          assert.deepEqual(params.slice(0, 2), ["10000000-0000-4000-8000-000000000001", "user-1"]);
           assert.equal(params[2] instanceof Date, true);
           assert.equal(params[3], '["Milk"]');
           return { rows: [{ item_count: 1 }] };
@@ -223,7 +242,7 @@ describe("entry routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).post("/api/lists/list-1/entries").send({
+    const response = await request(createAuthedApp(pool)).post("/api/lists/10000000-0000-4000-8000-000000000001/entries").send({
       text: "Milk",
       icon: "🥛",
       details: " 2L "
@@ -231,15 +250,15 @@ describe("entry routes", () => {
 
     assert.equal(response.status, 201);
     assert.deepEqual(response.body.entry, {
-      id: "entry-1",
-      list_id: "list-1",
+      id: "20000000-0000-4000-8000-000000000001",
+      list_id: "10000000-0000-4000-8000-000000000001",
       text: "Milk",
       status: "open",
       icon: "🥛",
       details: "2L"
     });
     await waitForQueuedPushInsert();
-    assert.equal(callCount, 4);
+    assert.equal(callCount, 5);
   });
 
   it("rejects entry creation when the list already has 1000 open entries", async () => {
@@ -249,12 +268,18 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         if (callCount === 2) {
+          assert.match(sql, /SELECT 1 FROM lists WHERE id = \$1 FOR UPDATE/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{}] };
+        }
+
+        if (callCount === 3) {
           assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'open'/);
-          assert.deepEqual(params, ["list-1"]);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
           return { rows: [{ cnt: "1000" }] };
         }
 
@@ -262,13 +287,13 @@ describe("entry routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).post("/api/lists/list-1/entries").send({
+    const response = await request(createAuthedApp(pool)).post("/api/lists/10000000-0000-4000-8000-000000000001/entries").send({
       text: "Milk"
     });
 
     assert.equal(response.status, 422);
     assert.match(response.body.error, /maximum of 1,000 open entries/);
-    assert.equal(callCount, 2);
+    assert.equal(callCount, 3);
   });
 
   it("marks an entry done without writing autocomplete history", async () => {
@@ -279,25 +304,37 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         if (callCount === 2) {
-          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'done'/);
-          assert.deepEqual(params, ["list-1"]);
-          return { rows: [{ cnt: "199" }] };
+          assert.match(sql, /SELECT 1 FROM lists WHERE id = \$1 FOR UPDATE/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{}] };
         }
 
         if (callCount === 3) {
+          assert.match(sql, /SELECT status FROM entries WHERE id = \$1 AND list_id = \$2 FOR UPDATE/);
+          assert.deepEqual(params, ["20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{ status: "open" }] };
+        }
+
+        if (callCount === 4) {
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'done'/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{ cnt: "199" }] };
+        }
+
+        if (callCount === 5) {
           assert.match(sql, /UPDATE entries/);
           assert.match(sql, /last_updated_by = \$6/);
-          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "user-1", "entry-1", "list-1"]);
+          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
 
           return {
             rows: [
               {
-                id: "entry-1",
-                list_id: "list-1",
+                id: "20000000-0000-4000-8000-000000000001",
+                list_id: "10000000-0000-4000-8000-000000000001",
                 text: "Oat milk",
                 status: "done",
                 icon: null,
@@ -312,7 +349,7 @@ describe("entry routes", () => {
     };
 
     const response = await request(createAuthedApp(pool, { sseManager }))
-      .patch("/api/lists/list-1/entries/entry-1")
+      .patch("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001")
       .send({
         text: "Oat milk",
         status: "done"
@@ -322,9 +359,9 @@ describe("entry routes", () => {
     assert.equal(response.body.entry.text, "Oat milk");
     assert.equal(response.body.entry.status, "done");
     assert.equal(response.body.entry.details, "Barista");
-    assert.equal(callCount, 3);
+    assert.equal(callCount, 5);
     assert.deepEqual(sseManager.calls, [
-      ["list-1", "entry:updated", { listId: "list-1", entryId: "entry-1" }]
+      ["10000000-0000-4000-8000-000000000001", "entry:updated", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001" }]
     ]);
   });
 
@@ -336,31 +373,43 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         if (callCount === 2) {
-          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'done'/);
-          assert.deepEqual(params, ["list-1"]);
-          return { rows: [{ cnt: "200" }] };
+          assert.match(sql, /SELECT 1 FROM lists WHERE id = \$1 FOR UPDATE/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{}] };
         }
 
         if (callCount === 3) {
-          assert.match(sql, /DELETE FROM entries/);
-          assert.match(sql, /ORDER BY updated_at ASC, created_at ASC/);
-          assert.deepEqual(params, ["list-1"]);
-          return { rows: [] };
+          assert.match(sql, /SELECT status FROM entries WHERE id = \$1 AND list_id = \$2 FOR UPDATE/);
+          assert.deepEqual(params, ["20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{ status: "open" }] };
         }
 
         if (callCount === 4) {
+          assert.match(sql, /SELECT COUNT\(\*\) AS cnt\s+FROM entries\s+WHERE list_id = \$1 AND status = 'done'/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
+          return { rows: [{ cnt: "200" }] };
+        }
+
+        if (callCount === 5) {
+          assert.match(sql, /DELETE FROM entries/);
+          assert.match(sql, /ORDER BY updated_at ASC, created_at ASC/);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "20000000-0000-4000-8000-000000000001"]);
+          return { rows: [] };
+        }
+
+        if (callCount === 6) {
           assert.match(sql, /UPDATE entries/);
-          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "user-1", "entry-1", "list-1"]);
+          assert.deepEqual(params, ["Oat milk", "done", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
 
           return {
             rows: [
               {
-                id: "entry-1",
-                list_id: "list-1",
+                id: "20000000-0000-4000-8000-000000000001",
+                list_id: "10000000-0000-4000-8000-000000000001",
                 text: "Oat milk",
                 status: "done",
                 icon: null,
@@ -375,7 +424,7 @@ describe("entry routes", () => {
     };
 
     const response = await request(createAuthedApp(pool, { sseManager }))
-      .patch("/api/lists/list-1/entries/entry-1")
+      .patch("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001")
       .send({
         text: "Oat milk",
         status: "done"
@@ -383,9 +432,9 @@ describe("entry routes", () => {
 
     assert.equal(response.status, 200);
     assert.equal(response.body.entry.status, "done");
-    assert.equal(callCount, 4);
+    assert.equal(callCount, 6);
     assert.deepEqual(sseManager.calls, [
-      ["list-1", "entry:updated", { listId: "list-1", entryId: "entry-1" }]
+      ["10000000-0000-4000-8000-000000000001", "entry:updated", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001" }]
     ]);
   });
 
@@ -396,15 +445,15 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         if (callCount === 2) {
           assert.match(sql, /UPDATE entries/);
-          assert.deepEqual(params, ["Oat milk", "open", null, false, null, "user-1", "entry-1", "list-1"]);
+          assert.deepEqual(params, ["Oat milk", "open", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
 
           return {
-            rows: [{ id: "entry-1", list_id: "list-1", text: "Oat milk", status: "open", icon: null, details: null }]
+            rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Oat milk", status: "open", icon: null, details: null }]
           };
         }
 
@@ -413,7 +462,7 @@ describe("entry routes", () => {
     };
 
     const response = await request(createAuthedApp(pool))
-      .patch("/api/lists/list-1/entries/entry-1")
+      .patch("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001")
       .send({
         text: "Oat milk",
         status: "open"
@@ -431,20 +480,20 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         assert.match(sql, /icon = COALESCE\(\$3, icon\)/);
-        assert.deepEqual(params, [null, null, "🥛", false, null, "user-1", "entry-1", "list-1"]);
+        assert.deepEqual(params, [null, null, "🥛", false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
 
         return {
-          rows: [{ id: "entry-1", list_id: "list-1", text: "Milk", status: "open", icon: "🥛", details: null }]
+          rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Milk", status: "open", icon: "🥛", details: null }]
         };
       }
     };
 
     const response = await request(createAuthedApp(pool))
-      .patch("/api/lists/list-1/entries/entry-1")
+      .patch("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001")
       .send({
         icon: "🥛"
       });
@@ -461,20 +510,20 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         assert.match(sql, /details = CASE WHEN \$4 THEN \$5 ELSE details END/);
-        assert.deepEqual(params, [null, "open", null, true, "1kg", "user-1", "entry-1", "list-1"]);
+        assert.deepEqual(params, [null, "open", null, true, "1kg", "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
 
         return {
-          rows: [{ id: "entry-1", list_id: "list-1", text: "Rice", status: "open", icon: null, details: "1kg" }]
+          rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Rice", status: "open", icon: null, details: "1kg" }]
         };
       }
     };
 
     const response = await request(createAuthedApp(pool))
-      .patch("/api/lists/list-1/entries/entry-1")
+      .patch("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001")
       .send({
         status: "open",
         details: " 1kg "
@@ -492,16 +541,16 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
-        assert.deepEqual(params, ["Rice", "open", null, false, null, "user-1", "entry-1", "list-1"]);
+        assert.deepEqual(params, ["Rice", "open", null, false, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
 
         return {
           rows: [
             {
-              id: "entry-1",
-              list_id: "list-1",
+              id: "20000000-0000-4000-8000-000000000001",
+              list_id: "10000000-0000-4000-8000-000000000001",
               text: "Rice",
               status: "open",
               icon: null,
@@ -513,7 +562,7 @@ describe("entry routes", () => {
     };
 
     const response = await request(createAuthedApp(pool))
-      .patch("/api/lists/list-1/entries/entry-1")
+      .patch("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001")
       .send({
         text: "Rice",
         status: "open"
@@ -531,19 +580,19 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
-        assert.deepEqual(params, [null, "open", null, true, null, "user-1", "entry-1", "list-1"]);
+        assert.deepEqual(params, [null, "open", null, true, null, "user-1", "20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
 
         return {
-          rows: [{ id: "entry-1", list_id: "list-1", text: "Rice", status: "open", icon: null, details: null }]
+          rows: [{ id: "20000000-0000-4000-8000-000000000001", list_id: "10000000-0000-4000-8000-000000000001", text: "Rice", status: "open", icon: null, details: null }]
         };
       }
     };
 
     const response = await request(createAuthedApp(pool))
-      .patch("/api/lists/list-1/entries/entry-1")
+      .patch("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001")
       .send({
         status: "open",
         details: "   "
@@ -562,14 +611,14 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         if (callCount === 2) {
           assert.match(sql, /DELETE FROM entries/);
-          assert.deepEqual(params, ["entry-1", "list-1"]);
+          assert.deepEqual(params, ["20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
 
-          return { rows: [{ id: "entry-1" }] };
+          return { rows: [{ id: "20000000-0000-4000-8000-000000000001" }] };
         }
 
         assert.fail(`Unexpected query ${callCount}: ${sql}`);
@@ -577,13 +626,13 @@ describe("entry routes", () => {
     };
 
     const response = await request(createAuthedApp(pool, { sseManager })).delete(
-      "/api/lists/list-1/entries/entry-1"
+      "/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001"
     );
 
     assert.equal(response.status, 204);
     assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
-      ["list-1", "entry:deleted", { listId: "list-1", entryId: "entry-1" }]
+      ["10000000-0000-4000-8000-000000000001", "entry:deleted", { listId: "10000000-0000-4000-8000-000000000001", entryId: "20000000-0000-4000-8000-000000000001" }]
     ]);
   });
 
@@ -594,21 +643,21 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         if (callCount === 2) {
           assert.match(sql, /DELETE FROM entries/);
-          assert.deepEqual(params, ["entry-1", "list-1"]);
+          assert.deepEqual(params, ["20000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000001"]);
 
-          return { rows: [{ id: "entry-1" }] };
+          return { rows: [{ id: "20000000-0000-4000-8000-000000000001" }] };
         }
 
         assert.fail(`Unexpected query ${callCount}: ${sql}`);
       }
     };
 
-    const response = await request(createAuthedApp(pool)).delete("/api/lists/list-1/entries/entry-1");
+    const response = await request(createAuthedApp(pool)).delete("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000001");
 
     assert.equal(response.status, 204);
     assert.equal(callCount, 2);
@@ -618,7 +667,7 @@ describe("entry routes", () => {
     const sseManager = createSseManagerSpy();
 
     const response = await request(createAuthedApp(null, { sseManager }))
-      .post("/api/lists/list-1/entries")
+      .post("/api/lists/10000000-0000-4000-8000-000000000001/entries")
       .send({});
 
     assert.equal(response.status, 400);
@@ -633,7 +682,7 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         return { rows: [] };
@@ -641,7 +690,7 @@ describe("entry routes", () => {
     };
 
     const response = await request(createAuthedApp(pool, { sseManager }))
-      .patch("/api/lists/list-1/entries/entry-404")
+      .patch("/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000404")
       .send({ text: "Milk" });
 
     assert.equal(response.status, 404);
@@ -656,7 +705,7 @@ describe("entry routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         return { rows: [] };
@@ -664,7 +713,7 @@ describe("entry routes", () => {
     };
 
     const response = await request(createAuthedApp(pool, { sseManager })).delete(
-      "/api/lists/list-1/entries/entry-404"
+      "/api/lists/10000000-0000-4000-8000-000000000001/entries/20000000-0000-4000-8000-000000000404"
     );
 
     assert.equal(response.status, 404);

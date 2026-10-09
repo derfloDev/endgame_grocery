@@ -1598,3 +1598,39 @@ No blocker or major findings; no required fixes.
 - Every non-OK API response now throws `HttpError` (a subclass of `Error`), so existing callers behave the same; T-020 will replace it with error codes.
 - The invite lookup, email check, owner check and claim are separate queries; only the claim and membership insert are transactional. A race can only make the claim fail, which answers 400 without changing state.
 - Not executed: Playwright E2E and a browser pass over the invite page.
+
+## Task: T-009 (hardening cycle 2026-10-08 — transactions, entry limits, UUID validation, mail after commit)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `backend/src/routes/entries.js` (PATCH, `status: "open"`): reopening a done entry is a single unlocked statement and does not check the 1,000 open-entry cap, so concurrent or repeated reopen requests can push a list past the cap. The acceptance criterion covers creates only and the plan did not ask for more, so this is not a required fix. A follow-up (T-010's shared service is the natural place) should apply the same list lock and cap check to reopen.
+2. **minor** — `backend/src/app.js` error handler: a NUL byte in `text`, `icon` or `details` makes PostgreSQL raise `22021`, which is not mapped and answers 500 (checked by hand with `icon: "bad\u0000"`). Pre-existing and outside the acceptance criteria. Mapping `22021` to 400 or validating strings would close it.
+3. **nit** — malformed ids now answer 404 before authentication, so an unauthenticated request to `/api/lists/foo/entries` gets 404 instead of 401. It leaks nothing; the implementer documented it.
+4. **nit** — `routes/auth.js` register keeps `const result = { rows: [user] }` as a shim for the old shape, with later code still reading `result.rows[0]`. Harmless; a small cleanup for later.
+5. **nit** — the race test seeds 995 open entries and fires 12 creates, expecting exactly five 201s. It would pass trivially only if the lock works, since an unlocked version would very likely create more than 1,000. I did not mutate the code to prove that it fails without the lock.
+
+No blocker or major findings; no required fixes. Scope additions beyond the plan are sound: forgot-password mail also runs in the background (otherwise an SMTP error would reveal that an account exists), and `acceptInviteForUser` can join an existing transaction.
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the full diff: `withTransaction` use in `entries.js` (create and done PATCH), `validateUuid.js` (`app.param("id")` plus `router.param` in lists, entries and sharing), `inviteService.js`, `middleware/auth.js`, `app.js` error mapping, `mail/mailer.js` (`sendMailInBackground`), `routes/auth.js` (atomic register and resend), `routes/sharing.js`, `routes/lists.js`, README, and the test changes (fixtures moved to UUIDs, `testHelpers.js`, new `inputValidation.test.js`, `integration/entries.test.js`).
+- Checked lock ordering: create and done PATCH both lock the list row first, then (PATCH only) the entry row, so they cannot deadlock each other. Eviction excludes the target id and only runs when the target exists and is currently open.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok. `npm test`: backend 347/347, frontend 674/674.
+- Integration suite against an embedded PostgreSQL 18 (Docker not running), run serially to avoid the known `pg_trgm` extension race from the T-007/T-008 reviews: 42/42, including the 12-way create race (exactly 1,000 open), unknown entry at the done limit (404, nothing deleted), eviction of exactly one old done entry, an already done entry (no eviction), and malformed ids (404, invite 400, API key 401).
+- Manual HTTP run with an SMTP transport that always throws, against the real database: register 201 with its verification token committed, forgot-password 200, invite 201, revoke 204, and three background mail failures were logged. Deleting an unknown valid entry id answered 404. Leave with a failing mailer is covered by `inputValidation.test.js` (my manual call used the wrong verb and got 404).
+
+##### Findings
+- Every acceptance criterion is met: unknown or already done entries delete nothing; concurrent creates never exceed 1,000 open entries; malformed UUIDs, API keys and invite tokens give 404/401/400, never 500; an SMTP failure after revoke, leave or invite still returns success; register inserts are atomic.
+- Existing tests were changed mechanically (ids and tokens became UUIDs, fakes gained `connect()`); no assertion was weakened.
+
+##### Risks
+- Mail is fire-and-forget: a process exit right after the response can drop a notification, and a failed invite mail now returns 201 without telling the owner (logged only). This is the requested behaviour.
+- Taking the list-row lock on every create and completion serialises writes per list; fine for list sizes here.
+- Not executed: Playwright E2E.

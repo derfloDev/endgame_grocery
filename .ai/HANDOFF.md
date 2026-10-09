@@ -657,3 +657,48 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-009 — implement — 2026-10-09T10:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Entry create/complete run in row-locked transactions, path ids/invite tokens/API keys are shape-validated, client-caused pg errors map to 400/404/409, notification mails go out after commit without affecting the response, and registration and verification resend are atomic. |
+| Files Changed | backend/src/app.js, backend/src/inviteService.js, backend/src/mail/mailer.js, backend/src/middleware/auth.js, backend/src/middleware/validateUuid.js, backend/src/routes/entries.js, backend/src/routes/auth.js, backend/src/routes/lists.js, backend/src/routes/sharing.js, backend/src/testHelpers.js, backend/src/inputValidation.test.js, backend/src/integration/entries.test.js, backend/src/entries.test.js, backend/src/auth.test.js, backend/src/hardening.test.js, backend/src/invites.test.js, backend/src/lists.test.js, backend/src/sharing.test.js, backend/src/history.test.js, backend/src/suggestions.test.js, backend/src/app.test.js, backend/src/v1.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ok; `npm test` backend 347/347 (frontend untouched, last run 674/674). `integration/entries.test.js` NOT executed locally (no PostgreSQL, Docker daemon not running); CI runs it. |
+| Commit | `fix(api): keep entry limits exact under concurrency and stop malformed input and mail outages from failing requests` |
+| Next Role | review |
+
+Notes for review:
+1. **Entry limits:** create and `status: "done"` PATCH use `withTransaction` and `SELECT 1 FROM lists WHERE id=$1 FOR UPDATE`. Done PATCH also locks the target (`SELECT status … FOR UPDATE`), answers 404 if missing, and only evicts when the target is currently open (eviction query excludes the target id). Non-done PATCHes keep a single statement. v1 routes are untouched (T-010 moves them onto a shared service).
+2. **UUID validation:** `validateUuid.js` (`isUuid`, `uuidParam`). `app.param("id")` covers the mount-path list id for history/suggestions/entries/members; `router.param` covers lists (`id`), entries (`entryId`) and sharing (`uid`). Invalid → 404 with the route's existing not-found text (`List not found.` is new for malformed list ids; unknown but well-formed ids still answer 403 as before). `getPendingInviteByToken` returns null for non-UUID tokens without querying (invite route → 400, register ignores the invite). `requireApiKey` answers 401 for non-UUID keys without querying. Param checks run before authentication, so they reveal nothing.
+3. **Error handler:** `22P02` → 400, `23505` → 409, `23503` → 404 with generic texts (logged at warn); everything else stays 500. Register keeps its own 23505 → "account already exists" 409 (the error now comes out of the transaction).
+4. **Mail after commit:** new `sendMailInBackground(fn, logger)` in `mail/mailer.js` starts the send synchronously and logs failures. Used for invite, revoke, leave, register verification, resend verification and (beyond the plan list) forgot-password, because an SMTP error there would otherwise leak account existence through a 500.
+5. **Register:** user insert, optional invite claim/membership and the verification token run in one transaction; `acceptInviteForUser` gained an optional `client` to join it. Mail is sent only after commit.
+6. **Test changes:** fixtures with ids like `list-1`/`entry-1`/`user-2` and invite tokens/API keys in URL or lookup position were mechanically replaced with UUIDs (same value everywhere in a file, no assertion changed). Ordered-query fakes in `entries.test.js` gained the two new lock/status statements; a `withTransactions` helper (`src/testHelpers.js`) gives fake pools `connect()` and hides BEGIN/COMMIT/ROLLBACK. One new API-key test pins the no-query rejection.
+7. Not done (out of T-009 scope): `DELETE /api/lists/:id` still broadcasts before deleting (T-012).
+
+---
+
+### T-009 — review — 2026-10-09T10:40:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed row-locked entry create/complete, UUID shape validation, pg error mapping, background notification mail and atomic registration; verified with real SQL (integration 42/42 serially) and a manual run with a failing SMTP transport. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+### T-009 — implement — 2026-10-09T10:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-009 after review PASS_WITH_NOTES: transactional entry limits, UUID/input validation, pg error mapping, mail after commit, atomic register. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-009 implementation files |
+| Commit | `fix(api): keep entry limits exact under concurrency and stop malformed input and mail outages from failing requests` |
+| Next Role | none |
+
+---

@@ -6,7 +6,7 @@ import { getPool, withTransaction } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { acceptInviteForUser, getPendingInviteByToken } from "../inviteService.js";
 import { logger as defaultLogger } from "../logger.js";
-import createMailer from "../mail/mailer.js";
+import createMailer, { sendMailInBackground } from "../mail/mailer.js";
 import { createRequireAuth } from "../middleware/auth.js";
 import { createRateLimiters } from "../middleware/rateLimit.js";
 import { validatePassword } from "../passwordPolicy.js";
@@ -101,29 +101,51 @@ export function createAuthRouter({
         ? inviteCandidate
         : null;
 
-      const result = await pool.query(
-        `
-          INSERT INTO users (email, password_hash, display_name, email_verified)
-          VALUES ($1, $2, $3, $4)
-          RETURNING id, email, display_name, created_at
-        `,
-        [normalizedEmail, passwordHash, displayName, Boolean(pendingInvite)]
-      );
+      // User, invite claim/membership and verification token are committed together: a failure
+      // can no longer leave an account without its token (which would lock the user out).
+      const { user, acceptedInvite, verificationToken } = await withTransaction(pool, async (client) => {
+        const inserted = await client.query(
+          `
+            INSERT INTO users (email, password_hash, display_name, email_verified)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, email, display_name, created_at
+          `,
+          [normalizedEmail, passwordHash, displayName, Boolean(pendingInvite)]
+        );
+        const createdUser = inserted.rows[0];
+        const accepted = pendingInvite
+          ? await acceptInviteForUser({
+              pool,
+              client,
+              invite: pendingInvite,
+              userId: createdUser.id,
+              now: now()
+            })
+          : null;
 
-      const acceptedInvite = pendingInvite
-        ? await acceptInviteForUser({
-            pool,
-            invite: pendingInvite,
-            userId: result.rows[0].id,
-            now: now()
-          })
-        : null;
+        if (accepted) {
+          return { user: createdUser, acceptedInvite: accepted, verificationToken: null };
+        }
 
-      if (pendingInvite && !acceptedInvite) {
-        // The invite was used by someone else between the lookup and the insert, so the account
-        // was not vetted by it after all: fall back to the normal email verification.
-        await pool.query("UPDATE users SET email_verified = false WHERE id = $1", [result.rows[0].id]);
-      }
+        if (pendingInvite) {
+          // The invite was used by someone else between the lookup and the insert, so the account
+          // was not vetted by it after all: fall back to the normal email verification.
+          await client.query("UPDATE users SET email_verified = false WHERE id = $1", [createdUser.id]);
+        }
+
+        // Only the hash is stored; the plaintext leaves the server in the verification mail.
+        const token = generateVerificationToken();
+        await client.query(
+          `
+            INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3)
+          `,
+          [createdUser.id, hashToken(token), addHours(now(), 24)]
+        );
+
+        return { user: createdUser, acceptedInvite: null, verificationToken: token };
+      });
+      const result = { rows: [user] };
 
       if (acceptedInvite) {
         const { listId, memberAdded } = acceptedInvite;
@@ -132,7 +154,7 @@ export function createAuthRouter({
           void sseManager
             .broadcastToList(pool, listId, "member:added", {
               listId,
-              userId: result.rows[0].id
+              userId: user.id
             })
             .catch((broadcastError) => {
               logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
@@ -141,38 +163,30 @@ export function createAuthRouter({
 
         logger.info(
           {
-            userId: result.rows[0].id,
+            userId: user.id,
             email: normalizedEmail,
             inviteUsed: true
           },
           "User registered"
         );
         res.status(201).json({
-          token: createToken({ jwtLib, config, userId: result.rows[0].id }),
+          token: createToken({ jwtLib, config, userId: user.id }),
           listId,
-          user: serializeAuthUser(result.rows[0])
+          user: serializeAuthUser(user)
         });
         return;
       }
 
-      const verificationToken = generateVerificationToken();
-      const expiresAt = addHours(now(), 24);
-
-      // Only the hash is stored; the plaintext leaves the server in the verification mail.
-      await pool.query(
-        `
-          INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
-          VALUES ($1, $2, $3)
-        `,
-        [result.rows[0].id, hashToken(verificationToken), expiresAt]
+      sendMailInBackground(
+        () =>
+          sendVerificationEmail({
+            config,
+            mailer,
+            token: verificationToken,
+            user
+          }),
+        logger
       );
-
-      await sendVerificationEmail({
-        config,
-        mailer,
-        token: verificationToken,
-        user: result.rows[0]
-      });
 
       logger.info(
         {
@@ -353,27 +367,34 @@ export function createAuthRouter({
         const verificationToken = generateVerificationToken();
         const expiresAt = addHours(now(), 24);
 
-        await pool.query(
-          `
-            DELETE FROM email_verification_tokens
-            WHERE user_id = $1
-          `,
-          [user.id]
-        );
-        await pool.query(
-          `
-            INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
-            VALUES ($1, $2, $3)
-          `,
-          [user.id, hashToken(verificationToken), expiresAt]
-        );
-
-        await sendVerificationEmail({
-          config,
-          mailer,
-          token: verificationToken,
-          user
+        // Replace the old token atomically so a failure cannot leave the user without one.
+        await withTransaction(pool, async (client) => {
+          await client.query(
+            `
+              DELETE FROM email_verification_tokens
+              WHERE user_id = $1
+            `,
+            [user.id]
+          );
+          await client.query(
+            `
+              INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+              VALUES ($1, $2, $3)
+            `,
+            [user.id, hashToken(verificationToken), expiresAt]
+          );
         });
+
+        sendMailInBackground(
+          () =>
+            sendVerificationEmail({
+              config,
+              mailer,
+              token: verificationToken,
+              user
+            }),
+          logger
+        );
       }
 
       res.json({ message: "If your account is pending verification, a new email has been sent." });
@@ -419,12 +440,17 @@ export function createAuthRouter({
           [user.id, hashToken(resetToken), expiresAt]
         );
 
-        await sendPasswordResetEmail({
-          config,
-          mailer,
-          token: resetToken,
-          user
-        });
+        // Answered the same whether or not the account exists, so a mail failure must not show.
+        sendMailInBackground(
+          () =>
+            sendPasswordResetEmail({
+              config,
+              mailer,
+              token: resetToken,
+              user
+            }),
+          logger
+        );
       }
 
       res.json({ message: "If an account exists, you will receive an email." });

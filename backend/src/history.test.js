@@ -22,7 +22,7 @@ describe("history routes", () => {
       }
     };
 
-    const response = await request(createApp({ pool })).get("/api/lists/list-1/history");
+    const response = await request(createApp({ pool })).get("/api/lists/10000000-0000-4000-8000-000000000001/history");
 
     assert.equal(response.status, 401);
   });
@@ -31,13 +31,13 @@ describe("history routes", () => {
     const pool = {
       async query(sql, params) {
         assert.match(sql, /SELECT l.id/);
-        assert.deepEqual(params, ["list-1", "user-1"]);
+        assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "user-1"]);
 
         return { rows: [] };
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/lists/list-1/history");
+    const response = await request(createAuthedApp(pool)).get("/api/lists/10000000-0000-4000-8000-000000000001/history");
 
     assert.equal(response.status, 403);
     assert.equal(response.body.error, "You do not have access to this list.");
@@ -51,9 +51,9 @@ describe("history routes", () => {
 
         if (callCount === 1) {
           assert.match(sql, /SELECT l.id/);
-          assert.deepEqual(params, ["list-1", "user-1"]);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "user-1"]);
 
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         assert.match(sql, /FROM entries/);
@@ -62,7 +62,7 @@ describe("history routes", () => {
         assert.match(sql, /e2\.status\s*=\s*'open'/);
         assert.match(sql, /ORDER BY updated_at DESC/);
         assert.match(sql, /LIMIT 20/);
-        assert.deepEqual(params, ["list-1"]);
+        assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001"]);
 
         return {
           rows: [
@@ -73,7 +73,7 @@ describe("history routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/lists/list-1/history");
+    const response = await request(createAuthedApp(pool)).get("/api/lists/10000000-0000-4000-8000-000000000001/history");
 
     assert.equal(response.status, 200);
     assert.equal(callCount, 2);
@@ -92,14 +92,14 @@ describe("history routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         return { rows: [] };
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/lists/list-1/history");
+    const response = await request(createAuthedApp(pool)).get("/api/lists/10000000-0000-4000-8000-000000000001/history");
 
     assert.equal(response.status, 200);
     assert.equal(callCount, 2);
@@ -115,27 +115,27 @@ describe("history routes", () => {
 
         if (callCount === 1) {
           assert.match(sql, /SELECT l.id/);
-          assert.deepEqual(params, ["list-1", "user-1"]);
+          assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "user-1"]);
 
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         assert.match(sql, /DELETE FROM entries/);
         assert.match(sql, /status = 'done'/);
-        assert.deepEqual(params, ["list-1", "Milk"]);
+        assert.deepEqual(params, ["10000000-0000-4000-8000-000000000001", "Milk"]);
 
         return { rowCount: 2, rows: [] };
       }
     };
 
     const response = await request(createAuthedApp(pool, { sseManager }))
-      .delete("/api/lists/list-1/history")
+      .delete("/api/lists/10000000-0000-4000-8000-000000000001/history")
       .send({ text: "Milk" });
 
     assert.equal(response.status, 204);
     assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
-      ["list-1", "history:updated", { listId: "list-1" }]
+      ["10000000-0000-4000-8000-000000000001", "history:updated", { listId: "10000000-0000-4000-8000-000000000001" }]
     ]);
   });
 
@@ -147,7 +147,7 @@ describe("history routes", () => {
         callCount += 1;
 
         if (callCount === 1) {
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         return { rowCount: 0, rows: [] };
@@ -155,7 +155,7 @@ describe("history routes", () => {
     };
 
     const response = await request(createAuthedApp(pool, { sseManager }))
-      .delete("/api/lists/list-1/history")
+      .delete("/api/lists/10000000-0000-4000-8000-000000000001/history")
       .send({ text: "Missing item" });
 
     assert.equal(response.status, 204);
@@ -169,7 +169,7 @@ describe("history routes", () => {
       async query(sql) {
         if (!deleteSql) {
           deleteSql = sql;
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         deleteSql = sql;
@@ -178,7 +178,7 @@ describe("history routes", () => {
     };
 
     const response = await request(createAuthedApp(pool))
-      .delete("/api/lists/list-1/history")
+      .delete("/api/lists/10000000-0000-4000-8000-000000000001/history")
       .send({ text: "Bread" });
 
     assert.equal(response.status, 204);

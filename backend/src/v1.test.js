@@ -69,12 +69,12 @@ describe("external v1 API routes", () => {
 
     const response = await request(createApp({ pool }))
       .get("/api/v1/lists")
-      .set("X-Api-Key", "unknown-api-key");
+      .set("X-Api-Key", "40000000-0000-4000-8000-000000000007");
 
     assert.equal(response.status, 401);
     assert.deepEqual(response.body, { error: "Invalid API key." });
     assert.match(queryArgs[0], /SELECT id FROM users WHERE api_key_hash = \$1 LIMIT 1/);
-    assert.deepEqual(queryArgs[1], [hashToken("unknown-api-key")]);
+    assert.deepEqual(queryArgs[1], [hashToken("40000000-0000-4000-8000-000000000007")]);
   });
 
   const listAccessEndpoints = [

@@ -63,7 +63,7 @@ describe("invite routes", () => {
     const sseManager = createSseManagerSpy();
     const pool = createInvitePool();
 
-    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/invite-token-1");
+    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/40000000-0000-4000-8000-000000000001");
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { listId: "list-1" });
@@ -82,7 +82,7 @@ describe("invite routes", () => {
     assert.equal(claim[0].includes("token"), false);
     assert.equal(claim[1][0], "invite-1");
     assert.equal(claim[1][1] instanceof Date, true);
-    assert.equal(pool.statements[0][1][0], hashToken("invite-token-1"));
+    assert.equal(pool.statements[0][1][0], hashToken("40000000-0000-4000-8000-000000000001"));
     assert.deepEqual(sseManager.calls, [["list-1", "member:added", { listId: "list-1", userId: "user-1" }]]);
   });
 
@@ -90,7 +90,7 @@ describe("invite routes", () => {
     const sseManager = createSseManagerSpy();
     const pool = createInvitePool({ userEmail: "other@example.com" });
 
-    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/invite-token-1");
+    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/40000000-0000-4000-8000-000000000001");
 
     assert.equal(response.status, 403);
     assert.deepEqual(response.body, { error: "This invitation was sent to a different email address." });
@@ -102,7 +102,7 @@ describe("invite routes", () => {
     const sseManager = createSseManagerSpy();
     const pool = createInvitePool({ ownerId: "user-1" });
 
-    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/invite-token-1");
+    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/40000000-0000-4000-8000-000000000001");
 
     assert.equal(response.status, 409);
     assert.deepEqual(response.body, { error: "You already own this list." });
@@ -114,7 +114,7 @@ describe("invite routes", () => {
     const sseManager = createSseManagerSpy();
     const pool = createInvitePool({ claimRows: [] });
 
-    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/invite-token-1");
+    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/40000000-0000-4000-8000-000000000001");
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body, { error: "Invitation link is invalid or has expired." });
@@ -126,7 +126,7 @@ describe("invite routes", () => {
     const sseManager = createSseManagerSpy();
     const pool = createInvitePool({ insertedRows: [] });
 
-    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/already-member-token");
+    const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/40000000-0000-4000-8000-000000000004");
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { listId: "list-1" });
@@ -140,7 +140,7 @@ describe("invite routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/invites/expired-token");
+    const response = await request(createAuthedApp(pool)).get("/api/invites/40000000-0000-4000-8000-000000000002");
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body, {

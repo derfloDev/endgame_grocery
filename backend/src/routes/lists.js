@@ -2,8 +2,9 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { logger as defaultLogger } from "../logger.js";
-import createMailer from "../mail/mailer.js";
+import createMailer, { sendMailInBackground } from "../mail/mailer.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
+import { uuidParam } from "../middleware/validateUuid.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 
@@ -30,6 +31,7 @@ export function createListRouter({
   const router = Router();
 
   router.use(requireAuthMiddleware);
+  router.param("id", uuidParam("List not found."));
 
   router.get("/", async (req, res, next) => {
     if (!pool) {
@@ -271,7 +273,7 @@ export function createListRouter({
           logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
         });
 
-      await sendMemberLeftEmail({ list, mailer, member });
+      sendMailInBackground(() => sendMemberLeftEmail({ list, mailer, member }), logger);
 
       res.status(204).send();
     } catch (error) {

@@ -51,6 +51,27 @@ export function createMailer({
   };
 }
 
+/**
+ * Starts a mail delivery without making the caller wait for it or fail because of it. Use it for
+ * notifications about changes that are already committed: an SMTP outage must not turn a
+ * successful change into an error response.
+ *
+ * @param {() => Promise<unknown> | unknown} send Function that sends the mail.
+ * @param {{ error: (obj: object, msg: string) => void }} [logger] Logger for delivery failures.
+ * @returns {void}
+ */
+export function sendMailInBackground(send, logger = defaultLogger) {
+  const report = (error) => {
+    logger.error({ err: error }, "Failed to send notification email");
+  };
+
+  try {
+    Promise.resolve(send()).catch(report);
+  } catch (error) {
+    report(error);
+  }
+}
+
 async function createRenderer({ handlebarsLib, templatesDir }) {
   const handlebars = handlebarsLib.create();
   const baseTemplatePath = path.join(templatesDir, "base.hbs");

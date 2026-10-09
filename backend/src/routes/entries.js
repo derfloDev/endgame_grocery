@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { getPool } from "../db/client.js";
+import { getPool, withTransaction } from "../db/client.js";
 import { logger as defaultLogger } from "../logger.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
 import { requireAuth } from "../middleware/auth.js";
+import { uuidParam } from "../middleware/validateUuid.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 import { enqueuePushJob } from "../workers/pushWorker.js";
 
@@ -37,6 +38,7 @@ export function createEntryRouter({
   const router = Router({ mergeParams: true });
 
   router.use(requireAuthMiddleware);
+  router.param("entryId", uuidParam("Entry not found."));
 
   router.get("/", async (req, res, next) => {
     if (!pool) {
@@ -108,16 +110,35 @@ export function createEntryRouter({
         return;
       }
 
-      const openEntryCount = await pool.query(
-        `
-          SELECT COUNT(*) AS cnt
-          FROM entries
-          WHERE list_id = $1 AND status = 'open'
-        `,
-        [req.params.id]
-      );
+      // The list row lock serialises concurrent creates, so the open-entry cap cannot be exceeded
+      // by two requests that both counted before either inserted.
+      const created = await withTransaction(pool, async (client) => {
+        await client.query("SELECT 1 FROM lists WHERE id = $1 FOR UPDATE", [req.params.id]);
 
-      if (Number(openEntryCount.rows[0]?.cnt) >= MAX_OPEN_ENTRIES_PER_LIST) {
+        const openEntryCount = await client.query(
+          `
+            SELECT COUNT(*) AS cnt
+            FROM entries
+            WHERE list_id = $1 AND status = 'open'
+          `,
+          [req.params.id]
+        );
+
+        if (Number(openEntryCount.rows[0]?.cnt) >= MAX_OPEN_ENTRIES_PER_LIST) {
+          return null;
+        }
+
+        return client.query(
+          `
+            INSERT INTO entries (list_id, text, status, icon, details, last_updated_by)
+            VALUES ($1, $2, 'open', $3, $4, $5)
+            RETURNING id, list_id, text, status, icon, details, created_at, updated_at, last_updated_by
+          `,
+          [req.params.id, text.trim(), icon ?? null, normalizeDetails(details), req.user.sub]
+        );
+      });
+
+      if (!created) {
         res.status(422).json({
           error:
             "This list has reached the maximum of 1,000 open entries. Please complete or remove some items first."
@@ -125,14 +146,7 @@ export function createEntryRouter({
         return;
       }
 
-      const result = await pool.query(
-        `
-          INSERT INTO entries (list_id, text, status, icon, details, last_updated_by)
-          VALUES ($1, $2, 'open', $3, $4, $5)
-          RETURNING id, list_id, text, status, icon, details, created_at, updated_at, last_updated_by
-        `,
-        [req.params.id, text.trim(), icon ?? null, normalizeDetails(details), req.user.sub]
-      );
+      const result = created;
 
       void sseManager
         .broadcastToList(pool, req.params.id, "entry:created", {
@@ -188,57 +202,79 @@ export function createEntryRouter({
         return;
       }
 
-      if (status === "done") {
-        const doneEntryCount = await pool.query(
+      const updateEntry = (executor) =>
+        executor.query(
           `
-            SELECT COUNT(*) AS cnt
-            FROM entries
-            WHERE list_id = $1 AND status = 'done'
+            UPDATE entries
+            SET
+              text = COALESCE($1, text),
+              status = COALESCE($2, status),
+              icon = COALESCE($3, icon),
+              details = CASE WHEN $4 THEN $5 ELSE details END,
+              last_updated_by = $6,
+              updated_at = NOW()
+            WHERE id = $7 AND list_id = $8
+            RETURNING id, list_id, text, status, icon, details, created_at, updated_at, last_updated_by
           `,
-          [req.params.id]
+          [
+            text?.trim() || null,
+            status ?? null,
+            icon ?? null,
+            hasDetails,
+            hasDetails ? normalizeDetails(details) : null,
+            req.user.sub,
+            req.params.entryId,
+            req.params.id
+          ]
         );
 
-        if (Number(doneEntryCount.rows[0]?.cnt) >= MAX_DONE_ENTRIES_PER_LIST) {
-          await pool.query(
-            `
-              DELETE FROM entries
-              WHERE id = (
-                SELECT id
-                FROM entries
-                WHERE list_id = $1 AND status = 'done'
-                ORDER BY updated_at ASC, created_at ASC
-                LIMIT 1
-              )
-            `,
-            [req.params.id]
-          );
-        }
-      }
+      // Completing an entry may have to evict the oldest done entry. That must only happen for an
+      // entry that exists and is currently open, and not race with other completions, so the list
+      // and the target row are locked first.
+      const result =
+        status === "done"
+          ? await withTransaction(pool, async (client) => {
+              await client.query("SELECT 1 FROM lists WHERE id = $1 FOR UPDATE", [req.params.id]);
 
-      const result = await pool.query(
-        `
-          UPDATE entries
-          SET
-            text = COALESCE($1, text),
-            status = COALESCE($2, status),
-            icon = COALESCE($3, icon),
-            details = CASE WHEN $4 THEN $5 ELSE details END,
-            last_updated_by = $6,
-            updated_at = NOW()
-          WHERE id = $7 AND list_id = $8
-          RETURNING id, list_id, text, status, icon, details, created_at, updated_at, last_updated_by
-        `,
-        [
-          text?.trim() || null,
-          status ?? null,
-          icon ?? null,
-          hasDetails,
-          hasDetails ? normalizeDetails(details) : null,
-          req.user.sub,
-          req.params.entryId,
-          req.params.id
-        ]
-      );
+              const current = await client.query(
+                "SELECT status FROM entries WHERE id = $1 AND list_id = $2 FOR UPDATE",
+                [req.params.entryId, req.params.id]
+              );
+
+              if (!current.rows[0]) {
+                return { rows: [] };
+              }
+
+              if (current.rows[0].status === "open") {
+                const doneEntryCount = await client.query(
+                  `
+                    SELECT COUNT(*) AS cnt
+                    FROM entries
+                    WHERE list_id = $1 AND status = 'done'
+                  `,
+                  [req.params.id]
+                );
+
+                if (Number(doneEntryCount.rows[0]?.cnt) >= MAX_DONE_ENTRIES_PER_LIST) {
+                  await client.query(
+                    `
+                      DELETE FROM entries
+                      WHERE id = (
+                        SELECT id
+                        FROM entries
+                        WHERE list_id = $1 AND status = 'done' AND id <> $2
+                        ORDER BY updated_at ASC, created_at ASC
+                        LIMIT 1
+                      )
+                    `,
+                    [req.params.id, req.params.entryId]
+                  );
+                }
+              }
+
+              return updateEntry(client);
+            })
+          : await updateEntry(pool);
 
       if (!result.rows[0]) {
         res.status(404).json({ error: "Entry not found." });
