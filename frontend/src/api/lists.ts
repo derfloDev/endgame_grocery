@@ -1,4 +1,5 @@
-import { AuthExpiredError, createCacheKey, HttpError, sendJsonRequest } from "./client";
+import { AuthExpiredError, createCacheKey, sendJsonRequest } from "./client";
+import { ApiError } from "./errors";
 import { readCachedResource } from "./offlineStore";
 import type { CachedReadOptions } from "./client";
 import type { List, QueueMeta } from "../types";
@@ -78,7 +79,7 @@ export async function fetchList(
   } catch (error) {
     // Offline and never opened before: the overview cache still knows the list's title and owner.
     // Server answers (403/404) must stay visible, so only non-HTTP failures fall back.
-    if (!(error instanceof HttpError) && !(error instanceof AuthExpiredError)) {
+    if (!(error instanceof ApiError) && !(error instanceof AuthExpiredError)) {
       const cachedLists = (await readCachedResource(LISTS_CACHE_KEY).catch(() => null)) as ListsResponse | null;
       const cachedList = cachedLists?.lists?.find((candidate) => candidate.id === listId);
 

@@ -1,4 +1,5 @@
 import rateLimit from "express-rate-limit";
+import { ApiError } from "../errors.js";
 
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -33,14 +34,14 @@ export function getEmailKey(req) {
   return typeof email === "string" ? email.trim().toLowerCase() : "";
 }
 
-function tooManyRequests(req, res) {
+function tooManyRequests(req, res, next) {
   const resetTime = req.rateLimit?.resetTime;
   const retryAfterSeconds = resetTime
     ? Math.max(1, Math.ceil((resetTime.getTime() - Date.now()) / 1000))
     : 60;
 
   res.set("Retry-After", String(retryAfterSeconds));
-  res.status(429).json({ error: "Too many requests. Please try again later." });
+  next(new ApiError(429, "rate_limited", "Too many requests. Please try again later."));
 }
 
 function createLimiter({ limit, windowMs }, extra = {}) {

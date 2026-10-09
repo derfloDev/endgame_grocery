@@ -63,4 +63,23 @@ describe("OfflineBanner", () => {
     expect(screen.queryByText(/A change this one depends on was discarded/)).toBeNull();
     await i18next.changeLanguage("en");
   });
+  it("translates the reason by the server's error code and falls back to its text", () => {
+    const base = {
+      discardFailedMutation: vi.fn(async () => undefined),
+      failedMutationId: "mutation-1",
+      isOffline: false,
+      isSyncing: false,
+      queuedCount: 1,
+      resolvedIds: {},
+      syncVersion: 0
+    };
+
+    useOfflineQueueMock.mockReturnValue({ ...base, syncError: "List name is required.", syncErrorKey: "errors.validation.list_name_required" });
+    const view = render(<OfflineBanner />);
+    expect(screen.getByText("1 queued change still waiting to sync. List name is required.")).toBeTruthy();
+
+    useOfflineQueueMock.mockReturnValue({ ...base, syncError: "Brand new message.", syncErrorKey: "errors.brand.new_code" });
+    view.rerender(<OfflineBanner />);
+    expect(screen.getByText("1 queued change still waiting to sync. Brand new message.")).toBeTruthy();
+  });
 });

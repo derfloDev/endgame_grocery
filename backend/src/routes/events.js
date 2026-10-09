@@ -2,6 +2,7 @@ import { Router } from "express";
 import { createRequireAuthFn } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
 import { sseTickets as defaultSseTickets } from "../sseTickets.js";
+import { ApiError } from "../errors.js";
 
 /**
  * Creates the SSE router.
@@ -22,11 +23,11 @@ export function createEventsRouter({
 } = {}) {
   const router = Router();
 
-  router.post("/ticket", async (req, res) => {
+  router.post("/ticket", async (req, res, next) => {
     const token = getBearerToken(req);
 
     if (!token) {
-      res.status(401).json({ error: "Authentication token is required." });
+      next(new ApiError(401, "auth.token_required", "Authentication token is required."));
       return;
     }
 
@@ -36,7 +37,7 @@ export function createEventsRouter({
       // Also rejects tokens revoked by a password reset (token version check).
       user = await requireAuthFn(token);
     } catch {
-      res.status(401).json({ error: "Authentication token is invalid." });
+      next(new ApiError(401, "auth.invalid_token", "Authentication token is invalid."));
       return;
     }
 
@@ -44,14 +45,14 @@ export function createEventsRouter({
     res.json({ ticket: sseTickets.issue(user.sub) });
   });
 
-  router.get("/", async (req, res) => {
+  router.get("/", async (req, res, next) => {
     let user;
 
     if (typeof req.query.ticket === "string" && req.query.ticket) {
       const userId = sseTickets.consume(req.query.ticket);
 
       if (!userId) {
-        res.status(401).json({ error: "Authentication ticket is invalid." });
+        next(new ApiError(401, "auth.invalid_ticket", "Authentication ticket is invalid."));
         return;
       }
 
@@ -60,14 +61,14 @@ export function createEventsRouter({
       const token = getBearerToken(req);
 
       if (!token) {
-        res.status(401).json({ error: "Authentication token is required." });
+        next(new ApiError(401, "auth.token_required", "Authentication token is required."));
         return;
       }
 
       try {
         user = await requireAuthFn(token);
       } catch {
-        res.status(401).json({ error: "Authentication token is invalid." });
+        next(new ApiError(401, "auth.invalid_token", "Authentication token is invalid."));
         return;
       }
     }

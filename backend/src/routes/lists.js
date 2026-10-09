@@ -7,6 +7,7 @@ import { ensureListAccess } from "../middleware/listAccess.js";
 import { uuidParam } from "../middleware/validateUuid.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
 
 /**
  * Creates the authenticated list router.
@@ -31,14 +32,9 @@ export function createListRouter({
   const router = Router();
 
   router.use(requireAuthMiddleware);
-  router.param("id", uuidParam("List not found."));
+  router.param("id", uuidParam("list.not_found", "List not found."));
 
   router.get("/", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const result = await pool.query(
         `
@@ -97,16 +93,11 @@ export function createListRouter({
 
   // Single-list metadata for the detail page, so it does not have to load every list.
   router.get("/:id", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const hasAccess = await ensureListAccess(pool, req.params.id, req.user.sub);
 
       if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
+        next(new ApiError(403, "list.forbidden", "You do not have access to this list."));
         return;
       }
 
@@ -129,7 +120,7 @@ export function createListRouter({
       const list = result.rows[0];
 
       if (!list) {
-        res.status(404).json({ error: "List not found." });
+        next(new ApiError(404, "list.not_found", "List not found."));
         return;
       }
 
@@ -152,12 +143,7 @@ export function createListRouter({
     const { name } = req.body ?? {};
 
     if (!name?.trim()) {
-      res.status(400).json({ error: "List name is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.list_name_required", "List name is required."));
       return;
     }
 
@@ -183,16 +169,11 @@ export function createListRouter({
   });
 
   router.post("/:id/mark-viewed", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const hasAccess = await ensureListAccess(pool, req.params.id, req.user.sub);
 
       if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
+        next(new ApiError(403, "list.forbidden", "You do not have access to this list."));
         return;
       }
 
@@ -216,12 +197,7 @@ export function createListRouter({
     const { name } = req.body ?? {};
 
     if (!name?.trim()) {
-      res.status(400).json({ error: "List name is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.list_name_required", "List name is required."));
       return;
     }
 
@@ -237,7 +213,7 @@ export function createListRouter({
       );
 
       if (!ownershipResult.rows[0]) {
-        res.status(403).json({ error: "Only the list owner can rename this list." });
+        next(new ApiError(403, "list.owner_only_rename", "Only the list owner can rename this list."));
         return;
       }
 
@@ -271,11 +247,6 @@ export function createListRouter({
   });
 
   router.delete("/:id/leave", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const listResult = await pool.query(
         `
@@ -295,7 +266,7 @@ export function createListRouter({
       const list = listResult.rows[0];
 
       if (list?.owner_id === req.user.sub) {
-        res.status(403).json({ error: "The list owner cannot leave their own list." });
+        next(new ApiError(403, "list.owner_cannot_leave", "The list owner cannot leave their own list."));
         return;
       }
 
@@ -313,7 +284,7 @@ export function createListRouter({
       const member = deleteResult.rows[0];
 
       if (!list || !member) {
-        res.status(404).json({ error: "You do not have access to this list." });
+        next(new ApiError(404, "list.forbidden", "You do not have access to this list."));
         return;
       }
 
@@ -336,11 +307,6 @@ export function createListRouter({
   });
 
   router.delete("/:id", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const ownershipResult = await pool.query(
         `
@@ -353,7 +319,7 @@ export function createListRouter({
       );
 
       if (!ownershipResult.rows[0]) {
-        res.status(403).json({ error: "Only the list owner can delete this list." });
+        next(new ApiError(403, "list.owner_only_delete", "Only the list owner can delete this list."));
         return;
       }
 

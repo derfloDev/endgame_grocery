@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import logo from "../../assets/endgame_grocery_logo.png";
-import { HttpError } from "../../api/client";
+import { ApiError, getErrorMessage } from "../../api/errors";
 import { acceptInvite } from "../../api/sharing";
 import { useAuth } from "../../context/AuthContext";
 import styles from "../../styles/auth.module.css";
@@ -46,19 +46,15 @@ export default function InviteAcceptPage(): ReactElement {
           return;
         }
 
-        if (acceptError instanceof HttpError && acceptError.status === 403) {
+        if (acceptError instanceof ApiError && acceptError.code === "invite.email_mismatch") {
           // The invite belongs to another email address: offer to switch accounts.
           setWrongAccount(true);
           setError(t("invite.wrongAccount"));
           return;
         }
 
-        if (acceptError instanceof HttpError && acceptError.status === 409) {
-          setError(t("invite.ownList"));
-          return;
-        }
 
-        setError(getErrorMessage(acceptError));
+        setError(getErrorMessage(acceptError, t));
       }
     }
 
@@ -107,6 +103,3 @@ export default function InviteAcceptPage(): ReactElement {
   );
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

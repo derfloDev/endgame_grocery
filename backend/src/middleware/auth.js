@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { getConfig } from "../env.js";
 import { hashToken } from "../tokens.js";
 import { isUuid } from "./validateUuid.js";
+import { ApiError } from "../errors.js";
 
 // Pin the algorithm so tokens with alg "none" or another HMAC variant are never accepted.
 export const JWT_ALGORITHM = "HS256";
@@ -60,7 +61,7 @@ export function createRequireAuth({ jwtLib = jwt, config = getConfig(), pool } =
     const header = req.headers.authorization;
 
     if (!header?.startsWith("Bearer ")) {
-      res.status(401).json({ error: "Authentication token is required." });
+      next(new ApiError(401, "auth.token_required", "Authentication token is required."));
       return;
     }
 
@@ -70,13 +71,13 @@ export function createRequireAuth({ jwtLib = jwt, config = getConfig(), pool } =
     try {
       payload = jwtLib.verify(token, config.jwtSecret, JWT_VERIFY_OPTIONS);
     } catch {
-      res.status(401).json({ error: "Authentication token is invalid." });
+      next(new ApiError(401, "auth.invalid_token", "Authentication token is invalid."));
       return;
     }
 
     try {
       if (pool && !(await isTokenCurrent(pool, payload))) {
-        res.status(401).json({ error: "Authentication token is invalid." });
+        next(new ApiError(401, "auth.invalid_token", "Authentication token is invalid."));
         return;
       }
     } catch (error) {
@@ -95,20 +96,16 @@ export function createRequireApiKey({ pool } = {}) {
     const apiKey = req.headers["x-api-key"];
 
     if (!apiKey) {
-      res.status(401).json({ error: "API key is required." });
+      next(new ApiError(401, "auth.api_key_required", "API key is required."));
       return;
     }
 
     // Keys are generated as UUIDs, so anything else cannot match and needs no query.
     if (!isUuid(apiKey)) {
-      res.status(401).json({ error: "Invalid API key." });
+      next(new ApiError(401, "auth.invalid_api_key", "Invalid API key."));
       return;
     }
 
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
 
     try {
       const result = await pool.query(
@@ -123,7 +120,7 @@ export function createRequireApiKey({ pool } = {}) {
       const user = result.rows[0];
 
       if (!user) {
-        res.status(401).json({ error: "Invalid API key." });
+        next(new ApiError(401, "auth.invalid_api_key", "Invalid API key."));
         return;
       }
 

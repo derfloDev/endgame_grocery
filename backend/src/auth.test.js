@@ -31,7 +31,7 @@ describe("authentication routes", () => {
     });
 
     assert.equal(response.status, 404);
-    assert.equal(response.text, "");
+    assert.deepEqual(response.body, { error: "Registration is disabled.", code: "auth.registration_disabled" });
     assert.equal(queryCalled, false);
   });
 
@@ -476,7 +476,8 @@ it("falls back to the standard verification flow when the invite token is invali
 
     assert.equal(response.status, 401);
     assert.deepEqual(response.body, {
-      error: "Authentication token is required."
+      error: "Authentication token is required.",
+      code: "auth.token_required"
     });
     assert.equal(queryCalled, false);
   });
@@ -503,7 +504,8 @@ it("falls back to the standard verification flow when the invite token is invali
 
     assert.equal(response.status, 404);
     assert.deepEqual(response.body, {
-      error: "User not found."
+      error: "User not found.",
+      code: "user.not_found"
     });
   });
 
@@ -693,7 +695,7 @@ it("falls back to the standard verification flow when the invite token is invali
     });
 
     assert.equal(response.status, 401);
-    assert.deepEqual(response.body, { error: "Invalid email or password." });
+    assert.deepEqual(response.body, { error: "Invalid email or password.", code: "auth.invalid_credentials" });
     assert.deepEqual(findLogEntry(getEntries(), "Login failed"), {
       email: "demo@example.com",
       level: 40,
@@ -731,7 +733,8 @@ it("falls back to the standard verification flow when the invite token is invali
 
     assert.equal(response.status, 403);
     assert.deepEqual(response.body, {
-      error: "Please verify your email before logging in."
+      error: "Please verify your email before logging in.",
+      code: "auth.email_not_verified"
     });
     assert.deepEqual(findLogEntry(getEntries(), "Login blocked"), {
       email: "demo@example.com",
@@ -817,7 +820,8 @@ it("falls back to the standard verification flow when the invite token is invali
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body, {
-      error: "Verification link is invalid or has expired."
+      error: "Verification link is invalid or has expired.",
+      code: "auth.verification_invalid"
     });
   });
 
@@ -1029,7 +1033,8 @@ it("falls back to the standard verification flow when the invite token is invali
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body, {
-      error: "Password reset link is invalid or has expired."
+      error: "Password reset link is invalid or has expired.",
+      code: "auth.reset_invalid"
     });
   });
 
@@ -1105,13 +1110,16 @@ describe("requireAuth middleware", () => {
     const req = { headers: {} };
     const res = createResponse();
     let nextCalled = false;
+    let nextError = null;
 
-    middleware(req, res, () => {
-      nextCalled = true;
+    middleware(req, res, (error) => {
+      nextCalled = !error;
+      nextError = error ?? null;
     });
 
-    assert.equal(res.statusCode, 401);
-    assert.equal(res.body.error, "Authentication token is required.");
+    assert.equal(nextError?.status, 401);
+    assert.equal(nextError?.code, "auth.token_required");
+    assert.equal(nextError?.message, "Authentication token is required.");
     assert.equal(nextCalled, false);
   });
 
@@ -1137,8 +1145,8 @@ describe("requireAuth middleware", () => {
     const res = createResponse();
     let nextCalled = false;
 
-    middleware(req, res, () => {
-      nextCalled = true;
+    middleware(req, res, (error) => {
+      nextCalled = !error;
     });
 
     assert.deepEqual(req.user, { sub: "user-1" });
@@ -1159,13 +1167,16 @@ describe("requireApiKey middleware", () => {
     const req = { headers: {} };
     const res = createResponse();
     let nextCalled = false;
+    let nextError = null;
 
-    await middleware(req, res, () => {
-      nextCalled = true;
+    await middleware(req, res, (error) => {
+      nextCalled = !error;
+      nextError = error ?? null;
     });
 
-    assert.equal(res.statusCode, 401);
-    assert.equal(res.body.error, "API key is required.");
+    assert.equal(nextError?.status, 401);
+    assert.equal(nextError?.code, "auth.api_key_required");
+    assert.equal(nextError?.message, "API key is required.");
     assert.equal(nextCalled, false);
   });
 
@@ -1181,13 +1192,16 @@ describe("requireApiKey middleware", () => {
     const req = { headers: { "x-api-key": "not-a-uuid" } };
     const res = createResponse();
     let nextCalled = false;
+    let nextError = null;
 
-    await middleware(req, res, () => {
-      nextCalled = true;
+    await middleware(req, res, (error) => {
+      nextCalled = !error;
+      nextError = error ?? null;
     });
 
-    assert.equal(res.statusCode, 401);
-    assert.equal(res.body.error, "Invalid API key.");
+    assert.equal(nextError?.status, 401);
+    assert.equal(nextError?.code, "auth.invalid_api_key");
+    assert.equal(nextError?.message, "Invalid API key.");
     assert.equal(nextCalled, false);
   });
 
@@ -1205,13 +1219,16 @@ describe("requireApiKey middleware", () => {
     const req = { headers: { "x-api-key": "50000000-0000-4000-8000-000000000001" } };
     const res = createResponse();
     let nextCalled = false;
+    let nextError = null;
 
-    await middleware(req, res, () => {
-      nextCalled = true;
+    await middleware(req, res, (error) => {
+      nextCalled = !error;
+      nextError = error ?? null;
     });
 
-    assert.equal(res.statusCode, 401);
-    assert.equal(res.body.error, "Invalid API key.");
+    assert.equal(nextError?.status, 401);
+    assert.equal(nextError?.code, "auth.invalid_api_key");
+    assert.equal(nextError?.message, "Invalid API key.");
     assert.match(apiKeyQuery[0], /SELECT id FROM users WHERE api_key_hash = \$1 LIMIT 1/);
     assert.deepEqual(apiKeyQuery[1], [hashToken("50000000-0000-4000-8000-000000000001")]);
     assert.equal(nextCalled, false);
@@ -1231,8 +1248,8 @@ describe("requireApiKey middleware", () => {
     const res = createResponse();
     let nextCalled = false;
 
-    await middleware(req, res, () => {
-      nextCalled = true;
+    await middleware(req, res, (error) => {
+      nextCalled = !error;
     });
 
     assert.deepEqual(req.user, { sub: "user-1" });

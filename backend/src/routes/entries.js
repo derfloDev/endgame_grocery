@@ -5,11 +5,11 @@ import { requireAuth } from "../middleware/auth.js";
 import { uuidParam } from "../middleware/validateUuid.js";
 import { createEntry, deleteEntry, listEntries, updateEntry } from "../services/entryService.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
 
-const FORBIDDEN = { error: "You do not have access to this list." };
-const OPEN_LIMIT = {
-  error: "This list has reached the maximum of 1,000 open entries. Please complete or remove some items first."
-};
+const forbidden = () => new ApiError(403, "list.forbidden", "You do not have access to this list.");
+const openLimit = () =>
+  new ApiError(422, "entry.limit_open", "This list has reached the maximum of 1,000 open entries. Please complete or remove some items first.");
 
 /**
  * Creates the authenticated list entry router.
@@ -30,23 +30,18 @@ export function createEntryRouter({
   const router = Router({ mergeParams: true });
 
   router.use(requireAuthMiddleware);
-  router.param("entryId", uuidParam("Entry not found."));
+  router.param("entryId", uuidParam("entry.not_found", "Entry not found."));
 
   // Business rules (access, limits, events, push) live in the entry service, which the v1 API
   // shares; the routes only parse input and serialise output.
   const contextOf = (req) => ({ pool, sseManager, logger, userId: req.user.sub, listId: req.params.id });
 
   router.get("/", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const result = await listEntries(contextOf(req));
 
       if (result.status === "forbidden") {
-        res.status(403).json(FORBIDDEN);
+        next(forbidden());
         return;
       }
 
@@ -60,12 +55,7 @@ export function createEntryRouter({
     const { text, icon, details } = req.body ?? {};
 
     if (!text?.trim()) {
-      res.status(400).json({ error: "Entry text is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.entry_text_required", "Entry text is required."));
       return;
     }
 
@@ -73,12 +63,12 @@ export function createEntryRouter({
       const result = await createEntry(contextOf(req), { text: text.trim(), icon, details });
 
       if (result.status === "forbidden") {
-        res.status(403).json(FORBIDDEN);
+        next(forbidden());
         return;
       }
 
       if (result.status === "limit_open") {
-        res.status(422).json(OPEN_LIMIT);
+        next(openLimit());
         return;
       }
 
@@ -95,17 +85,12 @@ export function createEntryRouter({
     const hasIcon = "icon" in (req.body ?? {});
 
     if (!text?.trim() && !status && icon === undefined) {
-      res.status(400).json({ error: "At least one entry update field is required." });
+      next(new ApiError(400, "validation.entry_update_required", "At least one entry update field is required."));
       return;
     }
 
     if (status && !["open", "done"].includes(status)) {
-      res.status(400).json({ error: "Entry status must be open or done." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.entry_status_invalid", "Entry status must be open or done."));
       return;
     }
 
@@ -121,12 +106,12 @@ export function createEntryRouter({
       });
 
       if (result.status === "forbidden") {
-        res.status(403).json(FORBIDDEN);
+        next(forbidden());
         return;
       }
 
       if (result.status === "not_found") {
-        res.status(404).json({ error: "Entry not found." });
+        next(new ApiError(404, "entry.not_found", "Entry not found."));
         return;
       }
 
@@ -137,21 +122,16 @@ export function createEntryRouter({
   });
 
   router.delete("/:entryId", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const result = await deleteEntry(contextOf(req), { entryId: req.params.entryId });
 
       if (result.status === "forbidden") {
-        res.status(403).json(FORBIDDEN);
+        next(forbidden());
         return;
       }
 
       if (result.status === "not_found") {
-        res.status(404).json({ error: "Entry not found." });
+        next(new ApiError(404, "entry.not_found", "Entry not found."));
         return;
       }
 

@@ -122,7 +122,7 @@ describe("login rate limit", () => {
     const response = await login(app, "nobody@example.com");
 
     assert.equal(response.status, 401);
-    assert.deepEqual(response.body, { error: "Invalid email or password." });
+    assert.deepEqual(response.body, { error: "Invalid email or password.", code: "auth.invalid_credentials" });
     assert.equal(comparisons.length, 1);
     assert.equal(comparisons[0].password, "wrong-password");
     // A well-formed cost-12 hash makes the unknown-user path as slow as a real check.

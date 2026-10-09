@@ -1,5 +1,6 @@
 import { enqueueOfflineMutation, readCachedResource, writeCachedResource } from "./offlineStore";
 import type { QueueMeta } from "../types";
+import { ApiError } from "./errors";
 import { isNetworkError, requestJson } from "./request";
 import { REQUEST_TIMEOUT_MS } from "./connectionTimings";
 
@@ -23,17 +24,7 @@ interface SendJsonRequestOptions<T> extends CachedReadOptions<T> {
 
 interface ErrorResponse {
   error?: string;
-}
-
-/** Error for a non-OK API response; `status` lets callers show a translated, status-specific message. */
-export class HttpError extends Error {
-  status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "HttpError";
-    this.status = status;
-  }
+  code?: string;
 }
 
 export class AuthExpiredError extends Error {
@@ -99,7 +90,7 @@ export async function sendJsonRequest<T = unknown>(
         throw new AuthExpiredError();
       }
 
-      throw new HttpError(data.error ?? "Request failed.", response.status);
+      throw new ApiError(data.error ?? "Request failed.", response.status, data.code);
     }
 
     if (method === "GET" && cacheKey) {

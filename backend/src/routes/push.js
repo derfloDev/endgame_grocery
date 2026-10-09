@@ -4,6 +4,7 @@ import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
+import { ApiError } from "../errors.js";
 
 // Hostnames (and their subdomains) of the push services used by browsers. The server later POSTs
 // to every stored endpoint, so accepting arbitrary URLs would turn the worker into an SSRF proxy.
@@ -75,17 +76,12 @@ export function createPushRouter({
     const auth = req.body?.keys?.auth?.trim();
 
     if (!endpoint || !p256dh || !auth) {
-      res.status(400).json({ error: "endpoint, keys.p256dh, and keys.auth are required." });
+      next(new ApiError(400, "push.subscription_fields_required", "endpoint, keys.p256dh, and keys.auth are required."));
       return;
     }
 
     if (!isAllowedPushEndpoint(endpoint)) {
-      res.status(400).json({ error: "endpoint must be an https URL of a supported browser push service." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "push.endpoint_unsupported", "endpoint must be an https URL of a supported browser push service."));
       return;
     }
 
@@ -116,12 +112,7 @@ export function createPushRouter({
     const endpoint = req.body?.endpoint?.trim();
 
     if (!endpoint) {
-      res.status(400).json({ error: "endpoint is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "push.endpoint_required", "endpoint is required."));
       return;
     }
 

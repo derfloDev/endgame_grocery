@@ -8,6 +8,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { createRateLimiters } from "../middleware/rateLimit.js";
 import { uuidParam } from "../middleware/validateUuid.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
 
 /**
  * Creates the authenticated list sharing router.
@@ -37,19 +38,14 @@ export function createSharingRouter({
   const router = Router({ mergeParams: true });
 
   router.use(requireAuthMiddleware);
-  router.param("uid", uuidParam("That member does not have access to this list."));
+  router.param("uid", uuidParam("sharing.member_not_found", "That member does not have access to this list."));
 
   router.get("/", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const list = await getOwnedList(pool, req.params.id, req.user.sub);
 
       if (!list) {
-        res.status(403).json({ error: "Only the list owner can manage sharing." });
+        next(new ApiError(403, "list.owner_only_sharing", "Only the list owner can manage sharing."));
         return;
       }
 
@@ -96,12 +92,7 @@ export function createSharingRouter({
     const email = req.body?.email?.trim();
 
     if (!email) {
-      res.status(400).json({ error: "Email is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.email_required", "Email is required."));
       return;
     }
 
@@ -109,7 +100,7 @@ export function createSharingRouter({
       const list = await getOwnedList(pool, req.params.id, req.user.sub);
 
       if (!list) {
-        res.status(403).json({ error: "Only the list owner can manage sharing." });
+        next(new ApiError(403, "list.owner_only_sharing", "Only the list owner can manage sharing."));
         return;
       }
 
@@ -126,7 +117,7 @@ export function createSharingRouter({
       const user = userResult.rows[0];
 
       if (user?.id === list.owner_id || email.toLowerCase() === list.owner_email.toLowerCase()) {
-        res.status(409).json({ error: "That user already has access to this list." });
+        next(new ApiError(409, "sharing.already_has_access", "That user already has access to this list."));
         return;
       }
 
@@ -142,7 +133,7 @@ export function createSharingRouter({
         );
 
         if (existingMemberResult.rows[0]) {
-          res.status(409).json({ error: "That user already has access to this list." });
+          next(new ApiError(409, "sharing.already_has_access", "That user already has access to this list."));
           return;
         }
       }
@@ -187,21 +178,16 @@ export function createSharingRouter({
   });
 
   router.delete("/:uid", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const list = await getOwnedList(pool, req.params.id, req.user.sub);
 
       if (!list) {
-        res.status(403).json({ error: "Only the list owner can manage sharing." });
+        next(new ApiError(403, "list.owner_only_sharing", "Only the list owner can manage sharing."));
         return;
       }
 
       if (req.params.uid === list.owner_id) {
-        res.status(400).json({ error: "The list owner cannot be removed." });
+        next(new ApiError(400, "list.owner_cannot_be_removed", "The list owner cannot be removed."));
         return;
       }
 
@@ -218,7 +204,7 @@ export function createSharingRouter({
       );
 
       if (!deleteResult.rows[0]) {
-        res.status(404).json({ error: "That member does not have access to this list." });
+        next(new ApiError(404, "sharing.member_not_found", "That member does not have access to this list."));
         return;
       }
 

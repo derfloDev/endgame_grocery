@@ -1,6 +1,7 @@
 import express from "express";
 import { createRequireApiKey, createRequireAuth, createRequireAuthFn } from "./middleware/auth.js";
 import { createRateLimiters } from "./middleware/rateLimit.js";
+import { createNotFoundError, createUnavailablePool, toApiError, toErrorBody } from "./errors.js";
 import { uuidParam } from "./middleware/validateUuid.js";
 import pinoHttp from "pino-http";
 import authRoutes from "./routes/auth.js";
@@ -20,13 +21,6 @@ import { sseManager as defaultSseManager } from "./sseManager.js";
 import testRoutes from "./routes/testRouter.js";
 import v1Routes from "./routes/v1.js";
 import { getMissingVapidConfigFields, startPushWorker } from "./workers/pushWorker.js";
-
-// PostgreSQL errors that mean "the request was wrong", not "the server is broken".
-const PG_ERROR_RESPONSES = {
-  "22P02": { status: 400, error: "Invalid identifier or value." },
-  "23505": { status: 409, error: "That item already exists." },
-  "23503": { status: 404, error: "A referenced item does not exist." }
-};
 
 export function createApp(options = {}) {
   const app = express();
@@ -54,10 +48,13 @@ export function createApp(options = {}) {
       config,
       pool
     });
+  // Routes use this pool without checking for it. An app created without a database (tests of
+  // pages that never touch it) gets a stand-in whose every use fails with one clear error.
+  const routePool = pool ?? createUnavailablePool();
   const requireApiKey =
     options.requireApiKey ??
     createRequireApiKey({
-      pool
+      pool: routePool
     });
   // One set of in-memory counters per app instance (the deployment is single-instance).
   // The E2E suite (the only user of the opt-in test routes) registers and fails logins from a
@@ -68,7 +65,7 @@ export function createApp(options = {}) {
   const routerOptions = {
     ...options,
     config,
-    pool,
+    pool: routePool,
     rateLimiters,
     requireApiKey,
     requireAuthMiddleware,
@@ -129,25 +126,32 @@ export function createApp(options = {}) {
   }
   app.use("/api/lists", listRoutes(routerOptions));
   // Reject malformed list ids before any router runs a query with them.
-  app.param("id", uuidParam("List not found."));
+  app.param("id", uuidParam("list.not_found", "List not found."));
   app.use("/api/lists/:id/history", historyRoutes(routerOptions));
   app.use("/api/lists/:id/suggestions", suggestionRoutes(routerOptions));
   app.use("/api/lists/:id/entries", entryRoutes(routerOptions));
   app.use("/api/lists/:id/members", sharingRoutes(routerOptions));
 
+  // Anything under /api that no route handled (unknown paths, disabled test routes).
+  app.use("/api", (_req, _res, next) => next(createNotFoundError()));
+
+  // The one place that turns errors into responses: `{ error, code }` for every failure.
   app.use((error, req, res, _next) => {
     void _next;
-    const mapped = PG_ERROR_RESPONSES[error?.code];
+    const apiError = toApiError(error);
 
-    if (mapped) {
-      // Constraint and type violations caused by client input are not server faults.
-      (req.log ?? logger).warn({ err: error }, "Request rejected by the database");
-      res.status(mapped.status).json({ error: mapped.error });
+    if (apiError) {
+      if (!(error instanceof Error && error.name === "ApiError")) {
+        // Errors mapped from the database or the body parser are worth a trace; plain API errors are routine.
+        (req.log ?? logger).warn({ err: error }, "Request rejected");
+      }
+
+      res.status(apiError.status).json(toErrorBody(apiError));
       return;
     }
 
     (req.log ?? logger).error({ err: error }, "Unhandled error");
-    res.status(500).json({ error: "Internal server error." });
+    res.status(500).json({ error: "Internal server error.", code: "internal.error" });
   });
 
   if (shouldStartWorkers) {

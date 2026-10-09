@@ -6,6 +6,7 @@ import logo from "../../assets/endgame_grocery_logo.png";
 import { useAuth } from "../../context/AuthContext";
 import styles from "../../styles/auth.module.css";
 import { getPasswordPolicyError } from "../../utils/passwordPolicy";
+import { getErrorMessage } from "../../api/errors";
 
 interface RegisterResult {
   token?: string;
@@ -62,7 +63,7 @@ export default function RegisterPage(): ReactElement {
 
       navigate("/verify-email", { replace: true, state: { email } });
     } catch (submitError) {
-      setError(getErrorMessage(submitError));
+      setError(getErrorMessage(submitError, t));
     } finally {
       setIsSubmitting(false);
     }
@@ -141,6 +142,3 @@ export default function RegisterPage(): ReactElement {
   );
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

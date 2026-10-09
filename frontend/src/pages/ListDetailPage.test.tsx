@@ -12,7 +12,7 @@ import enTranslations from "../locales/en/translation.json";
 import deTranslations from "../locales/de/translation.json";
 import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
-import { HttpError } from "../api/client";
+import { ApiError } from "../api/errors";
 import { fetchList, fetchLists, markListViewed } from "../api/lists";
 import { fetchListMembers, leaveList } from "../api/sharing";
 import { listOfflineMutations, writeCachedResource } from "../api/offlineStore";
@@ -361,7 +361,7 @@ describe("ListDetailPage cache-first loading", () => {
     await deliverCache();
     expect(screen.getByText("Cached Milk")).toBeTruthy();
     await act(async () => {
-      network.lists.reject(new HttpError("You do not have access to this list.", 403));
+      network.lists.reject(new ApiError("You do not have access to this list.", 403));
       network.entries.resolve({ entries: [] });
     });
     expect(screen.getByText(enTranslations["detail.accessError"])).toBeTruthy();
@@ -465,7 +465,7 @@ describe("ListDetailPage initial loading", () => {
     const translations = createInstance();
     await translations.init({ lng: "en", resources: { en: { translation: enTranslations }, de: { translation: deTranslations } } });
     mockListDetailData();
-    fetchListMock.mockRejectedValue(new HttpError("You do not have access to this list.", 403));
+    fetchListMock.mockRejectedValue(new ApiError("You do not have access to this list.", 403));
     renderListDetailPage(translations);
     await screen.findByText(enTranslations["detail.accessError"]);
 

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18next from "i18next";
 import "../i18n";
 import { resetPassword } from "../api/auth";
+import { ApiError } from "../api/errors";
 import { useAppConfig } from "../context/appConfigState";
 import { useAuth } from "../context/AuthContext";
 import LoginPage from "./LoginPage/LoginPage";
@@ -185,5 +186,43 @@ describe("reset password policy", () => {
     renderAt("/reset-password?token=reset-1", <ResetPasswordPage />);
 
     expect(screen.getByText(/Mindestens 8 Zeichen/)).toBeTruthy();
+  });
+});
+
+describe("translated API errors", () => {
+  async function failLogin(language: "en" | "de") {
+    await i18next.changeLanguage(language);
+    useAuthMock.mockReturnValue(
+      createAuth({ login: vi.fn().mockRejectedValue(new ApiError("Invalid email or password.", 401, "auth.invalid_credentials")) })
+    );
+    renderLogin("/login");
+    await userEvent.type(screen.getByLabelText(language === "de" ? "E-Mail" : "Email"), "a@example.com");
+    await userEvent.type(screen.getByLabelText(language === "de" ? "Passwort" : "Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: language === "de" ? /anmelden/i : /log in/i }));
+  }
+
+  it("shows the English text for the error code", async () => {
+    await failLogin("en");
+
+    expect(await screen.findByText("Invalid email or password.")).toBeTruthy();
+  });
+
+  it("shows the German text for the same error code", async () => {
+    await failLogin("de");
+
+    expect(await screen.findByText("E-Mail-Adresse oder Passwort ist falsch.")).toBeTruthy();
+    expect(screen.queryByText("Invalid email or password.")).toBeNull();
+  });
+
+  it("falls back to the server text for a code without translation", async () => {
+    useAuthMock.mockReturnValue(
+      createAuth({ login: vi.fn().mockRejectedValue(new ApiError("Brand new server message.", 400, "brand.new_code")) })
+    );
+    renderLogin("/login");
+    await userEvent.type(screen.getByLabelText("Email"), "a@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.click(screen.getByRole("button", { name: /log in/i }));
+
+    expect(await screen.findByText("Brand new server message.")).toBeTruthy();
   });
 });

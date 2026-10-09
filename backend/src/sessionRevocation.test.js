@@ -40,6 +40,12 @@ function runMiddleware(middleware, token) {
       }
     };
     Promise.resolve(middleware(req, res, (error) => {
+      if (error?.name === "ApiError") {
+        // Middleware hands API errors to the central handler; report them like a response.
+        resolve({ status: error.status, body: { error: error.message, code: error.code }, req, nextCalled: false });
+        return;
+      }
+
       if (error) {
         reject(error);
         return;
@@ -65,7 +71,7 @@ describe("requireAuth token version check", () => {
     const result = await runMiddleware(createRequireAuth({ config, pool }), sign({ sub: "user-1", tv: 3 }));
 
     assert.equal(result.status, 401);
-    assert.deepEqual(result.body, { error: "Authentication token is invalid." });
+    assert.deepEqual(result.body, { error: "Authentication token is invalid.", code: "auth.invalid_token" });
   });
 
   it("treats a token without tv as version 0", async () => {
@@ -86,7 +92,7 @@ describe("requireAuth token version check", () => {
     const result = await runMiddleware(createRequireAuth({ config, pool: createPool([]) }), sign({ sub: "gone", tv: 0 }));
 
     assert.equal(result.status, 401);
-    assert.deepEqual(result.body, { error: "Authentication token is invalid." });
+    assert.deepEqual(result.body, { error: "Authentication token is invalid.", code: "auth.invalid_token" });
   });
 
   it("does not query the database for an invalid or missing JWT", async () => {
@@ -289,7 +295,7 @@ describe("password reset", () => {
     const response = await reset(app);
 
     assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: "Password reset link is invalid or has expired." });
+    assert.deepEqual(response.body, { error: "Password reset link is invalid or has expired.", code: "auth.reset_invalid" });
     assert.deepEqual(hashes, []);
     assert.equal(statements.some(([sql]) => sql.startsWith("UPDATE users")), false);
   });

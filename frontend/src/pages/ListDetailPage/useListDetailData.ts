@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createTemporaryId } from "../../api/client";
 import { createEntry, fetchEntries, updateEntry } from "../../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../../api/history";
-import { HttpError } from "../../api/client";
+import { ApiError, getErrorMessage } from "../../api/errors";
 import { fetchList, markListViewed } from "../../api/lists";
 import { listOfflineMutations, writeCachedResource } from "../../api/offlineStore";
 import { fetchListMembers } from "../../api/sharing";
@@ -65,6 +66,7 @@ export function useListDetailData({
   syncVersion,
   token
 }: UseListDetailDataOptions) {
+  const { t } = useTranslation();
   const [list, setList] = useState<DetailList | null>(null);
   const [entries, setEntriesState] = useState<DetailEntry[]>([]);
   const entriesRef = useRef<DetailEntry[]>([]);
@@ -329,13 +331,13 @@ export function useListDetailData({
         await updateEntries((currentEntries) =>
           currentEntries.filter((currentEntry) => currentEntry.id !== temporaryEntry.id)
         );
-        setEntryError(getErrorMessage(submitError));
+        setEntryError(getErrorMessage(submitError, t));
         return false;
       } finally {
         inFlightTempIdsRef.current.delete(temporaryEntry.id);
       }
     },
-    [listId, token, updateEntries]
+    [listId, t, token, updateEntries]
   );
 
   const toggleStatus = useCallback(
@@ -404,10 +406,10 @@ export function useListDetailData({
           setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== entry.text));
         }
 
-        setEntryError(getErrorMessage(submitError));
+        setEntryError(getErrorMessage(submitError, t));
       }
     },
-    [listId, token, updateEntries]
+    [listId, t, token, updateEntries]
   );
 
   const submitEditEntry = useCallback(
@@ -440,11 +442,11 @@ export function useListDetailData({
         );
         return true;
       } catch (submitError) {
-        setEntryError(getErrorMessage(submitError));
+        setEntryError(getErrorMessage(submitError, t));
         return false;
       }
     },
-    [listId, token, updateEntries]
+    [listId, t, token, updateEntries]
   );
 
   const addRecentlyUsedEntry = useCallback(
@@ -505,7 +507,7 @@ export function useListDetailData({
             }
           }).catch((listError: unknown) => {
             // 403/404: the list is gone or not shared with this user. Shown as the access error.
-            if (listError instanceof HttpError && (listError.status === 403 || listError.status === 404)) {
+            if (listError instanceof ApiError && (listError.status === 403 || listError.status === 404)) {
               return { list: null };
             }
             throw listError;
@@ -635,6 +637,3 @@ function normalizeEntryDetails(details: string): string | null {
   return trimmedDetails ? trimmedDetails : null;
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

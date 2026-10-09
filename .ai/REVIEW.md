@@ -2012,3 +2012,75 @@ No blocker or major findings; no required fixes.
 ##### Risks
 - Production runs Alpine's nginx, not the Windows build I tested; the directives are standard and the Alpine `mime.types` is upstream's, but the final proof is a `curl -I` against the built image.
 - A Cloudflare "cache everything" rule would still override these headers; the README now warns about it.
+
+## Task: T-020 (hardening cycle 2026-10-08 — stable error codes with DE/EN translations)
+
+### Review Round 1
+
+#### Verdict
+
+`FAIL`
+
+One required fix: the E2E suite (which CI runs) now fails on a changed message. Everything else in the task works; the fix is a one-line spec update.
+
+#### Findings
+
+1. **major — required fix** — `e2e/auth.spec.js:71`: the spec waits for the text `An account with that email already exists.`, but the app now shows the translated `errors.auth.email_taken`, which reads `An account with this email address already exists.` (`frontend/src/locales/en/translation.json:185`; the server's own English message still has the old wording). `registration › shows an error when the email is already registered` fails deterministically (2 of 2 runs against the real stack; the page snapshot shows the new text). The implementer did not run Playwright and the task did not list the E2E specs in its scope. Either update the spec to the new text (preferred: assert the translated text the user sees) or align the locale text with the old wording.
+2. **minor** — unknown API paths and the disabled test routes still answer Express's default `404` HTML page with no `{ error, code }` (for example `GET /api/does-not-exist`), which contradicts "every error response has `{ error, code }`". Adding a final `/api` catch-all that throws an `ApiError(404, …)` closes it. Not part of the acceptance examples, hence not required.
+3. **minor** — a request body over the 100 kB limit answers `500 internal.error` (checked with a 200 kB JSON body) instead of `413`; `toApiError` maps only `entity.parse.failed`, not body-parser's `entity.too.large`. A client mistake is reported as a server fault and logged at error level. Pre-existing behaviour (the old handler also answered 500), but a natural addition now that the central mapping exists.
+4. **nit** — one other E2E case (`login › shows an error for an unknown email`) failed once in the full run and passed in three single and repeated runs: a timing flake, not related to the change.
+5. **nit** — `POST /api/lists/:id/members` accepts any non-empty string as the invited email (`"nope"` answered 201). Pre-existing and outside this task; noted because the code catalogue has a `validation.*` family that could hold it.
+
+#### Required Fixes
+
+1. Fix `e2e/auth.spec.js:71` (finding 1) so the E2E suite passes again.
+
+#### Verification
+
+##### Steps performed
+- Re-read the plan, the board, the handoff and the staged diff: `errors.js` (52 codes, `ApiError`, `toApiError`, `createUnavailablePool`), the central handler in `app.js`, all converted routes and middleware, `frontend/src/api/errors.ts`, `client.ts`, the six auth/invite pages, `OfflineBanner`/`OfflineQueueContext`, locales and OpenAPI.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok. `npm test`: backend 388/388, frontend 823/823.
+- `rg` confirmed no `if (!pool)` guard is left in `backend/src/routes` or middleware (remaining uses are in the db client, seed, worker and SSE manager, outside the criterion) and that `res.status(4xx/5xx)` is only written in the central handler.
+- Probed 26 requests through `createApp` against a real PostgreSQL (embedded 18, migrated to the migration before the broken T-011 one): authentication, validation, access, not-found, rate-limit-free paths, v1, push, events, invites, resets. Every error response except the two in finding 2 carries `{ error, code }`, each code is in the backend catalogue, and each has a DE and an EN text; malformed JSON answers `400 request.invalid_json`.
+- Browser check against the real backend: a wrong password on the login page shows `E-Mail-Adresse oder Passwort ist falsch.` in German and `Invalid email or password.` in English; an invalid reset link shows the matching translated sentence in both languages.
+- Playwright against the real stack: 11 of 14 pass; the failures are finding 1, the known T-013 duplicate-tile failure (`lists.spec.js › adds an item`), and the flake in finding 4.
+- The integration suite could not be run: the committed T-011 migration still fails on PostgreSQL (T-014 review, finding 1). I grepped it for assertions on `body.error`/`code`: there are none, so the error-shape change does not affect it.
+
+##### Findings
+- Acceptance criteria: every error response has `{ error, code }` (apart from finding 2); the UI shows translated text per code in DE and EN; no `if (!pool)` guards remain in routes; there is a single `getErrorMessage`.
+- Existing tests: assertions of the form `{ error }` gained the matching `code`, middleware tests read the `ApiError` passed to `next`; no assertion was removed or weakened. `errors.test.js` also enforces that no code is unused or missing a translation.
+- The implementer's side fix in `OverviewPage` (writing `listsRef` together with the state) removes a real stale-read race and explains the flaky test seen in T-017/T-018.
+
+##### Risks
+- The wording of `errors.auth.email_taken` and similar messages now lives in the locale files, so any tool that matches on English text (E2E specs, the Home Assistant integration) must match on `code` instead; the OpenAPI schema says so.
+- Not executed: the integration suite (see above).
+
+### Review Round 2 (T-020)
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **resolved (was major, required fix)** — `e2e/auth.spec.js:71` now expects `An account with this email address already exists.`; `registration › shows an error when the email is already registered` passes against the real stack.
+2. **resolved (was minor)** — unknown `/api` paths and the disabled `/api/test/*` routes now answer `404 { "error": "Not found.", "code": "request.not_found" }` through a final `app.use("/api", …)` that feeds the central handler (checked with `curl`: JSON body, `application/json`).
+3. **resolved (was minor)** — a 200 kB JSON body now answers `413 request.too_large` instead of `500 internal.error`.
+4. **minor (unchanged, not required)** — `POST /api/lists/:id/members` still accepts any non-empty string as the invited email (pre-existing, outside T-020).
+5. **nit** — the two new codes (`request.not_found`, `request.too_large`) have DE and EN texts; the catalogue is now 54 codes and the translation test enforces both languages.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the rework diff: the one-line E2E change, the `/api` catch-all and `entity.too.large` mapping in `app.js`/`errors.js`, new locale texts, README and the new cases in `errors.test.js`.
+- `npm run lint`: 0 errors (1 pre-existing warning). `npm run build`: ok. `npm test`: backend 391/391, frontend 823/823.
+- Re-ran my 26-request probe against a real PostgreSQL (embedded 18, migrated to the migration before the broken T-011 one): all error responses now carry a catalogued, translated `code` (0 without), including the unknown path (404 `request.not_found`), the disabled test route (404) and the oversize body (413 `request.too_large`).
+- Full Playwright run against the real backend and Vite: 13 of 14 pass. The one failure is `lists.spec.js › adds an item to a shopping list`, the known T-013 duplicate-tile regression (REVIEW.md, T-016 finding 1), which this task does not touch.
+
+##### Findings
+- All round 1 required fixes are done and verified; acceptance criteria remain met (every error response `{ error, code }`, translated per code in DE/EN, no route `if (!pool)` guards, one `getErrorMessage`).
+
+##### Risks
+- The integration suite still cannot run because of the T-011 migration defect, so SQL-backed error paths (for example unique-violation mapping) rely on the unit tests and my probe.

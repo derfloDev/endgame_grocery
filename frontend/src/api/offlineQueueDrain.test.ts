@@ -95,6 +95,19 @@ describe("drainOfflineQueue", () => {
       expect(result.failed).toEqual({ id: "m1", error: "Name is required." });
       expect(result.authExpired).toBeUndefined();
     });
+
+    it("passes the server's error code along so the banner can translate it", async () => {
+      await enqueueOfflineMutation(queued({ url: "/api/lists", method: "POST", payload: {} }));
+      fetchMock.mockResolvedValue(jsonResponse(400, { error: "List name is required.", code: "validation.list_name_required" }));
+
+      const result = await drain();
+
+      expect(result.failed).toEqual({
+        id: "m1",
+        error: "List name is required.",
+        apiCode: "validation.list_name_required"
+      });
+    });
   });
 
   describe("user scoping", () => {

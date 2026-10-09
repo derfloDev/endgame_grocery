@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18next from "i18next";
 import "../../i18n";
-import { HttpError } from "../../api/client";
+import { ApiError } from "../../api/errors";
 import { acceptInvite } from "../../api/sharing";
 import { useAuth } from "../../context/AuthContext";
 import InviteAcceptPage from "./InviteAcceptPage";
@@ -61,7 +61,7 @@ describe("InviteAcceptPage", () => {
   });
 
   it("explains a 403 with the signed-in email and offers to switch accounts", async () => {
-    acceptInviteMock.mockRejectedValue(new HttpError("This invitation was sent to a different email address.", 403));
+    acceptInviteMock.mockRejectedValue(new ApiError("This invitation was sent to a different email address.", 403, "invite.email_mismatch"));
 
     renderPage();
 
@@ -74,7 +74,7 @@ describe("InviteAcceptPage", () => {
   });
 
   it("shows a translated notice when the user already owns the list", async () => {
-    acceptInviteMock.mockRejectedValue(new HttpError("You already own this list.", 409));
+    acceptInviteMock.mockRejectedValue(new ApiError("You already own this list.", 409, "invite.owner_cannot_accept"));
 
     renderPage();
 
@@ -84,7 +84,7 @@ describe("InviteAcceptPage", () => {
 
   it("shows the German message for a mismatched account", async () => {
     await i18next.changeLanguage("de");
-    acceptInviteMock.mockRejectedValue(new HttpError("This invitation was sent to a different email address.", 403));
+    acceptInviteMock.mockRejectedValue(new ApiError("This invitation was sent to a different email address.", 403, "invite.email_mismatch"));
 
     renderPage();
 
@@ -92,7 +92,7 @@ describe("InviteAcceptPage", () => {
   });
 
   it("shows the server message for other failures", async () => {
-    acceptInviteMock.mockRejectedValue(new HttpError("Invitation link is invalid or has expired.", 400));
+    acceptInviteMock.mockRejectedValue(new ApiError("Invitation link is invalid or has expired.", 400));
 
     renderPage();
 

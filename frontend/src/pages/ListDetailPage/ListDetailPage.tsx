@@ -3,6 +3,7 @@ import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { AuthExpiredError } from "../../api/client";
+import { getErrorMessage } from "../../api/errors";
 import { writeCachedResource } from "../../api/offlineStore";
 import { renameList } from "../../api/lists";
 import { revokeListMember, shareListWithMember } from "../../api/sharing";
@@ -22,7 +23,7 @@ import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { getRecentlyUsedDisplayState } from "../recentlyUsedState";
 import { leaveSharedList } from "../leaveListAction";
 import styles from "./ListDetailPage.module.css";
-import { getChangeKind, getErrorMessage, getInitials, isShareInviteResult } from "./listDetailUtils";
+import { getChangeKind, getEntryErrorText, getInitials, isShareInviteResult } from "./listDetailUtils";
 import { useEntryTiles } from "./useEntryTiles";
 import { useListDetailData } from "./useListDetailData";
 import { useListLifecycleEvents } from "./useListLifecycleEvents";
@@ -144,7 +145,7 @@ export default function ListDetailPage(): ReactElement {
           : currentList
       );
     } catch (submitError) {
-      setEntryError(getErrorMessage(submitError));
+      setEntryError(getErrorMessage(submitError, t));
       throw submitError;
     }
   }
@@ -170,7 +171,7 @@ export default function ListDetailPage(): ReactElement {
 
       setShareEmail("");
     } catch (submitError) {
-      setShareError(getErrorMessage(submitError));
+      setShareError(getErrorMessage(submitError, t));
     } finally {
       setIsShareSubmitting(false);
     }
@@ -182,7 +183,7 @@ export default function ListDetailPage(): ReactElement {
       await revokeListMember(listId, memberId, token);
       await updateMembers((currentMembers) => currentMembers.filter((member) => member.user_id !== memberId));
     } catch (submitError) {
-      setShareError(getErrorMessage(submitError));
+      setShareError(getErrorMessage(submitError, t));
     }
   }
 
@@ -191,7 +192,7 @@ export default function ListDetailPage(): ReactElement {
       confirmMessage: t("list.leaveConfirm"),
       listId,
       token,
-      onError: (error) => setEntryError(getErrorMessage(error)),
+      onError: (error) => setEntryError(getErrorMessage(error, t)),
       onSuccess: () => navigate("/")
     });
   }
@@ -207,7 +208,7 @@ export default function ListDetailPage(): ReactElement {
 
       await subscribe();
     } catch (pushError) {
-      setEntryError(getErrorMessage(pushError));
+      setEntryError(getErrorMessage(pushError, t));
     }
   }
 
@@ -275,7 +276,7 @@ export default function ListDetailPage(): ReactElement {
         ) : null}
 
         {entryError && !shouldSuppressEntryError ? (
-          <div className="detail-banner eg-error-banner">{getErrorMessage(entryError, t("detail.accessError"))}</div>
+          <div className="detail-banner eg-error-banner">{getEntryErrorText(entryError, t)}</div>
         ) : null}
         {isLoading ? <LoadingState rows={4} /> : null}
 
@@ -350,7 +351,6 @@ export default function ListDetailPage(): ReactElement {
             }
 
             const didSaveEntry = await submitEditEntry(editingEntry.id, text, icon, details);
-
             if (didSaveEntry) {
               setEditingEntry(null);
             }

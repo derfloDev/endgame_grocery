@@ -32,7 +32,7 @@ describe("events route", () => {
     const response = await request(createTestApp()).get("/api/events");
 
     assert.equal(response.status, 401);
-    assert.deepEqual(response.body, { error: "Authentication token is required." });
+    assert.deepEqual(response.body, { error: "Authentication token is required.", code: "auth.token_required" });
   });
 
   it("returns 401 for an invalid bearer token", async () => {
@@ -41,7 +41,7 @@ describe("events route", () => {
       .set("Authorization", "Bearer bad-token");
 
     assert.equal(response.status, 401);
-    assert.deepEqual(response.body, { error: "Authentication token is invalid." });
+    assert.deepEqual(response.body, { error: "Authentication token is invalid.", code: "auth.invalid_token" });
   });
 
   it("no longer accepts the JWT in the query string", async () => {
@@ -49,14 +49,14 @@ describe("events route", () => {
     const response = await request(createTestApp()).get(`/api/events?token=${token}`);
 
     assert.equal(response.status, 401);
-    assert.deepEqual(response.body, { error: "Authentication token is required." });
+    assert.deepEqual(response.body, { error: "Authentication token is required.", code: "auth.token_required" });
   });
 
   it("returns 401 for an unknown ticket", async () => {
     const response = await request(createTestApp()).get("/api/events?ticket=unknown");
 
     assert.equal(response.status, 401);
-    assert.deepEqual(response.body, { error: "Authentication ticket is invalid." });
+    assert.deepEqual(response.body, { error: "Authentication ticket is invalid.", code: "auth.invalid_ticket" });
   });
 
   describe("POST /api/events/ticket", () => {

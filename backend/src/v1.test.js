@@ -19,7 +19,7 @@ function createV1App(pool, options = {}) {
     sseManager: options.sseManager ?? createSseManagerSpy(),
     requireApiKey(req, res, next) {
       if (!req.headers["x-api-key"]) {
-        res.status(401).json({ error: "API key is required." });
+        res.status(401).json({ error: "API key is required.", code: "auth.api_key_required" });
         return;
       }
 
@@ -54,7 +54,7 @@ describe("external v1 API routes", () => {
       const response = await request(createV1App(null))[method](path);
 
       assert.equal(response.status, 401);
-      assert.deepEqual(response.body, { error: "API key is required." });
+      assert.deepEqual(response.body, { error: "API key is required.", code: "auth.api_key_required" });
     });
   }
 
@@ -72,7 +72,7 @@ describe("external v1 API routes", () => {
       .set("X-Api-Key", "40000000-0000-4000-8000-000000000007");
 
     assert.equal(response.status, 401);
-    assert.deepEqual(response.body, { error: "Invalid API key." });
+    assert.deepEqual(response.body, { error: "Invalid API key.", code: "auth.invalid_api_key" });
     assert.match(queryArgs[0], /SELECT id FROM users WHERE api_key_hash = \$1 LIMIT 1/);
     assert.deepEqual(queryArgs[1], [hashToken("40000000-0000-4000-8000-000000000007")]);
   });
@@ -94,7 +94,7 @@ describe("external v1 API routes", () => {
         .send(body);
 
       assert.equal(response.status, 403);
-      assert.deepEqual(response.body, { error: "You do not have access to this list." });
+      assert.deepEqual(response.body, { error: "You do not have access to this list.", code: "list.forbidden" });
     });
   }
 
@@ -157,7 +157,7 @@ describe("external v1 API routes", () => {
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "List not found." });
+    assert.deepEqual(response.body, { error: "List not found.", code: "list.not_found" });
   });
 
   it("returns 400 when creating an item without a name", async () => {
@@ -173,7 +173,7 @@ describe("external v1 API routes", () => {
       .send({});
 
     assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: "Item name is required." });
+    assert.deepEqual(response.body, { error: "Item name is required.", code: "validation.item_name_required" });
   });
 
   it("creates an open item, records the actor and queues a push", async () => {
@@ -247,7 +247,7 @@ describe("external v1 API routes", () => {
         .send({ name: "Milk", description });
 
       assert.equal(response.status, 400);
-      assert.deepEqual(response.body, { error: "Item description must be a string." });
+      assert.deepEqual(response.body, { error: "Item description must be a string.", code: "validation.item_description_invalid" });
     }
 
     const rename = await request(createV1App(pool))
@@ -288,7 +288,7 @@ describe("external v1 API routes", () => {
       .send({ name: "Milk" });
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "List not found." });
+    assert.deepEqual(response.body, { error: "List not found.", code: "list.not_found" });
   });
 
   it("toggles an open item to done and records the actor", async () => {
@@ -377,7 +377,7 @@ describe("external v1 API routes", () => {
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
   });
 
   it("returns 404 when toggling an unknown item", async () => {
@@ -388,7 +388,7 @@ describe("external v1 API routes", () => {
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
     assert.equal(pool.find("DELETE FROM entries"), undefined);
   });
 
@@ -401,7 +401,7 @@ describe("external v1 API routes", () => {
       .send({});
 
     assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: "Item name is required." });
+    assert.deepEqual(response.body, { error: "Item name is required.", code: "validation.item_name_required" });
   });
 
   it("returns 400 when renaming an item with a blank name", async () => {
@@ -413,7 +413,7 @@ describe("external v1 API routes", () => {
       .send({ name: "  " });
 
     assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: "Item name is required." });
+    assert.deepEqual(response.body, { error: "Item name is required.", code: "validation.item_name_required" });
   });
 
   it("returns 404 for an invalid list ID when renaming an item", async () => {
@@ -425,7 +425,7 @@ describe("external v1 API routes", () => {
       .send({ name: "Oat milk" });
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "List not found." });
+    assert.deepEqual(response.body, { error: "List not found.", code: "list.not_found" });
   });
 
   it("returns 404 for an invalid item ID when renaming an item", async () => {
@@ -437,7 +437,7 @@ describe("external v1 API routes", () => {
       .send({ name: "Oat milk" });
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
   });
 
   it("returns 404 when renaming an unknown item", async () => {
@@ -450,7 +450,7 @@ describe("external v1 API routes", () => {
       .send({ name: "Oat milk" });
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
     assert.deepEqual(pool.find("UPDATE entries")[1].slice(0, 1), ["Oat milk"]);
     assert.deepEqual(sseManager.calls, []);
   });
@@ -557,7 +557,7 @@ describe("external v1 API routes", () => {
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
   });
 
   it("returns 404 when deleting an unknown item", async () => {
@@ -574,7 +574,7 @@ describe("external v1 API routes", () => {
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
   });
 });
 

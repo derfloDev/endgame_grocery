@@ -53,20 +53,20 @@ const failingMailer = {
 
 describe("malformed identifiers", () => {
   const cases = [
-    ["get", "/api/lists/not-a-uuid/entries", "List not found."],
-    ["post", "/api/lists/not-a-uuid/entries", "List not found."],
-    ["patch", `/api/lists/${LIST}/entries/not-a-uuid`, "Entry not found."],
-    ["delete", `/api/lists/${LIST}/entries/not-a-uuid`, "Entry not found."],
-    ["delete", `/api/lists/not-a-uuid/members/${USER}`, "List not found."],
-    ["delete", `/api/lists/${LIST}/members/not-a-uuid`, "That member does not have access to this list."],
-    ["get", "/api/lists/not-a-uuid/history", "List not found."],
-    ["patch", "/api/lists/not-a-uuid", "List not found."],
-    ["delete", "/api/lists/not-a-uuid", "List not found."],
-    ["delete", "/api/lists/not-a-uuid/leave", "List not found."],
-    ["post", "/api/lists/not-a-uuid/mark-viewed", "List not found."]
+    ["get", "/api/lists/not-a-uuid/entries", "list.not_found", "List not found."],
+    ["post", "/api/lists/not-a-uuid/entries", "list.not_found", "List not found."],
+    ["patch", `/api/lists/${LIST}/entries/not-a-uuid`, "entry.not_found", "Entry not found."],
+    ["delete", `/api/lists/${LIST}/entries/not-a-uuid`, "entry.not_found", "Entry not found."],
+    ["delete", `/api/lists/not-a-uuid/members/${USER}`, "list.not_found", "List not found."],
+    ["delete", `/api/lists/${LIST}/members/not-a-uuid`, "sharing.member_not_found", "That member does not have access to this list."],
+    ["get", "/api/lists/not-a-uuid/history", "list.not_found", "List not found."],
+    ["patch", "/api/lists/not-a-uuid", "list.not_found", "List not found."],
+    ["delete", "/api/lists/not-a-uuid", "list.not_found", "List not found."],
+    ["delete", "/api/lists/not-a-uuid/leave", "list.not_found", "List not found."],
+    ["post", "/api/lists/not-a-uuid/mark-viewed", "list.not_found", "List not found."]
   ];
 
-  for (const [method, path, message] of cases) {
+  for (const [method, path, code, message] of cases) {
     it(`answers ${method.toUpperCase()} ${path} with 404 and runs no query`, async () => {
       const pool = createPool(() => {
         throw new Error("no query expected");
@@ -75,7 +75,7 @@ describe("malformed identifiers", () => {
       const response = await request(createTestApp(pool))[method](path).send({ text: "x", name: "x", email: "a@b.c" });
 
       assert.equal(response.status, 404);
-      assert.deepEqual(response.body, { error: message });
+      assert.deepEqual(response.body, { error: message, code });
       assert.deepEqual(pool.statements, []);
     });
   }

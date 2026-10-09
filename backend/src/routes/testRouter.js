@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
+import { ApiError } from "../errors.js";
 
 function createToken({ jwtLib, config, userId }) {
   return jwtLib.sign({ sub: userId }, config.jwtSecret, {
@@ -23,12 +24,7 @@ export function createTestRouter({
     const { email, password, display_name: displayName } = req.body ?? {};
 
     if (!email || !password || !displayName) {
-      res.status(400).json({ error: "Email, password, and display_name are required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.registration_fields_required", "Email, password, and display_name are required."));
       return;
     }
 
@@ -52,7 +48,7 @@ export function createTestRouter({
       });
     } catch (error) {
       if (error.code === "23505") {
-        res.status(409).json({ error: "An account with that email already exists." });
+        next(new ApiError(409, "auth.email_taken", "An account with that email already exists."));
         return;
       }
 

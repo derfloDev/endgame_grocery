@@ -93,7 +93,7 @@ describe("invite routes", () => {
     const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/40000000-0000-4000-8000-000000000001");
 
     assert.equal(response.status, 403);
-    assert.deepEqual(response.body, { error: "This invitation was sent to a different email address." });
+    assert.deepEqual(response.body, { error: "This invitation was sent to a different email address.", code: "invite.email_mismatch" });
     assert.equal(pool.statements.some(([text]) => text.startsWith("UPDATE") || text.startsWith("INSERT")), false);
     assert.deepEqual(sseManager.calls, []);
   });
@@ -105,7 +105,7 @@ describe("invite routes", () => {
     const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/40000000-0000-4000-8000-000000000001");
 
     assert.equal(response.status, 409);
-    assert.deepEqual(response.body, { error: "You already own this list." });
+    assert.deepEqual(response.body, { error: "You already own this list.", code: "invite.owner_cannot_accept" });
     assert.equal(pool.statements.some(([text]) => text.startsWith("UPDATE") || text.startsWith("INSERT")), false);
     assert.deepEqual(sseManager.calls, []);
   });
@@ -117,7 +117,7 @@ describe("invite routes", () => {
     const response = await request(createAuthedApp(pool, { sseManager })).get("/api/invites/40000000-0000-4000-8000-000000000001");
 
     assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: "Invitation link is invalid or has expired." });
+    assert.deepEqual(response.body, { error: "Invitation link is invalid or has expired.", code: "invite.invalid" });
     assert.equal(pool.statements.some(([text]) => text.startsWith("INSERT")), false);
     assert.deepEqual(sseManager.calls, []);
   });
@@ -144,7 +144,8 @@ describe("invite routes", () => {
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body, {
-      error: "Invitation link is invalid or has expired."
+      error: "Invitation link is invalid or has expired.",
+      code: "invite.invalid"
     });
   });
 });

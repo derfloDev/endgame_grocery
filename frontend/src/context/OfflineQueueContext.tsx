@@ -3,6 +3,7 @@ import type { ReactElement, ReactNode } from "react";
 import { OFFLINE_SYNC_COMPLETE_EVENT } from "../api/client";
 import { getCurrentUserId, subscribeAuthSession } from "../api/authSession";
 import { listOfflineMutations, OFFLINE_QUEUE_CHANGED_EVENT, removeOfflineMutation } from "../api/offlineStore";
+import { getErrorTranslationKey } from "../api/errors";
 import { drainOfflineQueue } from "../api/offlineQueueDrain";
 import type { AcceptedMutations } from "../api/offlineQueueDrain";
 import { createTimeoutSignal, REQUEST_TIMEOUT_MS, QUEUE_RETRY_BASE_DELAY_MS, QUEUE_RETRY_MAX_DELAY_MS, QUEUE_DRAIN_STALL_TIMEOUT_MS } from "../api/connectionTimings";
@@ -94,7 +95,13 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
         blockedRef.current = result.failed.id;
         setFailedMutationId(result.failed.id);
         setSyncError(result.failed.error);
-        setSyncErrorKey(result.failed.code === "dependency" ? "offline.dependencyDiscarded" : "");
+        setSyncErrorKey(
+          result.failed.code === "dependency"
+            ? "offline.dependencyDiscarded"
+            : result.failed.apiCode
+              ? getErrorTranslationKey(result.failed.apiCode)
+              : ""
+        );
       } else {
         retryAttempt.current = 0;
         setSyncError("");

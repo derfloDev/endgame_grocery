@@ -235,9 +235,18 @@ components:
       type: object
       required:
         - error
+        - code
       properties:
         error:
           type: string
+          description: English message for logs and developers. Do not match on it; it may be reworded.
+        code:
+          type: string
+          description: >-
+            Stable machine-readable error code such as `list.not_found`, `list.forbidden`,
+            `auth.invalid_api_key`, `entry.limit_open` or `rate_limited`. Match on this value.
+          examples:
+            - list.not_found
   responses:
     BadRequest:
       description: The request body is invalid.

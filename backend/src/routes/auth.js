@@ -9,8 +9,9 @@ import { logger as defaultLogger } from "../logger.js";
 import createMailer, { sendMailInBackground } from "../mail/mailer.js";
 import { createRequireAuth } from "../middleware/auth.js";
 import { createRateLimiters } from "../middleware/rateLimit.js";
-import { validatePassword } from "../passwordPolicy.js";
+import { checkPassword } from "../passwordPolicy.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
 
 // A valid cost-12 bcrypt hash of a throwaway password. Login compares against it when the email
 // is unknown so that the unknown-user path takes as long as a wrong-password check.
@@ -68,26 +69,21 @@ export function createAuthRouter({
 
   router.post("/register", ...rateLimiters.register, async (req, res, next) => {
     if (config.registrationEnabled === false) {
-      res.status(404).end();
+      next(new ApiError(404, "auth.registration_disabled", "Registration is disabled."));
       return;
     }
 
     const { email, password, display_name: displayName, invite_token: inviteToken } = req.body ?? {};
 
     if (!email || !password || !displayName) {
-      res.status(400).json({ error: "Email, password, and display_name are required." });
+      next(new ApiError(400, "validation.registration_fields_required", "Email, password, and display_name are required."));
       return;
     }
 
-    const passwordError = validatePassword(password);
+    const passwordError = checkPassword(password);
 
     if (passwordError) {
-      res.status(400).json({ error: passwordError });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, passwordError.code, passwordError.message));
       return;
     }
 
@@ -203,7 +199,7 @@ export function createAuthRouter({
           { email: email.toLowerCase() },
           "Registration rejected: email already exists"
         );
-        res.status(409).json({ error: "An account with that email already exists." });
+        next(new ApiError(409, "auth.email_taken", "An account with that email already exists."));
         return;
       }
 
@@ -215,12 +211,7 @@ export function createAuthRouter({
     const { email, password } = req.body ?? {};
 
     if (!email || !password) {
-      res.status(400).json({ error: "Email and password are required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.credentials_required", "Email and password are required."));
       return;
     }
 
@@ -243,7 +234,7 @@ export function createAuthRouter({
         // response time does not reveal which emails are registered.
         await bcryptLib.compare(password, DUMMY_PASSWORD_HASH);
         logger.warn({ email: normalizedEmail, reason: "invalid_credentials" }, "Login failed");
-        res.status(401).json({ error: "Invalid email or password." });
+        next(new ApiError(401, "auth.invalid_credentials", "Invalid email or password."));
         return;
       }
 
@@ -251,13 +242,13 @@ export function createAuthRouter({
 
       if (!isValid) {
         logger.warn({ email: normalizedEmail, reason: "invalid_credentials" }, "Login failed");
-        res.status(401).json({ error: "Invalid email or password." });
+        next(new ApiError(401, "auth.invalid_credentials", "Invalid email or password."));
         return;
       }
 
       if (!user.email_verified) {
         logger.warn({ email: normalizedEmail, reason: "email_not_verified" }, "Login blocked");
-        res.status(403).json({ error: "Please verify your email before logging in." });
+        next(new ApiError(403, "auth.email_not_verified", "Please verify your email before logging in."));
         return;
       }
 
@@ -275,12 +266,7 @@ export function createAuthRouter({
     const verificationToken = req.query.token;
 
     if (!verificationToken) {
-      res.status(400).json({ error: "Verification token is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.verification_token_required", "Verification token is required."));
       return;
     }
 
@@ -299,7 +285,7 @@ export function createAuthRouter({
       const verification = result.rows[0];
 
       if (!verification) {
-        res.status(400).json({ error: "Verification link is invalid or has expired." });
+        next(new ApiError(400, "auth.verification_invalid", "Verification link is invalid or has expired."));
         return;
       }
 
@@ -342,12 +328,7 @@ export function createAuthRouter({
     const { email } = req.body ?? {};
 
     if (!email) {
-      res.status(400).json({ error: "Email is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.email_required", "Email is required."));
       return;
     }
 
@@ -407,12 +388,7 @@ export function createAuthRouter({
     const { email } = req.body ?? {};
 
     if (!email) {
-      res.status(400).json({ error: "Email is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.email_required", "Email is required."));
       return;
     }
 
@@ -463,19 +439,14 @@ export function createAuthRouter({
     const { token, password } = req.body ?? {};
 
     if (!token || !password) {
-      res.status(400).json({ error: "Token and password are required." });
+      next(new ApiError(400, "validation.token_password_required", "Token and password are required."));
       return;
     }
 
-    const passwordError = validatePassword(password);
+    const passwordError = checkPassword(password);
 
     if (passwordError) {
-      res.status(400).json({ error: passwordError });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, passwordError.code, passwordError.message));
       return;
     }
 
@@ -529,7 +500,7 @@ export function createAuthRouter({
       });
 
       if (!userId) {
-        res.status(400).json({ error: "Password reset link is invalid or has expired." });
+        next(new ApiError(400, "auth.reset_invalid", "Password reset link is invalid or has expired."));
         return;
       }
 
@@ -541,11 +512,6 @@ export function createAuthRouter({
   });
 
   router.get("/me", requireAuth, async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const result = await pool.query(
         `
@@ -559,7 +525,7 @@ export function createAuthRouter({
       const user = result.rows[0];
 
       if (!user) {
-        res.status(404).json({ error: "User not found." });
+        next(new ApiError(404, "user.not_found", "User not found."));
         return;
       }
 
@@ -570,11 +536,6 @@ export function createAuthRouter({
   });
 
   router.get("/api-key", requireAuth, async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       // The key itself is not stored (only its hash), so it can no longer be read back.
       const result = await pool.query(
@@ -589,7 +550,7 @@ export function createAuthRouter({
       const user = result.rows[0];
 
       if (!user) {
-        res.status(404).json({ error: "User not found." });
+        next(new ApiError(404, "user.not_found", "User not found."));
         return;
       }
 
@@ -604,11 +565,6 @@ export function createAuthRouter({
   });
 
   router.post("/api-key", requireAuth, async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const apiKey = generateApiKey();
       const result = await pool.query(
@@ -625,7 +581,7 @@ export function createAuthRouter({
       const user = result.rows[0];
 
       if (!user) {
-        res.status(404).json({ error: "User not found." });
+        next(new ApiError(404, "user.not_found", "User not found."));
         return;
       }
 

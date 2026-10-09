@@ -13,7 +13,7 @@ export interface DrainResult {
   /** Mutations accepted by the server in this run. */
   count: number;
   /** Client error on one mutation; it stays queued until the user discards it. */
-  failed?: { id: string; error: string; code?: "dependency" };
+  failed?: { id: string; error: string; code?: "dependency"; apiCode?: string };
   /** The server rejected the session (or there is none): the queue is paused and nothing was discarded. */
   authExpired?: true;
   /** Temporary ids that received their real id in this run. */
@@ -72,8 +72,9 @@ export async function drainOfflineQueue(signal: AbortSignal, timeoutMs: number, 
       if (response.status === 401) return finish({ authExpired: true });
       if (!response.ok) {
         const error = isRecord(data) && typeof data.error === "string" ? data.error : "Failed to sync queued changes.";
+        const apiCode = isRecord(data) && typeof data.code === "string" ? data.code : undefined;
         // Client errors require discard; network errors, deadlines and server errors retry quietly.
-        if (response.status >= 400 && response.status < 500) return finish({ failed: { id: mutation.id, error } });
+        if (response.status >= 400 && response.status < 500) return finish({ failed: { id: mutation.id, error, ...(apiCode ? { apiCode } : {}) } });
         throw new Error(error);
       }
       resolvedIds = { ...idMap };

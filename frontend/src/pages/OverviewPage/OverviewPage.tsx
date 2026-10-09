@@ -55,12 +55,14 @@ export default function OverviewPage(): ReactElement {
   // The detail page hands over why it sent the user back (list deleted, user removed).
   const [notice] = useState<string>(() => readNotice(location.state));
   const [lists, setLists] = useState<OverviewList[]>([]);
-  // Event handlers read the current lists without re-subscribing on every change.
+  // Event handlers read the current lists without re-subscribing on every change. The ref is
+  // written together with the state (not from an effect), so a handler that runs right after a
+  // render never sees stale lists.
   const listsRef = useRef<OverviewList[]>(lists);
-
-  useEffect(() => {
-    listsRef.current = lists;
-  }, [lists]);
+  const applyLists = useCallback((nextLists: OverviewList[]) => {
+    listsRef.current = nextLists;
+    setLists(nextLists);
+  }, []);
   const [error, setError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showInfo, setShowInfo] = useState<boolean>(false);
@@ -98,7 +100,7 @@ export default function OverviewPage(): ReactElement {
       // Another session: never keep showing the previous user's lists while loading.
       loadedForTokenRef.current = token;
       hasListsRef.current = false;
-      setLists([]);
+      applyLists([]);
       setIsLoading(true);
     }
 
@@ -117,14 +119,14 @@ export default function OverviewPage(): ReactElement {
           }
 
           hasListsRef.current = true;
-          setLists((cached.lists ?? []) as OverviewList[]);
+          applyLists((cached.lists ?? []) as OverviewList[]);
           setIsLoading(false);
         }
       });
 
       if (isMountedRef.current && loadedForTokenRef.current === token) {
         hasListsRef.current = true;
-        setLists((result.lists ?? []) as OverviewList[]);
+        applyLists((result.lists ?? []) as OverviewList[]);
       }
     } catch (loadError) {
       // A failed refresh keeps what is on screen; only an empty page reports the error.
@@ -136,7 +138,7 @@ export default function OverviewPage(): ReactElement {
         setIsLoading(false);
       }
     }
-  }, [token]);
+  }, [applyLists, token]);
 
   useEffect(() => {
     void loadLists();
@@ -158,10 +160,9 @@ export default function OverviewPage(): ReactElement {
       return;
     }
 
-    listsRef.current = remainingLists;
-    setLists(remainingLists);
+    applyLists(remainingLists);
     void writeCachedResource(LISTS_CACHE_KEY, { lists: remainingLists });
-  }, []);
+  }, [applyLists]);
 
   const handleListDeleted = useCallback(
     (data: Record<string, unknown>) => {
@@ -186,12 +187,9 @@ export default function OverviewPage(): ReactElement {
   useListEvents("member:removed", null, handleMemberRemoved);
 
   async function updateLists(updater: (currentLists: OverviewList[]) => OverviewList[]): Promise<void> {
-    let nextLists: OverviewList[] = [];
+    const nextLists = updater(listsRef.current);
 
-    setLists((currentLists) => {
-      nextLists = updater(currentLists);
-      return nextLists;
-    });
+    applyLists(nextLists);
 
     await writeCachedResource(LISTS_CACHE_KEY, { lists: nextLists });
   }

@@ -4,6 +4,7 @@ import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
 
 /**
  * Creates the authenticated recently used history router backed by completed entries.
@@ -26,16 +27,11 @@ export function createHistoryRouter({
   router.use(requireAuthMiddleware);
 
   router.get("/", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const hasAccess = await ensureListAccess(pool, req.params.id, req.user.sub);
 
       if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
+        next(new ApiError(403, "list.forbidden", "You do not have access to this list."));
         return;
       }
 
@@ -75,23 +71,18 @@ export function createHistoryRouter({
   });
 
   router.delete("/", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const hasAccess = await ensureListAccess(pool, req.params.id, req.user.sub);
 
       if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
+        next(new ApiError(403, "list.forbidden", "You do not have access to this list."));
         return;
       }
 
       const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
 
       if (!text) {
-        res.status(400).json({ error: "History item text is required." });
+        next(new ApiError(400, "validation.history_text_required", "History item text is required."));
         return;
       }
 

@@ -6,6 +6,7 @@ import logo from "../../assets/endgame_grocery_logo.png";
 import { resetPassword } from "../../api/auth";
 import styles from "../../styles/auth.module.css";
 import { getPasswordPolicyError } from "../../utils/passwordPolicy";
+import { getErrorMessage } from "../../api/errors";
 
 export default function ResetPasswordPage(): ReactElement {
   const { t } = useTranslation();
@@ -42,7 +43,7 @@ export default function ResetPasswordPage(): ReactElement {
         state: { message: t("auth.passwordUpdatedLogin") }
       });
     } catch (submitError) {
-      setError(getErrorMessage(submitError));
+      setError(getErrorMessage(submitError, t));
     } finally {
       setIsSubmitting(false);
     }
@@ -91,6 +92,3 @@ export default function ResetPasswordPage(): ReactElement {
   );
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

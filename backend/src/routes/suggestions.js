@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { requireAuth } from "../middleware/auth.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
+import { ApiError } from "../errors.js";
 
 /**
  * Creates the authenticated autocomplete suggestions router backed by list entries.
@@ -23,12 +24,7 @@ export function createSuggestionsRouter({
     const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
 
     if (query.length < 2) {
-      res.status(400).json({ error: "Suggestion query must be at least 2 characters." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.suggestion_query_short", "Suggestion query must be at least 2 characters."));
       return;
     }
 
@@ -36,7 +32,7 @@ export function createSuggestionsRouter({
       const hasAccess = await ensureListAccess(pool, req.params.id, req.user.sub);
 
       if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
+        next(new ApiError(403, "list.forbidden", "You do not have access to this list."));
         return;
       }
 

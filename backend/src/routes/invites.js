@@ -4,6 +4,7 @@ import { logger as defaultLogger } from "../logger.js";
 import { requireAuth } from "../middleware/auth.js";
 import { acceptInviteForUser, getPendingInviteByToken, isInviteForEmail } from "../inviteService.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
 
 export function createInvitesRouter({
   pool = getPool(),
@@ -17,16 +18,11 @@ export function createInvitesRouter({
   router.use(requireAuthMiddleware);
 
   router.get("/:token", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const invite = await getPendingInviteByToken(pool, req.params.token, now());
 
       if (!invite) {
-        res.status(400).json({ error: "Invitation link is invalid or has expired." });
+        next(new ApiError(400, "invite.invalid", "Invitation link is invalid or has expired."));
         return;
       }
 
@@ -35,7 +31,7 @@ export function createInvitesRouter({
       const userResult = await pool.query("SELECT email FROM users WHERE id = $1 LIMIT 1", [req.user.sub]);
 
       if (!isInviteForEmail(invite.invited_email, userResult.rows[0]?.email)) {
-        res.status(403).json({ error: "This invitation was sent to a different email address." });
+        next(new ApiError(403, "invite.email_mismatch", "This invitation was sent to a different email address."));
         return;
       }
 
@@ -43,7 +39,7 @@ export function createInvitesRouter({
       const listResult = await pool.query("SELECT owner_id FROM lists WHERE id = $1 LIMIT 1", [invite.list_id]);
 
       if (listResult.rows[0]?.owner_id === req.user.sub) {
-        res.status(409).json({ error: "You already own this list." });
+        next(new ApiError(409, "invite.owner_cannot_accept", "You already own this list."));
         return;
       }
 
@@ -55,7 +51,7 @@ export function createInvitesRouter({
       });
 
       if (!accepted) {
-        res.status(400).json({ error: "Invitation link is invalid or has expired." });
+        next(new ApiError(400, "invite.invalid", "Invitation link is invalid or has expired."));
         return;
       }
 

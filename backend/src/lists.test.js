@@ -74,7 +74,7 @@ describe("list routes", () => {
     const response = await request(createAuthedApp(pool)).get(`/api/lists/${LIST_ONE}`);
 
     assert.equal(response.status, 403);
-    assert.deepEqual(response.body, { error: "You do not have access to this list." });
+    assert.deepEqual(response.body, { error: "You do not have access to this list.", code: "list.forbidden" });
     assert.equal(queries.length, 1);
   });
 

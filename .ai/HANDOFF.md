@@ -1146,3 +1146,79 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-020 — implement — 2026-10-10T14:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Every API error is now `{ error, code }` from one central handler, the web app shows the translated text per code (DE/EN) through a single `getErrorMessage`, and the per-route `if (!pool)` guards are gone. |
+| Files Changed | backend: src/errors.js, src/errors.test.js, src/app.js, src/passwordPolicy.js, src/middleware/{auth,rateLimit,validateUuid}.js, src/routes/*.js (auth, entries, events, history, invites, lists, push, sharing, suggestions, testRouter, v1), src/openapi/v1.yaml, and the updated tests (app, auth, hardening, invites, lists, sessionRevocation, v1, inputValidation, routes/events). frontend: src/api/errors.ts, errors.test.ts, client.ts, lists.ts, offlineQueueDrain.ts (+test), context/OfflineQueueContext.tsx, components/OfflineBanner (+test), the six auth/invite pages, ListDetailPage.tsx, useListDetailData.ts, listDetailUtils.ts, OverviewPage.tsx, locales en/de, authPagesHardening.test.tsx, InviteAcceptPage test, ListDetailPage.test.tsx. README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ok; backend `npm test` 388/388; frontend `npm test` 823/823 (two consecutive clean full runs). Integration suite and Playwright specs not run (no PostgreSQL / Docker). |
+| Commit | `feat(api): send a stable error code with every failure and show it translated in the app` |
+| Next Role | review |
+
+Notes for review:
+1. **Backend mechanism:** `errors.js` holds `ERROR_CODES` (52 codes), `ApiError(status, code, message)` (throws on an unknown code), `toApiError` (maps `22P02`/`23505`/`23503` and body-parser `entity.parse.failed`), and `createUnavailablePool`. All 60-odd `res.status(4xx).json({ error })` sites in routes and middleware were converted mechanically to `next(new ApiError(...))` (middleware handlers gained a `next` parameter where they lacked one: `rateLimit.tooManyRequests`, the two events routes). The handler in `app.js` is the only writer of error statuses; `errors.test.js` enforces that, that thrown codes are in the catalogue, that no code is unused, and that no route has an `if (!pool)` guard.
+2. **Pool guards:** `createApp` gives routers and `requireApiKey` a stand-in pool when `pool` is null/absent; its `query`/`connect` reject with "Database connection is not configured." (logged, answered `500 internal.error`). The JWT middleware and the push worker still get the nullable pool (the token-version lookup is skipped without one, as before). Direct router construction without a pool now fails at first use instead of with the guard's message.
+3. **Behaviour changes:** registration disabled answers `404 { error, code: "auth.registration_disabled" }` (was an empty body; its test assertion was updated); malformed JSON bodies answer `400 request.invalid_json` (was `500`); `uuidParam(code, message, status)` takes a code now; `checkPassword` in `passwordPolicy.js` returns `{ code, message }` (`validatePassword` unchanged for callers that want text).
+4. **Existing tests:** assertions of the form `{ error: "…" }` got the matching `code`; middleware unit tests that read `res.statusCode`/`res.body` now read the `ApiError` passed to `next`. No assertion was removed or weakened.
+5. **Frontend:** `ApiError` (renamed from the `HttpError` of T-008, now with `code`) lives in `api/errors.ts`; `client.ts` fills it from the response body. `getErrorMessage(error, t)` translates `errors.<code>` with the server message as `defaultValue`; the six page-local copies and the `listDetailUtils` copy are gone (`getEntryErrorText` keeps the "missing list" special case). `VerifyEmailPage` now keeps the raw error and translates at render so a language switch does not re-run the verification request. `InviteAcceptPage` switches to the account-mismatch UI on the code `invite.email_mismatch` and no longer needs its own owner (409) text, so `invite.ownList` was removed from the locales. The offline banner translates a failed queued change by the server's code (`DrainResult.failed.apiCode` → `syncErrorKey`).
+6. **Locales:** 52 `errors.*` texts in each of `en` and `de`; `api/errors.test.ts` reads the backend catalogue and fails for a missing or stale key.
+7. **Latent race fixed on the way:** `OverviewPage` kept `listsRef` in sync from an effect, so an event handler running right after a render could see stale lists (the cause of the flaky "drops a deleted list immediately…" test seen in T-017). The ref is now written together with the state.
+
+---
+
+### T-020 — review — 2026-10-10T15:30:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed stable error codes, the central handler and DE/EN translations; verified 26 real error responses and the German/English UI texts against a real backend; the Playwright registration spec still expects the old English wording and fails. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | FAIL |
+| Blocking Findings | 1. e2e/auth.spec.js:71 expects "An account with that email already exists." but the app now shows the translated "An account with this email address already exists." (CI E2E would fail). |
+| Next Role | implement |
+
+### T-020 — implement — 2026-10-10T16:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Rework after review FAIL: the E2E spec now expects the translated duplicate-email text, and two minor review findings are closed (unknown `/api` paths and oversized bodies now answer `{ error, code }`). |
+| Files Changed | e2e/auth.spec.js, backend/src/errors.js, backend/src/errors.test.js, backend/src/app.js, frontend/src/locales/en/translation.json, frontend/src/locales/de/translation.json, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run lint` 0 errors (1 pre-existing warning); backend `npm test` 391/391; frontend `npm test` 823/823. Playwright not run locally. |
+| Commit | `feat(api): send a stable error code with every failure and show it translated in the app` (unchanged) |
+| Next Role | review |
+
+Rework checklist (REVIEW.md T-020):
+1. **Required fix 1 (finding 1):** `e2e/auth.spec.js:71` now waits for `An account with this email address already exists.` (the translated `errors.auth.email_taken`). I checked the other E2E assertions on error text: `auth.spec.js:111/123` expect `Invalid email or password.`, which equals the translated `errors.auth.invalid_credentials`, so they stay valid. Playwright was not run here, so the full E2E suite remains to be confirmed.
+2. **Finding 2 (minor, done):** a final `app.use("/api", …)` hands unmatched paths to the central handler: `404 { error: "Not found.", code: "request.not_found" }`, covering unknown paths and the disabled `/api/test/*` routes (their existing 404 status tests still pass). New code `request.not_found` with DE/EN texts.
+3. **Finding 3 (minor, done):** `toApiError` maps body-parser's `entity.too.large` to `413 request.too_large` (was `500 internal.error`), with DE/EN texts. The catalogue now has 54 codes; the translation test confirms every one has both texts.
+4. Findings 4 and 5 are unchanged: finding 4 is a timing flake in an unrelated E2E case, finding 5 (the invite endpoint accepting any non-empty string as email) is pre-existing and outside this task.
+5. New tests in `errors.test.js`: unknown path, disabled test route, oversized body, and the mapping unit test.
+
+---
+
+### T-020 — review — 2026-10-10T17:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Round 2: the E2E spec text is fixed and unknown API paths and oversized bodies now return coded errors; verified with lint, build, unit tests, a 26-request probe against real PostgreSQL and the full Playwright run (13/14, the failure being the known T-013 duplicate tile). |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+### T-020 — implement — 2026-10-10T17:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-020 after review round 2 PASS_WITH_NOTES: stable error codes with DE/EN translations, central error handling and no per-route pool guards. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-020 implementation files |
+| Commit | `feat(api): send a stable error code with every failure and show it translated in the app` |
+| Next Role | none |
+
+---

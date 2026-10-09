@@ -4,6 +4,7 @@ import { logger as defaultLogger } from "../logger.js";
 import { createRequireApiKey } from "../middleware/auth.js";
 import { createEntry, deleteEntry, listEntries, updateEntry } from "../services/entryService.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -42,11 +43,6 @@ export function createV1Router({
   router.use(requireApiKeyMiddleware);
 
   router.get("/lists", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const result = await pool.query(
         `
@@ -82,22 +78,26 @@ export function createV1Router({
     listId: req.params.listId
   });
 
-  /** Writes the error response for a non-ok service result. Returns true when it did. */
-  function respondToFailure(result, res) {
+  /** Passes the API error for a non-ok service result to `next`. Returns true when it did. */
+  function respondToFailure(result, next) {
     if (result.status === "forbidden") {
-      res.status(403).json({ error: "You do not have access to this list." });
+      next(new ApiError(403, "list.forbidden", "You do not have access to this list."));
       return true;
     }
 
     if (result.status === "not_found") {
-      res.status(404).json({ error: "Item not found." });
+      next(new ApiError(404, "item.not_found", "Item not found."));
       return true;
     }
 
     if (result.status === "limit_open") {
-      res.status(422).json({
-        error: "This list has reached the maximum of 1,000 open items. Please complete or remove some items first."
-      });
+      next(
+        new ApiError(
+          422,
+          "entry.limit_open",
+          "This list has reached the maximum of 1,000 open items. Please complete or remove some items first."
+        )
+      );
       return true;
     }
 
@@ -111,19 +111,14 @@ export function createV1Router({
 
   router.get("/lists/:listId/items", async (req, res, next) => {
     if (!isValidUuid(req.params.listId)) {
-      res.status(404).json({ error: "List not found." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(404, "list.not_found", "List not found."));
       return;
     }
 
     try {
       const result = await listEntries(contextOf(req));
 
-      if (respondToFailure(result, res)) {
+      if (respondToFailure(result, next)) {
         return;
       }
 
@@ -137,31 +132,26 @@ export function createV1Router({
 
   router.post("/lists/:listId/items", async (req, res, next) => {
     if (!isValidUuid(req.params.listId)) {
-      res.status(404).json({ error: "List not found." });
+      next(new ApiError(404, "list.not_found", "List not found."));
       return;
     }
 
     const { name, description } = req.body ?? {};
 
     if (typeof name !== "string" || !name.trim()) {
-      res.status(400).json({ error: "Item name is required." });
+      next(new ApiError(400, "validation.item_name_required", "Item name is required."));
       return;
     }
 
     if (!isValidDescription(description)) {
-      res.status(400).json({ error: "Item description must be a string." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.item_description_invalid", "Item description must be a string."));
       return;
     }
 
     try {
       const result = await createEntry(contextOf(req), { text: name.trim(), details: description });
 
-      if (respondToFailure(result, res)) {
+      if (respondToFailure(result, next)) {
         return;
       }
 
@@ -175,24 +165,19 @@ export function createV1Router({
 
   router.post("/lists/:listId/items/:itemId/toggle", async (req, res, next) => {
     if (!isValidUuid(req.params.listId)) {
-      res.status(404).json({ error: "List not found." });
+      next(new ApiError(404, "list.not_found", "List not found."));
       return;
     }
 
     if (!isValidUuid(req.params.itemId)) {
-      res.status(404).json({ error: "Item not found." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(404, "item.not_found", "Item not found."));
       return;
     }
 
     try {
       const result = await updateEntry(contextOf(req), { entryId: req.params.itemId, toggle: true });
 
-      if (respondToFailure(result, res)) {
+      if (respondToFailure(result, next)) {
         return;
       }
 
@@ -206,29 +191,24 @@ export function createV1Router({
 
   router.patch("/lists/:listId/items/:itemId", async (req, res, next) => {
     if (!isValidUuid(req.params.listId)) {
-      res.status(404).json({ error: "List not found." });
+      next(new ApiError(404, "list.not_found", "List not found."));
       return;
     }
 
     if (!isValidUuid(req.params.itemId)) {
-      res.status(404).json({ error: "Item not found." });
+      next(new ApiError(404, "item.not_found", "Item not found."));
       return;
     }
 
     const { name, description } = req.body ?? {};
 
     if (typeof name !== "string" || !name.trim()) {
-      res.status(400).json({ error: "Item name is required." });
+      next(new ApiError(400, "validation.item_name_required", "Item name is required."));
       return;
     }
 
     if (!isValidDescription(description)) {
-      res.status(400).json({ error: "Item description must be a string." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.item_description_invalid", "Item description must be a string."));
       return;
     }
 
@@ -240,7 +220,7 @@ export function createV1Router({
         details: description
       });
 
-      if (respondToFailure(result, res)) {
+      if (respondToFailure(result, next)) {
         return;
       }
 
@@ -254,24 +234,19 @@ export function createV1Router({
 
   router.delete("/lists/:listId/items/:itemId", async (req, res, next) => {
     if (!isValidUuid(req.params.listId)) {
-      res.status(404).json({ error: "List not found." });
+      next(new ApiError(404, "list.not_found", "List not found."));
       return;
     }
 
     if (!isValidUuid(req.params.itemId)) {
-      res.status(404).json({ error: "Item not found." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(404, "item.not_found", "Item not found."));
       return;
     }
 
     try {
       const result = await deleteEntry(contextOf(req), { entryId: req.params.itemId });
 
-      if (respondToFailure(result, res)) {
+      if (respondToFailure(result, next)) {
         return;
       }
 

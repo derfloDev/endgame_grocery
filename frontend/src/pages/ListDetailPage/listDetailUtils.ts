@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next";
+import { getErrorMessage } from "../../api/errors";
 import type { DetailEntry } from "./useListDetailData";
 
 export class ListAccessError extends Error {
@@ -185,10 +187,7 @@ export function getChangeKind(entry: DetailEntry): "new" | "edited" | "done" | u
     : "new";
 }
 
-export function getErrorMessage(error: unknown, accessErrorMessage = "detail.accessError"): string {
-  if (error instanceof ListAccessError) {
-    return accessErrorMessage;
-  }
-
-  return error instanceof Error ? error.message : String(error);
+/** Text for the error banner: the translated access message for a missing list, otherwise the API/other error text. */
+export function getEntryErrorText(error: unknown, t: TFunction): string {
+  return error instanceof ListAccessError ? t("detail.accessError") : getErrorMessage(error, t);
 }

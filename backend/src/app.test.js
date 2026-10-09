@@ -82,7 +82,7 @@ describe("createApp logging", () => {
     const response = await request(app).get("/api/lists/10000000-0000-4000-8000-000000000001/entries");
 
     assert.equal(response.status, 500);
-    assert.deepEqual(response.body, { error: "Internal server error." });
+    assert.deepEqual(response.body, { error: "Internal server error.", code: "internal.error" });
 
     const errorLog = getEntries().find((entry) => entry.msg === "Unhandled error");
 

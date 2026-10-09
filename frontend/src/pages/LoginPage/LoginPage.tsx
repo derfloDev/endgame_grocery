@@ -8,6 +8,7 @@ import { SESSION_EXPIRED_REDIRECT_KEY } from "../../context/authStorage";
 import { useAppConfig } from "../../context/appConfigState";
 import styles from "../../styles/auth.module.css";
 import { getSafeRedirect } from "../../utils/safeRedirect";
+import { getErrorMessage } from "../../api/errors";
 
 interface LoginLocationState {
   from?: string;
@@ -53,7 +54,7 @@ export default function LoginPage(): ReactElement {
       await login({ email, password });
       navigate(redirectTo, { replace: true });
     } catch (submitError) {
-      setError(getErrorMessage(submitError));
+      setError(getErrorMessage(submitError, t));
     } finally {
       setIsSubmitting(false);
     }
@@ -120,9 +121,6 @@ export default function LoginPage(): ReactElement {
   );
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function readSessionExpiredRedirect(): LoginLocationState | null {
   try {
