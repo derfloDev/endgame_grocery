@@ -1539,3 +1539,12 @@ Notes for review:
 Unrelated .ai/config.json and .claude/settings.local.json changes remain uncommitted.
 
 ---
+
+### Cycle closed — v1.9.4 — 2026-10-10T18:17:01Z
+
+| Field | Value |
+|-------|-------|
+| Summary | All tasks done; cycle closed |
+| Version | v1.9.4 |
+
+---
