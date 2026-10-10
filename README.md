@@ -290,6 +290,19 @@ parallel suite stable on slower local machines. The frontend TypeScript setup al
 existing JavaScript modules during the staged TSX migration so converted entry points
 can continue importing files that move in later tasks.
 
+App integration tests use `frontend/src/test/fetchRoutes.ts`: register a method and a literal
+pathname (including its query) or a RegExp with `routes.on("GET", "/api/lists", () => ({ json: async () => ({ lists: [] }) }))`,
+then stub global fetch with `routes.fetch`. Handlers return response fixtures, promises for
+loading states, or throw for network failures. The last matching registration wins, so a test
+can override a default route. Reset the table before each test and call `routes.assertAllMatched()`
+after cleanup: an unexpected request rejects immediately and fails teardown even when the app
+catches the error. Use `routes.fetch.mock.calls` for explicit request counts and ordering checks;
+keep intentional retry or SSE response sequences local to the route they describe.
+
+Recently completed items stay at the front of Recently Used in completion/history order,
+independent of when the entries were created. Changed items retain their details and badges;
+items awaiting their history update appear ahead of known history items.
+
 ## E2E Tests
 
 Playwright E2E coverage exercises the registration, login, and core shopping-list CRUD flows against the full local stack, so the PostgreSQL container must be running and the project-root `.env` file must be present first. The backend only exposes `POST /api/test/create-verified-user` for E2E setup when `ENABLE_TEST_ROUTES=true` (Playwright sets it for its backend dev server and the CI `.env` includes it; the production image never enables it), and transactional mail delivery is skipped with a warning when `SMTP_HOST` is not configured.

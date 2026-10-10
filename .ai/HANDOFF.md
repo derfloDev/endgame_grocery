@@ -1486,3 +1486,56 @@ Notes for review:
 Unrelated .ai/config.json and .claude/settings.local.json changes remain uncommitted.
 
 ---
+---
+
+### T-024 — implement — 2026-10-10T13:59:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Replaced ordered app and cross-endpoint queue fetch fixtures with method/path routes that fail on unmatched requests; fixed newest-completion ordering with the user's explicit approval. |
+| Files Changed | frontend/src/test/fetchRoutes.ts, frontend/src/test/fetchRoutes.test.ts, frontend/src/app.test.tsx, frontend/src/api/offlineQueueDrain.test.ts, frontend/src/context/OfflineQueueContext.test.tsx, frontend/src/pages/recentlyUsedState.ts, frontend/src/pages/recentlyUsedState.test.ts, README.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | npm run lint passes (one existing AuthContext warning); npm run typecheck and npm run build pass; npm test passes: frontend 905/905, backend 419/419. npm run test:integration passes 66/66 against isolated local PostgreSQL 18.4. Targeted helper/app/history and queue suites pass. AST comparison confirms all 350 existing expect chains and test cases in the three migrated suites remain unchanged; no ordered fetch response chains remain in app.test.tsx. Staged and unstaged whitespace checks pass. |
+| Commit | `fix(lists): keep recently completed items newest first` |
+| Next Role | review |
+
+Notes for review:
+1. Helper tests were written before implementation (initial import failure, then 7/7 passing). Routes match methods and pathname/query strings or patterns; later registrations override defaults. Native responses preserve status/body semantics, and fetch.mock.calls preserves original request arguments. afterEach verifies unmatched requests even when application error handling caught their rejection. Pending responses, offline failures, URL/Request inputs, resets and repeated RegExp matching have coverage.
+2. App fixtures now cover background requests explicitly and retain route-local sequences for SSE/session-expiry scenarios. Multi-endpoint queue chains were migrated; existing replay-order assertions remain. Single-route retry/deadline mocks and non-fetch API/store mocks remain focused on their existing scenarios. README documents setup and teardown.
+3. The migration exposed a real ordering defect: the previous global fixture chain let a background mark-viewed request consume a response, shifting subsequent completion responses. With correct route responses, the existing Cheese-before-Milk assertion failed. The user explicitly approved a small fix and regression tests; PLAN.md records this amendment. Two new regressions failed before the fix. Changed completed entries now use history order, retaining their details/badges; items awaiting history appear first. No original assertion was weakened or removed.
+4. Out-of-scope discovery: the invite-registration app test currently requests the overview after authentication despite its title saying it redirects directly to the shared list. Its existing assertions only check the visible list name and stored token. The overview response is now explicit; registration navigation behavior and assertions were preserved for a separate follow-up.
+5. No commit created. Both new helper files are explicitly staged. Unrelated .ai/config.json and .claude/settings.local.json changes are preserved and excluded from task staging. Validation logs are under ignored test-results/. The isolated PostgreSQL instance was stopped after validation; CI retains PostgreSQL 16 as its target.
+
+---
+
+---
+
+### T-024 — review — 2026-10-10T18:15:57Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Verified unchanged assertions, strict route fixtures and newest-completion ordering; lint, typecheck, build, 1324 unit tests, 66 integration tests, 15 E2E tests and live two-user exploratory/visual checks pass. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+---
+
+### T-024 — implement — 2026-10-10T18:16:39Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task: completed T-024 after review PASS_WITH_NOTES, including route-based fetch fixtures and the approved newest-completion ordering fix. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, and all reviewed T-024 implementation, test, documentation and review files |
+| Validation | Implementation and review confirmed lint, typecheck and build pass; frontend 905/905, backend 419/419, PostgreSQL integration 66/66 and Chromium E2E 15/15 pass. Review also verified unchanged assertions and live two-user completion order, reload and detail/icon preservation. Commit-time whitespace checks pass. |
+| Commit | `fix(lists): keep recently completed items newest first` |
+| Next Role | none |
+
+Unrelated .ai/config.json and .claude/settings.local.json changes remain uncommitted.
+
+---

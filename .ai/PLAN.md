@@ -525,6 +525,12 @@ ordered `mockResolvedValueOnce` fetch chains.
 2. Assertions stay identical; no test is deleted. If an assertion turns out to depend on request
    order, keep it explicit with a recorded-requests check.
 
+3. User-approved amendment — 2026-10-10: the route migration exposed that changed completed
+   items were displayed in entry creation order instead of newest-completion/history order.
+   Add failing regressions in `frontend/src/pages/recentlyUsedState.test.ts`, then make the small
+   ordering fix in `recentlyUsedState.ts` while preserving every existing assertion.
+   Document the fetch fake's registration/teardown contract and the recent-items ordering in README.
+
 ## Validation
 
 - `npm run lint`

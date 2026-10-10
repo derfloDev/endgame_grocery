@@ -4,7 +4,9 @@ import { drainOfflineQueue, replaceTemporaryIds } from "./offlineQueueDrain";
 import type { AcceptedMutations } from "./offlineQueueDrain";
 import { enqueueOfflineMutation, listOfflineMutations, resetOfflineStateForTests } from "./offlineStore";
 import type { OfflineMutation } from "../types";
+import { createFetchRoutes } from "../test/fetchRoutes";
 
+const routes = createFetchRoutes();
 const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -31,6 +33,7 @@ describe("drainOfflineQueue", () => {
     vi.stubGlobal("indexedDB", undefined);
     vi.stubGlobal("fetch", fetchMock);
     fetchMock.mockReset();
+    routes.reset();
     sequence = 0;
     setAuthSession("current-jwt", "user-1");
     await resetOfflineStateForTests();
@@ -39,6 +42,7 @@ describe("drainOfflineQueue", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     resetAuthSessionForTests();
+    routes.assertAllMatched();
   });
 
   const sentRequests = () => fetchMock.mock.calls.map(([url, init]) => ({ url: String(url), init: init as RequestInit }));
@@ -78,7 +82,8 @@ describe("drainOfflineQueue", () => {
     it("keeps counting what was accepted before the 401", async () => {
       await enqueueOfflineMutation(queued({ url: "/api/lists", method: "POST", payload: { name: "A" } }));
       await enqueueOfflineMutation(queued({ url: "/api/lists", method: "POST", payload: { name: "B" } }));
-      fetchMock.mockResolvedValueOnce(jsonResponse(200, {})).mockResolvedValueOnce(jsonResponse(401, {}));
+      routes.on("POST", "/api/lists", (_input, init) => jsonResponse(JSON.parse(String(init.body)).name === "A" ? 200 : 401, {}));
+      fetchMock.mockImplementation(routes.fetch);
 
       const result = await drain();
 
@@ -131,10 +136,12 @@ describe("drainOfflineQueue", () => {
       await enqueueOfflineMutation(queued({ url: "/api/lists", method: "POST", payload: { name: "ten" }, queueMeta: { resourceType: "list", tempId: "temp-10" } }));
       await enqueueOfflineMutation(queued({ url: "/api/lists/temp-10/entries", method: "POST", payload: { text: "for ten", listId: "temp-10" } }));
       await enqueueOfflineMutation(queued({ url: "/api/lists/temp-1/entries", method: "POST", payload: { text: "for one", listId: "temp-1" } }));
-      fetchMock
-        .mockResolvedValueOnce(jsonResponse(201, { list: { id: "real-A" } }))
-        .mockResolvedValueOnce(jsonResponse(201, { list: { id: "real-B" } }))
-        .mockResolvedValue(jsonResponse(201, {}));
+      routes.on("POST", "/api/lists", (_input, init) => jsonResponse(201, {
+        list: { id: JSON.parse(String(init.body)).name === "one" ? "real-A" : "real-B" }
+      }));
+      routes.on("POST", "/api/lists/real-A/entries", () => jsonResponse(201, {}));
+      routes.on("POST", "/api/lists/real-B/entries", () => jsonResponse(201, {}));
+      fetchMock.mockImplementation(routes.fetch);
 
       const result = await drain();
 

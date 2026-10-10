@@ -2274,3 +2274,42 @@ No blocker or major findings. No required fixes.
 - The first full E2E run reported all 15 tests passing but stalled in teardown and was interrupted. The complete rerun with separately managed servers exited successfully; no source changes were needed.
 - The interactive browser tool failed to initialize even after reset. Exploratory interaction used Playwright, followed by manual screenshot inspection. The first exploratory script used an incorrect fixture response field in its final database assertion; correcting the scratch check to query by email produced a clean pass.
 - Logs and screenshots are under ignored `test-results/t023-review-*` paths.
+
+## Task: T-024 (hardening cycle 2026-10-08 — route-based fetch fixtures)
+
+### Review Round 1 — 2026-10-10T18:15:57Z
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `frontend/src/app.test.tsx:362`: the existing invite-registration test title promises navigation directly to the shared list, but its assertions only check the list name and stored token; the explicit overview fixture now makes that pre-existing coverage gap visible. Navigation behavior and all original assertions were preserved. A separate follow-up can check the actual destination. **Required fix: no (pre-existing and outside the approved scope).**
+2. **minor** — `.ai/config.json`, `.claude/settings.local.json`: unrelated pre-existing configuration edits remain outside this task review. Account for them before the workflow's `git add -A` commit. **Required fix: no.**
+
+No blocker or major findings. No required fixes.
+
+#### Verification
+
+##### Steps performed
+
+- Compared staged and unstaged changes with PLAN.md, including the user-approved recent-completion ordering amendment, the board and implementer handoff. Read the fetch helper, helper tests, migrated app/queue fixtures, recent-items state/tests, documentation and surrounding history/SSE implementation.
+- Independently compared TypeScript ASTs against HEAD: all 83 existing test cases and 350 assertion chains in the three migrated suites are identical (app: 37/187; queue drain: 15/34; queue context: 31/129). No ordered fetch response chains remain in app.test.tsx. Intentional per-route SSE/retry sequences and request-order assertions remain explicit.
+- `npm run lint`: passed, zero errors and the existing AuthContext fast-refresh warning. `npm run typecheck`: passed. `npm run build`: passed.
+- `npm test`: frontend 905/905 and backend 419/419 passed. Includes all seven new fetch-helper checks and both new history-order regressions.
+- `npm run test:integration`: 66/66 passed with default parallel execution against local PostgreSQL 18.4.
+- `npm run e2e -- --output=test-results/t024-review-e2e`: all 15 Chromium scenarios passed, exit 0 (42.5 seconds), using separately managed dev servers.
+- Exploratory real-browser/API/database check with owner and observer contexts: created Milk before Cheese, completed Milk then Cheese, and verified Cheese precedes Milk on both clients without reloading the observer. Both Done badges remain; ordering survives reload. Re-adding Cheese preserves its Aged details and IconCheese icon and removes the open item from Recently Used. Temporary users and dependent data were removed.
+- Manually inspected `test-results/t024-review-completion-order.png`: both ordered chips and Done badges are visible without clipping. `git diff --check` and `git diff --cached --check` passed. No production or test code modified during review.
+
+##### Findings
+
+- Method/path dispatch prevents unrelated background requests from consuming mutation fixtures. Unmatched requests reject with method/path diagnostics and are retained for afterEach verification even when application error handling catches the rejection. Default overrides, query matching, Request/URL inputs, repeated RegExp matching, pending responses, network failures and reset behavior are tested.
+- The ordering fix sorts a newly built array using history position without mutating inputs, preserves changed-entry details/badges and keeps items missing from the current history ahead of known items. Regression tests and the live two-user scenario cover the approved behavior. README documents both the helper teardown contract and recent-item ordering.
+
+##### Risks and environment notes
+
+- Local validation used PostgreSQL 18.4 and Node 24.18.0; CI remains the PostgreSQL 16 / Node 22 check. Browser validation covered Chromium.
+- Initial exploratory setup attempts timed out while waiting for idle SSE readiness/headers before generating an event. The successful retry used visible item updates as the end-to-end signal and passed without source changes. The regular E2E suite passed independently.
+- Browser interaction used Playwright, with manual screenshot inspection; the interactive browser tool was unavailable earlier in this review session. Logs and screenshots are under ignored `test-results/t024-review-*` paths.

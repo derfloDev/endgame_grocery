@@ -12,6 +12,7 @@ import { reportStreamState, resetConnectivityForTests } from "../api/connectivit
 import { getCurrentUserId, resetAuthSessionForTests, setAuthSession } from "../api/authSession";
 import { requestJson } from "../api/request";
 import { StrictMode } from "react";
+import { createFetchRoutes } from "../test/fetchRoutes";
 
 const offlineStoreMock = vi.hoisted(() => ({
   completeOfflineMutation: vi.fn(),
@@ -26,12 +27,15 @@ const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promis
 const listOfflineMutationsMock = vi.mocked(listOfflineMutations);
 const removeOfflineMutationMock = vi.mocked(removeOfflineMutation);
 
+const routes = createFetchRoutes();
+
 let currentMutations: OfflineMutation[] = [];
 
 describe("OfflineQueueProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentMutations = [];
+    routes.reset();
     setAuthSession("token-1", "user-1");
     fetchMock.mockReset();
     fetchMock.mockResolvedValue(createResponse({ ok: true }));
@@ -58,6 +62,7 @@ describe("OfflineQueueProvider", () => {
     resetConnectivityForTests();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    routes.assertAllMatched();
   });
 
   it("keeps the context value stable while the queue state does not change", async () => {
@@ -115,8 +120,9 @@ describe("OfflineQueueProvider", () => {
 
   it("shows the offline state after a real request fails while the browser is online", async () => {
     setNavigatorOnline(true);
-    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
-    fetchMock.mockResolvedValueOnce(createResponse({ ok: true }, 503));
+    routes.on("GET", "/api/lists", () => { throw new TypeError("Failed to fetch"); });
+    routes.on("GET", "/api/health", () => createResponse({ ok: true }, 503));
+    fetchMock.mockImplementation(routes.fetch);
     renderProvider(<OfflineQueueState />);
 
     await act(async () => {
@@ -365,7 +371,11 @@ describe("OfflineQueueProvider", () => {
         createMutation({ id: "child", url: "/api/lists/temp-list/entries", createdAt: "2026-05-27T10:00:01Z", payload: { parent: "temp-list" } }),
         createMutation({ id: "last", url: "/api/lists/temp-list/members", createdAt: "2026-05-27T10:00:02Z" })
       ];
-      fetchMock.mockResolvedValueOnce(createResponse({ list: { id: "real-list" } })).mockResolvedValueOnce(createResponse({}, 503));
+      let childAttempts = 0;
+      routes.on("POST", "/api/lists", () => createResponse({ list: { id: "real-list" } }));
+      routes.on("POST", "/api/lists/real-list/entries", () => createResponse({}, ++childAttempts === 1 ? 503 : 200));
+      routes.on("POST", "/api/lists/real-list/members", () => createResponse({}));
+      fetchMock.mockImplementation(routes.fetch);
       const first = mount();
       await advance();
       expect(currentMutations.map(({ id }) => id)).toEqual(["child", "last"]);
@@ -596,9 +606,9 @@ describe("OfflineQueueProvider", () => {
       createMutation({ id: "mutation-1", url: "/api/entries/missing" }),
       createMutation({ id: "mutation-2", url: "/api/lists" })
     ];
-    fetchMock
-      .mockResolvedValueOnce(createResponse({ error: "Entry not found." }, 404))
-      .mockResolvedValueOnce(createResponse({ list: { id: "list-1" } }));
+    routes.on("POST", "/api/entries/missing", () => createResponse({ error: "Entry not found." }, 404));
+    routes.on("POST", "/api/lists", () => createResponse({ list: { id: "list-1" } }));
+    fetchMock.mockImplementation(routes.fetch);
     setNavigatorOnline(true);
 
     renderProvider(<OfflineQueueState />);
