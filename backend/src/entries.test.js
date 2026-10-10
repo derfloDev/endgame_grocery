@@ -16,6 +16,33 @@ function createAuthedApp(pool, options = {}) {
 }
 
 describe("entry routes", () => {
+  for (const method of ["get", "post", "patch", "delete"]) {
+    it(`denies stranger ${method.toUpperCase()} without writes, SSE or push jobs`, async () => {
+      const listId = "10000000-0000-4000-8000-000000000001";
+      const entryId = "20000000-0000-4000-8000-000000000001";
+      const queries = [];
+      const pool = {
+        async query(sql, params) {
+          queries.push({ sql, params });
+          return { rows: [] };
+        }
+      };
+      const sseManager = createSseManagerSpy();
+      const suffix = ["patch", "delete"].includes(method) ? `/${entryId}` : "";
+      const response = await request(createAuthedApp(pool, { sseManager }))[method](
+        `/api/lists/${listId}/entries${suffix}`
+      ).send({ text: "Forbidden edit", status: "done" });
+
+      assert.equal(response.status, 403);
+      assert.equal(response.body.code, "list.forbidden");
+      await waitForQueuedPushInsert();
+      assert.equal(queries.length, 1, "only the access check may query the database");
+      assert.match(queries[0].sql, /SELECT l.id[\s\S]*FROM lists l/);
+      assert.deepEqual(queries[0].params, [listId, "user-1"]);
+      assert.deepEqual(sseManager.calls, []);
+    });
+  }
+
   it("returns entries with icon values for accessible lists", async () => {
     let callCount = 0;
     const pool = {

@@ -509,6 +509,12 @@ Files: `backend/src/entries.test.js`, `sharing.test.js`, `push.test.js`, new
    without reload, owner revokes, member is sent to the overview.
 6. Replace `waitForTimeout(1500)` in `e2e/lists.spec.js:92` with a deterministic signal.
 
+Scope amendment approved by the user on 2026-10-10: the new sharing E2E exposed duplicate
+single-use invite acceptance when React StrictMode replays the page effect. Add a regression
+test first, then reuse the page's acceptance request for the same invite/auth token pair in
+`InviteAcceptPage.tsx`. Document the behavior in README; retain fresh requests when the invite
+or signed-in session changes. No other production behavior changes are included.
+
 ### T-024 — Route-based fetch fake for the app tests
 
 Files: new `frontend/src/test/fetchRoutes.ts`, `frontend/src/app.test.tsx`, other tests using

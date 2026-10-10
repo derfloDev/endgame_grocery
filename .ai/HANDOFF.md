@@ -1437,3 +1437,52 @@ Notes for review:
 Unrelated changes in .ai/config.json and .claude/settings.local.json remain uncommitted.
 
 ---
+### T-023 — implement — 2026-10-10T08:27:20Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Added access-denial, push, auth-page, service-worker and two-user sharing coverage; fixed duplicate single-use invite acceptance with the user's explicit approval. |
+| Files Changed | backend/src/entries.test.js, backend/src/sharing.test.js, backend/src/push.test.js, backend/src/integration/access.test.js, frontend/src/pages/authPagesBehavior.test.tsx, frontend/src/pages/InviteAcceptPage/InviteAcceptPage.test.tsx, frontend/src/pages/InviteAcceptPage/InviteAcceptPage.tsx, frontend/src/sw/service-worker.test.js, e2e/sharing.spec.js, e2e/lists.spec.js, README.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | npm run lint passes (one existing AuthContext warning); npm run typecheck and npm run build pass; npm test passes: backend 419/419, frontend 896/896. npm run test:integration passes 66/66 against isolated PostgreSQL 18.4 with default parallel execution. Full Chromium E2E run: 14 existing tests passed; the new sharing test passed separately after correcting its title locator and closing sheets before subsequent actions. Final command: npm run e2e -- e2e/sharing.spec.js --output=test-results/t023-sharing-final --workers=1 (1/1). No waitForTimeout remains in e2e; staged and unstaged whitespace checks pass. |
+| Commit | `fix(invites): accept shared-list invitations once and expand regression coverage` |
+| Next Role | review |
+
+Notes for review:
+1. Tests were added before the production fix. The new real-browser sharing flow exposed StrictMode replay consuming a one-time invite twice; a focused unit regression reproduced the same failure before implementation. The user explicitly approved including the fix; the amendment is recorded in PLAN.md. InviteAcceptPage retains its request for the same invite/auth token pair and preserves cancellation handling. Regression coverage includes StrictMode, language changes while pending, and switching to the invited account.
+2. Backend unit checks assert that forbidden entry/sharing methods stop at their access query without writes, push jobs, mail or SSE. Real PostgreSQL tests verify persisted state and cross-list entry IDs. Push coverage adds missing/blank subscription fields, missing/invalid auth, missing unsubscribe endpoint and unconfigured VAPID. Existing assertions were retained.
+3. The new auth behavior suite complements existing safe-redirect/password-policy tests. Service-worker tests mock the worker environment and Workbox imports, then dispatch the real push/click handlers and await waitUntil promises.
+4. Sharing E2E uses two real browser contexts, real API/SSE, visible UI actions and no reload. Since CI has no SMTP inbox, it replaces only the freshly created test invite's stored hash with a known random token; email delivery itself is not verified. Its fixtures are removed afterwards. README documents this requirement. Browser output uses a dedicated subdirectory to avoid Playwright cleaning other validation artifacts.
+5. The first broad unit run, concurrent with the build, had an existing app.test.tsx lazy-login timeout. That file passed alone, then the complete npm test rerun passed unchanged. The full E2E run passed all existing tests; subsequent failures were new-test locator/sheet interactions, corrected before the final sharing pass. PostgreSQL 16 remains the CI target; local validation used the available 18.4 binary.
+6. No commit created. New test files are explicitly staged. Unrelated .ai/config.json and .claude/settings.local.json edits are preserved and excluded from task staging. Validation logs and browser artifacts are under ignored test-results/.
+
+---
+---
+
+### T-023 — review — 2026-10-10T13:20:02Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Reviewed coverage and single-use invite acceptance; lint, typecheck, build, 1315 unit tests, 66 PostgreSQL tests, all 15 Chromium E2E tests and exploratory invite checks pass. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-023 — implement — 2026-10-10T13:46:41Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task: completed T-023 after review PASS_WITH_NOTES, including the approved single-use invite fix and access, auth, push and sharing coverage. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, and all reviewed T-023 implementation, test and documentation files |
+| Validation | Review confirmed lint, typecheck and build pass; backend 419/419, frontend 896/896, PostgreSQL integration 66/66 and complete Chromium E2E 15/15 pass, plus exploratory invite checks. Commit-time whitespace checks pass. |
+| Commit | `fix(invites): accept shared-list invitations once and expand regression coverage` |
+| Next Role | none |
+
+Unrelated .ai/config.json and .claude/settings.local.json changes remain uncommitted.
+
+---

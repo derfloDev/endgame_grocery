@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -15,6 +15,11 @@ export default function InviteAcceptPage(): ReactElement {
   const { token: inviteToken = "" } = useParams();
   const [error, setError] = useState<string>("");
   const [wrongAccount, setWrongAccount] = useState(false);
+  const acceptanceRef = useRef<{
+    inviteToken: string;
+    authToken: string;
+    promise: ReturnType<typeof acceptInvite>;
+  } | null>(null);
 
   useEffect(() => {
     if (!inviteToken) {
@@ -28,13 +33,19 @@ export default function InviteAcceptPage(): ReactElement {
     }
 
     let cancelled = false;
+    // Accepting consumes the token. Reuse this page's request when StrictMode or a language
+    // change replays the effect; a different invite or signed-in session gets its own request.
+    if (acceptanceRef.current?.inviteToken !== inviteToken || acceptanceRef.current.authToken !== token) {
+      acceptanceRef.current = { inviteToken, authToken: token, promise: acceptInvite(inviteToken, token) };
+    }
+    const acceptance = acceptanceRef.current.promise;
 
     async function submitInvite(): Promise<void> {
       setError("");
       setWrongAccount(false);
 
       try {
-        const result = await acceptInvite(inviteToken, token);
+        const result = await acceptance;
 
         if (cancelled) {
           return;

@@ -90,8 +90,10 @@ test.describe("shopping lists", () => {
     page.on("worker", (worker) => workers.push(worker.url()));
     await page.goto("/lists/list-1");
     await expect(page.getByText("Milk", { exact: true })).toBeVisible();
-    // Allow idle callbacks and worker startup to run after the list becomes visible.
-    await page.waitForTimeout(1500);
+    // Observe an idle turn after rendering, then another frame, rather than racing a fixed delay.
+    await page.evaluate(() => new Promise((resolve) => {
+      requestAnimationFrame(() => requestIdleCallback(() => requestAnimationFrame(resolve)));
+    }));
     expect(workers).toEqual([]);
     expect(modelRequests).toEqual([]);
   });

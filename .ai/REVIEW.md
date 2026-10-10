@@ -2236,3 +2236,41 @@ No blocker or major findings; no required fixes.
 
 ##### Risks
 - Pure frontend refactor of the most complex page; verified by the unchanged page tests but not in a browser, and Playwright/integration suites were not run (no database in this session). CI is the first real run of `e2e/lists.spec.js` and the offline-queue specs against this structure.
+
+## Task: T-023 (hardening cycle 2026-10-08 — coverage gaps and single-use invites)
+
+### Review Round 1 — 2026-10-10T13:20:02Z
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `.ai/config.json`, `.claude/settings.local.json`: unrelated pre-existing configuration edits remain in the working tree. They are outside this review; the implementer should account for them before the workflow's `git add -A` commit. **Required fix: no.**
+
+No blocker or major findings. No required fixes.
+
+#### Verification
+
+##### Steps performed
+
+- Compared staged and unstaged changes against T-023 in PLAN.md, including the approved StrictMode invite-acceptance amendment, task acceptance criteria, and implementation handoff. Read all changed tests, the invite page/API, worker handlers, integration harness, Playwright configuration and CI wiring. Existing assertions were retained.
+- `npm run lint`: passed, zero errors and the existing AuthContext fast-refresh warning. `npm run typecheck`: passed. `npm run build`: passed.
+- `npm test`: frontend 896/896 and backend 419/419 passed.
+- `npm run test:integration`: 66/66 passed with default parallel execution against the disposable PostgreSQL 18.4 instance, including all new persisted-state and cross-list access checks.
+- `npm run e2e -- --output=test-results/t023-review-e2e-final`: 15/15 Chromium tests passed, exit 0, with separately managed local dev servers. Covers sharing, acceptance, live entries without navigation, revocation, auth, offline queue, resync and the deterministic cold-list check. No `waitForTimeout` remains in e2e.
+- Exploratory browser check using the real API/database: wrong-account invite shows the translated error with one acceptance request; switch-account sign-out and login retain the invite destination; the invited session accepts once; replay returns 400 and exactly one membership is persisted. Temporary users were removed. Manually inspected screenshots of the wrong-account and accepted-list pages; controls and messages were visible without clipping.
+- `git diff --check` and `git diff --cached --check`: passed. No production or test code modified during review.
+
+##### Findings
+
+- Access tests verify authorization failures have no writes, push jobs, mail or SSE effects; PostgreSQL tests additionally cover entry IDs belonging to another list. Push validation, auth-page behavior and real worker handlers have meaningful assertions.
+- The invite request is retained per invite/auth-token pair while effect cleanup suppresses obsolete results. StrictMode and language-change tests prevent repeat consumption; the session-change test and exploratory sign-out/login check verify fresh acceptance for the invited account. README describes the amended behavior and E2E fixture boundary accurately.
+
+##### Risks and environment notes
+
+- Local PostgreSQL was 18.4 and Node was 24.18.0; CI remains the PostgreSQL 16 / Node 22 check. Browser coverage is Chromium; push delivery and SMTP delivery were not exercised. The sharing fixture intentionally replaces only its own freshly created invite hash.
+- The first full E2E run reported all 15 tests passing but stalled in teardown and was interrupted. The complete rerun with separately managed servers exited successfully; no source changes were needed.
+- The interactive browser tool failed to initialize even after reset. Exploratory interaction used Playwright, followed by manual screenshot inspection. The first exploratory script used an incorrect fixture response field in its final database assertion; correcting the scratch check to query by email produced a clean pass.
+- Logs and screenshots are under ignored `test-results/t023-review-*` paths.

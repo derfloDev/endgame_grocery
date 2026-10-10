@@ -23,6 +23,78 @@ function createAuthedApp(pool, options = {}) {
 }
 
 describe("sharing routes", () => {
+  for (const method of ["get", "post", "delete"]) {
+    it(`denies non-owner ${method.toUpperCase()} without writes, mail or events`, async () => {
+      const queries = [];
+      const sentMessages = [];
+      const sseManager = createSseManagerSpy();
+      const pool = {
+        async query(sql, params) {
+          queries.push({ sql, params });
+          return { rows: [] };
+        }
+      };
+      const app = createAuthedApp(pool, {
+        sseManager,
+        mailer: { async send(message) { sentMessages.push(message); } }
+      });
+      const listId = "10000000-0000-4000-8000-000000000001";
+      const suffix = method === "delete" ? "/30000000-0000-4000-8000-000000000002" : "";
+      const response = await request(app)[method](`/api/lists/${listId}/members${suffix}`)
+        .send({ email: "member@example.com" });
+
+      assert.equal(response.status, 403);
+      assert.equal(response.body.code, "list.owner_only_sharing");
+      assert.equal(queries.length, 1);
+      assert.match(queries[0].sql, /WHERE l.id = \$1 AND l.owner_id = \$2/);
+      assert.deepEqual(queries[0].params, [listId, "30000000-0000-4000-8000-000000000001"]);
+      assert.deepEqual(sentMessages, []);
+      assert.deepEqual(sseManager.calls, []);
+      assert.deepEqual(sseManager.direct, []);
+    });
+  }
+
+  it("returns 404 for an unknown member without mail or events", async () => {
+    const queries = [];
+    const sentMessages = [];
+    const sseManager = createSseManagerSpy();
+    const pool = {
+      async query(sql, params) {
+        queries.push({ sql, params });
+        return { rows: queries.length === 1 ? [{ owner_id: "30000000-0000-4000-8000-000000000001" }] : [] };
+      }
+    };
+    const response = await request(createAuthedApp(pool, {
+      sseManager,
+      mailer: { async send(message) { sentMessages.push(message); } }
+    })).delete("/api/lists/10000000-0000-4000-8000-000000000001/members/30000000-0000-4000-8000-000000000099");
+
+    assert.equal(response.status, 404);
+    assert.equal(response.body.code, "sharing.member_not_found");
+    assert.equal(queries.length, 2);
+    assert.match(queries[1].sql, /DELETE FROM list_members/);
+    assert.deepEqual(queries[1].params, ["10000000-0000-4000-8000-000000000001", "30000000-0000-4000-8000-000000000099"]);
+    assert.deepEqual(sentMessages, []);
+    assert.deepEqual(sseManager.calls, []);
+    assert.deepEqual(sseManager.direct, []);
+  });
+
+  for (const body of [{}, { email: "" }, { email: "   " }]) {
+    it(`rejects an empty invite email ${JSON.stringify(body)} before database or mail access`, async () => {
+      let queries = 0;
+      let mails = 0;
+      const pool = { async query() { queries++; return { rows: [] }; } };
+      const response = await request(createAuthedApp(pool, {
+        mailer: { async send() { mails++; } }
+      })).post("/api/lists/10000000-0000-4000-8000-000000000001/members").send(body);
+
+      assert.equal(response.status, 400);
+      assert.equal(response.body.code, "validation.email_required");
+      assert.equal(queries, 0);
+      assert.equal(mails, 0);
+    });
+  }
+
   it("returns owner and members for an owned list", async () => {
     let callCount = 0;
     const pool = {
