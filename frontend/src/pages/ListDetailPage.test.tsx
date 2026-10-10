@@ -1525,7 +1525,7 @@ describe("ListDetailPage optimistic updates", () => {
 
   it("lets a shared member confirm leaving and returns to the overview", async () => {
     mockListDetailData();
-    leaveListMock.mockResolvedValue(undefined);
+    leaveListMock.mockResolvedValue(null);
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
     renderListDetailPage();

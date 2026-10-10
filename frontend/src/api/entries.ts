@@ -1,8 +1,8 @@
 import { createCacheKey, sendJsonRequest } from "./client";
 import type { CachedReadOptions } from "./client";
-import type { Entry, QueueMeta } from "../types";
+import type { Entry, MutationResult, QueueMeta } from "../types";
 
-interface EntryRequestOptions extends CachedReadOptions<EntriesResponse> {
+interface EntryRequestOptions<T> extends CachedReadOptions<T> {
   method?: string;
   payload?: unknown;
   queueMeta?: QueueMeta | null;
@@ -23,24 +23,21 @@ interface EntriesResponse {
   offline?: boolean;
 }
 
-interface EntryMutationResponse {
-  entry: Entry;
-  queued?: boolean;
-}
+type EntryMutationResponse = MutationResult<{ entry: Entry }>;
 
 function createEntriesCacheKey(listId: string): string {
   return createCacheKey("entries", listId);
 }
 
-function sendEntryRequest(
+function sendEntryRequest<T>(
   listId: string,
   token: string,
   path = "",
-  options: EntryRequestOptions = {}
-): Promise<unknown> {
+  options: EntryRequestOptions<T> = {}
+): Promise<T> {
   const method = options.method ?? "GET";
 
-  return sendJsonRequest(`/api/lists/${listId}/entries${path}`, {
+  return sendJsonRequest<T>(`/api/lists/${listId}/entries${path}`, {
     method,
     token,
     payload: options.payload,
@@ -53,7 +50,7 @@ function sendEntryRequest(
 }
 
 export function fetchEntries(listId: string, token: string, options: CachedReadOptions<EntriesResponse> = {}): Promise<EntriesResponse> {
-  return sendEntryRequest(listId, token, "", options) as Promise<EntriesResponse>;
+  return sendEntryRequest<EntriesResponse>(listId, token, "", options);
 }
 
 export function createEntry(
@@ -62,14 +59,14 @@ export function createEntry(
   { text, icon, details }: EntryPayload,
   options: CreateEntryOptions = {}
 ): Promise<EntryMutationResponse> {
-  return sendEntryRequest(listId, token, "", {
+  return sendEntryRequest<EntryMutationResponse>(listId, token, "", {
     method: "POST",
     payload: { text, icon, details },
     queueMeta: {
       resourceType: "entry",
       tempId: options.tempId ?? ""
     }
-  }) as Promise<EntryMutationResponse>;
+  });
 }
 
 export function updateEntry(
@@ -78,8 +75,8 @@ export function updateEntry(
   token: string,
   payload: Partial<EntryPayload> & { status?: Entry["status"] }
 ): Promise<EntryMutationResponse> {
-  return sendEntryRequest(listId, token, `/${entryId}`, {
+  return sendEntryRequest<EntryMutationResponse>(listId, token, `/${entryId}`, {
     method: "PATCH",
     payload
-  }) as Promise<EntryMutationResponse>;
+  });
 }

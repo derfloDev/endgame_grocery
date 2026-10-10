@@ -23,12 +23,12 @@ import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { getRecentlyUsedDisplayState } from "../recentlyUsedState";
 import { leaveSharedList } from "../leaveListAction";
 import styles from "./ListDetailPage.module.css";
-import { getChangeKind, getEntryErrorText, getInitials, isShareInviteResult } from "./listDetailUtils";
+import { getChangeKind, getEntryErrorText, getInitials } from "./listDetailUtils";
 import { useEntryTiles } from "./useEntryTiles";
 import { useListDetailData } from "./useListDetailData";
 import { useListLifecycleEvents } from "./useListLifecycleEvents";
 import { AddItemSheet, ListOptionsSheet, RenameListSheet, ShareListSheet } from "./lazySheets";
-import type { DetailEntry, DetailMember } from "./useListDetailData";
+import type { Entry, Member } from "../../types";
 
 export default function ListDetailPage(): ReactElement {
   const { t } = useTranslation();
@@ -45,7 +45,7 @@ export default function ListDetailPage(): ReactElement {
   const [isShareSubmitting, setIsShareSubmitting] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showAddItem, setShowAddItem] = useState<boolean>(false);
-  const [editingEntry, setEditingEntry] = useState<DetailEntry | null>(null);
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [showOptions, setShowOptions] = useState<boolean>(false);
   const [showRename, setShowRename] = useState<boolean>(false);
   const [showShare, setShowShare] = useState<boolean>(false);
@@ -120,8 +120,8 @@ export default function ListDetailPage(): ReactElement {
   // Deleted list, own removal (back to the overview with a notice) and rename (title in place).
   useListLifecycleEvents({ currentUserId: user?.id, listId, onOtherMemberRemoved: handleMemberChange, setList, token });
 
-  async function updateMembers(updater: (currentMembers: DetailMember[]) => DetailMember[]): Promise<void> {
-    let nextMembers: DetailMember[] = [];
+  async function updateMembers(updater: (currentMembers: Member[]) => Member[]): Promise<void> {
+    let nextMembers: Member[] = [];
 
     setMembers((currentMembers) => {
       nextMembers = updater(currentMembers);
@@ -163,9 +163,9 @@ export default function ListDetailPage(): ReactElement {
       setShareNotice("");
       const result = await shareListWithMember(listId, token, { email: shareEmail });
 
-      if (isShareInviteResult(result) && result.queued) {
+      if (result?.queued) {
         setShareNotice(t("share.inviteQueued", { email: shareEmail.trim() }));
-      } else if (isShareInviteResult(result) && result.invite?.invited_email) {
+      } else if (result?.invite?.invited_email) {
         setShareNotice(t("share.inviteSent", { email: result.invite.invited_email }));
       }
 

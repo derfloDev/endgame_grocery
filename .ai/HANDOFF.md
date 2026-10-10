@@ -1348,3 +1348,48 @@ Notes for review (T-016 finding 1 is the required fix):
 Open risk: if CI's e2e job fails on `adds an item to a shopping list`, the race fix is incomplete; start in `useListDetailData.ts` (`isOwnInFlightCreate`, `replaceTemporaryEntry`).
 
 ---
+
+### T-021 — implement — 2026-10-09T14:44:49Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | The frontend types now match the API and are checked in CI: shared `Entry`/`List`/`Member` replace the `Detail*` copies, `sendJsonRequest<T>` resolves to its stated type so the API helpers need no casts, mutations return a `queued`-or-server-answer union, and `npm run typecheck` (0 errors) runs in the CI lint job. |
+| Files Changed | frontend/src/types.ts, frontend/src/api/client.ts, frontend/src/api/{entries,lists,sharing,history,push,suggestions,auth,config,events}.ts, frontend/src/api/apiTypes.test.ts, frontend/src/pages/ListDetailPage/{ListDetailPage.tsx,useListDetailData.ts,listDetailUtils.ts,listDetailUtils.test.ts,useEntryTiles.ts,useListLifecycleEvents.ts}, frontend/src/pages/ListDetailPage.test.tsx, frontend/src/pages/OverviewPage/OverviewPage.test.tsx, frontend/src/components/ShareListSheet/ShareListSheet.tsx, frontend/package.json, package.json, .github/workflows/ci.yml, backend/src/releaseWorkflow.test.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | `npm run typecheck` 0 errors (it had 1 pre-existing error in `ListDetailPage.tsx`, gone with the type alignment); `npm run lint` (0 errors, 1 pre-existing warning); `npm run build` ok; `npm test` backend 394/394, frontend 840/840. |
+| Commit | `refactor(frontend): share one set of API-matching types and type-check them in CI` |
+| Next Role | review |
+
+Notes for review:
+1. **Types:** `Entry.details` is `string | null | undefined` (kept optional so offline temp entries and fixtures stay valid; the API always sends it). `Member` is the API shape (`user_id`, `display_name`, `email`, `joined_at?`, `is_owner?`); the old `Member { id }` was never what the API returned. `List` gains `is_pending_sync`. `QueuedMutationResult` and `MutationResult<T> = QueuedMutationResult | (T & { queued?: false })` are new.
+2. **`sendJsonRequest<T>`** now returns `Promise<T>`; the casts moved inside it (`null as T` for 204, `{ queued: true } as T`, the offline-cache merge). Every `api/*.ts` helper passes its response type as the generic instead of `as Promise<…>`. Unused-by-callers results are typed too: `registerUser` returns `AuthResult | MessageResult`, `shareListWithMember` returns `ShareInviteResponse`, revoke/leave/delete return `MutationResult<Record<string, never>> | null` (204 is `null`).
+3. **Removed:** `DetailEntry`/`DetailList`/`DetailMember` (hook), `SharedListMember` (ShareListSheet), the runtime guard `isShareInviteResult` (the result is typed now; the page uses `result?.queued` / `result?.invite?.invited_email` so a mocked empty answer is still tolerated), and the `as Entry`/`as Member[]`/`as List` casts in `useListDetailData.ts`. Two boundary casts remain on purpose in `listDetailUtils.applyEntryEvent`: the SSE payload is untrusted JSON whose `id`/`status` were validated just above.
+4. **Tests:** `api/apiTypes.test.ts` asserts the shapes with `expectTypeOf` (checked by `tsc`, since tsc includes tests), the narrowing on `queued`, and scans `src/` so a `Detail*` type cannot return. Two existing fixtures changed because the types are now exact: `leaveListMock.mockResolvedValue(undefined)` became `null` (a 204 is `null`) in `ListDetailPage.test.tsx` and `OverviewPage.test.tsx`. `releaseWorkflow.test.js` gained two tests (ci.yml runs typecheck between lint and build; the scripts exist at root and in the frontend workspace).
+5. **CI/scripts:** `frontend` script `typecheck` = `tsc --noEmit -p .`, root `typecheck` runs it through the workspaces, and `ci.yml` runs `npm run typecheck` after lint and before build in the lint-and-build job. Backend is plain JavaScript and has no type check.
+
+---
+
+### T-021 — review — 2026-10-11T10:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the frontend type alignment (shared Entry/List/Member, generic sendJsonRequest, mutation result union) and the CI typecheck step; all criteria met, typecheck, lint, build and tests clean. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-021 — implement — 2026-10-10T07:41:17Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Committed T-021 after review PASS_WITH_NOTES: shared API-matching frontend types, a generic request helper with a queued-or-answer mutation union, and `npm run typecheck` in CI. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, plus all T-021 implementation files |
+| Commit | `refactor(frontend): share one set of API-matching types and type-check them in CI` |
+| Next Role | none |
+
+---

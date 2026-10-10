@@ -52,7 +52,7 @@ describe("OverviewPage leave list", () => {
     fetchListsMock.mockResolvedValue({
       lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }]
     });
-    leaveListMock.mockResolvedValue(undefined);
+    leaveListMock.mockResolvedValue(null);
     writeCachedResourceMock.mockResolvedValue(undefined);
   });
 

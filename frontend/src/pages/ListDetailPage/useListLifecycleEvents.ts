@@ -4,14 +4,14 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { fetchList } from "../../api/lists";
 import { useListEvents } from "../../hooks/useListEvents";
-import type { DetailList } from "./useListDetailData";
+import type { List } from "../../types";
 
 interface UseListLifecycleEventsOptions {
   currentUserId: string | undefined;
   listId: string;
   /** Called for `member:removed` events about other users. */
   onOtherMemberRemoved: () => void;
-  setList: Dispatch<SetStateAction<DetailList | null>>;
+  setList: Dispatch<SetStateAction<List | null>>;
   token: string;
 }
 

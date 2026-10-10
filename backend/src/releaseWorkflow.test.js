@@ -73,6 +73,24 @@ describe("workflow hardening", () => {
     });
   }
 
+  it("ci.yml type-checks the frontend in the lint job", () => {
+    const workflow = readRepoFile(".github/workflows/ci.yml");
+    const lintJob = workflow.split(/^ {2}unit-test:/m)[0];
+
+    assert.match(lintJob, /- run: npm run typecheck\n/);
+    // The check runs after lint and before the build so type errors fail fast.
+    assert.ok(lintJob.indexOf("npm run lint") < lintJob.indexOf("npm run typecheck"));
+    assert.ok(lintJob.indexOf("npm run typecheck") < lintJob.indexOf("npm run build"));
+  });
+
+  it("provides the typecheck script at the root and in the frontend workspace", () => {
+    const rootScripts = JSON.parse(readRepoFile("package.json")).scripts;
+    const frontendScripts = JSON.parse(readRepoFile("frontend/package.json")).scripts;
+
+    assert.equal(frontendScripts.typecheck, "tsc --noEmit -p .");
+    assert.equal(rootScripts.typecheck, "npm run typecheck --workspaces --if-present");
+  });
+
   it("ci.yml only needs read access to the repository", () => {
     const workflow = readRepoFile(".github/workflows/ci.yml");
 

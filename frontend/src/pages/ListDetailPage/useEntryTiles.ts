@@ -1,10 +1,10 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef } from "react";
-import type { DetailEntry } from "./useListDetailData";
+import type { Entry } from "../../types";
 
 interface UseEntryTilesOptions {
-  entries: DetailEntry[];
-  onEdit: (entry: DetailEntry) => void;
-  onToggle: (entry: DetailEntry) => void;
+  entries: Entry[];
+  onEdit: (entry: Entry) => void;
+  onToggle: (entry: Entry) => void;
   searchQuery: string;
 }
 

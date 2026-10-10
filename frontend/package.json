@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p .",
     "build:icon-embeddings": "node scripts/build-icon-embeddings.mjs",
     "test": "vitest run --environment jsdom"
   },

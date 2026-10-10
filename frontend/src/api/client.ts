@@ -56,7 +56,7 @@ export async function sendJsonRequest<T = unknown>(
     queueMeta = null,
     timeoutMs = REQUEST_TIMEOUT_MS
   }: SendJsonRequestOptions<T> = {}
-): Promise<unknown> {
+): Promise<T> {
   let networkSettled = false;
   if (method === "GET" && cacheKey && onCachedValue) {
     // Read alongside the network, never delaying it. Once the response settles (including
@@ -80,8 +80,9 @@ export async function sendJsonRequest<T = unknown>(
     }, timeoutMs);
     networkSettled = true;
 
+    // The caller states what the endpoint returns (`T`); an empty 204 body is `null`.
     if (response.status === 204) {
-      return null;
+      return null as T;
     }
 
     if (!response.ok) {
@@ -97,7 +98,7 @@ export async function sendJsonRequest<T = unknown>(
       await writeCachedResource(cacheKey, data);
     }
 
-    return data;
+    return data as T;
   } catch (error) {
     networkSettled = true;
     if (method === "GET" && cacheKey && isNetworkError(error)) {
@@ -107,7 +108,7 @@ export async function sendJsonRequest<T = unknown>(
         return {
           ...(cachedValue as Record<string, unknown>),
           offline: true
-        };
+        } as T;
       }
 
       throw new Error(offlineFallbackMessage);
@@ -125,7 +126,8 @@ export async function sendJsonRequest<T = unknown>(
         queueMeta
       });
 
-      return { queued: true };
+      // Only mutations are queueable; their `T` is a `MutationResult`, which includes this shape.
+      return { queued: true } as T;
     }
 
     throw error;

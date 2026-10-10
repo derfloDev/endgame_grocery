@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import { getErrorMessage } from "../../api/errors";
-import type { DetailEntry } from "./useListDetailData";
+import type { Entry } from "../../types";
 
 export class ListAccessError extends Error {
   constructor() {
@@ -16,10 +16,10 @@ export class ListAccessError extends Error {
  * queue) instead of showing them forever; by default every queued entry is kept.
  */
 export function mergePendingEntries(
-  serverEntries: readonly DetailEntry[],
-  currentEntries: readonly DetailEntry[],
-  isStillPending: (entry: DetailEntry) => boolean = () => true
-): DetailEntry[] {
+  serverEntries: readonly Entry[],
+  currentEntries: readonly Entry[],
+  isStillPending: (entry: Entry) => boolean = () => true
+): Entry[] {
   const serverIds = new Set(serverEntries.map((entry) => entry.id));
   return [
     ...serverEntries,
@@ -33,7 +33,7 @@ export function mergePendingEntries(
  * (patched in from the event); keeping both would show one entry twice with the same id. Every
  * entry carrying the temporary or the real id is removed first, then the server's entry is added.
  */
-export function replaceTemporaryEntry(entries: DetailEntry[], temporaryId: string, serverEntry: DetailEntry): DetailEntry[] {
+export function replaceTemporaryEntry(entries: Entry[], temporaryId: string, serverEntry: Entry): Entry[] {
   return sortEntries([
     ...entries.filter((entry) => entry.id !== temporaryId && entry.id !== serverEntry.id),
     serverEntry
@@ -46,7 +46,7 @@ export function replaceTemporaryEntry(entries: DetailEntry[], temporaryId: strin
  * one is dropped, so a synced offline add never shows twice. Returns the same array when nothing
  * applies.
  */
-export function reconcileResolvedEntries(entries: DetailEntry[], resolvedIds: Readonly<Record<string, string>>): DetailEntry[] {
+export function reconcileResolvedEntries(entries: Entry[], resolvedIds: Readonly<Record<string, string>>): Entry[] {
   if (!entries.some((entry) => Object.hasOwn(resolvedIds, entry.id))) {
     return entries;
   }
@@ -66,7 +66,7 @@ export function reconcileResolvedEntries(entries: DetailEntry[], resolvedIds: Re
 }
 
 /** Open entries first, then by creation time. */
-export function sortEntries(entries: DetailEntry[]): DetailEntry[] {
+export function sortEntries(entries: Entry[]): Entry[] {
   return [...entries].sort((left, right) => {
     if (left.status === right.status) {
       return new Date(left.created_at ?? 0).getTime() - new Date(right.created_at ?? 0).getTime();
@@ -79,7 +79,7 @@ export function sortEntries(entries: DetailEntry[]): DetailEntry[] {
 export type EntryEventType = "entry:created" | "entry:updated" | "entry:deleted";
 
 export interface EntryEventResult {
-  entries: DetailEntry[];
+  entries: Entry[];
   /** Whether the recently used history may have changed (an entry moved to/from done, or a done entry was deleted). */
   historyChanged: boolean;
 }
@@ -111,7 +111,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *   incomplete (an older server); the caller then falls back to a full refetch.
  */
 export function applyEntryEvent(
-  entries: DetailEntry[],
+  entries: Entry[],
   type: EntryEventType,
   data: Record<string, unknown>,
   { currentUserId, locallyDoneIds }: ApplyEntryEventOptions
@@ -149,9 +149,10 @@ export function applyEntryEvent(
     (nextStatus === "done" && previousStatus !== "done") || (previousStatus === "done" && nextStatus !== "done");
   const isChanged =
     nextStatus === "done" && locallyDoneIds.has(payload.id) ? true : payload.last_updated_by !== currentUserId;
-  const nextEntry = { ...payload, is_changed: isChanged } as unknown as DetailEntry;
+  // The payload is JSON from the server; its id and status were checked above.
+  const nextEntry: Entry = { ...(payload as unknown as Entry), is_changed: isChanged };
 
-  if (existing && Object.entries(nextEntry).every(([key, value]) => (existing as unknown as Record<string, unknown>)[key] === value)) {
+  if (existing && (Object.keys(nextEntry) as Array<keyof Entry>).every((key) => existing[key] === nextEntry[key])) {
     return { entries, historyChanged };
   }
 
@@ -160,15 +161,6 @@ export function applyEntryEvent(
     : [...entries, nextEntry];
 
   return { entries: sortEntries(nextEntries), historyChanged };
-}
-
-interface ShareInviteResult {
-  queued?: boolean;
-  invite?: { invited_email?: string };
-}
-
-export function isShareInviteResult(value: unknown): value is ShareInviteResult {
-  return Boolean(value) && typeof value === "object";
 }
 
 export function getInitials(name: unknown): string {
@@ -183,7 +175,7 @@ export function getInitials(name: unknown): string {
     : "?";
 }
 
-export function getChangeKind(entry: DetailEntry): "new" | "edited" | "done" | undefined {
+export function getChangeKind(entry: Entry): "new" | "edited" | "done" | undefined {
   if (!entry.is_changed) {
     return undefined;
   }

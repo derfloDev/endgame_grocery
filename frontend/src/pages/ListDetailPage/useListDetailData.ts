@@ -22,26 +22,6 @@ import type { EntryEventType } from "./listDetailUtils";
 // Several entries are often completed within a moment (shopping); one history reload covers them.
 const HISTORY_RELOAD_DEBOUNCE_MS = 250;
 
-export interface DetailEntry extends Omit<Entry, "details"> {
-  details?: string | null;
-  created_at?: string;
-  is_pending_sync?: boolean;
-}
-
-export interface DetailList extends List {
-  name?: string;
-  owner_name?: string;
-  is_pending_sync?: boolean;
-}
-
-export interface DetailMember extends Member {
-  user_id: string;
-  display_name: string;
-  email: string;
-  is_owner?: boolean;
-  is_pending_sync?: boolean;
-}
-
 interface LoadEntriesOptions {
   historyItems?: Suggestion[] | null;
   throwOnError?: boolean;
@@ -74,11 +54,11 @@ export function useListDetailData({
   token
 }: UseListDetailDataOptions) {
   const { t } = useTranslation();
-  const [list, setList] = useState<DetailList | null>(null);
-  const [entries, setEntriesState] = useState<DetailEntry[]>([]);
-  const entriesRef = useRef<DetailEntry[]>([]);
+  const [list, setList] = useState<List | null>(null);
+  const [entries, setEntriesState] = useState<Entry[]>([]);
+  const entriesRef = useRef<Entry[]>([]);
   const entriesScopeRef = useRef({ listId, token });
-  const [members, setMembers] = useState<DetailMember[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [recentlyUsed, setRecentlyUsed] = useState<Suggestion[]>([]);
   const [entryError, setEntryError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -93,7 +73,7 @@ export function useListDetailData({
 
   // Keep an immediate snapshot for async reloads: React may defer state updaters, but
   // both the merge and the following history refresh must see entries queued meanwhile.
-  const setEntries = useCallback((value: DetailEntry[] | ((current: DetailEntry[]) => DetailEntry[])) => {
+  const setEntries = useCallback((value: Entry[] | ((current: Entry[]) => Entry[])) => {
     const nextEntries = typeof value === "function" ? value(entriesRef.current) : value;
     entriesRef.current = nextEntries;
     setEntriesState(nextEntries);
@@ -120,7 +100,7 @@ export function useListDetailData({
    * its create is still queued or running; once the change was synced (the server returns the real
    * entry) or discarded from the queue, keeping it would show a duplicate or a phantom entry.
    */
-  const createPendingFilter = useCallback(async (): Promise<(entry: DetailEntry) => boolean> => {
+  const createPendingFilter = useCallback(async (): Promise<(entry: Entry) => boolean> => {
     let queuedTempIds: Set<string>;
 
     try {
@@ -136,7 +116,7 @@ export function useListDetailData({
   }, []);
 
   const loadEntries = useCallback(
-    async ({ historyItems = null, throwOnError = false }: LoadEntriesOptions = {}): Promise<DetailEntry[]> => {
+    async ({ historyItems = null, throwOnError = false }: LoadEntriesOptions = {}): Promise<Entry[]> => {
       try {
         const entriesResult = await fetchEntries(listId, token);
         const isStillPending = await createPendingFilter();
@@ -146,11 +126,9 @@ export function useListDetailData({
         }
 
         const serverEntries = (entriesResult.entries ?? []).map((entry) => {
-          const detailEntry = entry as DetailEntry;
-
-          return locallyDoneIdsRef.current.has(detailEntry.id) && detailEntry.status === "done"
-            ? { ...detailEntry, is_changed: true }
-            : detailEntry;
+          return locallyDoneIdsRef.current.has(entry.id) && entry.status === "done"
+            ? { ...entry, is_changed: true }
+            : entry;
         });
         const nextEntries = mergePendingEntries(serverEntries, entriesRef.current, isStillPending);
 
@@ -176,7 +154,7 @@ export function useListDetailData({
   );
 
   const reloadHistory = useCallback(
-    async (entriesOverride?: DetailEntry[]): Promise<void> => {
+    async (entriesOverride?: Entry[]): Promise<void> => {
       try {
         const historyResult = await fetchRecentlyUsed(listId, token);
 
@@ -261,7 +239,7 @@ export function useListDetailData({
   const handleEntryDeleted = useCallback((data: Record<string, unknown>) => handleEntryEvent("entry:deleted", data), [handleEntryEvent]);
 
   const loadMembers = useCallback(
-    async ({ isOwner = false, throwOnError = false }: LoadMembersOptions = {}): Promise<DetailMember[]> => {
+    async ({ isOwner = false, throwOnError = false }: LoadMembersOptions = {}): Promise<Member[]> => {
       if (!isOwner) {
         if (isMountedRef.current) {
           setMembers([]);
@@ -277,7 +255,7 @@ export function useListDetailData({
 
       try {
         const membersResult = await fetchListMembers(listId, token);
-        const nextMembers = (membersResult.members ?? []) as DetailMember[];
+        const nextMembers = membersResult.members ?? [];
 
         if (isMountedRef.current && currentListIdRef.current === listId) {
           setMembers(nextMembers);
@@ -304,7 +282,7 @@ export function useListDetailData({
   );
 
   const updateEntries = useCallback(
-    async (updater: (currentEntries: DetailEntry[]) => DetailEntry[]): Promise<void> => {
+    async (updater: (currentEntries: Entry[]) => Entry[]): Promise<void> => {
       const nextEntries = setEntries(updater);
 
       await writeCachedResource(`entries:${listId}`, { entries: nextEntries });
@@ -321,7 +299,7 @@ export function useListDetailData({
       }
 
       const nextDetails = normalizeEntryDetails(details);
-      const temporaryEntry: DetailEntry = {
+      const temporaryEntry: Entry = {
         id: createTemporaryId("entry"),
         text: trimmed,
         icon: icon ?? null,
@@ -348,7 +326,7 @@ export function useListDetailData({
             ? sortEntries(currentEntries.map((currentEntry) => (currentEntry.id === temporaryEntry.id ? temporaryEntry : currentEntry)))
             // The server may have announced the entry (entry:created) before this response: never
             // keep it twice.
-            : replaceTemporaryEntry(currentEntries, temporaryEntry.id, result.entry as DetailEntry)
+            : replaceTemporaryEntry(currentEntries, temporaryEntry.id, result.entry)
         );
         return true;
       } catch (submitError) {
@@ -365,10 +343,10 @@ export function useListDetailData({
   );
 
   const toggleStatus = useCallback(
-    async (entry: DetailEntry): Promise<void> => {
+    async (entry: Entry): Promise<void> => {
       const nextStatus: Entry["status"] = entry.status === "open" ? "done" : "open";
       const isCompletingEntry = nextStatus === "done";
-      const optimisticEntry: DetailEntry = {
+      const optimisticEntry: Entry = {
         ...entry,
         status: nextStatus,
         is_pending_sync: true,
@@ -406,7 +384,7 @@ export function useListDetailData({
                           ...(isCompletingEntry ? { is_changed: true } : {})
                         }
                       : {
-                          ...(result.entry as DetailEntry),
+                          ...result.entry,
                           ...(isCompletingEntry ? { is_changed: true } : {})
                         })
                   }
@@ -417,7 +395,7 @@ export function useListDetailData({
 
         if (isCompletingEntry && !result?.queued) {
           setRecentlyUsed((currentItems) =>
-            upsertRecentlyUsedItems(currentItems, result?.entry ?? entry)
+            upsertRecentlyUsedItems(currentItems, result.entry)
           );
         }
       } catch (submitError) {
@@ -458,7 +436,7 @@ export function useListDetailData({
                     ...currentEntry,
                     ...(result?.queued
                       ? { details: nextDetails, icon: nextIcon, is_pending_sync: true, text: trimmed }
-                      : (result.entry as DetailEntry))
+                      : result.entry)
                   }
                 : currentEntry
             )
@@ -551,7 +529,7 @@ export function useListDetailData({
           })
         ]);
         networkFinished = true;
-        const activeList = (listResult.list ?? undefined) as DetailList | undefined;
+        const activeList = listResult.list ?? undefined;
         const isStillPending = await createPendingFilter();
 
         if (!active) {

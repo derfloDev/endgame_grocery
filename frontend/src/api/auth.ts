@@ -35,47 +35,48 @@ interface GeneratedApiKey {
   created_at: string;
 }
 
-function sendAuthRequest(path: string, payload: unknown): Promise<unknown> {
-  return sendJsonRequest(`/api/auth/${path}`, {
+function sendAuthRequest<T>(path: string, payload: unknown): Promise<T> {
+  return sendJsonRequest<T>(`/api/auth/${path}`, {
     method: "POST",
     payload
   });
 }
 
-export function registerUser(payload: RegisterPayload): Promise<AuthResult | MessageResult | unknown> {
-  return sendAuthRequest("register", payload);
+/** Registration answers with a verification notice, or with a session when an invite was used. */
+export function registerUser(payload: RegisterPayload): Promise<AuthResult | MessageResult> {
+  return sendAuthRequest<AuthResult | MessageResult>("register", payload);
 }
 
 export function loginUser(payload: LoginCredentials): Promise<{ token: string; user?: User }> {
-  return sendAuthRequest("login", payload) as Promise<{ token: string; user?: User }>;
+  return sendAuthRequest<{ token: string; user?: User }>("login", payload);
 }
 
 export function fetchCurrentUser(token: string): Promise<User> {
-  return sendJsonRequest("/api/auth/me", { token }) as Promise<User>;
+  return sendJsonRequest<User>("/api/auth/me", { token });
 }
 
 export function fetchApiKey(token: string): Promise<ApiKeyStatus> {
-  return sendJsonRequest("/api/auth/api-key", { token }) as Promise<ApiKeyStatus>;
+  return sendJsonRequest<ApiKeyStatus>("/api/auth/api-key", { token });
 }
 
 export function regenerateApiKey(token: string): Promise<GeneratedApiKey> {
-  return sendJsonRequest("/api/auth/api-key", { token, method: "POST" }) as Promise<GeneratedApiKey>;
+  return sendJsonRequest<GeneratedApiKey>("/api/auth/api-key", { token, method: "POST" });
 }
 
 export function verifyEmail(token: string): Promise<AuthResult> {
-  return sendJsonRequest(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, {
+  return sendJsonRequest<AuthResult>(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, {
     method: "GET"
-  }) as Promise<AuthResult>;
+  });
 }
 
-export function resendVerification(email: string): Promise<MessageResult | unknown> {
-  return sendAuthRequest("resend-verification", { email });
+export function resendVerification(email: string): Promise<MessageResult> {
+  return sendAuthRequest<MessageResult>("resend-verification", { email });
 }
 
-export function forgotPassword(email: string): Promise<MessageResult | unknown> {
-  return sendAuthRequest("forgot-password", { email });
+export function forgotPassword(email: string): Promise<MessageResult> {
+  return sendAuthRequest<MessageResult>("forgot-password", { email });
 }
 
-export function resetPassword(token: string, password: string): Promise<MessageResult | unknown> {
-  return sendAuthRequest("reset-password", { token, password });
+export function resetPassword(token: string, password: string): Promise<MessageResult> {
+  return sendAuthRequest<MessageResult>("reset-password", { token, password });
 }

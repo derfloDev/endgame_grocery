@@ -5,9 +5,9 @@ interface VapidPublicKeyResponse {
 }
 
 export function fetchVapidPublicKey(): Promise<VapidPublicKeyResponse> {
-  return sendJsonRequest("/api/push/vapid-public-key", {
+  return sendJsonRequest<VapidPublicKeyResponse>("/api/push/vapid-public-key", {
     method: "GET"
-  }) as Promise<VapidPublicKeyResponse>;
+  });
 }
 
 export function subscribePush(token: string, subscription: PushSubscriptionJSON): Promise<unknown> {

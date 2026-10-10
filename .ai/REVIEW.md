@@ -2173,3 +2173,36 @@ No required fixes.
 
 ##### Risks
 - Please run `npx playwright test e2e/lists.spec.js` against the real stack (several repetitions; the bug showed in 5 of 6 runs before) before `commit_task`, since that is the end-to-end proof; CI runs it as well.
+
+## Task: T-021 (hardening cycle 2026-10-08 — frontend types match the API; typecheck in CI)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `sendJsonRequest<T>` is generic, but the casts now live inside it (`null as T` for 204, `{ queued: true } as T`, the offline-cache merge). That is where the plan wanted them, but it means the compiler trusts the caller's stated `T`; the types document the API and do not validate responses at runtime.
+2. **minor** — `Entry.details` is `string | null | undefined` (optional kept so temporary offline entries and fixtures stay valid) while the plan asked for `string | null`. The API always sends it; consumers must still handle `undefined`. Acceptable, recorded in the handoff.
+3. **minor** — the runtime guard `isShareInviteResult` was removed in favour of the typed result (`result?.queued`, `result?.invite?.invited_email`), so a malformed server answer is now tolerated by optional chaining instead of an explicit check. Behaviour for valid answers is unchanged.
+4. **nit** — two fixtures changed because the types are now exact: `leaveListMock.mockResolvedValue(undefined)` became `null` (a 204 resolves to `null`) in `ListDetailPage.test.tsx` and `OverviewPage.test.tsx`. No assertion was weakened.
+5. **nit** — about a dozen `as` casts remain in `api/` and `listDetailUtils.ts`; the two in `applyEntryEvent` are deliberate (untrusted SSE JSON validated just above).
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board, the handoff and the diff (27 files): `types.ts`, `api/*.ts`, `useListDetailData.ts`, `listDetailUtils.ts`, `useEntryTiles.ts`, `useListLifecycleEvents.ts`, `ShareListSheet.tsx`, the new `api/apiTypes.test.ts`, package scripts, `ci.yml`, README, `releaseWorkflow.test.js`.
+- `npm run typecheck`: 0 errors. `npm run lint`: 0 errors. `npm run build`: ok. `npm test`: backend 394 pass, 0 fail; frontend 55 files pass (840 tests per the board entry).
+- `rg` for `DetailEntry|DetailList|DetailMember` outside tests: no matches; `apiTypes.test.ts` also scans `src/` so they cannot return.
+- Confirmed the wiring: frontend script `typecheck` = `tsc --noEmit -p .`, root `typecheck` runs it through the workspaces, and `ci.yml` runs `npm run typecheck` after lint and before build in the lint-and-build job (pinned by two new `releaseWorkflow.test.js` tests).
+
+##### Findings
+- All acceptance criteria are met: typecheck passes with zero errors and runs in CI; no `Detail*` re-declarations; `sendJsonRequest<T>` is generic; mutation results are the union `QueuedMutationResult | (T & { queued?: false })`; `Member` uses `user_id` and `List` has `owner_id`/`owner_name`. The one pre-existing `tsc` error in `ListDetailPage.tsx` is gone.
+- `Member` now matches what the API returns; the old `{ id }` shape was never correct.
+
+##### Risks
+- Type-only refactor across the API layer: any runtime difference would come from the removed `isShareInviteResult` guard or the cast placement; the existing 840 frontend tests pass unchanged apart from the two fixture values. No browser or E2E run in this review.

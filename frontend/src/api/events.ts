@@ -12,7 +12,7 @@ interface EventTicketResponse {
  * dispatches `auth:expired` and throws `AuthExpiredError` like every other authenticated request.
  */
 export async function fetchEventTicket(token: string): Promise<string> {
-  const data = (await sendJsonRequest("/api/events/ticket", { method: "POST", token })) as EventTicketResponse | null;
+  const data = await sendJsonRequest<EventTicketResponse | null>("/api/events/ticket", { method: "POST", token });
 
   if (!data?.ticket) {
     throw new Error("The server did not return an event stream ticket.");

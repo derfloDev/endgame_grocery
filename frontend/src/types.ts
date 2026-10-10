@@ -4,7 +4,8 @@ export interface Entry {
   id: string;
   text: string;
   icon?: string | null;
-  details?: string;
+  /** The API returns `null` for an entry without details. */
+  details?: string | null;
   status: "open" | "done";
   created_at?: string;
   updated_at?: string;
@@ -22,13 +23,30 @@ export interface List {
   changed_count?: number;
   created_at?: string;
   last_activity?: string;
+  /** Set on lists created offline that are still waiting to sync. */
+  is_pending_sync?: boolean;
 }
 
+/** A list member as `GET /api/lists/:id/members` returns it. */
 export interface Member {
-  id: string;
-  email?: string;
-  display_name?: string;
+  user_id: string;
+  display_name: string;
+  email: string;
+  joined_at?: string;
+  is_owner?: boolean;
+  is_pending_sync?: boolean;
 }
+
+/** Answer of a mutation that could not reach the server and was put into the offline queue. */
+export interface QueuedMutationResult {
+  queued: true;
+}
+
+/**
+ * Result of a write request: either the offline queue accepted it (`queued: true`, no server data
+ * yet) or the server answered with `T`. Narrow with `if (result.queued)`.
+ */
+export type MutationResult<T> = QueuedMutationResult | (T & { queued?: false });
 
 export interface User {
   id: string;

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { applyEntryEvent, mergePendingEntries, reconcileResolvedEntries, replaceTemporaryEntry, sortEntries } from "./listDetailUtils";
-import type { DetailEntry } from "./useListDetailData";
+import type { Entry } from "../../types";
 
 const ME = "user-me";
 const OTHER = "user-other";
 
-function entry(overrides: Partial<DetailEntry> & { id: string }): DetailEntry {
+function entry(overrides: Partial<Entry> & { id: string }): Entry {
   return {
     text: "Milk",
     status: "open",
@@ -15,10 +15,10 @@ function entry(overrides: Partial<DetailEntry> & { id: string }): DetailEntry {
     updated_at: "2026-04-01T10:00:00.000Z",
     last_updated_by: OTHER,
     ...overrides
-  } as DetailEntry;
+  } as Entry;
 }
 
-function serverRow(overrides: Partial<DetailEntry> & { id: string }) {
+function serverRow(overrides: Partial<Entry> & { id: string }) {
   const { is_changed: _ignored, ...row } = entry(overrides);
   void _ignored;
   return row;
@@ -238,7 +238,7 @@ describe("mergePendingEntries", () => {
 });
 
 describe("reconcileResolvedEntries", () => {
-  const temp = (id: string, overrides: Partial<DetailEntry> = {}) => entry({ id, is_pending_sync: true, ...overrides });
+  const temp = (id: string, overrides: Partial<Entry> = {}) => entry({ id, is_pending_sync: true, ...overrides });
 
   it("turns a resolved temporary entry into the entry with its real id", () => {
     const result = reconcileResolvedEntries([temp("temp-entry-1", { text: "Bread" })], { "temp-entry-1": "real-1" });
@@ -274,7 +274,7 @@ describe("reconcileResolvedEntries", () => {
 
 describe("replaceTemporaryEntry", () => {
   const temp = entry({ id: "temp-entry-1", is_pending_sync: true, text: "Bread" });
-  const real = serverRow({ id: "real-1", text: "Bread" }) as DetailEntry;
+  const real = serverRow({ id: "real-1", text: "Bread" }) as Entry;
 
   it("swaps the temporary entry for the server's entry", () => {
     const result = replaceTemporaryEntry([entry({ id: "s1" }), temp], "temp-entry-1", real);
