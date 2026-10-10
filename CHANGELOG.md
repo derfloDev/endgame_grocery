@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.9.4](https://github.com/derfloDev/endgame_grocery/compare/v1.9.3...v1.9.4) (2026-10-10)
+
+
+### Features
+
+* **api:** make Home Assistant item changes record the actor, honour list limits and notify like the app ([6033f0c](https://github.com/derfloDev/endgame_grocery/commit/6033f0c613ceaed9a34fbcfd7263e5a80ca85287))
+* **api:** send a stable error code with every failure and show it translated in the app ([1f048ee](https://github.com/derfloDev/endgame_grocery/commit/1f048ee400d12c3342a3b25333068b78a17e0309))
+* **security:** keep credentials out of logs and open the event stream with single-use tickets ([e6b1bfd](https://github.com/derfloDev/endgame_grocery/commit/e6b1bfde6499452acfd81557b4b5267a8a216bbf))
+* **security:** rate-limit auth endpoints, enforce a password policy and ship security headers ([ed48869](https://github.com/derfloDev/endgame_grocery/commit/ed48869aa77bac00d1aa42da8a5c59b5809cbe87))
+* **security:** sign users out everywhere and make password reset atomic ([39b736b](https://github.com/derfloDev/endgame_grocery/commit/39b736b58aaa896cbb7965a5e0d689abc080ed42))
+* **security:** store API keys and one-time tokens hashed and show a new API key only once ([0ffa9e3](https://github.com/derfloDev/endgame_grocery/commit/0ffa9e34caf36a2f1976d696b6183e80f9aaa45e))
+* **sharing:** bind invitations to the invited email and make acceptance single-use ([9cd1b53](https://github.com/derfloDev/endgame_grocery/commit/9cd1b53b8031fefc498318cb984c6ed72b46dd57))
+
+
+### Bug Fixes
+
+* **api:** keep entry limits exact under concurrency and stop malformed input and mail outages from failing requests ([b32b6db](https://github.com/derfloDev/endgame_grocery/commit/b32b6dbeb0a60586e7dda805d3a096f9d3d8b82b))
+* **db:** allow fresh databases to apply query indexes ([9a3ae6b](https://github.com/derfloDev/endgame_grocery/commit/9a3ae6b6524fd1495f28574533d793467c870cd7))
+* **invites:** accept shared-list invitations once and expand regression coverage ([5de0643](https://github.com/derfloDev/endgame_grocery/commit/5de0643b3be6da7b3249d40d8e0283572823ce9c))
+* **items:** keep a chosen icon when editing an item and allow removing icons ([5dc0460](https://github.com/derfloDev/endgame_grocery/commit/5dc0460a8aec0c10c6f8080b339a2ba07dbbc662))
+* **lists:** keep recently completed items newest first ([2e7e12f](https://github.com/derfloDev/endgame_grocery/commit/2e7e12f2e6a68a9a414bd823a48d7f58c92d567b))
+* **offline:** keep queued changes per user, survive session expiry and never double-add or resend dead changes ([1a20a21](https://github.com/derfloDev/endgame_grocery/commit/1a20a21d36057d14a58fe0f9567a5f2e6f31038e))
+* **push:** deliver push notifications reliably and accept only known push-service endpoints ([c43a140](https://github.com/derfloDev/endgame_grocery/commit/c43a140a9c5e036a1634242f428cefc0346c1ea1))
+* **security:** refuse weak JWT secrets at startup and make test routes opt-in ([1682e7c](https://github.com/derfloDev/endgame_grocery/commit/1682e7cbebba8d2a55a1b08585be7be454d22173))
+* **sharing:** tell removed members and everyone on a deleted list so their pages leave it ([63503d8](https://github.com/derfloDev/endgame_grocery/commit/63503d88478405056aa10238c3a85bbce046219a))
+* **sse:** show a newly added entry once when its event beats the response ([9bbefcb](https://github.com/derfloDev/endgame_grocery/commit/9bbefcb50e58da7a558c43c2432a78674d9de034))
+
+
+### Performance Improvements
+
+* **db:** index the hot queries, bound the connection pool and add a single-list endpoint ([6c9a949](https://github.com/derfloDev/endgame_grocery/commit/6c9a9496873d9e9cad2edffa4e2edea731d8453d))
+* **icons:** ship precomputed icon embeddings and drop the unused 23 MB ONNX WASM from the build ([7e2d3a3](https://github.com/derfloDev/endgame_grocery/commit/7e2d3a3f9b649f89f145807385fe07b9e40e3800))
+* **nginx:** cache hashed assets for a year, revalidate the app shell and compress at level 5 ([31d4c1d](https://github.com/derfloDev/endgame_grocery/commit/31d4c1dd0905a515b2849143e73284bd60e24540))
+* **sse:** patch live entry changes from the event payload instead of refetching the list ([80d05f5](https://github.com/derfloDev/endgame_grocery/commit/80d05f523c99cc5997abeeb746dc167c1c9903f0))
+* **ui:** show cached lists instantly and load only the open list's details ([29470bc](https://github.com/derfloDev/endgame_grocery/commit/29470bc12514f8e9ff148bc3c0f94b8c1f83a0f1))
+* **ui:** split rarely used screens and sheets out of the startup bundle and stop re-rendering unchanged tiles ([52c0e82](https://github.com/derfloDev/endgame_grocery/commit/52c0e829698d9e4f2bc8c43e9dde924b8a438fe9))
+
+
+### Miscellaneous Chores
+
+* **ai:** close cycle ([a4459d6](https://github.com/derfloDev/endgame_grocery/commit/a4459d6b2499165a3ee5239bbdf114a129c2b5f2))
+
 ## [1.9.3](https://github.com/derfloDev/endgame_grocery/compare/v1.9.2...v1.9.3) (2026-09-23)
 
 
