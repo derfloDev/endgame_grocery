@@ -272,6 +272,91 @@ describe("AddItemSheet", () => {
     expect(onAdd).toHaveBeenCalledWith("Milch", "Banana", "2L");
   });
 
+  it("keeps a custom icon when only the details are edited", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddItemSheet
+        initialDetails="2L"
+        initialIconName="IconCarrot"
+        initialText="Milch"
+        listId="list-1"
+        mode="edit"
+        open
+        onAdd={onAdd}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Details (optional)"), { target: { value: "3L" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save Item" }));
+
+    // "Milch" would suggest IconMilk; the stored icon must win while the text is untouched.
+    expect(onAdd).toHaveBeenCalledWith("Milch", "IconCarrot", "3L");
+  });
+
+  it("adopts the new suggestion once the text of an edited entry changes", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddItemSheet
+        initialIconName="IconCarrot"
+        initialText="Tee"
+        listId="list-1"
+        mode="edit"
+        open
+        onAdd={onAdd}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Edit item"), { target: { value: "Milch" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save Item" }));
+
+    expect(onAdd).toHaveBeenCalledWith("Milch", "IconMilk", "");
+  });
+
+  it("never overwrites an icon the user picked while editing", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddItemSheet
+        initialIconName="IconCarrot"
+        initialText="Tee"
+        listId="list-1"
+        mode="edit"
+        open
+        onAdd={onAdd}
+        onClose={vi.fn()}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Mehr anzeigen" }));
+    fireEvent.change(screen.getByLabelText("Search icons"), { target: { value: "banana" } });
+    await userEvent.click(screen.getByRole("button", { name: "Browse Banana" }));
+    fireEvent.change(screen.getByLabelText("Edit item"), { target: { value: "Milch" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save Item" }));
+
+    expect(onAdd).toHaveBeenCalledWith("Milch", "Banana", "");
+  });
+
+  it("keeps an entry without an icon iconless when only the details change", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddItemSheet
+        initialIconName={null}
+        initialText="Milch"
+        listId="list-1"
+        mode="edit"
+        open
+        onAdd={onAdd}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Details (optional)"), { target: { value: "2L" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save Item" }));
+
+    expect(onAdd).toHaveBeenCalledWith("Milch", null, "2L");
+  });
+
   it("shows a loading indicator while the icon suggestion is resolving", async () => {
     render(<AddItemSheet listId="list-1" open onAdd={vi.fn()} onClose={vi.fn()} />);
 

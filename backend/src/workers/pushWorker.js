@@ -3,6 +3,22 @@ import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { logger as defaultLogger } from "../logger.js";
 
+/**
+ * Queues a push notification for the other members of a list.
+ *
+ * Entries added by the same actor within the debounce window are merged into one job. The
+ * insert-or-merge is a single statement, so concurrent enqueues cannot create duplicate rows or
+ * lose items. `items` is a jsonb column, so the entry text is bound as a JSON array string.
+ *
+ * @param {object} options Enqueue options.
+ * @param {import("pg").Pool} options.pool Database pool.
+ * @param {string} options.listId List the entry was added to.
+ * @param {string} options.actorUserId User who added the entry.
+ * @param {string} options.entryText Text of the new entry.
+ * @param {typeof defaultLogger} [options.logger] Application logger.
+ * @param {Date} [options.now] Current time.
+ * @returns {Promise<void>}
+ */
 export async function enqueuePushJob({
   pool,
   listId,
@@ -11,53 +27,37 @@ export async function enqueuePushJob({
   logger = defaultLogger,
   now = new Date()
 }) {
-  const existingResult = await pool.query(
-    `
-      SELECT id, items, fire_at
-      FROM pending_push_jobs
-      WHERE list_id = $1 AND actor_user_id = $2
-      LIMIT 1
-    `,
-    [listId, actorUserId]
-  );
-
-  const existingJob = existingResult.rows[0];
   const fireAt = addMinutes(now, 5);
-
-  if (!existingJob) {
-    await pool.query(
-      `
-        INSERT INTO pending_push_jobs (list_id, actor_user_id, fire_at, items)
-        VALUES ($1, $2, $3, $4)
-      `,
-      [listId, actorUserId, fireAt, [entryText]]
-    );
-    logger.info(
-      { listId, actorUserId, fireAt, itemCount: 1 },
-      "Push job enqueued"
-    );
-    return;
-  }
-
-  const isPendingWindowActive = new Date(existingJob.fire_at).getTime() > now.getTime();
-  const nextItems = isPendingWindowActive
-    ? [...normalizeJobItems(existingJob.items), entryText]
-    : [entryText];
-
-  await pool.query(
+  const result = await pool.query(
     `
-      UPDATE pending_push_jobs
-      SET items = $1, fire_at = $2
-      WHERE id = $3
+      INSERT INTO pending_push_jobs (list_id, actor_user_id, fire_at, items)
+      VALUES ($1, $2, $3, $4::jsonb)
+      ON CONFLICT (list_id, actor_user_id) DO UPDATE
+      SET items = CASE
+            WHEN pending_push_jobs.fire_at > $5 THEN pending_push_jobs.items || EXCLUDED.items
+            ELSE EXCLUDED.items
+          END,
+          fire_at = EXCLUDED.fire_at
+      RETURNING jsonb_array_length(items) AS item_count
     `,
-    [nextItems, fireAt, existingJob.id]
+    [listId, actorUserId, fireAt, JSON.stringify([entryText]), now]
   );
+
   logger.info(
-    { listId, actorUserId, fireAt, itemCount: nextItems.length },
+    { listId, actorUserId, fireAt, itemCount: result.rows[0]?.item_count ?? 1 },
     "Push job enqueued"
   );
 }
 
+/**
+ * Starts the background loop that sends due push jobs.
+ *
+ * Ticks are chained with `setTimeout`: the next tick is only scheduled after the current one
+ * settled, so a slow tick can never overlap with the next one.
+ *
+ * @param {object} [options] Worker options.
+ * @returns {() => void} Function that stops the worker and cancels the pending timer.
+ */
 export function startPushWorker({
   pool = getPool(),
   config = getConfig(),
@@ -67,17 +67,37 @@ export function startPushWorker({
   logger = defaultLogger
 } = {}) {
   logger.info({ intervalMs }, "Push worker started");
-  const timer = setInterval(() => {
-    void processPendingPushJobs({ pool, config, webpushLib, now, logger }).catch((error) => {
-      logger.error({ err: error }, "Push worker tick failed");
-    });
-  }, intervalMs);
+  let stopped = false;
+  let timer;
 
-  if (typeof timer.unref === "function") {
-    timer.unref();
+  const schedule = () => {
+    if (stopped) {
+      return;
+    }
+
+    timer = setTimeout(runTick, intervalMs);
+
+    if (typeof timer.unref === "function") {
+      timer.unref();
+    }
+  };
+
+  async function runTick() {
+    try {
+      await processPendingPushJobs({ pool, config, webpushLib, now, logger });
+    } catch (error) {
+      logger.error({ err: error }, "Push worker tick failed");
+    }
+
+    schedule();
   }
 
-  return () => clearInterval(timer);
+  schedule();
+
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
 }
 
 export async function processPendingPushJobs({
@@ -107,12 +127,20 @@ export async function processPendingPushJobs({
     config.vapidPrivateKey
   );
 
+  // Claim due jobs by deleting them in one statement. SKIP LOCKED lets concurrent workers pick
+  // disjoint jobs, and items enqueued after the claim create a fresh row instead of being lost.
   const jobsResult = await pool.query(
     `
-      SELECT id, list_id, actor_user_id, items
-      FROM pending_push_jobs
-      WHERE fire_at <= $1
-      ORDER BY fire_at ASC
+      DELETE FROM pending_push_jobs
+      WHERE id IN (
+        SELECT id
+        FROM pending_push_jobs
+        WHERE fire_at <= $1
+        ORDER BY fire_at ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT 50
+      )
+      RETURNING id, list_id, actor_user_id, items
     `,
     [now()]
   );
@@ -143,7 +171,6 @@ export async function processPendingPushJobs({
       cooldown &&
       new Date(cooldown.last_sent_at).getTime() > addMinutes(currentTime, -15).getTime()
     ) {
-      await deletePushJob(pool, job.id);
       logger.debug(
         { jobId: job.id, listId: job.list_id },
         "Push job skipped because cooldown is active"
@@ -175,7 +202,6 @@ export async function processPendingPushJobs({
     );
 
     if (!recipientsResult.rows.length) {
-      await deletePushJob(pool, job.id);
       logger.info(
         { jobId: job.id, listId: job.list_id },
         "Push job skipped because no recipients are available"
@@ -245,7 +271,8 @@ export async function processPendingPushJobs({
         );
         notificationsSent += 1;
       } catch (error) {
-        if (error?.statusCode === 410) {
+        // 404 and 410 mean the push service no longer knows this subscription.
+        if (error?.statusCode === 404 || error?.statusCode === 410) {
           await pool.query(
             `
               DELETE FROM push_subscriptions
@@ -261,7 +288,15 @@ export async function processPendingPushJobs({
           continue;
         }
 
-        throw error;
+        // Any other failure affects this subscription only; the remaining ones are still served.
+        logger.warn(
+          {
+            endpoint: truncateEndpoint(subscription.endpoint),
+            statusCode: error?.statusCode,
+            err: error
+          },
+          "Push notification failed"
+        );
       }
     }
 
@@ -274,7 +309,6 @@ export async function processPendingPushJobs({
       },
       "Push notifications sent"
     );
-    await deletePushJob(pool, job.id);
     await pool.query(
       `
         INSERT INTO push_cooldowns (list_id, last_sent_at)
@@ -297,6 +331,7 @@ export async function processPendingPushJobs({
 }
 
 function normalizeJobItems(items) {
+  // jsonb columns arrive from pg already parsed; anything else is treated as empty.
   if (!Array.isArray(items)) {
     return [];
   }
@@ -323,16 +358,6 @@ export function getMissingVapidConfigFields(config = {}) {
   ]
     .filter(([, value]) => !value)
     .map(([key]) => key);
-}
-
-async function deletePushJob(pool, jobId) {
-  await pool.query(
-    `
-      DELETE FROM pending_push_jobs
-      WHERE id = $1
-    `,
-    [jobId]
-  );
 }
 
 function addMinutes(date, minutes) {

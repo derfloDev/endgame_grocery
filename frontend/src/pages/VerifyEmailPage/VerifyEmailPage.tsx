@@ -6,6 +6,7 @@ import logo from "../../assets/endgame_grocery_logo.png";
 import { resendVerification, verifyEmail } from "../../api/auth";
 import { useAuth } from "../../context/AuthContext";
 import styles from "../../styles/auth.module.css";
+import { getErrorMessage } from "../../api/errors";
 
 interface VerifyEmailLocationState {
   email?: string;
@@ -20,7 +21,9 @@ export default function VerifyEmailPage(): ReactElement {
   const locationState = location.state as VerifyEmailLocationState | null;
   const verificationToken = searchParams.get("token");
   const [email, setEmail] = useState<string>(locationState?.email ?? "");
-  const [error, setError] = useState<string>("");
+  // Kept as the raw error and translated when rendered, so a language switch updates the text
+  // without re-running the verification request.
+  const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -41,7 +44,7 @@ export default function VerifyEmailPage(): ReactElement {
     const tokenToVerify = verificationToken;
 
     async function submitVerification(): Promise<void> {
-      setError("");
+      setError(null);
       setNotice("");
 
       try {
@@ -58,7 +61,7 @@ export default function VerifyEmailPage(): ReactElement {
           return;
         }
 
-        setError(getErrorMessage(verificationError));
+        setError(verificationError);
       }
     }
 
@@ -80,7 +83,7 @@ export default function VerifyEmailPage(): ReactElement {
       return;
     }
 
-    setError("");
+    setError(null);
     setNotice("");
     setIsSubmitting(true);
 
@@ -88,7 +91,7 @@ export default function VerifyEmailPage(): ReactElement {
       await resendVerification(email.trim());
       setNotice(t("auth.verifySuccess"));
     } catch (resendError) {
-      setError(getErrorMessage(resendError));
+      setError(resendError);
     } finally {
       setIsSubmitting(false);
     }
@@ -107,7 +110,7 @@ export default function VerifyEmailPage(): ReactElement {
         <h1>{verificationToken && !error ? t("auth.verifying") : t("auth.checkInbox")}</h1>
         <p>{t("auth.verifyBody")}</p>
         <div className={styles["auth-form"]}>
-          {error ? <p className="eg-error-banner">{error}</p> : null}
+          {error ? <p className="eg-error-banner">{getErrorMessage(error, t)}</p> : null}
           {notice ? <p className="eg-success-banner">{notice}</p> : null}
           <div className="eg-field">
             <label htmlFor="verify-email-address">{t("auth.email")}</label>
@@ -141,6 +144,3 @@ export default function VerifyEmailPage(): ReactElement {
   );
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

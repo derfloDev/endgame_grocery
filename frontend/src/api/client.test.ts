@@ -219,9 +219,12 @@ describe("request reachability reporting", () => {
     const connectivity = await import("./connectivity");
     const report = vi.spyOn(connectivity, "reportRequestOutcome");
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
-    expect(await sendJsonRequest("/api/lists", { method: "POST", payload: { name: "Milk" }, queueable: true })).toEqual({ queued: true });
+    expect(await sendJsonRequest("/api/lists", { method: "POST", payload: { name: "Milk" }, queueable: true, token: "session-jwt" })).toEqual({ queued: true });
     expect(report).toHaveBeenCalledWith("network-error");
     expect(enqueueOfflineMutation).toHaveBeenCalledOnce();
+    // The session token must not be persisted with the queued change; the drain uses the current one.
+    expect(JSON.stringify(vi.mocked(enqueueOfflineMutation).mock.calls[0][0])).not.toContain("session-jwt");
+    expect(vi.mocked(enqueueOfflineMutation).mock.calls[0][0]).not.toHaveProperty("token");
   });
 });
 

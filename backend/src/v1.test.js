@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
+import { hashToken } from "./tokens.js";
 
 const LIST_ID = "11111111-1111-4111-8111-111111111111";
 const SECOND_LIST_ID = "22222222-2222-4222-8222-222222222222";
@@ -18,7 +19,7 @@ function createV1App(pool, options = {}) {
     sseManager: options.sseManager ?? createSseManagerSpy(),
     requireApiKey(req, res, next) {
       if (!req.headers["x-api-key"]) {
-        res.status(401).json({ error: "API key is required." });
+        res.status(401).json({ error: "API key is required.", code: "auth.api_key_required" });
         return;
       }
 
@@ -53,7 +54,7 @@ describe("external v1 API routes", () => {
       const response = await request(createV1App(null))[method](path);
 
       assert.equal(response.status, 401);
-      assert.deepEqual(response.body, { error: "API key is required." });
+      assert.deepEqual(response.body, { error: "API key is required.", code: "auth.api_key_required" });
     });
   }
 
@@ -68,12 +69,12 @@ describe("external v1 API routes", () => {
 
     const response = await request(createApp({ pool }))
       .get("/api/v1/lists")
-      .set("X-Api-Key", "unknown-api-key");
+      .set("X-Api-Key", "40000000-0000-4000-8000-000000000007");
 
     assert.equal(response.status, 401);
-    assert.deepEqual(response.body, { error: "Invalid API key." });
-    assert.match(queryArgs[0], /SELECT id FROM users WHERE api_key = \$1 LIMIT 1/);
-    assert.deepEqual(queryArgs[1], ["unknown-api-key"]);
+    assert.deepEqual(response.body, { error: "Invalid API key.", code: "auth.invalid_api_key" });
+    assert.match(queryArgs[0], /SELECT id FROM users WHERE api_key_hash = \$1 LIMIT 1/);
+    assert.deepEqual(queryArgs[1], [hashToken("40000000-0000-4000-8000-000000000007")]);
   });
 
   const listAccessEndpoints = [
@@ -93,7 +94,7 @@ describe("external v1 API routes", () => {
         .send(body);
 
       assert.equal(response.status, 403);
-      assert.deepEqual(response.body, { error: "You do not have access to this list." });
+      assert.deepEqual(response.body, { error: "You do not have access to this list.", code: "list.forbidden" });
     });
   }
 
@@ -128,26 +129,12 @@ describe("external v1 API routes", () => {
   });
 
   it("returns list items with raw entry status values", async () => {
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
-
-        if (callCount === 1) {
-          assert.deepEqual(params, [LIST_ID, "user-1"]);
-          return { rows: [{ id: LIST_ID }] };
-        }
-
-        assert.match(normalizeSql(sql), /SELECT id, text, status, details FROM entries/);
-        assert.deepEqual(params, [LIST_ID]);
-        return {
-          rows: [
-            { id: ITEM_ID, text: "Milk", status: "open", details: null },
-            { id: SECOND_ITEM_ID, text: "Bread", status: "done", details: "Sourdough" }
-          ]
-        };
-      }
-    };
+    const pool = createEntriesPool({
+      entries: [
+        { id: ITEM_ID, text: "Milk", status: "open", details: null, is_changed: false },
+        { id: SECOND_ITEM_ID, text: "Bread", status: "done", details: "Sourdough", is_changed: false }
+      ]
+    });
 
     const response = await request(createV1App(pool))
       .get(`/api/v1/lists/${LIST_ID}/items`)
@@ -160,7 +147,6 @@ describe("external v1 API routes", () => {
         { id: SECOND_ITEM_ID, name: "Bread", status: "done", description: "Sourdough" }
       ]
     });
-    assert.equal(callCount, 2);
   });
 
   it("returns 404 for an invalid list ID when listing items", async () => {
@@ -171,7 +157,7 @@ describe("external v1 API routes", () => {
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "List not found." });
+    assert.deepEqual(response.body, { error: "List not found.", code: "list.not_found" });
   });
 
   it("returns 400 when creating an item without a name", async () => {
@@ -187,85 +173,95 @@ describe("external v1 API routes", () => {
       .send({});
 
     assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: "Item name is required." });
+    assert.deepEqual(response.body, { error: "Item name is required.", code: "validation.item_name_required" });
   });
 
-  it("creates an open item and returns the raw entry status", async () => {
+  it("creates an open item, records the actor and queues a push", async () => {
     const sseManager = createSseManagerSpy();
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
-
-        if (callCount === 1) {
-          return { rows: [{ id: LIST_ID }] };
-        }
-
-        assert.match(normalizeSql(sql), /INSERT INTO entries \(list_id, text, status, details\)/);
-        assert.deepEqual(params, [LIST_ID, "Milk", null]);
-        return {
-          rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: null }]
-        };
-      }
-    };
+    const pool = createEntriesPool();
 
     const response = await request(createV1App(pool, { sseManager }))
       .post(`/api/v1/lists/${LIST_ID}/items`)
       .set("X-Api-Key", "valid-api-key")
       .send({ name: " Milk " });
 
+    await waitForAsyncHandlers();
     assert.equal(response.status, 201);
     assert.deepEqual(response.body, {
       item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
     });
-    assert.equal(callCount, 2);
+    const insert = pool.find("INSERT INTO entries");
+    assert.match(insert[0], /INSERT INTO entries \(list_id, text, status, icon, details, last_updated_by\)/);
+    assert.deepEqual(insert[1], [LIST_ID, "Milk", null, null, "user-1"]);
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);
+    const push = pool.find("INSERT INTO pending_push_jobs");
+    assert.deepEqual(push[1].slice(0, 2), [LIST_ID, "user-1"]);
+    assert.equal(push[1][3], '["Milk"]');
   });
 
-  it("creates an item with a description", async () => {
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
+  it("answers 422 when the list already has 1000 open items", async () => {
+    const sseManager = createSseManagerSpy();
+    const pool = createEntriesPool({ openCount: 1000 });
 
-        if (callCount === 1) {
-          return { rows: [{ id: LIST_ID }] };
-        }
-
-        assert.match(normalizeSql(sql), /INSERT INTO entries \(list_id, text, status, details\)/);
-        assert.deepEqual(params, [LIST_ID, "Milk", "fresh"]);
-        return {
-          rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: "fresh" }]
-        };
-      }
-    };
-
-    const response = await request(createV1App(pool))
+    const response = await request(createV1App(pool, { sseManager }))
       .post(`/api/v1/lists/${LIST_ID}/items`)
       .set("X-Api-Key", "valid-api-key")
-      .send({ name: " Milk ", description: " fresh " });
+      .send({ name: "Milk" });
 
-    assert.equal(response.status, 201);
-    assert.deepEqual(response.body, {
-      item: { id: ITEM_ID, name: "Milk", status: "open", description: "fresh" }
-    });
-    assert.equal(callCount, 2);
+    await waitForAsyncHandlers();
+    assert.equal(response.status, 422);
+    assert.match(response.body.error, /maximum of 1,000 open items/);
+    assert.equal(pool.find("INSERT INTO entries"), undefined);
+    assert.equal(pool.find("INSERT INTO pending_push_jobs"), undefined);
+    assert.deepEqual(sseManager.calls, []);
+  });
+
+  it("creates an item with a trimmed description and turns a blank one into null", async () => {
+    const pool = createEntriesPool();
+    const create = (description) =>
+      request(createV1App(pool))
+        .post(`/api/v1/lists/${LIST_ID}/items`)
+        .set("X-Api-Key", "valid-api-key")
+        .send({ name: " Milk ", description });
+
+    const withText = await create(" fresh ");
+    const blank = await create("   ");
+
+    assert.equal(withText.status, 201);
+    assert.equal(withText.body.item.description, "fresh");
+    assert.equal(blank.status, 201);
+    assert.equal(blank.body.item.description, null);
+    const inserts = pool.statements.filter(([sql]) => sql.startsWith("INSERT INTO entries"));
+    assert.deepEqual(inserts.map(([, params]) => params[3]), ["fresh", null]);
+  });
+
+  it("answers 400 for a description that is not a string", async () => {
+    const pool = createUnexpectedQueryPool();
+
+    for (const description of [5, true, ["a"], { a: 1 }]) {
+      const response = await request(createV1App(pool))
+        .post(`/api/v1/lists/${LIST_ID}/items`)
+        .set("X-Api-Key", "valid-api-key")
+        .send({ name: "Milk", description });
+
+      assert.equal(response.status, 400);
+      assert.deepEqual(response.body, { error: "Item description must be a string.", code: "validation.item_description_invalid" });
+    }
+
+    const rename = await request(createV1App(pool))
+      .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
+      .set("X-Api-Key", "valid-api-key")
+      .send({ name: "Milk", description: 5 });
+
+    assert.equal(rename.status, 400);
   });
 
   it("keeps create responses successful when the SSE broadcast fails", async () => {
     const { logger, getEntries } = createLogCapture();
     const sseManager = createRejectingSseManager();
-    let callCount = 0;
-    const pool = {
-      async query() {
-        callCount += 1;
-        return callCount === 1
-          ? { rows: [{ id: LIST_ID }] }
-          : { rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: null }] };
-      }
-    };
+    const pool = createEntriesPool();
 
     const response = await request(createV1App(pool, { logger, sseManager }))
       .post(`/api/v1/lists/${LIST_ID}/items`)
@@ -277,9 +273,8 @@ describe("external v1 API routes", () => {
     assert.deepEqual(response.body, {
       item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
     });
-    assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:created", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);
     assert.ok(getEntries().some((entry) => entry.msg === "Failed to broadcast SSE event"));
   });
@@ -293,36 +288,13 @@ describe("external v1 API routes", () => {
       .send({ name: "Milk" });
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "List not found." });
+    assert.deepEqual(response.body, { error: "List not found.", code: "list.not_found" });
   });
 
-  it("toggles an open item to done", async () => {
+  it("toggles an open item to done and records the actor", async () => {
     const order = [];
     const sseManager = createSseManagerSpy(() => order.push("broadcast"));
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
-
-        if (callCount === 1) {
-          return { rows: [{ id: LIST_ID }] };
-        }
-
-        if (callCount === 2) {
-          assert.match(normalizeSql(sql), /SELECT id, text, status, icon, details FROM entries/);
-          assert.deepEqual(params, [ITEM_ID, LIST_ID]);
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", icon: "IconMilk", details: "2%" }] };
-        }
-
-        if (callCount === 3) {
-          assert.match(normalizeSql(sql), /UPDATE entries SET status = \$1, updated_at = NOW\(\)/);
-          assert.deepEqual(params, ["done", ITEM_ID, LIST_ID]);
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done", details: "2%" }] };
-        }
-
-        assert.fail(`Unexpected query ${callCount}: ${sql}`);
-      }
-    };
+    const pool = createEntriesPool({ entry: { id: ITEM_ID, text: "Milk", status: "open", details: "2%" } });
 
     const response = await request(createV1App(pool, { sseManager }))
       .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
@@ -332,35 +304,35 @@ describe("external v1 API routes", () => {
     assert.deepEqual(response.body, {
       item: { id: ITEM_ID, name: "Milk", status: "done", description: "2%" }
     });
-    assert.equal(callCount, 3);
+    const update = pool.find("UPDATE entries");
+    assert.match(update[0], /last_updated_by = \$6/);
+    assert.deepEqual(update[1], [null, "done", null, false, null, "user-1", ITEM_ID, LIST_ID, false]);
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "done",details: "2%",last_updated_by: "user-1"} }]
     ]);
     assert.deepEqual(order, ["broadcast"]);
   });
 
-  it("does not upsert autocomplete history when toggling a done item to open", async () => {
+  it("evicts the oldest done item when toggling an open item to done at the done limit", async () => {
+    const pool = createEntriesPool({
+      entry: { id: ITEM_ID, text: "Milk", status: "open", details: null },
+      doneCount: 200
+    });
+
+    const response = await request(createV1App(pool))
+      .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
+      .set("X-Api-Key", "valid-api-key");
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(pool.find("DELETE FROM entries")[1], [LIST_ID, ITEM_ID]);
+  });
+
+  it("toggles a done item back to open without evicting anything", async () => {
     const sseManager = createSseManagerSpy();
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
-
-        if (callCount === 1) {
-          return { rows: [{ id: LIST_ID }] };
-        }
-
-        if (callCount === 2) {
-          assert.match(normalizeSql(sql), /SELECT id, text, status, icon, details FROM entries/);
-          assert.deepEqual(params, [ITEM_ID, LIST_ID]);
-          return { rows: [{ id: ITEM_ID, text: "Milk", status: "done", icon: "IconMilk", details: null }] };
-        }
-
-        assert.match(normalizeSql(sql), /UPDATE entries SET status = \$1, updated_at = NOW\(\)/);
-        assert.deepEqual(params, ["open", ITEM_ID, LIST_ID]);
-        return { rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: null }] };
-      }
-    };
+    const pool = createEntriesPool({
+      entry: { id: ITEM_ID, text: "Milk", status: "done", details: null },
+      doneCount: 200
+    });
 
     const response = await request(createV1App(pool, { sseManager }))
       .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
@@ -370,24 +342,17 @@ describe("external v1 API routes", () => {
     assert.deepEqual(response.body, {
       item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
     });
-    assert.equal(callCount, 3);
+    assert.equal(pool.find("DELETE FROM entries"), undefined);
+    assert.equal(pool.find("UPDATE entries")[1][1], "open");
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);
   });
 
   it("keeps toggle responses successful when the SSE broadcast fails", async () => {
     const { logger, getEntries } = createLogCapture();
     const sseManager = createRejectingSseManager();
-    let callCount = 0;
-    const pool = {
-      async query() {
-        callCount += 1;
-        return callCount === 1
-          ? { rows: [{ id: LIST_ID }] }
-          : { rows: [{ id: ITEM_ID, text: "Milk", status: callCount === 2 ? "done" : "open", icon: "IconMilk", details: null }] };
-      }
-    };
+    const pool = createEntriesPool({ entry: { id: ITEM_ID, text: "Milk", status: "done", details: null } });
 
     const response = await request(createV1App(pool, { logger, sseManager }))
       .post(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}/toggle`)
@@ -398,9 +363,8 @@ describe("external v1 API routes", () => {
     assert.deepEqual(response.body, {
       item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
     });
-    assert.equal(callCount, 3);
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);
     assert.ok(getEntries().some((entry) => entry.msg === "Failed to broadcast SSE event"));
   });
@@ -413,24 +377,19 @@ describe("external v1 API routes", () => {
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
   });
 
   it("returns 404 when toggling an unknown item", async () => {
-    let callCount = 0;
-    const pool = {
-      async query() {
-        callCount += 1;
-        return callCount === 1 ? { rows: [{ id: LIST_ID }] } : { rows: [] };
-      }
-    };
+    const pool = createEntriesPool({ entry: null });
 
     const response = await request(createV1App(pool))
       .post(`/api/v1/lists/${LIST_ID}/items/${MISSING_ITEM_ID}/toggle`)
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
+    assert.equal(pool.find("DELETE FROM entries"), undefined);
   });
 
   it("returns 400 when renaming an item without a name", async () => {
@@ -442,7 +401,7 @@ describe("external v1 API routes", () => {
       .send({});
 
     assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: "Item name is required." });
+    assert.deepEqual(response.body, { error: "Item name is required.", code: "validation.item_name_required" });
   });
 
   it("returns 400 when renaming an item with a blank name", async () => {
@@ -454,7 +413,7 @@ describe("external v1 API routes", () => {
       .send({ name: "  " });
 
     assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: "Item name is required." });
+    assert.deepEqual(response.body, { error: "Item name is required.", code: "validation.item_name_required" });
   });
 
   it("returns 404 for an invalid list ID when renaming an item", async () => {
@@ -466,7 +425,7 @@ describe("external v1 API routes", () => {
       .send({ name: "Oat milk" });
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "List not found." });
+    assert.deepEqual(response.body, { error: "List not found.", code: "list.not_found" });
   });
 
   it("returns 404 for an invalid item ID when renaming an item", async () => {
@@ -478,53 +437,27 @@ describe("external v1 API routes", () => {
       .send({ name: "Oat milk" });
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
   });
 
   it("returns 404 when renaming an unknown item", async () => {
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
+    const sseManager = createSseManagerSpy();
+    const pool = createEntriesPool({ entry: null });
 
-        if (callCount === 1) {
-          return { rows: [{ id: LIST_ID }] };
-        }
-
-        assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, updated_at = NOW\(\)/);
-        assert.deepEqual(params, ["Oat milk", MISSING_ITEM_ID, LIST_ID]);
-        return { rows: [] };
-      }
-    };
-
-    const response = await request(createV1App(pool))
+    const response = await request(createV1App(pool, { sseManager }))
       .patch(`/api/v1/lists/${LIST_ID}/items/${MISSING_ITEM_ID}`)
       .set("X-Api-Key", "valid-api-key")
       .send({ name: "Oat milk" });
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
-    assert.equal(callCount, 2);
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
+    assert.deepEqual(pool.find("UPDATE entries")[1].slice(0, 1), ["Oat milk"]);
+    assert.deepEqual(sseManager.calls, []);
   });
 
-  it("renames an existing item and returns the updated item", async () => {
+  it("renames an existing item and records the actor", async () => {
     const sseManager = createSseManagerSpy();
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
-
-        if (callCount === 1) {
-          return { rows: [{ id: LIST_ID }] };
-        }
-
-        assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, updated_at = NOW\(\)/);
-        assert.deepEqual(params, ["Oat milk", ITEM_ID, LIST_ID]);
-        return {
-          rows: [{ id: ITEM_ID, text: "Oat milk", status: "open", details: null }]
-        };
-      }
-    };
+    const pool = createEntriesPool({ entry: { id: ITEM_ID, text: "Milk", status: "open", details: null } });
 
     const response = await request(createV1App(pool, { sseManager }))
       .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
@@ -535,29 +468,14 @@ describe("external v1 API routes", () => {
     assert.deepEqual(response.body, {
       item: { id: ITEM_ID, name: "Oat milk", status: "open", description: null }
     });
-    assert.equal(callCount, 2);
+    assert.deepEqual(pool.find("UPDATE entries")[1], ["Oat milk", null, null, false, null, "user-1", ITEM_ID, LIST_ID, false]);
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:updated", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entry: {id: ITEM_ID,text: "Oat milk",status: "open",details: null,last_updated_by: "user-1"} }]
     ]);
   });
 
   it("updates description when the description key is present in a patch", async () => {
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
-
-        if (callCount === 1) {
-          return { rows: [{ id: LIST_ID }] };
-        }
-
-        assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, details = \$2, updated_at = NOW\(\)/);
-        assert.deepEqual(params, ["Milk", "2%", ITEM_ID, LIST_ID]);
-        return {
-          rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: "2%" }]
-        };
-      }
-    };
+    const pool = createEntriesPool({ entry: { id: ITEM_ID, text: "Milk", status: "open", details: null } });
 
     const response = await request(createV1App(pool))
       .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
@@ -568,57 +486,27 @@ describe("external v1 API routes", () => {
     assert.deepEqual(response.body, {
       item: { id: ITEM_ID, name: "Milk", status: "open", description: "2%" }
     });
-    assert.equal(callCount, 2);
+    assert.deepEqual(pool.find("UPDATE entries")[1].slice(3, 5), [true, "2%"]);
   });
 
-  it("clears description when description is null in a patch", async () => {
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
+  it("clears description when description is null or blank in a patch", async () => {
+    const pool = createEntriesPool({ entry: { id: ITEM_ID, text: "Milk", status: "open", details: "old" } });
 
-        if (callCount === 1) {
-          return { rows: [{ id: LIST_ID }] };
-        }
+    for (const description of [null, "   "]) {
+      pool.statements.length = 0;
+      const response = await request(createV1App(pool))
+        .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
+        .set("X-Api-Key", "valid-api-key")
+        .send({ name: " Milk ", description });
 
-        assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, details = \$2, updated_at = NOW\(\)/);
-        assert.deepEqual(params, ["Milk", null, ITEM_ID, LIST_ID]);
-        return {
-          rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: null }]
-        };
-      }
-    };
-
-    const response = await request(createV1App(pool))
-      .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
-      .set("X-Api-Key", "valid-api-key")
-      .send({ name: " Milk ", description: null });
-
-    assert.equal(response.status, 200);
-    assert.deepEqual(response.body, {
-      item: { id: ITEM_ID, name: "Milk", status: "open", description: null }
-    });
-    assert.equal(callCount, 2);
+      assert.equal(response.status, 200);
+      assert.equal(response.body.item.description, null);
+      assert.deepEqual(pool.find("UPDATE entries")[1].slice(3, 5), [true, null]);
+    }
   });
 
   it("preserves description when the description key is absent from a patch", async () => {
-    let callCount = 0;
-    const pool = {
-      async query(sql, params) {
-        callCount += 1;
-
-        if (callCount === 1) {
-          return { rows: [{ id: LIST_ID }] };
-        }
-
-        assert.match(normalizeSql(sql), /UPDATE entries SET text = \$1, updated_at = NOW\(\)/);
-        assert.doesNotMatch(normalizeSql(sql), /details =/);
-        assert.deepEqual(params, ["Milk", ITEM_ID, LIST_ID]);
-        return {
-          rows: [{ id: ITEM_ID, text: "Milk", status: "open", details: "Keep chilled" }]
-        };
-      }
-    };
+    const pool = createEntriesPool({ entry: { id: ITEM_ID, text: "Milk", status: "open", details: "Keep chilled" } });
 
     const response = await request(createV1App(pool))
       .patch(`/api/v1/lists/${LIST_ID}/items/${ITEM_ID}`)
@@ -629,7 +517,7 @@ describe("external v1 API routes", () => {
     assert.deepEqual(response.body, {
       item: { id: ITEM_ID, name: "Milk", status: "open", description: "Keep chilled" }
     });
-    assert.equal(callCount, 2);
+    assert.deepEqual(pool.find("UPDATE entries")[1].slice(3, 5), [false, null]);
   });
 
   it("deletes an existing item", async () => {
@@ -645,7 +533,7 @@ describe("external v1 API routes", () => {
 
         assert.match(normalizeSql(sql), /DELETE FROM entries/);
         assert.deepEqual(params, [ITEM_ID, LIST_ID]);
-        return { rows: [{ id: ITEM_ID }] };
+        return { rows: [{ id: ITEM_ID, status: "done" }] };
       }
     };
 
@@ -657,7 +545,7 @@ describe("external v1 API routes", () => {
     assert.equal(response.text, "");
     assert.equal(callCount, 2);
     assert.deepEqual(sseManager.calls, [
-      [LIST_ID, "entry:deleted", { listId: LIST_ID, entryId: ITEM_ID }]
+      [LIST_ID, "entry:deleted", { listId: LIST_ID, entryId: ITEM_ID, actorId: "user-1", entryStatus: "done" }]
     ]);
   });
 
@@ -669,7 +557,7 @@ describe("external v1 API routes", () => {
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
   });
 
   it("returns 404 when deleting an unknown item", async () => {
@@ -686,9 +574,58 @@ describe("external v1 API routes", () => {
       .set("X-Api-Key", "valid-api-key");
 
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: "Item not found." });
+    assert.deepEqual(response.body, { error: "Item not found.", code: "item.not_found" });
   });
 });
+
+/**
+ * Pool fake that answers by statement shape (and supports transactions), so the tests do not
+ * depend on the exact order of the service's queries. `pool.find(text)` returns the first
+ * recorded statement that starts with, or contains, the given text.
+ */
+function createEntriesPool({ entry = null, entries = [], openCount = 0, doneCount = 0 } = {}) {
+  const statements = [];
+  const run = async (sql, params) => {
+    const text = normalizeSql(sql);
+    statements.push([text, params]);
+
+    if (text.startsWith("SELECT l.id")) return { rows: [{ id: LIST_ID }] };
+    if (text.startsWith("SELECT status FROM entries")) return { rows: entry ? [{ status: entry.status }] : [] };
+    if (text.startsWith("SELECT COUNT(*)") && text.includes("status = 'open'")) return { rows: [{ cnt: String(openCount) }] };
+    if (text.startsWith("SELECT COUNT(*)")) return { rows: [{ cnt: String(doneCount) }] };
+    if (text.startsWith("SELECT e.id")) return { rows: entries };
+    if (text.startsWith("INSERT INTO entries")) {
+      return { rows: [{ id: ITEM_ID, text: params[1], status: "open", details: params[3], last_updated_by: params[4] }] };
+    }
+    if (text.startsWith("UPDATE entries")) {
+      if (!entry) return { rows: [] };
+      return {
+        rows: [
+          {
+            ...entry,
+            text: params[0] ?? entry.text,
+            status: params[1] ?? entry.status,
+            details: params[3] ? params[4] : entry.details,
+            last_updated_by: params[5]
+          }
+        ]
+      };
+    }
+    if (text.startsWith("INSERT INTO pending_push_jobs")) return { rows: [{ item_count: 1 }] };
+    return { rows: [] };
+  };
+
+  return {
+    statements,
+    query: run,
+    async connect() {
+      return { query: run, release() {} };
+    },
+    find(text) {
+      return statements.find(([sql]) => sql.startsWith(text) || sql.includes(text));
+    }
+  };
+}
 
 function createUnexpectedQueryPool() {
   return {

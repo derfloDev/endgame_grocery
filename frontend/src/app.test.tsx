@@ -7,21 +7,19 @@ import i18next from "i18next";
 import "./i18n";
 import { resetOfflineStateForTests } from "./api/offlineStore";
 import { resetConnectivityForTests } from "./api/connectivity";
+import { createFetchRoutes, type FetchReply } from "./test/fetchRoutes";
 import App from "./App";
 import { StaticAppConfigProvider } from "./context/AppConfigContext";
 import { AuthProvider } from "./context/AuthContext";
 import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 
-const fetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>>();
+const routes = createFetchRoutes();
+const fetch = routes.fetch;
 const queueTimings = { REACHABILITY_PROBE_MIN_INTERVAL_MS: 0 };
 
 interface RenderAppOptions {
   registrationEnabled?: boolean;
-}
-
-function isMarkViewedRequest(input: RequestInfo | URL, init?: RequestInit): boolean {
-  return String(input).endsWith("/mark-viewed") && (init?.method ?? "GET") === "POST";
 }
 
 function createNoContentResponse(): Response {
@@ -59,16 +57,21 @@ function renderApp(
 
 describe("authentication shell", () => {
   beforeEach(async () => {
-    fetch.mockReset();
+    routes.reset();
     resetConnectivityForTests();
-    // Keep health checks independent of ordered resource-response fixtures.
-    // These integration scenarios simulate loss of both browser connectivity and health access.
-    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input) === "/api/health") {
-        return navigator.onLine ? Promise.resolve(createNoContentResponse()) : Promise.reject(new TypeError("Failed to fetch"));
-      }
-      return fetch(input, init);
+    // Background requests use explicit routes too; successful probes must never mask offline state.
+    routes.on("GET", "/api/health", () => {
+      if (!navigator.onLine) throw new TypeError("Failed to fetch");
+      return createNoContentResponse();
     });
+    routes.on("POST", "/api/events/ticket", () => {
+      if (!navigator.onLine) throw new TypeError("Failed to fetch");
+      return { json: async () => ({ ticket: "ticket-test" }) };
+    });
+    routes.on("POST", /^\/api\/lists\/[^/]+\/mark-viewed$/, createNoContentResponse);
+    routes.on("GET", "/api/push/vapid-public-key", () => ({ json: async () => ({ publicKey: "dGVzdA" }) }));
+    routes.on("GET", "/api/auth/api-key", () => ({ json: async () => ({ has_key: false, hint: null, created_at: null }) }));
+    vi.stubGlobal("fetch", fetch);
     stubMatchMedia();
     MockEventSource.instances = [];
     vi.stubGlobal("EventSource", MockEventSource);
@@ -119,6 +122,7 @@ describe("authentication shell", () => {
     resetConnectivityForTests();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    routes.assertAllMatched();
   });
 
   it("redirects unauthenticated users to login", async () => {
@@ -170,20 +174,19 @@ describe("authentication shell", () => {
   });
 
   it("submits the login form and shows the protected overview", async () => {
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          token: createFakeJwt("user-123"),
-          user: createAuthUser("user-123")
-        })
+    routes.on("POST", "/api/auth/login", () => ({
+      ok: true,
+      json: async () => ({
+        token: createFakeJwt("user-123"),
+        user: createAuthUser("user-123")
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
-        })
-      });
+    }));
+    routes.on("GET", "/api/lists", () => ({
+      ok: true,
+      json: async () => ({
+        lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
+      })
+    }));
 
     renderApp(["/login"]);
 
@@ -207,11 +210,17 @@ describe("authentication shell", () => {
     seedAuthSession("user-1");
     let didRejectExpiredSession = false;
 
-    fetch.mockImplementation(async (input, init = {}) => {
-      const url = String(input);
-      const method = init.method ?? "GET";
-
-      if (url === "/api/lists" && !didRejectExpiredSession) {
+    routes.on("POST", "/api/auth/login", () => {
+      return {
+        ok: true,
+        json: async () => ({
+          token: createFakeJwt("user-1"),
+          user: createAuthUser("user-1")
+        })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1", () => {
+      if (!didRejectExpiredSession) {
         didRejectExpiredSession = true;
         return {
           ok: false,
@@ -219,62 +228,40 @@ describe("authentication shell", () => {
           json: async () => ({ error: "jwt expired" })
         };
       }
-
-      if (url === "/api/auth/login" && method === "POST") {
-        return {
-          ok: true,
-          json: async () => ({
-            token: createFakeJwt("user-1"),
-            user: createAuthUser("user-1")
-          })
-        };
-      }
-
-      if (url === "/api/lists") {
-        return {
-          ok: true,
-          json: async () => ({
-            lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
-          })
-        };
-      }
-
-      if (url === "/api/lists/list-1/entries") {
-        return {
-          ok: true,
-          json: async () => ({ entries: [] })
-        };
-      }
-
-      if (url === "/api/lists/list-1/history") {
-        return {
-          ok: true,
-          json: async () => ({ history: [] })
-        };
-      }
-
-      if (url === "/api/lists/list-1/members") {
-        return {
-          ok: true,
-          json: async () => ({
-            members: [
-              {
-                user_id: "user-1",
-                display_name: "Demo User",
-                email: "demo@example.com",
-                joined_at: "2026-04-21T00:00:00Z",
-                is_owner: true
-              }
-            ]
-          })
-        };
-      }
-
-      if (isMarkViewedRequest(input, init)) {
-        return createNoContentResponse();
-      }
-
-      throw new Error(`Unexpected fetch in test: ${method} ${url}`);
+      return {
+        ok: true,
+        json: async () => ({
+          list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
+        })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1/entries", () => {
+      return {
+        ok: true,
+        json: async () => ({ entries: [] })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1/history", () => {
+      return {
+        ok: true,
+        json: async () => ({ history: [] })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1/members", () => {
+      return {
+        ok: true,
+        json: async () => ({
+          members: [
+            {
+              user_id: "user-1",
+              display_name: "Demo User",
+              email: "demo@example.com",
+              joined_at: "2026-04-21T00:00:00Z",
+              is_owner: true
+            }
+          ]
+        })
+      };
     });
 
     renderApp(["/lists/list-1"]);
@@ -292,11 +279,11 @@ describe("authentication shell", () => {
   }, 20000);
 
   it("keeps wrong login credentials on the login page without a session-expired banner", async () => {
-    fetch.mockResolvedValueOnce({
+    routes.on("POST", "/api/auth/login", () => ({
       ok: false,
       status: 401,
       json: async () => ({ error: "Invalid credentials." })
-    });
+    }));
 
     renderApp(["/login"]);
 
@@ -311,10 +298,10 @@ describe("authentication shell", () => {
 
   it("does not render bottom navigation in either the protected shell or auth pages", async () => {
     seedAuthSession("user-1");
-    fetch.mockResolvedValueOnce({
+    routes.on("GET", "/api/lists", () => ({
       ok: true,
       json: async () => ({ lists: [] })
-    });
+    }));
 
     const rendered = renderApp(["/"]);
 
@@ -332,10 +319,10 @@ describe("authentication shell", () => {
 
   it("redirects the removed /search route back to the overview", async () => {
     seedAuthSession("user-1");
-    fetch.mockResolvedValueOnce({
+    routes.on("GET", "/api/lists", () => ({
       ok: true,
       json: async () => ({ lists: [] })
-    });
+    }));
 
     renderApp(["/search"]);
 
@@ -346,10 +333,10 @@ describe("authentication shell", () => {
   });
 
   it("submits the register form and redirects to email verification", async () => {
-    fetch.mockResolvedValueOnce({
+    routes.on("POST", "/api/auth/register", () => ({
       ok: true,
       json: async () => ({ message: "Verification email sent." })
-    });
+    }));
 
     renderApp(["/register"]);
 
@@ -373,33 +360,36 @@ describe("authentication shell", () => {
   });
 
   it("registers a user from an invite and redirects directly to the shared list", async () => {
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          token: createFakeJwt("user-5"),
-          listId: "list-1",
-          user: createAuthUser("user-5")
-        })
+    routes.on("POST", "/api/auth/register", () => ({
+      ok: true,
+      json: async () => ({
+        token: createFakeJwt("user-5"),
+        listId: "list-1",
+        user: createAuthUser("user-5")
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }]
-        })
+    }));
+    routes.on("GET", "/api/lists/list-1", () => ({
+      ok: true,
+      json: async () => ({
+        list: { id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ entries: [] })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ history: [] })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ publicKey: "dGVzdA" })
-      });
+    }));
+    routes.on("GET", "/api/lists/list-1/entries", () => ({
+      ok: true,
+      json: async () => ({ entries: [] })
+    }));
+    routes.on("GET", "/api/lists/list-1/history", () => ({
+      ok: true,
+      json: async () => ({ history: [] })
+    }));
+    routes.on("GET", "/api/push/vapid-public-key", () => ({
+      ok: true,
+      json: async () => ({ publicKey: "dGVzdA" })
+    }));
+
+    routes.on("GET", "/api/lists", () => ({
+      json: async () => ({ lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }] })
+    }));
 
     renderApp(["/register?invite=invite-token-1"]);
 
@@ -428,18 +418,17 @@ describe("authentication shell", () => {
   });
 
   it("verifies the email token, stores the jwt, and redirects into the protected app", async () => {
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          token: createFakeJwt("user-1"),
-          user: createAuthUser("user-1")
-        })
+    routes.on("GET", "/api/auth/verify-email?token=valid-token", () => ({
+      ok: true,
+      json: async () => ({
+        token: createFakeJwt("user-1"),
+        user: createAuthUser("user-1")
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ lists: [] })
-      });
+    }));
+    routes.on("GET", "/api/lists", () => ({
+      ok: true,
+      json: async () => ({ lists: [] })
+    }));
 
     renderApp(["/verify-email?token=valid-token"]);
 
@@ -457,36 +446,35 @@ describe("authentication shell", () => {
   });
 
   it("redirects invite links through login and accepts the invite after authentication", async () => {
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          token: createFakeJwt("user-1"),
-          user: createAuthUser("user-1")
-        })
+    routes.on("POST", "/api/auth/login", () => ({
+      ok: true,
+      json: async () => ({
+        token: createFakeJwt("user-1"),
+        user: createAuthUser("user-1")
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ listId: "list-1" })
+    }));
+    routes.on("GET", "/api/invites/invite-token-1", () => ({
+      ok: true,
+      json: async () => ({ listId: "list-1" })
+    }));
+    routes.on("GET", "/api/lists/list-1", () => ({
+      ok: true,
+      json: async () => ({
+        list: { id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Alex", is_owner: false }]
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ entries: [] })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ history: [] })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ publicKey: "dGVzdA" })
-      });
+    }));
+    routes.on("GET", "/api/lists/list-1/entries", () => ({
+      ok: true,
+      json: async () => ({ entries: [] })
+    }));
+    routes.on("GET", "/api/lists/list-1/history", () => ({
+      ok: true,
+      json: async () => ({ history: [] })
+    }));
+    routes.on("GET", "/api/push/vapid-public-key", () => ({
+      ok: true,
+      json: async () => ({ publicKey: "dGVzdA" })
+    }));
 
     renderApp(["/invite/invite-token-1"]);
 
@@ -518,10 +506,10 @@ describe("authentication shell", () => {
   });
 
   it("shows verification errors when the token is invalid or expired", async () => {
-    fetch.mockResolvedValueOnce({
+    routes.on("GET", "/api/auth/verify-email?token=expired-token", () => ({
       ok: false,
       json: async () => ({ error: "Verification link is invalid or has expired." })
-    });
+    }));
 
     renderApp(["/verify-email?token=expired-token"]);
 
@@ -530,10 +518,10 @@ describe("authentication shell", () => {
   });
 
   it("resends the verification email from the public verify page", async () => {
-    fetch.mockResolvedValueOnce({
+    routes.on("POST", "/api/auth/resend-verification", () => ({
       ok: true,
       json: async () => ({ message: "If your account is pending verification, a new email has been sent." })
-    });
+    }));
 
     renderApp([{ pathname: "/verify-email", state: { email: "demo@example.com" } }]);
 
@@ -554,10 +542,10 @@ describe("authentication shell", () => {
   });
 
   it("links to forgot password from login and submits the request with a generic success message", async () => {
-    fetch.mockResolvedValueOnce({
+    routes.on("POST", "/api/auth/forgot-password", () => ({
       ok: true,
       json: async () => ({ message: "If an account exists, you will receive an email." })
-    });
+    }));
 
     renderApp(["/login"]);
 
@@ -582,24 +570,25 @@ describe("authentication shell", () => {
   });
 
   it("shows reset-password errors for invalid or expired tokens", async () => {
-    fetch.mockResolvedValueOnce({
+    routes.on("POST", "/api/auth/reset-password", () => ({
       ok: false,
       json: async () => ({ error: "Password reset link is invalid or has expired." })
-    });
+    }));
 
     renderApp(["/reset-password?token=expired-reset"]);
 
-    await userEvent.type(screen.getByLabelText("New password"), "new-password-123");
+    // Signed-out pages are lazy chunks.
+    await userEvent.type(await screen.findByLabelText("New password"), "new-password-123");
     await userEvent.click(screen.getByRole("button", { name: "Update password" }));
 
     expect(await screen.findByText("Password reset link is invalid or has expired.")).toBeTruthy();
   });
 
   it("submits a new password and returns to login with a success message", async () => {
-    fetch.mockResolvedValueOnce({
+    routes.on("POST", "/api/auth/reset-password", () => ({
       ok: true,
       json: async () => ({ message: "Password updated." })
-    });
+    }));
 
     renderApp(["/reset-password?token=valid-reset"]);
 
@@ -618,32 +607,31 @@ describe("authentication shell", () => {
     });
 
     expect(await screen.findByRole("heading", { name: "Welcome Back" })).toBeTruthy();
-    expect(screen.getByText("Password updated. Please log in with your new password.")).toBeTruthy();
+    expect(screen.getByText(/^Password updated\. You were signed out on all other devices and your API key was removed.*Please log in with your new password\.$/)).toBeTruthy();
   });
 
   it("creates, renames, and deletes a list from the overview", async () => {
     seedAuthSession("user-1");
     vi.stubGlobal("confirm", vi.fn(() => true));
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ lists: [] })
+    routes.on("GET", "/api/lists", () => ({
+      ok: true,
+      json: async () => ({ lists: [] })
+    }));
+    routes.on("POST", "/api/lists", () => ({
+      ok: true,
+      json: async () => ({
+        list: { id: "list-1", name: "Weekend groceries", owner_name: "Demo User", is_owner: true }
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          list: { id: "list-1", name: "Weekend groceries", owner_name: "Demo User", is_owner: true }
-        })
+    }));
+    routes.on("PATCH", "/api/lists/list-1", () => ({
+      ok: true,
+      json: async () => ({
+        list: { id: "list-1", name: "Renamed list", owner_name: "Demo User", is_owner: true }
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          list: { id: "list-1", name: "Renamed list", owner_name: "Demo User", is_owner: true }
-        })
-      })
-      .mockResolvedValueOnce({
-        status: 204
-      });
+    }));
+    routes.on("DELETE", "/api/lists/list-1", () => ({
+      status: 204
+    }));
 
     renderApp(["/"]);
 
@@ -678,11 +666,9 @@ describe("authentication shell", () => {
     seedAuthSession("user-1");
 
     let rejectFetch: (reason?: unknown) => void = () => undefined;
-    fetch.mockReturnValueOnce(
-      new Promise((_, reject) => {
-        rejectFetch = reject;
-      })
-    );
+    routes.on("GET", "/api/lists", () => (new Promise<FetchReply>((_, reject) => {
+      rejectFetch = reject;
+    })));
 
     renderApp(["/"]);
 
@@ -696,11 +682,11 @@ describe("authentication shell", () => {
 
   it("keeps forbidden overview errors in the existing error UI", async () => {
     seedAuthSession("user-1");
-    fetch.mockResolvedValueOnce({
+    routes.on("GET", "/api/lists", () => ({
       ok: false,
       status: 403,
       json: async () => ({ error: "Forbidden." })
-    });
+    }));
 
     renderApp(["/"]);
 
@@ -711,12 +697,12 @@ describe("authentication shell", () => {
 
   it("removes the overview toggle buttons and stat chips", async () => {
     seedAuthSession("user-1");
-    fetch.mockResolvedValueOnce({
+    routes.on("GET", "/api/lists", () => ({
       ok: true,
       json: async () => ({
         lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
       })
-    });
+    }));
 
     renderApp(["/"]);
 
@@ -729,22 +715,21 @@ describe("authentication shell", () => {
   });
 
   it("opens the overview info sheet and logs out from it", async () => {
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          token: createFakeJwt("user-1"),
-          user: {
-            id: "user-1",
-            display_name: "Demo User",
-            email: "demo@example.com"
-          }
-        })
+    routes.on("POST", "/api/auth/login", () => ({
+      ok: true,
+      json: async () => ({
+        token: createFakeJwt("user-1"),
+        user: {
+          id: "user-1",
+          display_name: "Demo User",
+          email: "demo@example.com"
+        }
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ lists: [] })
-      });
+    }));
+    routes.on("GET", "/api/lists", () => ({
+      ok: true,
+      json: async () => ({ lists: [] })
+    }));
 
     renderApp(["/login"]);
 
@@ -781,10 +766,10 @@ describe("authentication shell", () => {
         email: "demo@example.com"
       })
     );
-    fetch.mockResolvedValueOnce({
+    routes.on("GET", "/api/lists", () => ({
       ok: true,
       json: async () => ({ lists: [] })
-    });
+    }));
 
     renderApp(["/"]);
 
@@ -799,28 +784,21 @@ describe("authentication shell", () => {
   it("rehydrates missing auth user data from /api/auth/me after a full reload", async () => {
     const token = createFakeJwt("user-1");
     window.localStorage.setItem("endgame_grocery.auth_token", token);
-    fetch.mockImplementation(async (input) => {
-      const url = String(input);
-
-      if (url === "/api/auth/me") {
-        return {
-          ok: true,
-          json: async () => ({
-            id: "user-1",
-            display_name: "Demo User",
-            email: "demo@example.com"
-          })
-        };
-      }
-
-      if (url === "/api/lists") {
-        return {
-          ok: true,
-          json: async () => ({ lists: [] })
-        };
-      }
-
-      throw new Error(`Unexpected fetch in test: ${url}`);
+    routes.on("GET", "/api/auth/me", () => {
+      return {
+        ok: true,
+        json: async () => ({
+          id: "user-1",
+          display_name: "Demo User",
+          email: "demo@example.com"
+        })
+      };
+    });
+    routes.on("GET", "/api/lists", () => {
+      return {
+        ok: true,
+        json: async () => ({ lists: [] })
+      };
     });
 
     renderApp(["/"]);
@@ -852,12 +830,12 @@ describe("authentication shell", () => {
 
   it("shows a shared badge in the overview with the owner name", async () => {
     seedAuthSession("user-2");
-    fetch.mockResolvedValueOnce({
+    routes.on("GET", "/api/lists", () => ({
       ok: true,
       json: async () => ({
         lists: [{ id: "list-2", name: "BBQ party", owner_name: "Alex", is_owner: false }]
       })
-    });
+    }));
 
     renderApp(["/"]);
 
@@ -874,20 +852,13 @@ describe("authentication shell", () => {
     ];
     let listRequestCount = 0;
 
-    fetch.mockImplementation(async (input) => {
-      const url = String(input);
-
-      if (url === "/api/lists") {
-        const lists = listResponses[Math.min(listRequestCount, listResponses.length - 1)];
-        listRequestCount += 1;
-
-        return {
-          ok: true,
-          json: async () => ({ lists })
-        };
-      }
-
-      throw new Error(`Unexpected fetch in test: ${url}`);
+    routes.on("GET", "/api/lists", () => {
+      const lists = listResponses[Math.min(listRequestCount, listResponses.length - 1)];
+      listRequestCount += 1;
+      return {
+        ok: true,
+        json: async () => ({ lists })
+      };
     });
 
     renderApp(["/"]);
@@ -909,87 +880,62 @@ describe("authentication shell", () => {
 
   it("shows recently used items, re-adds them, and dismisses history from list detail", async () => {
     seedAuthSession("user-1");
-    const queuedResponses = [
-      {
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
-        })
-      },
-      {
-        ok: true,
-        json: async () => ({
-          entries: [
-            { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" }
-          ]
-        })
-      },
-      {
-        ok: true,
-        json: async () => ({
-          history: [
-            { text: "Tomatoes", icon: "IconSalad" },
-            { text: "Bread", icon: "IconBread" }
-          ]
-        })
-      },
-      {
-        ok: true,
-        json: async () => ({
-          members: [
-            {
-              user_id: "user-1",
-              display_name: "Demo User",
-              email: "demo@example.com",
-              joined_at: "2026-04-21T00:00:00Z",
-              is_owner: true
-            }
-          ]
-        })
-      },
-      {
-        ok: true,
-        json: async () => ({
-          entry: {
-            id: "entry-2",
-            text: "Tomatoes",
-            status: "open",
-            icon: "IconSalad",
-            created_at: "2026-04-21T00:02:00Z"
+    routes.on("GET", "/api/lists/list-1", () => ({
+      ok: true,
+      json: async () => ({
+        list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
+      })
+    }));
+    routes.on("GET", "/api/lists/list-1/entries", () => ({
+      ok: true,
+      json: async () => ({
+        entries: [
+          { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" }
+        ]
+      })
+    }));
+    routes.on("GET", "/api/lists/list-1/history", () => ({
+      ok: true,
+      json: async () => ({
+        history: [
+          { text: "Tomatoes", icon: "IconSalad" },
+          { text: "Bread", icon: "IconBread" }
+        ]
+      })
+    }));
+    routes.on("GET", "/api/lists/list-1/members", () => ({
+      ok: true,
+      json: async () => ({
+        members: [
+          {
+            user_id: "user-1",
+            display_name: "Demo User",
+            email: "demo@example.com",
+            joined_at: "2026-04-21T00:00:00Z",
+            is_owner: true
           }
-        })
-      },
-      {
-        ok: true,
-        status: 204,
-        json: async () => ({})
-      }
-    ];
+        ]
+      })
+    }));
+    routes.on("POST", "/api/lists/list-1/entries", () => ({
+      ok: true,
+      json: async () => ({
+        entry: {
+          id: "entry-2",
+          text: "Tomatoes",
+          status: "open",
+          icon: "IconSalad",
+          created_at: "2026-04-21T00:02:00Z"
+        }
+      })
+    }));
+    routes.on("DELETE", "/api/lists/list-1/history", () => ({
+      ok: true,
+      status: 204,
+      json: async () => ({})
+    }));
 
-    fetch.mockImplementation(async (input, init) => {
-      const url = String(input);
-
-      if (url.includes("/suggestions?")) {
-        return {
-          ok: true,
-          json: async () => ({
-            suggestions: []
-          })
-        };
-      }
-
-      if (isMarkViewedRequest(input, init)) {
-        return createNoContentResponse();
-      }
-
-      const nextResponse = queuedResponses.shift();
-
-      if (!nextResponse) {
-        throw new Error(`Unexpected fetch in test: ${url}`);
-      }
-
-      return nextResponse;
-    });
+    routes.on("GET", /^\/api\/lists\/list-1\/suggestions\?/, () => ({ json: async () => ({ suggestions: [] }) }));
 
     renderApp(["/lists/list-1"]);
 
@@ -1043,72 +989,71 @@ describe("authentication shell", () => {
 
   it("adds completed items to recently used and keeps newest history first", async () => {
     seedAuthSession("user-1");
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
-        })
+    routes.on("GET", "/api/lists/list-1", () => ({
+      ok: true,
+      json: async () => ({
+        list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          entries: [
-            { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" },
-            {
-              id: "entry-2",
-              text: "Cheese",
-              status: "open",
-              icon: "IconCheese",
-              created_at: "2026-04-21T00:01:00Z"
-            }
-          ]
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          history: [{ text: "Bread", icon: "IconBread" }]
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          members: [
-            {
-              user_id: "user-1",
-              display_name: "Demo User",
-              email: "demo@example.com",
-              joined_at: "2026-04-21T00:00:00Z",
-              is_owner: true
-            }
-          ]
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          entry: {
-            id: "entry-1",
-            text: "Milk",
-            status: "done",
-            icon: "IconMilk",
-            created_at: "2026-04-21T00:00:00Z"
-          }
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          entry: {
+    }));
+    routes.on("GET", "/api/lists/list-1/entries", () => ({
+      ok: true,
+      json: async () => ({
+        entries: [
+          { id: "entry-1", text: "Milk", status: "open", icon: "IconMilk", created_at: "2026-04-21T00:00:00Z" },
+          {
             id: "entry-2",
             text: "Cheese",
-            status: "done",
+            status: "open",
             icon: "IconCheese",
             created_at: "2026-04-21T00:01:00Z"
           }
-        })
-      });
+        ]
+      })
+    }));
+    routes.on("GET", "/api/lists/list-1/history", () => ({
+      ok: true,
+      json: async () => ({
+        history: [{ text: "Bread", icon: "IconBread" }]
+      })
+    }));
+    routes.on("GET", "/api/lists/list-1/members", () => ({
+      ok: true,
+      json: async () => ({
+        members: [
+          {
+            user_id: "user-1",
+            display_name: "Demo User",
+            email: "demo@example.com",
+            joined_at: "2026-04-21T00:00:00Z",
+            is_owner: true
+          }
+        ]
+      })
+    }));
+    routes.on("PATCH", "/api/lists/list-1/entries/entry-1", () => ({
+      ok: true,
+      json: async () => ({
+        entry: {
+          id: "entry-1",
+          text: "Milk",
+          status: "done",
+          icon: "IconMilk",
+          created_at: "2026-04-21T00:00:00Z"
+        }
+      })
+    }));
+    routes.on("PATCH", "/api/lists/list-1/entries/entry-2", () => ({
+      ok: true,
+      json: async () => ({
+        entry: {
+          id: "entry-2",
+          text: "Cheese",
+          status: "done",
+          icon: "IconCheese",
+          created_at: "2026-04-21T00:01:00Z"
+        }
+      })
+    }));
 
     renderApp(["/lists/list-1"]);
 
@@ -1226,60 +1171,43 @@ describe("authentication shell", () => {
     let historyRequestCount = 0;
     let memberRequestCount = 0;
 
-    fetch.mockImplementation(async (input, init) => {
-      const url = String(input);
-
-      if (url === "/api/lists") {
-        return {
-          ok: true,
-          json: async () => ({
-            lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
-          })
-        };
-      }
-
-      if (url === "/api/lists/list-1/entries") {
-        const entries = entryResponses[Math.min(entryRequestCount, entryResponses.length - 1)];
-        entryRequestCount += 1;
-
-        return {
-          ok: true,
-          json: async () => ({ entries })
-        };
-      }
-
-      if (url === "/api/lists/list-1/history") {
-        const history = historyResponses[Math.min(historyRequestCount, historyResponses.length - 1)];
-        historyRequestCount += 1;
-
-        return {
-          ok: true,
-          json: async () => ({ history })
-        };
-      }
-
-      if (url === "/api/lists/list-1/members") {
-        const members = memberResponses[Math.min(memberRequestCount, memberResponses.length - 1)];
-        memberRequestCount += 1;
-
-        return {
-          ok: true,
-          json: async () => ({ members })
-        };
-      }
-
-      if (url === "/api/push/vapid-public-key") {
-        return {
-          ok: true,
-          json: async () => ({ publicKey: "dGVzdA" })
-        };
-      }
-
-      if (isMarkViewedRequest(input, init)) {
-        return createNoContentResponse();
-      }
-
-      throw new Error(`Unexpected fetch in test: ${url}`);
+    routes.on("GET", "/api/lists/list-1", () => {
+      return {
+        ok: true,
+        json: async () => ({
+          list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
+        })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1/entries", () => {
+      const entries = entryResponses[Math.min(entryRequestCount, entryResponses.length - 1)];
+      entryRequestCount += 1;
+      return {
+        ok: true,
+        json: async () => ({ entries })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1/history", () => {
+      const history = historyResponses[Math.min(historyRequestCount, historyResponses.length - 1)];
+      historyRequestCount += 1;
+      return {
+        ok: true,
+        json: async () => ({ history })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1/members", () => {
+      const members = memberResponses[Math.min(memberRequestCount, memberResponses.length - 1)];
+      memberRequestCount += 1;
+      return {
+        ok: true,
+        json: async () => ({ members })
+      };
+    });
+    routes.on("GET", "/api/push/vapid-public-key", () => {
+      return {
+        ok: true,
+        json: async () => ({ publicKey: "dGVzdA" })
+      };
     });
 
     renderApp(["/lists/list-1"]);
@@ -1291,8 +1219,8 @@ describe("authentication shell", () => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
 
-    await userEvent.click(screen.getByRole("button", { name: "List options" }));
-    await userEvent.click(screen.getByRole("button", { name: /^Share list/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "List options" }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Share list/ }));
     expect(await screen.findByText(/SQUAD \(1\)/)).toBeTruthy();
 
     MockEventSource.instances[0].emit("entry:created", { listId: "list-1", entryId: "entry-2" });
@@ -1326,7 +1254,7 @@ describe("authentication shell", () => {
       expect(screen.queryByText("Tomatoes")).toBeNull();
     });
 
-    expect(fetch.mock.calls.filter(([url]) => url === "/api/lists")).toHaveLength(1);
+    expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1")).toHaveLength(1);
     expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1/entries")).toHaveLength(4);
     expect(fetch.mock.calls.filter(([url]) => url === "/api/lists/list-1/members")).toHaveLength(3);
   }, 10000);
@@ -1334,106 +1262,87 @@ describe("authentication shell", () => {
   it("adds and edits entry details from the list detail sheet", async () => {
     seedAuthSession("user-1");
 
-    fetch.mockImplementation(async (input, init = {}) => {
-      const url = String(input);
-      const method = init.method ?? "GET";
-
-      if (url.includes("/suggestions?")) {
-        return {
-          ok: true,
-          json: async () => ({
-            suggestions: []
-          })
-        };
-      }
-
-      if (url === "/api/lists") {
-        return {
-          ok: true,
-          json: async () => ({
-            lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
-          })
-        };
-      }
-
-      if (url === "/api/lists/list-1/entries" && method === "GET") {
-        return {
-          ok: true,
-          json: async () => ({
-            entries: [
-              { id: "entry-1", text: "X", status: "open", icon: null, details: "2L", created_at: "2026-04-21T00:00:00Z" }
-            ]
-          })
-        };
-      }
-
-      if (url === "/api/lists/list-1/history") {
-        return {
-          ok: true,
-          json: async () => ({
-            history: []
-          })
-        };
-      }
-
-      if (url === "/api/lists/list-1/members") {
-        return {
-          ok: true,
-          json: async () => ({
-            members: [
-              {
-                user_id: "user-1",
-                display_name: "Demo User",
-                email: "demo@example.com",
-                joined_at: "2026-04-21T00:00:00Z",
-                is_owner: true
-              }
-            ]
-          })
-        };
-      }
-
-      if (url === "/api/lists/list-1/entries" && method === "POST") {
-        expect(JSON.parse(String(init.body))).toMatchObject({ text: "Milk", details: "500 g" });
-
-        return {
-          ok: true,
-          json: async () => ({
-            entry: {
-              id: "entry-2",
-              text: "Milk",
-              status: "open",
-              icon: null,
-              details: "500 g",
-              created_at: "2026-04-21T00:01:00Z"
+    routes.on("GET", /^\/api\/lists\/list-1\/suggestions\?/, () => {
+      return {
+        ok: true,
+        json: async () => ({
+          suggestions: []
+        })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1", () => {
+      return {
+        ok: true,
+        json: async () => ({
+          list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
+        })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1/entries", () => {
+      return {
+        ok: true,
+        json: async () => ({
+          entries: [
+            { id: "entry-1", text: "X", status: "open", icon: null, details: "2L", created_at: "2026-04-21T00:00:00Z" }
+          ]
+        })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1/history", () => {
+      return {
+        ok: true,
+        json: async () => ({
+          history: []
+        })
+      };
+    });
+    routes.on("GET", "/api/lists/list-1/members", () => {
+      return {
+        ok: true,
+        json: async () => ({
+          members: [
+            {
+              user_id: "user-1",
+              display_name: "Demo User",
+              email: "demo@example.com",
+              joined_at: "2026-04-21T00:00:00Z",
+              is_owner: true
             }
-          })
-        };
-      }
-
-      if (url === "/api/lists/list-1/entries/entry-1" && method === "PATCH") {
-        expect(JSON.parse(String(init.body))).toMatchObject({ text: "X", details: "3L" });
-
-        return {
-          ok: true,
-          json: async () => ({
-            entry: {
-              id: "entry-1",
-              text: "X",
-              status: "open",
-              icon: null,
-              details: "3L",
-              created_at: "2026-04-21T00:00:00Z"
-            }
-          })
-        };
-      }
-
-      if (isMarkViewedRequest(input, init)) {
-        return createNoContentResponse();
-      }
-
-      throw new Error(`Unexpected fetch in test: ${method} ${url}`);
+          ]
+        })
+      };
+    });
+    routes.on("POST", "/api/lists/list-1/entries", (_input, init) => {
+      expect(JSON.parse(String(init.body))).toMatchObject({ text: "Milk", details: "500 g" });
+      return {
+        ok: true,
+        json: async () => ({
+          entry: {
+            id: "entry-2",
+            text: "Milk",
+            status: "open",
+            icon: null,
+            details: "500 g",
+            created_at: "2026-04-21T00:01:00Z"
+          }
+        })
+      };
+    });
+    routes.on("PATCH", "/api/lists/list-1/entries/entry-1", (_input, init) => {
+      expect(JSON.parse(String(init.body))).toMatchObject({ text: "X", details: "3L" });
+      return {
+        ok: true,
+        json: async () => ({
+          entry: {
+            id: "entry-1",
+            text: "X",
+            status: "open",
+            icon: null,
+            details: "3L",
+            created_at: "2026-04-21T00:00:00Z"
+          }
+        })
+      };
     });
 
     renderApp(["/lists/list-1"]);
@@ -1491,56 +1400,55 @@ describe("authentication shell", () => {
 
   it("opens the share sheet, sends an invite notice, and revokes an existing member", async () => {
     seedAuthSession("user-1");
-    const inviteRequest = createDeferred();
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
-        })
+    const inviteRequest = createDeferred<FetchReply>();
+    routes.on("GET", "/api/lists/list-1", () => ({
+      ok: true,
+      json: async () => ({
+        list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          entries: []
-        })
+    }));
+    routes.on("GET", "/api/lists/list-1/entries", () => ({
+      ok: true,
+      json: async () => ({
+        entries: []
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          history: []
-        })
+    }));
+    routes.on("GET", "/api/lists/list-1/history", () => ({
+      ok: true,
+      json: async () => ({
+        history: []
       })
-      .mockResolvedValueOnce(createNoContentResponse())
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          members: [
-            {
-              user_id: "user-1",
-              display_name: "Demo User",
-              email: "demo@example.com",
-              joined_at: "2026-04-21T00:00:00Z",
-              is_owner: true
-            },
-            {
-              user_id: "user-2",
-              display_name: "Alex Brown",
-              email: "alex@example.com",
-              joined_at: "2026-04-21T01:00:00Z",
-              is_owner: false
-            }
-          ]
-        })
+    }));
+    routes.on("POST", "/api/lists/list-1/mark-viewed", () => (createNoContentResponse()));
+    routes.on("GET", "/api/lists/list-1/members", () => ({
+      ok: true,
+      json: async () => ({
+        members: [
+          {
+            user_id: "user-1",
+            display_name: "Demo User",
+            email: "demo@example.com",
+            joined_at: "2026-04-21T00:00:00Z",
+            is_owner: true
+          },
+          {
+            user_id: "user-2",
+            display_name: "Alex Brown",
+            email: "alex@example.com",
+            joined_at: "2026-04-21T01:00:00Z",
+            is_owner: false
+          }
+        ]
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ publicKey: "dGVzdA" })
-      })
-      .mockReturnValueOnce(inviteRequest.promise)
-      .mockResolvedValueOnce({
-        status: 204
-      });
+    }));
+    routes.on("GET", "/api/push/vapid-public-key", () => ({
+      ok: true,
+      json: async () => ({ publicKey: "dGVzdA" })
+    }));
+    routes.on("POST", "/api/lists/list-1/members", () => (inviteRequest.promise));
+    routes.on("DELETE", "/api/lists/list-1/members/user-2", () => ({
+      status: 204
+    }));
 
     renderApp(["/lists/list-1"]);
 
@@ -1548,7 +1456,7 @@ describe("authentication shell", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "List options" }));
     expect(await screen.findByRole("dialog", { name: "List Options" })).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: /^Share list/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Share list/ }));
 
     expect(await screen.findByRole("dialog", { name: "Share List" })).toBeTruthy();
     expect(screen.getByText("SQUAD (2)")).toBeTruthy();
@@ -1587,36 +1495,35 @@ describe("authentication shell", () => {
   it("shows the notifications toggle only for shared lists", async () => {
     seedAuthSession("user-1");
 
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-1", name: "Solo groceries", owner_name: "Demo User", is_owner: true }]
-        })
+    routes.on("GET", "/api/lists/list-1", () => ({
+      ok: true,
+      json: async () => ({
+        list: { id: "list-1", name: "Solo groceries", owner_name: "Demo User", is_owner: true }
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ entries: [] })
+    }));
+    routes.on("GET", "/api/lists/list-1/entries", () => ({
+      ok: true,
+      json: async () => ({ entries: [] })
+    }));
+    routes.on("GET", "/api/lists/list-1/history", () => ({
+      ok: true,
+      json: async () => ({ history: [] })
+    }));
+    routes.on("POST", "/api/lists/list-1/mark-viewed", () => (createNoContentResponse()));
+    routes.on("GET", "/api/lists/list-1/members", () => ({
+      ok: true,
+      json: async () => ({
+        members: [
+          {
+            user_id: "user-1",
+            display_name: "Demo User",
+            email: "demo@example.com",
+            joined_at: "2026-04-21T00:00:00Z",
+            is_owner: true
+          }
+        ]
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ history: [] })
-      })
-      .mockResolvedValueOnce(createNoContentResponse())
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          members: [
-            {
-              user_id: "user-1",
-              display_name: "Demo User",
-              email: "demo@example.com",
-              joined_at: "2026-04-21T00:00:00Z",
-              is_owner: true
-            }
-          ]
-        })
-      });
+    }));
 
     const rendered = renderApp(["/lists/list-1"]);
 
@@ -1624,26 +1531,25 @@ describe("authentication shell", () => {
     expect(screen.queryByRole("button", { name: "Enable notifications" })).toBeNull();
 
     rendered.unmount();
-    fetch.mockReset();
-    const deferredVapidResponse = createDeferred();
+    fetch.mockClear();
+    const deferredVapidResponse = createDeferred<FetchReply>();
 
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-2", name: "BBQ party", owner_name: "Alex", is_owner: false }]
-        })
+    routes.on("GET", "/api/lists/list-2", () => ({
+      ok: true,
+      json: async () => ({
+        list: { id: "list-2", name: "BBQ party", owner_name: "Alex", is_owner: false }
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ entries: [] })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ history: [] })
-      })
-      .mockResolvedValueOnce(createNoContentResponse())
-      .mockReturnValueOnce(deferredVapidResponse.promise);
+    }));
+    routes.on("GET", "/api/lists/list-2/entries", () => ({
+      ok: true,
+      json: async () => ({ entries: [] })
+    }));
+    routes.on("GET", "/api/lists/list-2/history", () => ({
+      ok: true,
+      json: async () => ({ history: [] })
+    }));
+    routes.on("POST", "/api/lists/list-2/mark-viewed", () => (createNoContentResponse()));
+    routes.on("GET", "/api/push/vapid-public-key", () => (deferredVapidResponse.promise));
 
     renderApp(["/lists/list-2"]);
 
@@ -1667,24 +1573,21 @@ describe("authentication shell", () => {
     seedAuthSession("user-1");
 
     let rejectFetch: (reason?: unknown) => void = () => undefined;
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
-        })
+    routes.on("GET", "/api/lists/list-1", () => ({
+      ok: true,
+      json: async () => ({
+        list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }
       })
-      .mockReturnValueOnce(
-      new Promise((_, reject) => {
-        rejectFetch = reject;
+    }));
+    routes.on("GET", "/api/lists/list-1/entries", () => (new Promise<FetchReply>((_, reject) => {
+      rejectFetch = reject;
+    })));
+    routes.on("GET", "/api/lists/list-1/history", () => ({
+      ok: true,
+      json: async () => ({
+        history: []
       })
-      )
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          history: []
-        })
-      });
+    }));
 
     renderApp(["/lists/list-1"]);
 
@@ -1697,19 +1600,19 @@ describe("authentication shell", () => {
 
   it("shows cached lists while offline and displays the offline banner", async () => {
     seedAuthSession("user-1");
-    fetch.mockResolvedValueOnce({
+    routes.on("GET", "/api/lists", () => ({
       ok: true,
       json: async () => ({
         lists: [{ id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: true }]
       })
-    });
+    }));
 
     const rendered = renderApp(["/"]);
 
     expect(await screen.findByText("Weekly groceries")).toBeTruthy();
 
     rendered.unmount();
-    fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    routes.on("GET", "/api/lists", () => { throw new TypeError("Failed to fetch"); });
     setNavigatorOnline(false);
 
     renderApp(["/"]);
@@ -1721,24 +1624,14 @@ describe("authentication shell", () => {
   it("queues offline writes and refreshes after reconnect", async () => {
     seedAuthSession("user-1");
     vi.stubGlobal("confirm", vi.fn(() => true));
-    fetch
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ lists: [] })
-      })
-      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          list: { id: "list-99", name: "Queued list", owner_name: "Demo User", is_owner: true }
-        })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          lists: [{ id: "list-99", name: "Queued list", owner_name: "Demo User", is_owner: true }]
-        })
-      });
+    let createdList = false;
+    const list = { id: "list-99", name: "Queued list", owner_name: "Demo User", is_owner: true };
+    routes.on("GET", "/api/lists", () => ({ json: async () => ({ lists: createdList ? [list] : [] }) }));
+    routes.on("POST", "/api/lists", () => {
+      if (!navigator.onLine) throw new TypeError("Failed to fetch");
+      createdList = true;
+      return { json: async () => ({ list }) };
+    });
 
     renderApp(["/"]);
 

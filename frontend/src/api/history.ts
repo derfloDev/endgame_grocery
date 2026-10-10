@@ -7,9 +7,9 @@ interface HistoryResponse {
 }
 
 export function fetchRecentlyUsed(listId: string, token: string): Promise<HistoryResponse> {
-  return sendJsonRequest(`/api/lists/${listId}/history`, {
+  return sendJsonRequest<HistoryResponse>(`/api/lists/${listId}/history`, {
     token
-  }) as Promise<HistoryResponse>;
+  });
 }
 
 export function deleteFromHistory(listId: string, text: string, token: string): Promise<unknown> {

@@ -9,17 +9,21 @@ import {
   SSE_RECONNECT_JITTER_RATIO,
   SSE_RECONNECT_MAX_DELAY_MS
 } from "../api/connectionTimings";
+import { AuthExpiredError } from "../api/client";
 import { reportStreamState } from "../api/connectivity";
+import { fetchEventTicket } from "../api/events";
+import { SSE_EVENT_TYPES } from "../api/sseEvents";
+import type { SseEventType } from "../api/sseEvents";
 
-export type SseEventType =
-  | "entry:created"
-  | "entry:updated"
-  | "entry:deleted"
-  | "history:updated"
-  | "list:updated"
-  | "list:deleted"
-  | "member:added"
-  | "member:removed";
+// The event names live in api/sseEvents.ts; re-exported so existing imports keep working.
+export type { SseEventType };
+/**
+ * Event payloads (all carry `listId`):
+ * - `entry:created` / `entry:updated`: `{ listId, entryId, actorId, entry }`, where `entry` has the
+ *   fields of the entries GET (without `is_changed`) so clients patch their state without refetching.
+ * - `entry:deleted`: `{ listId, entryId, actorId, entryStatus }`.
+ * - other events: `{ listId }` plus `userId` for member events.
+ */
 export type SseHandler = (data: Record<string, unknown>) => void;
 
 interface EventSourceContextValue {
@@ -41,16 +45,6 @@ interface EventSourceProviderProps {
   timings?: Partial<EventSourceTimings>;
 }
 
-const EVENT_TYPES: SseEventType[] = [
-  "entry:created",
-  "entry:updated",
-  "entry:deleted",
-  "history:updated",
-  "list:updated",
-  "list:deleted",
-  "member:added",
-  "member:removed"
-];
 const EventSourceContext = createContext<EventSourceContextValue | null>(null);
 
 export function EventSourceProvider({ children, timings }: EventSourceProviderProps): ReactElement {
@@ -100,7 +94,9 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
     let wasHidden = document.visibilityState === "hidden";
     let lastResyncAt = -Infinity;
     let removeSourceListeners: (() => void) | undefined;
-    const url = `/api/events?token=${encodeURIComponent(token)}`;
+    // Each connect attempt gets a sequence number so a slow ticket request that was superseded
+    // (by a newer attempt, a token change or unmount) never opens a stream.
+    let connectSequence = 0;
     attemptRef.current = 0;
 
     function requestResync() {
@@ -147,7 +143,7 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
       attemptRef.current += 1;
       reconnectTimerRef.current = setTimeout(() => {
         reconnectTimerRef.current = null;
-        connect();
+        void connect();
       }, jitteredDelay);
     }
 
@@ -161,17 +157,37 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
       watchdogTimerRef.current = setTimeout(scheduleReconnect, heartbeatTimeout);
     }
 
-    function connect() {
+    async function connect() {
       if (disposed) {
         return;
       }
       clearReconnectTimer();
       closeSource();
       setConnectionState("connecting");
-      const source = new window.EventSource(url);
+      const sequence = ++connectSequence;
+      let ticket: string;
+      try {
+        // The stream URL carries a single-use ticket, never the JWT (see api/events.ts).
+        ticket = await fetchEventTicket(token);
+      } catch (error) {
+        if (disposed || sequence !== connectSequence) {
+          return;
+        }
+        // An expired session was already reported through auth:expired; the provider is torn
+        // down once the token is cleared, so retrying here would only hammer the server.
+        if (!(error instanceof AuthExpiredError)) {
+          // A failed ticket request counts as a failed connection attempt and uses the backoff.
+          scheduleReconnect();
+        }
+        return;
+      }
+      if (disposed || sequence !== connectSequence) {
+        return;
+      }
+      const source = new window.EventSource(`/api/events?ticket=${encodeURIComponent(ticket)}`);
       eventSourceRef.current = source;
       const isCurrent = () => !disposed && eventSourceRef.current === source;
-      const eventListeners: Array<[string, (event: MessageEvent<string>) => void]> = EVENT_TYPES.map((type) => {
+      const eventListeners: Array<[string, (event: MessageEvent<string>) => void]> = SSE_EVENT_TYPES.map((type) => {
         const listener = (event: MessageEvent<string>) => {
           if (!isCurrent()) {
             return;
@@ -237,7 +253,7 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
       if (!healthy) {
         lostSinceOpen = true;
         reportStreamState("lost");
-        connect();
+        void connect();
       }
       return healthy;
     }
@@ -256,7 +272,7 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
 
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("online", reconnectIfUnhealthy);
-    connect();
+    void connect();
 
     return () => {
       disposed = true;

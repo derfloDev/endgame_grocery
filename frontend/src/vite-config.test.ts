@@ -96,3 +96,44 @@ describe("vite worker config", () => {
   it("precaches self-hosted WOFF2 fonts for offline rendering", () => {
     expect(viteConfigSource).toMatch(/globPatterns:\s*\[[^\]]*woff2[^\]]*\]/i);
   });
+
+  it("ships a small 192x192 install icon", () => {
+    const icon = readFileSync(path.resolve(import.meta.dirname, "../public/icon-192.png"));
+    // PNG signature, then the IHDR chunk with width and height.
+    expect(icon.subarray(1, 4).toString("ascii")).toBe("PNG");
+    expect(icon.readUInt32BE(16)).toBe(192);
+    expect(icon.readUInt32BE(20)).toBe(192);
+    expect(icon.length).toBeLessThan(15 * 1024);
+    // Still declared as maskable in the manifest.
+    expect(viteConfigSource).toMatch(/src: "\/icon-192\.png",\s+sizes: "192x192",\s+type: "image\/png",\s+purpose: "any maskable"/);
+  });
+
+  it("preloads the primary font so text does not wait for the stylesheet", () => {
+    const indexHtml = readFileSync(path.resolve(import.meta.dirname, "../index.html"), "utf8");
+    expect(indexHtml).toContain(
+      '<link rel="preload" href="/fonts/exo-2-latin.woff2" as="font" type="font/woff2" crossorigin />'
+    );
+  });
+
+  it("drops onnxruntime's unused bundled WASM binary from the build output", () => {
+    const plugins = (viteConfig.plugins ?? []).flat() as Array<{ name?: string; generateBundle?: (options: unknown, bundle: Record<string, unknown>) => void }>;
+    const plugin = plugins.find((candidate) => candidate?.name === "endgame:drop-unused-ort-wasm");
+    const bundle: Record<string, unknown> = {
+      "assets/ort-wasm-simd-threaded.asyncify-DMmc6YqF.wasm": {},
+      "assets/iconWorker-abc.js": {},
+      "assets/iconEmbeddings-abc.bin": {}
+    };
+
+    plugin?.generateBundle?.({}, bundle);
+
+    expect(plugin).toBeDefined();
+    expect(Object.keys(bundle)).toEqual(["assets/iconWorker-abc.js", "assets/iconEmbeddings-abc.bin"]);
+  });
+
+  it("ships the precomputed icon embeddings with the worker instead of computing them at runtime", () => {
+    const worker = readFileSync(path.resolve(import.meta.dirname, "./workers/iconWorker.ts"), "utf8");
+
+    expect(worker).toContain('iconEmbeddings.bin?url');
+    expect(worker).not.toMatch(/ICON_DB\.map\(/);
+  });
+

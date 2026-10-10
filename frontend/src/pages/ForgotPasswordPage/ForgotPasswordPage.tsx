@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import logo from "../../assets/endgame_grocery_logo.png";
 import { forgotPassword } from "../../api/auth";
 import styles from "../../styles/auth.module.css";
+import { getErrorMessage } from "../../api/errors";
 
 export default function ForgotPasswordPage(): ReactElement {
   const { t } = useTranslation();
@@ -23,7 +24,7 @@ export default function ForgotPasswordPage(): ReactElement {
       await forgotPassword(email.trim());
       setNotice(t("auth.resetSuccess"));
     } catch (submitError) {
-      setError(getErrorMessage(submitError));
+      setError(getErrorMessage(submitError, t));
     } finally {
       setIsSubmitting(false);
     }
@@ -71,6 +72,3 @@ export default function ForgotPasswordPage(): ReactElement {
   );
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

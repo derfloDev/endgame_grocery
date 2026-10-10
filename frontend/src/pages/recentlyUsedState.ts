@@ -58,6 +58,14 @@ export function getRecentlyUsedDisplayState(
     });
   }
 
+  // Entries are sorted by creation time, while history tracks the newest completion first.
+  // Keep changed-entry details/badges, but use history order; a just-completed item can
+  // briefly arrive before its history update and belongs ahead of the known items.
+  const historyOrder = new Map(historyItems.map((item, index) => [item.text, index]));
+  changedDoneItems.sort((left, right) =>
+    (historyOrder.get(left.text) ?? -1) - (historyOrder.get(right.text) ?? -1)
+  );
+
   return {
     changedDoneTexts,
     visibleRecentlyUsed: [

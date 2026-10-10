@@ -5,18 +5,10 @@ import BottomSheet from "../ui/BottomSheet/BottomSheet";
 import LoadingState from "../ui/LoadingState/LoadingState";
 import styles from "./ShareListSheet.module.css";
 
-interface SharedListMember extends Member {
-  user_id: string;
-  display_name: string;
-  email: string;
-  is_owner?: boolean;
-  is_pending_sync?: boolean;
-}
-
 interface ShareListSheetProps {
   open: boolean;
   onClose: () => void;
-  members: SharedListMember[];
+  members: Member[];
   shareEmail: string;
   shareError: string;
   shareNotice: string;

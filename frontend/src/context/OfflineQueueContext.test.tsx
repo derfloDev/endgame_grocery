@@ -9,8 +9,10 @@ import {
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 import { OfflineQueueProvider } from "./OfflineQueueContext";
 import { reportStreamState, resetConnectivityForTests } from "../api/connectivity";
+import { getCurrentUserId, resetAuthSessionForTests, setAuthSession } from "../api/authSession";
 import { requestJson } from "../api/request";
 import { StrictMode } from "react";
+import { createFetchRoutes } from "../test/fetchRoutes";
 
 const offlineStoreMock = vi.hoisted(() => ({
   completeOfflineMutation: vi.fn(),
@@ -25,15 +27,20 @@ const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promis
 const listOfflineMutationsMock = vi.mocked(listOfflineMutations);
 const removeOfflineMutationMock = vi.mocked(removeOfflineMutation);
 
+const routes = createFetchRoutes();
+
 let currentMutations: OfflineMutation[] = [];
 
 describe("OfflineQueueProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentMutations = [];
+    routes.reset();
+    setAuthSession("token-1", "user-1");
     fetchMock.mockReset();
     fetchMock.mockResolvedValue(createResponse({ ok: true }));
-    listOfflineMutationsMock.mockImplementation(async () => [...currentMutations]);
+    // Like the real store, only the signed-in user's mutations are visible.
+    listOfflineMutationsMock.mockImplementation(async () => currentMutations.filter((mutation) => mutation.userId === getCurrentUserId()));
     removeOfflineMutationMock.mockImplementation(async (id: string) => {
       currentMutations = currentMutations.filter((mutation) => mutation.id !== id);
       window.dispatchEvent(new Event(OFFLINE_QUEUE_CHANGED_EVENT));
@@ -51,9 +58,28 @@ describe("OfflineQueueProvider", () => {
 
   afterEach(() => {
     cleanup();
+    resetAuthSessionForTests();
     resetConnectivityForTests();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    routes.assertAllMatched();
+  });
+
+  it("keeps the context value stable while the queue state does not change", async () => {
+    const values: unknown[] = [];
+    function ValueProbe() {
+      values.push(useOfflineQueue());
+      return null;
+    }
+    const view = renderProvider(<ValueProbe />);
+    await waitFor(() => { expect(values.length).toBeGreaterThan(0); });
+    await act(async () => { await Promise.resolve(); });
+    const settled = values.at(-1);
+
+    // A parent re-render with the same state must hand consumers the identical object.
+    view.rerender(<OfflineQueueProvider><ValueProbe /></OfflineQueueProvider>);
+
+    expect(values.at(-1)).toBe(settled);
   });
 
   it("drains queued mutations when the page becomes visible while online", async () => {
@@ -94,8 +120,9 @@ describe("OfflineQueueProvider", () => {
 
   it("shows the offline state after a real request fails while the browser is online", async () => {
     setNavigatorOnline(true);
-    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
-    fetchMock.mockResolvedValueOnce(createResponse({ ok: true }, 503));
+    routes.on("GET", "/api/lists", () => { throw new TypeError("Failed to fetch"); });
+    routes.on("GET", "/api/health", () => createResponse({ ok: true }, 503));
+    fetchMock.mockImplementation(routes.fetch);
     renderProvider(<OfflineQueueState />);
 
     await act(async () => {
@@ -344,7 +371,11 @@ describe("OfflineQueueProvider", () => {
         createMutation({ id: "child", url: "/api/lists/temp-list/entries", createdAt: "2026-05-27T10:00:01Z", payload: { parent: "temp-list" } }),
         createMutation({ id: "last", url: "/api/lists/temp-list/members", createdAt: "2026-05-27T10:00:02Z" })
       ];
-      fetchMock.mockResolvedValueOnce(createResponse({ list: { id: "real-list" } })).mockResolvedValueOnce(createResponse({}, 503));
+      let childAttempts = 0;
+      routes.on("POST", "/api/lists", () => createResponse({ list: { id: "real-list" } }));
+      routes.on("POST", "/api/lists/real-list/entries", () => createResponse({}, ++childAttempts === 1 ? 503 : 200));
+      routes.on("POST", "/api/lists/real-list/members", () => createResponse({}));
+      fetchMock.mockImplementation(routes.fetch);
       const first = mount();
       await advance();
       expect(currentMutations.map(({ id }) => id)).toEqual(["child", "last"]);
@@ -431,14 +462,153 @@ describe("OfflineQueueProvider", () => {
     });
   });
 
+  describe("session handling", () => {
+    const mutationCalls = () => fetchMock.mock.calls.filter(([url]) => url !== "/api/health");
+
+    it("sends the current session token, not one from when the change was queued", async () => {
+      currentMutations = [createMutation()];
+      setAuthSession("token-after-relogin", "user-1");
+      setNavigatorOnline(true);
+
+      renderProvider(<OfflineQueueState />);
+
+      await waitFor(() => expect(mutationCalls()).toHaveLength(1));
+      expect((mutationCalls()[0][1]?.headers as Record<string, string>).Authorization).toBe("Bearer token-after-relogin");
+    });
+
+    it("pauses on a 401 without discarding, signals auth:expired once and does not retry", async () => {
+      const expired = vi.fn();
+      window.addEventListener("auth:expired", expired);
+      currentMutations = [createMutation({ id: "first" }), createMutation({ id: "second", createdAt: "2026-05-27T10:00:01.000Z" })];
+      fetchMock.mockResolvedValue(createResponse({ error: "Authentication token is invalid." }, 401));
+      setNavigatorOnline(true);
+
+      renderProvider(<OfflineQueueState />);
+
+      await waitFor(() => expect(expired).toHaveBeenCalledTimes(1));
+      await act(async () => { window.dispatchEvent(new Event("focus")); });
+      await flushAsyncWork();
+      window.removeEventListener("auth:expired", expired);
+      expect(mutationCalls()).toHaveLength(1);
+      expect(currentMutations.map(({ id }) => id)).toEqual(["first", "second"]);
+      expect(removeOfflineMutationMock).not.toHaveBeenCalled();
+      expect(screen.getByTestId("failed-mutation-id").textContent).toBe("");
+      expect(screen.getByTestId("sync-error").textContent).toBe("");
+    });
+
+    it("resumes after the same user signs in again", async () => {
+      currentMutations = [createMutation()];
+      fetchMock.mockResolvedValueOnce(createResponse({}, 401));
+      setNavigatorOnline(true);
+      renderProvider(<OfflineQueueState />);
+      await waitFor(() => expect(mutationCalls()).toHaveLength(1));
+      fetchMock.mockResolvedValue(createResponse({ list: { id: "real" } }));
+
+      act(() => { setAuthSession("", ""); });
+      act(() => { setAuthSession("fresh-token", "user-1"); });
+
+      await waitFor(() => expect(currentMutations).toHaveLength(0));
+      expect((mutationCalls()[1][1]?.headers as Record<string, string>).Authorization).toBe("Bearer fresh-token");
+    });
+
+    it("never replays the queue of a previous user, and resumes it when that user returns", async () => {
+      currentMutations = [createMutation({ id: "theirs" })];
+      fetchMock.mockResolvedValueOnce(createResponse({}, 401));
+      setNavigatorOnline(true);
+      renderProvider(<OfflineQueueState />);
+      await waitFor(() => expect(mutationCalls()).toHaveLength(1));
+
+      act(() => { setAuthSession("token-2", "user-2"); });
+      await flushAsyncWork();
+
+      expect(mutationCalls()).toHaveLength(1);
+      expect(screen.getByTestId("queued-count").textContent).toBe("0");
+      expect(currentMutations.map(({ id }) => id)).toEqual(["theirs"]);
+
+      fetchMock.mockResolvedValue(createResponse({}));
+      act(() => { setAuthSession("token-1b", "user-1"); });
+
+      await waitFor(() => expect(currentMutations).toHaveLength(0));
+    });
+
+    it("forgets a failed mutation of the previous user when somebody else signs in", async () => {
+      currentMutations = [createMutation({ id: "bad" })];
+      fetchMock.mockResolvedValue(createResponse({ error: "Entry not found." }, 404));
+      setNavigatorOnline(true);
+      renderProvider(<OfflineQueueState />);
+      await waitFor(() => expect(screen.getByTestId("failed-mutation-id").textContent).toBe("bad"));
+
+      act(() => { setAuthSession("token-2", "user-2"); });
+
+      await waitFor(() => expect(screen.getByTestId("failed-mutation-id").textContent).toBe(""));
+      expect(screen.getByTestId("sync-error").textContent).toBe("");
+    });
+  });
+
+  describe("dependencies and resolved ids", () => {
+    it("exposes a mutation whose creating change was discarded as failed, with a translatable reason", async () => {
+      currentMutations = [createMutation({ id: "orphan", url: "/api/lists/temp-list-1700000000000-abc123/entries" })];
+      setNavigatorOnline(true);
+
+      renderProvider(<OfflineQueueState />);
+
+      await waitFor(() => expect(screen.getByTestId("failed-mutation-id").textContent).toBe("orphan"));
+      expect(screen.getByTestId("sync-error-key").textContent).toBe("offline.dependencyDiscarded");
+      expect(screen.getByTestId("sync-error").textContent).toMatch(/discarded/i);
+      expect(fetchMock.mock.calls.filter(([url]) => url !== "/api/health")).toHaveLength(0);
+      expect(currentMutations).toHaveLength(1);
+    });
+
+    it("clears the translatable reason when the failed mutation is discarded", async () => {
+      currentMutations = [createMutation({ id: "orphan", url: "/api/lists/temp-list-1700000000000-abc123/entries" })];
+      setNavigatorOnline(true);
+      renderProvider(<OfflineQueueState />);
+      await waitFor(() => expect(screen.getByTestId("failed-mutation-id").textContent).toBe("orphan"));
+
+      await act(async () => { screen.getByRole("button", { name: "discard" }).click(); });
+
+      await waitFor(() => expect(screen.getByTestId("sync-error-key").textContent).toBe(""));
+      expect(currentMutations).toHaveLength(0);
+    });
+
+    it("exposes the ids a drain resolved together with the new sync version", async () => {
+      currentMutations = [createMutation({ id: "create", queueMeta: { resourceType: "list", tempId: "temp-list-1700000000000-abc123" } })];
+      fetchMock.mockResolvedValue(createResponse({ list: { id: "real-list" } }));
+      setNavigatorOnline(true);
+
+      renderProvider(<OfflineQueueState />);
+
+      await waitFor(() => expect(screen.getByTestId("sync-version").textContent).toBe("1"));
+      expect(JSON.parse(screen.getByTestId("resolved-ids").textContent ?? "{}")).toEqual({ "temp-list-1700000000000-abc123": "real-list" });
+    });
+
+    it("keeps earlier resolved ids when a later drain resolves more", async () => {
+      currentMutations = [createMutation({ id: "one", queueMeta: { resourceType: "list", tempId: "temp-list-1700000000000-aaa111" } })];
+      fetchMock.mockResolvedValueOnce(createResponse({ list: { id: "real-1" } }));
+      setNavigatorOnline(true);
+      renderProvider(<OfflineQueueState />);
+      await waitFor(() => expect(screen.getByTestId("sync-version").textContent).toBe("1"));
+
+      currentMutations = [createMutation({ id: "two", createdAt: "2026-05-27T11:00:00.000Z", queueMeta: { resourceType: "list", tempId: "temp-list-1700000000001-bbb222" } })];
+      fetchMock.mockResolvedValueOnce(createResponse({ list: { id: "real-2" } }));
+      act(() => { window.dispatchEvent(new Event(OFFLINE_QUEUE_CHANGED_EVENT)); });
+
+      await waitFor(() => expect(screen.getByTestId("sync-version").textContent).toBe("2"));
+      expect(JSON.parse(screen.getByTestId("resolved-ids").textContent ?? "{}")).toEqual({
+        "temp-list-1700000000000-aaa111": "real-1",
+        "temp-list-1700000000001-bbb222": "real-2"
+      });
+    });
+  });
+
   it("discards the failed mutation, clears the error, and drains remaining queued mutations", async () => {
     currentMutations = [
       createMutation({ id: "mutation-1", url: "/api/entries/missing" }),
       createMutation({ id: "mutation-2", url: "/api/lists" })
     ];
-    fetchMock
-      .mockResolvedValueOnce(createResponse({ error: "Entry not found." }, 404))
-      .mockResolvedValueOnce(createResponse({ list: { id: "list-1" } }));
+    routes.on("POST", "/api/entries/missing", () => createResponse({ error: "Entry not found." }, 404));
+    routes.on("POST", "/api/lists", () => createResponse({ list: { id: "list-1" } }));
+    fetchMock.mockImplementation(routes.fetch);
     setNavigatorOnline(true);
 
     renderProvider(<OfflineQueueState />);
@@ -462,10 +632,14 @@ describe("OfflineQueueProvider", () => {
 });
 
 function OfflineQueueState() {
-  const { discardFailedMutation, failedMutationId, syncError, isOffline, isSyncing } = useOfflineQueue();
+  const { discardFailedMutation, failedMutationId, syncError, syncErrorKey, isOffline, isSyncing, queuedCount, resolvedIds, syncVersion } = useOfflineQueue();
 
   return (
     <>
+      <div data-testid="sync-error-key">{syncErrorKey}</div>
+      <div data-testid="queued-count">{queuedCount}</div>
+      <div data-testid="sync-version">{syncVersion}</div>
+      <div data-testid="resolved-ids">{JSON.stringify(resolvedIds)}</div>
       <div data-testid="is-offline">{String(isOffline)}</div>
       <div data-testid="is-syncing">{String(isSyncing)}</div>
       <div data-testid="failed-mutation-id">{failedMutationId}</div>
@@ -491,7 +665,7 @@ function createMutation(overrides: Partial<OfflineMutation> = {}): OfflineMutati
     url: "/api/lists",
     method: "POST",
     payload: { name: "Queued list" },
-    token: "token-1",
+    userId: "user-1",
     createdAt: "2026-05-27T10:00:00.000Z",
     ...overrides
   };

@@ -68,7 +68,7 @@ test.describe("registration", () => {
     });
     await page.getByRole("button", { name: "Create account" }).click();
 
-    await expect(page.getByText("An account with that email already exists.")).toBeVisible();
+    await expect(page.getByText("An account with this email address already exists.")).toBeVisible();
     await expect(page).toHaveURL(/\/register$/);
   });
 });

@@ -22,6 +22,8 @@ export default defineConfig({
   webServer: [
     {
       command: "npm run dev --workspace backend",
+      // E2E setup creates verified users through /api/test/*, which is off unless opted in.
+      env: { ENABLE_TEST_ROUTES: "true" },
       url: "http://localhost:4000/api/health",
       reuseExistingServer: !process.env.CI,
       timeout: 30_000

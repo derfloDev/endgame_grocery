@@ -85,6 +85,20 @@ export class SseManager {
    * @returns {Promise<void>} Resolves after recipients are queried and notified.
    */
   async broadcastToList(pool, listId, eventType, data) {
+    this.sendToUsers(await this.getListRecipients(pool, listId), eventType, data);
+  }
+
+  /**
+   * Reads the owner and members of a list, i.e. everyone who should hear about its events.
+   *
+   * Read this *before* deleting a list or a membership: afterwards the affected users are gone
+   * from the result, so they could no longer be notified.
+   *
+   * @param {import("pg").Pool} pool Database pool.
+   * @param {string} listId List identifier.
+   * @returns {Promise<string[]>} Distinct user identifiers.
+   */
+  async getListRecipients(pool, listId) {
     if (!pool) {
       throw new Error("Database connection is not configured.");
     }
@@ -102,11 +116,7 @@ export class SseManager {
       [listId]
     );
 
-    this.sendToUsers(
-      Array.from(new Set(result.rows.map((row) => row.user_id))),
-      eventType,
-      data
-    );
+    return Array.from(new Set(result.rows.map((row) => row.user_id)));
   }
 }
 

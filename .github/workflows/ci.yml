@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# The jobs only read the repository; upload-artifact uses the runtime token, not repo permissions.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -17,13 +21,14 @@ jobs:
       group: ${{ github.workflow }}-lint-and-build-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm run typecheck
       - run: npm run build
 
   unit-test:
@@ -31,14 +36,32 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-unit-test-${{ github.ref }}
       cancel-in-progress: true
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: endgame_grocery_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Run PostgreSQL integration tests
+        run: npm run test:integration
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/endgame_grocery_test
 
   e2e:
     needs: [lint-and-build, unit-test]
@@ -61,15 +84,15 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - name: Create environment file
         run: |
-          printf 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/endgame_grocery\nJWT_SECRET=ci-test-secret\nPORT=4000\n' > .env
+          printf 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/endgame_grocery\nJWT_SECRET=ci-only-secret-0123456789abcdef0123456789abcdef\nPORT=4000\nENABLE_TEST_ROUTES=true\n' > .env
       - name: Run database migrations
         run: npm run migrate
       - name: Install Playwright browser
@@ -78,7 +101,7 @@ jobs:
         run: npm run e2e
       - name: Upload test artifacts
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report
           path: test-results/

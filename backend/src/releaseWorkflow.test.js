@@ -27,16 +27,74 @@ describe("release workflows", () => {
 
     assert.match(workflow, /^on:\n {2}release:\n {4}types: \[published\]\n/m);
     assert.match(workflow, /^jobs:\n {2}docker-publish:\n/m);
-    assert.match(workflow, /uses: actions\/checkout@v6/);
-    assert.match(workflow, /uses: docker\/login-action@v4/);
-    assert.match(workflow, /uses: docker\/metadata-action@v6/);
+    // Actions are pinned to a full commit SHA; the comment records the release line.
+    assert.match(workflow, /uses: actions\/checkout@[0-9a-f]{40} # v6/);
+    assert.match(workflow, /uses: docker\/login-action@[0-9a-f]{40} # v4/);
+    assert.match(workflow, /uses: docker\/metadata-action@[0-9a-f]{40} # v6/);
     assert.match(workflow, /images: ghcr\.io\/derfloDev\/endgame-grocery/);
     assert.match(
       workflow,
       /type=semver,pattern=\{\{version\}\},value=\$\{\{ github\.event\.release\.tag_name \}\}/
     );
     assert.match(workflow, /type=raw,value=latest/);
-    assert.match(workflow, /uses: docker\/build-push-action@v7/);
+    assert.match(workflow, /uses: docker\/build-push-action@[0-9a-f]{40} # v7/);
     assert.match(workflow, /push: true/);
+  });
+});
+
+describe("workflow hardening", () => {
+  const workflowFiles = fs
+    .readdirSync(path.join(repoRootDir, ".github/workflows"))
+    .filter((file) => file.endsWith(".yml"));
+
+  it("finds the workflow files", () => {
+    assert.deepEqual(workflowFiles.sort(), ["ci.yml", "docker-publish.yml", "release-please.yml"]);
+  });
+
+  for (const file of workflowFiles) {
+    it(`${file} declares workflow-level permissions`, () => {
+      const workflow = readRepoFile(`.github/workflows/${file}`);
+
+      assert.match(workflow, /^permissions:\n(?: {2}[a-z-]+: (?:read|write)\n)+/m);
+    });
+
+    it(`${file} pins every action to a full commit SHA`, () => {
+      const workflow = readRepoFile(`.github/workflows/${file}`);
+      const uses = workflow.match(/^\s*(?:- )?uses: .+$/gm) ?? [];
+
+      assert.ok(uses.length > 0, "expected at least one action");
+      for (const line of uses) {
+        assert.match(
+          line,
+          /uses: [\w.-]+\/[\w./-]+@[0-9a-f]{40} # v\d+(\.\d+)*$/,
+          `not pinned to a SHA with a tag comment: ${line.trim()}`
+        );
+      }
+    });
+  }
+
+  it("ci.yml type-checks the frontend in the lint job", () => {
+    const workflow = readRepoFile(".github/workflows/ci.yml");
+    const lintJob = workflow.split(/^ {2}unit-test:/m)[0];
+
+    assert.match(lintJob, /- run: npm run typecheck\n/);
+    // The check runs after lint and before the build so type errors fail fast.
+    assert.ok(lintJob.indexOf("npm run lint") < lintJob.indexOf("npm run typecheck"));
+    assert.ok(lintJob.indexOf("npm run typecheck") < lintJob.indexOf("npm run build"));
+  });
+
+  it("provides the typecheck script at the root and in the frontend workspace", () => {
+    const rootScripts = JSON.parse(readRepoFile("package.json")).scripts;
+    const frontendScripts = JSON.parse(readRepoFile("frontend/package.json")).scripts;
+
+    assert.equal(frontendScripts.typecheck, "tsc --noEmit -p .");
+    assert.equal(rootScripts.typecheck, "npm run typecheck --workspaces --if-present");
+  });
+
+  it("ci.yml only needs read access to the repository", () => {
+    const workflow = readRepoFile(".github/workflows/ci.yml");
+
+    assert.match(workflow, /^permissions:\n {2}contents: read\n/m);
+    assert.doesNotMatch(workflow, /: write/);
   });
 });

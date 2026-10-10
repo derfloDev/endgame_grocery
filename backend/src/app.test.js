@@ -41,7 +41,7 @@ describe("createApp logging", () => {
 
         if (queryCount === 1) {
           assert.match(text, /SELECT l\.id/);
-          return { rows: [{ id: "list-1" }] };
+          return { rows: [{ id: "10000000-0000-4000-8000-000000000001" }] };
         }
 
         return { rows: [] };
@@ -57,13 +57,13 @@ describe("createApp logging", () => {
     });
 
     await request(app).get("/api/health");
-    await request(app).get("/api/lists/list-1/entries");
+    await request(app).get("/api/lists/10000000-0000-4000-8000-000000000001/entries");
 
     const requestLogs = getEntries().filter((entry) => entry.msg === "request completed");
 
     assert.equal(requestLogs.length, 1);
     assert.equal(requestLogs[0].req.method, "GET");
-    assert.equal(requestLogs[0].req.url, "/api/lists/list-1/entries");
+    assert.equal(requestLogs[0].req.url, "/api/lists/10000000-0000-4000-8000-000000000001/entries");
     assert.equal(requestLogs[0].res.statusCode, 200);
     assert.equal(typeof requestLogs[0].responseTime, "number");
   });
@@ -79,10 +79,10 @@ describe("createApp logging", () => {
       }
     });
 
-    const response = await request(app).get("/api/lists/list-1/entries");
+    const response = await request(app).get("/api/lists/10000000-0000-4000-8000-000000000001/entries");
 
     assert.equal(response.status, 500);
-    assert.deepEqual(response.body, { error: "Internal server error." });
+    assert.deepEqual(response.body, { error: "Internal server error.", code: "internal.error" });
 
     const errorLog = getEntries().find((entry) => entry.msg === "Unhandled error");
 

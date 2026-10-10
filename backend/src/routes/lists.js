@@ -2,10 +2,12 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { logger as defaultLogger } from "../logger.js";
-import createMailer from "../mail/mailer.js";
+import createMailer, { sendMailInBackground } from "../mail/mailer.js";
 import { ensureListAccess } from "../middleware/listAccess.js";
+import { uuidParam } from "../middleware/validateUuid.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
 
 /**
  * Creates the authenticated list router.
@@ -30,13 +32,9 @@ export function createListRouter({
   const router = Router();
 
   router.use(requireAuthMiddleware);
+  router.param("id", uuidParam("list.not_found", "List not found."));
 
   router.get("/", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const result = await pool.query(
         `
@@ -93,16 +91,59 @@ export function createListRouter({
     }
   });
 
+  // Single-list metadata for the detail page, so it does not have to load every list.
+  router.get("/:id", async (req, res, next) => {
+    try {
+      const hasAccess = await ensureListAccess(pool, req.params.id, req.user.sub);
+
+      if (!hasAccess) {
+        next(new ApiError(403, "list.forbidden", "You do not have access to this list."));
+        return;
+      }
+
+      const result = await pool.query(
+        `
+          SELECT
+            l.id,
+            l.name,
+            l.owner_id,
+            owner.display_name AS owner_name,
+            (l.owner_id = $1) AS is_owner,
+            l.created_at
+          FROM lists l
+          JOIN users owner ON owner.id = l.owner_id
+          WHERE l.id = $2
+          LIMIT 1
+        `,
+        [req.user.sub, req.params.id]
+      );
+      const list = result.rows[0];
+
+      if (!list) {
+        next(new ApiError(404, "list.not_found", "List not found."));
+        return;
+      }
+
+      res.json({
+        list: {
+          id: list.id,
+          name: list.name,
+          owner_id: list.owner_id,
+          owner_name: list.owner_name,
+          is_owner: list.is_owner,
+          created_at: list.created_at
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/", async (req, res, next) => {
     const { name } = req.body ?? {};
 
     if (!name?.trim()) {
-      res.status(400).json({ error: "List name is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.list_name_required", "List name is required."));
       return;
     }
 
@@ -128,16 +169,11 @@ export function createListRouter({
   });
 
   router.post("/:id/mark-viewed", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const hasAccess = await ensureListAccess(pool, req.params.id, req.user.sub);
 
       if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
+        next(new ApiError(403, "list.forbidden", "You do not have access to this list."));
         return;
       }
 
@@ -161,12 +197,7 @@ export function createListRouter({
     const { name } = req.body ?? {};
 
     if (!name?.trim()) {
-      res.status(400).json({ error: "List name is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.list_name_required", "List name is required."));
       return;
     }
 
@@ -182,7 +213,7 @@ export function createListRouter({
       );
 
       if (!ownershipResult.rows[0]) {
-        res.status(403).json({ error: "Only the list owner can rename this list." });
+        next(new ApiError(403, "list.owner_only_rename", "Only the list owner can rename this list."));
         return;
       }
 
@@ -216,11 +247,6 @@ export function createListRouter({
   });
 
   router.delete("/:id/leave", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const listResult = await pool.query(
         `
@@ -240,7 +266,7 @@ export function createListRouter({
       const list = listResult.rows[0];
 
       if (list?.owner_id === req.user.sub) {
-        res.status(403).json({ error: "The list owner cannot leave their own list." });
+        next(new ApiError(403, "list.owner_cannot_leave", "The list owner cannot leave their own list."));
         return;
       }
 
@@ -258,20 +284,21 @@ export function createListRouter({
       const member = deleteResult.rows[0];
 
       if (!list || !member) {
-        res.status(404).json({ error: "You do not have access to this list." });
+        next(new ApiError(404, "list.forbidden", "You do not have access to this list."));
         return;
       }
 
+      // The leaving user is no longer a member, so the list broadcast below cannot reach them;
+      // tell them directly so their other tabs and devices leave the list too.
+      const removedPayload = { listId: req.params.id, userId: req.user.sub };
+      sseManager.sendToUsers([req.user.sub], "member:removed", removedPayload);
       void sseManager
-        .broadcastToList(pool, req.params.id, "member:removed", {
-          listId: req.params.id,
-          userId: req.user.sub
-        })
+        .broadcastToList(pool, req.params.id, "member:removed", removedPayload)
         .catch((broadcastError) => {
           logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
         });
 
-      await sendMemberLeftEmail({ list, mailer, member });
+      sendMailInBackground(() => sendMemberLeftEmail({ list, mailer, member }), logger);
 
       res.status(204).send();
     } catch (error) {
@@ -280,11 +307,6 @@ export function createListRouter({
   });
 
   router.delete("/:id", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const ownershipResult = await pool.query(
         `
@@ -297,14 +319,29 @@ export function createListRouter({
       );
 
       if (!ownershipResult.rows[0]) {
-        res.status(403).json({ error: "Only the list owner can delete this list." });
+        next(new ApiError(403, "list.owner_only_delete", "Only the list owner can delete this list."));
         return;
       }
 
-      await sseManager.broadcastToList(pool, req.params.id, "list:deleted", {
-        listId: req.params.id
-      });
+      // Read the recipients first: once the list is gone nobody can be looked up any more. A
+      // failing lookup or notification must never keep the list from being deleted.
+      let recipients = [];
+
+      try {
+        recipients = await sseManager.getListRecipients(pool, req.params.id);
+      } catch (recipientError) {
+        logger.error({ err: recipientError }, "Failed to read list recipients before deletion");
+      }
+
       await pool.query("DELETE FROM lists WHERE id = $1", [req.params.id]);
+
+      // Only announce a deletion that really happened.
+      try {
+        sseManager.sendToUsers(recipients, "list:deleted", { listId: req.params.id });
+      } catch (broadcastError) {
+        logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
+      }
+
       res.status(204).send();
     } catch (error) {
       next(error);

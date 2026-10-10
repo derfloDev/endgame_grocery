@@ -4,16 +4,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventSourceProvider, useEventSource } from "./EventSourceContext";
 import { useAuth } from "./AuthContext";
 import type { SseEventType, SseHandler } from "./EventSourceContext";
+import { AuthExpiredError } from "../api/client";
 import { getIsOnline, resetConnectivityForTests } from "../api/connectivity";
+import { fetchEventTicket } from "../api/events";
 
 vi.mock("./AuthContext", () => ({
   useAuth: vi.fn()
 }));
 
+// The stream URL carries a single-use ticket requested over an authenticated call.
+vi.mock("../api/events", () => ({
+  fetchEventTicket: vi.fn()
+}));
+
 const useAuthMock = vi.mocked(useAuth);
+const fetchEventTicketMock = vi.mocked(fetchEventTicket);
 
 describe("EventSourceProvider", () => {
   beforeEach(() => {
+    fetchEventTicketMock.mockReset();
+    fetchEventTicketMock.mockResolvedValue("ticket-abc");
     MockEventSource.instances = [];
     resetConnectivityForTests();
     vi.stubGlobal("EventSource", MockEventSource);
@@ -38,7 +48,8 @@ describe("EventSourceProvider", () => {
     await waitFor(() => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
-    expect(MockEventSource.instances[0]?.url).toBe("/api/events?token=token-123");
+    expect(MockEventSource.instances[0]?.url).toBe("/api/events?ticket=ticket-abc");
+    expect(fetchEventTicketMock).toHaveBeenCalledWith("token-123");
   });
 
   it("closes the active EventSource when the token is removed", async () => {
@@ -131,6 +142,8 @@ describe("EventSource reconnect manager", () => {
   };
 
   beforeEach(() => {
+    fetchEventTicketMock.mockReset();
+    fetchEventTicketMock.mockResolvedValue("ticket-abc");
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     vi.stubGlobal("EventSource", MockEventSource);
@@ -146,20 +159,30 @@ describe("EventSource reconnect manager", () => {
     vi.unstubAllGlobals();
   });
 
-  function mount() {
-    return render(<EventSourceProvider timings={timings}><StateHarness /></EventSourceProvider>);
+  // The stream URL needs a ticket from an async request, so every step that can open a stream
+  // flushes pending promises.
+  async function flush() {
+    await act(async () => {
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    });
   }
 
-  function advance(ms: number) {
-    act(() => { vi.advanceTimersByTime(ms); });
+  async function mount() {
+    const view = render(<EventSourceProvider timings={timings}><StateHarness /></EventSourceProvider>);
+    await flush();
+    return view;
+  }
+
+  async function advance(ms: number) {
+    await act(async () => { await vi.advanceTimersByTimeAsync(ms); });
   }
 
   function latest() {
     return MockEventSource.instances[MockEventSource.instances.length - 1]!;
   }
 
-  function wake(type: "visible" | "hidden" | "online") {
-    act(() => {
+  async function wake(type: "visible" | "hidden" | "online") {
+    await act(async () => {
       if (type === "online") {
         window.dispatchEvent(new Event("online"));
       } else {
@@ -167,109 +190,110 @@ describe("EventSource reconnect manager", () => {
         document.dispatchEvent(new Event("visibilitychange"));
       }
     });
+    await flush();
   }
 
   function resyncVersion() {
     return Number.parseInt(screen.getByTestId("resync-version").textContent ?? "", 10);
   }
 
-  it("does not resync on the first successful connection, even after initial failures", () => {
-    mount();
+  it("does not resync on the first successful connection, even after initial failures", async () => {
+    await mount();
     expect(resyncVersion()).toBe(0);
     act(() => { latest().fail(); });
-    advance(100);
+    await advance(100);
     act(() => { latest().open(); });
     expect(resyncVersion()).toBe(0);
     act(() => { latest().open(); });
     expect(resyncVersion()).toBe(0);
   });
 
-  it.each([MockEventSource.CLOSED, MockEventSource.CONNECTING])("resyncs on a confirmed reconnect after loss in state %s", (state) => {
-    mount();
+  it.each([MockEventSource.CLOSED, MockEventSource.CONNECTING])("resyncs on a confirmed reconnect after loss in state %s", async (state) => {
+    await mount();
     act(() => { latest().open(); latest().fail(state); });
     expect(resyncVersion()).toBe(0);
-    if (state === MockEventSource.CLOSED) advance(100);
+    if (state === MockEventSource.CLOSED) await advance(100);
     act(() => { latest().open(); });
     expect(resyncVersion()).toBe(1);
-    advance(200);
+    await advance(200);
     act(() => { latest().open(); });
     expect(resyncVersion()).toBe(1);
   });
 
-  it("resyncs only on hidden-to-visible transitions with a healthy stream", () => {
-    mount();
+  it("resyncs only on hidden-to-visible transitions with a healthy stream", async () => {
+    await mount();
     act(() => { latest().open(); });
-    wake("visible");
-    wake("online");
+    await wake("visible");
+    await wake("online");
     expect(resyncVersion()).toBe(0);
-    wake("hidden");
+    await wake("hidden");
     expect(resyncVersion()).toBe(0);
-    wake("visible");
+    await wake("visible");
     expect(resyncVersion()).toBe(1);
-    advance(200);
-    wake("visible");
+    await advance(200);
+    await wake("visible");
     expect(resyncVersion()).toBe(1);
-    wake("hidden");
-    wake("visible");
+    await wake("hidden");
+    await wake("visible");
     expect(resyncVersion()).toBe(2);
   });
 
-  it("deduplicates reconnect followed by foreground within the configured window", () => {
-    mount();
+  it("deduplicates reconnect followed by foreground within the configured window", async () => {
+    await mount();
     act(() => { latest().open(); });
-    wake("hidden");
+    await wake("hidden");
     act(() => { latest().fail(); });
-    advance(100);
+    await advance(100);
     act(() => { latest().open(); });
     expect(resyncVersion()).toBe(1);
-    advance(199);
-    wake("visible");
+    await advance(199);
+    await wake("visible");
     expect(resyncVersion()).toBe(1);
-    advance(1);
-    wake("hidden");
-    wake("visible");
+    await advance(1);
+    await wake("hidden");
+    await wake("visible");
     expect(resyncVersion()).toBe(2);
   });
 
-  it("deduplicates foreground followed by a reconnect", () => {
-    mount();
+  it("deduplicates foreground followed by a reconnect", async () => {
+    await mount();
     act(() => { latest().open(); });
-    wake("hidden");
-    wake("visible");
+    await wake("hidden");
+    await wake("visible");
     act(() => { latest().fail(MockEventSource.CONNECTING); latest().open(); });
     expect(resyncVersion()).toBe(1);
   });
 
-  it("waits for the unhealthy foreground stream to reopen before resyncing", () => {
-    mount();
+  it("waits for the unhealthy foreground stream to reopen before resyncing", async () => {
+    await mount();
     act(() => { latest().open(); });
-    wake("hidden");
+    await wake("hidden");
     vi.setSystemTime(Date.now() + 1001);
-    wake("visible");
+    await wake("visible");
     expect(resyncVersion()).toBe(0);
     act(() => { latest().open(); });
     expect(resyncVersion()).toBe(1);
   });
 
-  it("resyncs after watchdog recovery", () => {
-    mount();
+  it("resyncs after watchdog recovery", async () => {
+    await mount();
     act(() => { latest().open(); });
-    advance(1100);
+    await advance(1100);
     act(() => { latest().open(); });
     expect(resyncVersion()).toBe(1);
   });
 
-  it("creates no stream or timer without a token, including on wake-up", () => {
+  it("creates no stream or timer without a token, including on wake-up", async () => {
     useAuthMock.mockReturnValue(createAuthValue(""));
-    mount();
-    wake("visible");
-    wake("online");
+    await mount();
+    await wake("visible");
+    await wake("online");
     expect(MockEventSource.instances).toHaveLength(0);
     expect(vi.getTimerCount()).toBe(0);
     expect(screen.getByTestId("connection-state").textContent).toBe("closed");
   });
 
-  it("reports connecting, open and closed and preserves the listener registration function", () => {
+  it("reports connecting, open and closed and preserves the listener registration function", async () => {
     const values: ReturnType<typeof useEventSource>[] = [];
     function Consumer() {
       values.push(useEventSource());
@@ -277,6 +301,7 @@ describe("EventSource reconnect manager", () => {
     }
     const view = render(<EventSourceProvider timings={timings}><Consumer /></EventSourceProvider>);
     expect(values.at(-1)?.connectionState).toBe("connecting");
+    await flush();
     act(() => { latest().open(); });
     expect(values.at(-1)?.connectionState).toBe("open");
     expect(getIsOnline()).toBe(true);
@@ -289,35 +314,37 @@ describe("EventSource reconnect manager", () => {
     expect(new Set(values.map((value) => value.addEventListener)).size).toBe(1);
   });
 
-  it("creates no timer when EventSource is unavailable", () => {
+  it("creates no timer when EventSource is unavailable", async () => {
     vi.stubGlobal("EventSource", undefined);
-    mount();
+    await mount();
     expect(vi.getTimerCount()).toBe(0);
     expect(screen.getByTestId("connection-state").textContent).toBe("closed");
   });
 
-  it("uses a 45 second watchdog and a one second initial retry by default", () => {
+  it("uses a 45 second watchdog and a one second initial retry by default", async () => {
     render(<EventSourceProvider><StateHarness /></EventSourceProvider>);
+    await flush();
     const source = latest();
     act(() => { source.open(); });
-    advance(44_999);
+    await advance(44_999);
     expect(source.close).not.toHaveBeenCalled();
-    advance(1);
+    await advance(1);
     expect(source.close).toHaveBeenCalledTimes(1);
-    advance(999);
+    await advance(999);
     expect(MockEventSource.instances).toHaveLength(1);
-    advance(1);
+    await advance(1);
     expect(MockEventSource.instances).toHaveLength(2);
   });
 
-  it("preserves subscriptions across reconnect and ignores callbacks queued by the old stream", () => {
+  it("preserves subscriptions across reconnect and ignores callbacks queued by the old stream", async () => {
     const handler = vi.fn();
     render(<EventSourceProvider timings={timings}><ListenerHarness eventType="entry:created" handler={handler} /></EventSourceProvider>);
+    await flush();
     const source = latest();
     const staleError = source.onerror;
     const staleTraffic = [...source.listeners.get("entry:created")!][0];
     act(() => { source.fail(); staleError?.(new Event("error")); });
-    advance(100);
+    await advance(100);
     act(() => {
       latest().open();
       staleTraffic(new MessageEvent("entry:created", { data: '{"entryId":"old"}' }));
@@ -328,145 +355,145 @@ describe("EventSource reconnect manager", () => {
     expect(MockEventSource.instances).toHaveLength(2);
   });
 
-  it("retries closed streams with increasing delay capped at the maximum", () => {
-    mount();
+  it("retries closed streams with increasing delay capped at the maximum", async () => {
+    await mount();
     for (const delay of [100, 200, 400, 400, 400]) {
       const source = latest();
       const count = MockEventSource.instances.length;
       act(() => { source.fail(); });
       expect(source.close).toHaveBeenCalledTimes(1);
       expect(vi.getTimerCount()).toBe(1);
-      advance(delay - 1);
+      await advance(delay - 1);
       expect(MockEventSource.instances).toHaveLength(count);
-      advance(1);
+      await advance(1);
       expect(MockEventSource.instances).toHaveLength(count + 1);
     }
   });
 
-  it.each([[0, 70], [1, 130]])("jitters retry delays for random value %s", (random, delay) => {
+  it.each([[0, 70], [1, 130]])("jitters retry delays for random value %s", async (random, delay) => {
     vi.mocked(Math.random).mockReturnValue(random);
-    mount();
+    await mount();
     act(() => { latest().fail(); });
-    advance(delay - 1);
+    await advance(delay - 1);
     expect(MockEventSource.instances).toHaveLength(1);
-    advance(1);
+    await advance(1);
     expect(MockEventSource.instances).toHaveLength(2);
   });
 
-  it("caps the final delay even with positive jitter", () => {
+  it("caps the final delay even with positive jitter", async () => {
     vi.mocked(Math.random).mockReturnValue(1);
-    mount();
+    await mount();
     for (const delay of [130, 260, 400, 400]) {
       const count = MockEventSource.instances.length;
       act(() => { latest().fail(); });
-      advance(delay - 1);
+      await advance(delay - 1);
       expect(MockEventSource.instances).toHaveLength(count);
-      advance(1);
+      await advance(1);
       expect(MockEventSource.instances).toHaveLength(count + 1);
     }
   });
 
-  it("resets backoff only after the stream opens", () => {
-    mount();
+  it("resets backoff only after the stream opens", async () => {
+    await mount();
     act(() => { latest().fail(); });
-    advance(100);
+    await advance(100);
     act(() => { latest().fail(); });
-    advance(200);
+    await advance(200);
     act(() => { latest().open(); latest().fail(); });
-    advance(99);
+    await advance(99);
     expect(MockEventSource.instances).toHaveLength(3);
-    advance(1);
+    await advance(1);
     expect(MockEventSource.instances).toHaveLength(4);
   });
 
-  it("reconnects silent streams after the watchdog expires without an error", () => {
-    mount();
+  it("reconnects silent streams after the watchdog expires without an error", async () => {
+    await mount();
     const source = latest();
     act(() => { source.open(); });
-    advance(999);
+    await advance(999);
     expect(source.close).not.toHaveBeenCalled();
-    advance(1);
+    await advance(1);
     expect(source.close).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("connection-state").textContent).toBe("closed");
-    advance(100);
+    await advance(100);
     expect(MockEventSource.instances).toHaveLength(2);
   });
 
-  it.each(["ping", "message", "entry:created", "history:updated"])("re-arms the watchdog on %s traffic", (type) => {
-    mount();
+  it.each(["ping", "message", "entry:created", "history:updated"])("re-arms the watchdog on %s traffic", async (type) => {
+    await mount();
     const source = latest();
     act(() => { source.open(); });
-    advance(900);
+    await advance(900);
     act(() => { source.emit(type, {}); });
-    advance(999);
+    await advance(999);
     expect(source.close).not.toHaveBeenCalled();
-    advance(1);
+    await advance(1);
     expect(source.close).toHaveBeenCalledTimes(1);
   });
 
-  it("re-arms the watchdog on open and lets native retry recover CONNECTING streams", () => {
-    mount();
+  it("re-arms the watchdog on open and lets native retry recover CONNECTING streams", async () => {
+    await mount();
     const source = latest();
     act(() => { source.open(); });
-    advance(600);
+    await advance(600);
     act(() => { source.fail(MockEventSource.CONNECTING); });
     expect(screen.getByTestId("connection-state").textContent).toBe("connecting");
-    advance(300);
+    await advance(300);
     expect(MockEventSource.instances).toHaveLength(1);
     act(() => { source.open(); });
-    advance(999);
+    await advance(999);
     expect(source.close).not.toHaveBeenCalled();
-    advance(1);
+    await advance(1);
     expect(source.close).toHaveBeenCalledTimes(1);
   });
 
-  it("does not extend the watchdog on repeated native retry errors", () => {
-    mount();
+  it("does not extend the watchdog on repeated native retry errors", async () => {
+    await mount();
     const source = latest();
-    advance(600);
+    await advance(600);
     act(() => { source.fail(MockEventSource.CONNECTING); });
-    advance(300);
+    await advance(300);
     act(() => { source.fail(MockEventSource.CONNECTING); });
-    advance(100);
+    await advance(100);
     expect(source.close).toHaveBeenCalledTimes(1);
-    advance(100);
+    await advance(100);
     expect(MockEventSource.instances).toHaveLength(2);
   });
 
-  it.each(["visible", "online"] as const)("reconnects immediately on %s when unhealthy and cancels backoff", (type) => {
-    mount();
+  it.each(["visible", "online"] as const)("reconnects immediately on %s when unhealthy and cancels backoff", async (type) => {
+    await mount();
     act(() => { latest().fail(); });
-    wake(type);
+    await wake(type);
     expect(MockEventSource.instances).toHaveLength(2);
     act(() => { latest().open(); });
-    advance(400);
+    await advance(400);
     expect(MockEventSource.instances).toHaveLength(2);
     expect(vi.getTimerCount()).toBe(1);
   });
 
-  it("leaves a healthy stream alone on wake-up and ignores hidden transitions", () => {
-    mount();
+  it("leaves a healthy stream alone on wake-up and ignores hidden transitions", async () => {
+    await mount();
     act(() => { latest().open(); });
-    wake("visible");
-    wake("online");
+    await wake("visible");
+    await wake("online");
     expect(MockEventSource.instances).toHaveLength(1);
     act(() => { latest().fail(); });
-    wake("hidden");
+    await wake("hidden");
     expect(MockEventSource.instances).toHaveLength(1);
   });
 
-  it("replaces a stale OPEN stream on foreground return before throttled timers fire", () => {
-    mount();
+  it("replaces a stale OPEN stream on foreground return before throttled timers fire", async () => {
+    await mount();
     const source = latest();
     act(() => { source.open(); });
     vi.setSystemTime(Date.now() + 1001);
-    wake("visible");
+    await wake("visible");
     expect(source.close).toHaveBeenCalledTimes(1);
     expect(MockEventSource.instances).toHaveLength(2);
   });
 
-  it.each(["unmount", "logout"])("clears pending retry and lifecycle listeners on %s", (action) => {
-    const view = mount();
+  it.each(["unmount", "logout"])("clears pending retry and lifecycle listeners on %s", async (action) => {
+    const view = await mount();
     const source = latest();
     const staleError = source.onerror;
     const staleOpen = source.onopen;
@@ -479,15 +506,15 @@ describe("EventSource reconnect manager", () => {
       expect(screen.getByTestId("connection-state").textContent).toBe("closed");
     }
     act(() => { staleError?.(new Event("error")); staleOpen?.(new Event("open")); });
-    wake("visible");
-    wake("online");
+    await wake("visible");
+    await wake("online");
     expect(vi.getTimerCount()).toBe(0);
-    advance(10000);
+    await advance(10000);
     expect(MockEventSource.instances).toHaveLength(1);
   });
 
-  it.each(["unmount", "logout"])("closes an active stream and clears its watchdog on %s", (action) => {
-    const view = mount();
+  it.each(["unmount", "logout"])("closes an active stream and clears its watchdog on %s", async (action) => {
+    const view = await mount();
     const source = latest();
     act(() => { source.open(); });
     if (action === "unmount") {
@@ -503,28 +530,93 @@ describe("EventSource reconnect manager", () => {
     expect([...source.listeners.values()].every((listeners) => listeners.size === 0)).toBe(true);
   });
 
-  it("replaces the old token stream and ignores its queued callbacks", () => {
-    const view = mount();
+  it("replaces the old token stream and ignores its queued callbacks", async () => {
+    const view = await mount();
     const source = latest();
     const staleOpen = source.onopen;
     const staleError = source.onerror;
+    fetchEventTicketMock.mockResolvedValueOnce("ticket-for-new-token");
     useAuthMock.mockReturnValue(createAuthValue("new/token"));
     view.rerender(<EventSourceProvider timings={timings}><StateHarness /></EventSourceProvider>);
     expect(source.close).toHaveBeenCalledTimes(1);
-    expect(latest().url).toBe("/api/events?token=new%2Ftoken");
+    await flush();
+    expect(fetchEventTicketMock).toHaveBeenLastCalledWith("new/token");
+    expect(latest().url).toBe("/api/events?ticket=ticket-for-new-token");
     act(() => { staleOpen?.(new Event("open")); staleError?.(new Event("error")); });
     expect(screen.getByTestId("connection-state").textContent).toBe("connecting");
     expect(vi.getTimerCount()).toBe(1);
   });
 
-  it("keeps only one live stream and watchdog through StrictMode setup and cleanup", () => {
+  it("keeps only one live stream and watchdog through StrictMode setup and cleanup", async () => {
     const view = render(<StrictMode><EventSourceProvider timings={timings}><StateHarness /></EventSourceProvider></StrictMode>);
-    expect(MockEventSource.instances).toHaveLength(2);
-    expect(MockEventSource.instances[0].close).toHaveBeenCalledTimes(1);
+    await flush();
+    // The first setup is cleaned up before its ticket arrives, so it never opens a stream.
+    expect(MockEventSource.instances).toHaveLength(1);
     expect(latest().close).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(1);
     view.unmount();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("opens the stream with a ticket and never puts the JWT in the URL", async () => {
+    await mount();
+    expect(fetchEventTicketMock).toHaveBeenCalledExactlyOnceWith("token-123");
+    expect(latest().url).toBe("/api/events?ticket=ticket-abc");
+    expect(latest().url).not.toContain("token-123");
+  });
+
+  it("requests a fresh ticket for every reconnect", async () => {
+    fetchEventTicketMock.mockResolvedValueOnce("ticket-1").mockResolvedValueOnce("ticket-2");
+    await mount();
+    act(() => { latest().fail(); });
+    await advance(100);
+    expect(MockEventSource.instances.map((instance) => instance.url)).toEqual([
+      "/api/events?ticket=ticket-1",
+      "/api/events?ticket=ticket-2"
+    ]);
+  });
+
+  it("treats a failed ticket request as a failed attempt and retries with backoff", async () => {
+    fetchEventTicketMock.mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(new Error("offline"));
+    await mount();
+    expect(MockEventSource.instances).toHaveLength(0);
+    expect(screen.getByTestId("connection-state").textContent).toBe("closed");
+    await advance(99);
+    expect(fetchEventTicketMock).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(fetchEventTicketMock).toHaveBeenCalledTimes(2);
+    expect(MockEventSource.instances).toHaveLength(0);
+    // The second failure doubles the delay (100 -> 200) like a failed stream would.
+    await advance(199);
+    expect(fetchEventTicketMock).toHaveBeenCalledTimes(2);
+    await advance(1);
+    expect(fetchEventTicketMock).toHaveBeenCalledTimes(3);
+    expect(MockEventSource.instances).toHaveLength(1);
+  });
+
+  it("does not retry when the ticket request reports an expired session", async () => {
+    fetchEventTicketMock.mockRejectedValue(new AuthExpiredError());
+    await mount();
+    await advance(10_000);
+    expect(fetchEventTicketMock).toHaveBeenCalledTimes(1);
+    expect(MockEventSource.instances).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("ignores a ticket that arrives after unmount or after a newer connect attempt", async () => {
+    let resolveTicket!: (ticket: string) => void;
+    fetchEventTicketMock.mockReturnValueOnce(new Promise<string>((resolve) => { resolveTicket = resolve; }));
+    const view = await mount();
+    view.unmount();
+    await act(async () => { resolveTicket("late-ticket"); });
+    expect(MockEventSource.instances).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not request a ticket without a token", async () => {
+    useAuthMock.mockReturnValue(createAuthValue(""));
+    await mount();
+    expect(fetchEventTicketMock).not.toHaveBeenCalled();
   });
 });
 

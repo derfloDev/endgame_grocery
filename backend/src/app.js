@@ -1,5 +1,8 @@
 import express from "express";
-import { createRequireApiKey, createRequireAuthFn } from "./middleware/auth.js";
+import { createRequireApiKey, createRequireAuth, createRequireAuthFn } from "./middleware/auth.js";
+import { createRateLimiters } from "./middleware/rateLimit.js";
+import { createNotFoundError, createUnavailablePool, toApiError, toErrorBody } from "./errors.js";
+import { uuidParam } from "./middleware/validateUuid.js";
 import pinoHttp from "pino-http";
 import authRoutes from "./routes/auth.js";
 import docsRoutes from "./routes/docs.js";
@@ -9,7 +12,7 @@ import entryRoutes from "./routes/entries.js";
 import historyRoutes from "./routes/history.js";
 import invitesRoutes from "./routes/invites.js";
 import { getConfig } from "./env.js";
-import { logger as defaultLogger } from "./logger.js";
+import { logger as defaultLogger, serializeRequest } from "./logger.js";
 import listRoutes from "./routes/lists.js";
 import pushRoutes from "./routes/push.js";
 import suggestionRoutes from "./routes/suggestions.js";
@@ -33,24 +36,52 @@ export function createApp(options = {}) {
     options.requireAuthFn ??
     createRequireAuthFn({
       jwtLib: options.jwtLib,
-      config
+      config,
+      pool
     });
+  // Every authenticated router shares this middleware, so the token version check (session
+  // revocation) applies everywhere and uses the app's own config and pool.
+  const requireAuthMiddleware =
+    options.requireAuthMiddleware ??
+    createRequireAuth({
+      jwtLib: options.jwtLib,
+      config,
+      pool
+    });
+  // Routes use this pool without checking for it. An app created without a database (tests of
+  // pages that never touch it) gets a stand-in whose every use fails with one clear error.
+  const routePool = pool ?? createUnavailablePool();
   const requireApiKey =
     options.requireApiKey ??
     createRequireApiKey({
-      pool
+      pool: routePool
     });
+  // One set of in-memory counters per app instance (the deployment is single-instance).
+  // The E2E suite (the only user of the opt-in test routes) registers and fails logins from a
+  // single IP, so limiting is skipped there. Production never enables test routes.
+  const rateLimiters =
+    options.rateLimiters ??
+    createRateLimiters(options.rateLimits, { disabled: config.enableTestRoutes === true });
   const routerOptions = {
     ...options,
     config,
-    pool,
+    pool: routePool,
+    rateLimiters,
     requireApiKey,
+    requireAuthMiddleware,
     sseManager
   };
+
+  // nginx is the only proxy in front of the backend; trusting exactly one hop makes req.ip the
+  // address nginx saw, which the rate limiters key on. Clients cannot spoof it via X-Forwarded-For.
+  app.set("trust proxy", 1);
+  app.disable("x-powered-by");
 
   app.use(
     pinoHttp({
       logger,
+      // Log method, path and address only; never headers or query strings (see logger.js).
+      serializers: { req: serializeRequest },
       autoLogging: {
         ignore(req) {
           return req.url === "/api/health";
@@ -73,6 +104,7 @@ export function createApp(options = {}) {
     createEventsRouter({
       requireAuthFn,
       sseManager,
+      sseTickets: options.sseTickets,
       heartbeatIntervalMs: options.sseHeartbeatIntervalMs
     })
   );
@@ -89,19 +121,37 @@ export function createApp(options = {}) {
   app.use("/api/v1", v1Routes(routerOptions));
   app.use("/api/invites", invitesRoutes(routerOptions));
   app.use("/api/push", pushRoutes(routerOptions));
-  if (process.env.NODE_ENV !== "production") {
+  if (config.enableTestRoutes) {
     app.use("/api/test", testRoutes(routerOptions));
   }
   app.use("/api/lists", listRoutes(routerOptions));
+  // Reject malformed list ids before any router runs a query with them.
+  app.param("id", uuidParam("list.not_found", "List not found."));
   app.use("/api/lists/:id/history", historyRoutes(routerOptions));
   app.use("/api/lists/:id/suggestions", suggestionRoutes(routerOptions));
   app.use("/api/lists/:id/entries", entryRoutes(routerOptions));
   app.use("/api/lists/:id/members", sharingRoutes(routerOptions));
 
+  // Anything under /api that no route handled (unknown paths, disabled test routes).
+  app.use("/api", (_req, _res, next) => next(createNotFoundError()));
+
+  // The one place that turns errors into responses: `{ error, code }` for every failure.
   app.use((error, req, res, _next) => {
     void _next;
+    const apiError = toApiError(error);
+
+    if (apiError) {
+      if (!(error instanceof Error && error.name === "ApiError")) {
+        // Errors mapped from the database or the body parser are worth a trace; plain API errors are routine.
+        (req.log ?? logger).warn({ err: error }, "Request rejected");
+      }
+
+      res.status(apiError.status).json(toErrorBody(apiError));
+      return;
+    }
+
     (req.log ?? logger).error({ err: error }, "Unhandled error");
-    res.status(500).json({ error: "Internal server error." });
+    res.status(500).json({ error: "Internal server error.", code: "internal.error" });
   });
 
   if (shouldStartWorkers) {

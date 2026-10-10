@@ -69,8 +69,8 @@ paths:
                   type: string
                   minLength: 1
                 description:
-                  type: string
-                  nullable: true
+                  type: [string, "null"]
+                  description: Optional details. Surrounding whitespace is trimmed and a blank value is stored as null; any other type is rejected with 400.
       responses:
         '201':
           description: The created item.
@@ -91,13 +91,15 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/LimitReached'
   /lists/{listId}/items/{itemId}/toggle:
     parameters:
       - $ref: '#/components/parameters/ListId'
       - $ref: '#/components/parameters/ItemId'
     post:
       summary: Toggle a grocery item status
-      description: Toggles between `open` and `done`; toggles to `done` also update autocomplete history for the list.
+      description: Toggles between `open` and `done`. Completing an item while the list already has 200 done items removes the oldest done item.
       operationId: toggleGroceryItem
       responses:
         '200':
@@ -138,8 +140,8 @@ paths:
                   type: string
                   minLength: 1
                 description:
-                  type: string
-                  nullable: true
+                  type: [string, "null"]
+                  description: Optional details. Surrounding whitespace is trimmed and a blank value is stored as null; any other type is rejected with 400.
       responses:
         '200':
           description: The renamed item.
@@ -178,6 +180,10 @@ components:
       type: apiKey
       in: header
       name: X-Api-Key
+      description: >-
+        Personal API key generated in the app (Info & Settings). The server stores only a SHA-256
+        hash of the key, so it is shown exactly once, right after it is generated. Generating a new
+        key invalidates the previous one; a password reset removes the key.
   parameters:
     ListId:
       name: listId
@@ -223,16 +229,24 @@ components:
             - open
             - done
         description:
-          type: string
-          nullable: true
+          type: [string, "null"]
           description: Optional details for the item.
     Error:
       type: object
       required:
         - error
+        - code
       properties:
         error:
           type: string
+          description: English message for logs and developers. Do not match on it; it may be reworded.
+        code:
+          type: string
+          description: >-
+            Stable machine-readable error code such as `list.not_found`, `list.forbidden`,
+            `auth.invalid_api_key`, `entry.limit_open` or `rate_limited`. Match on this value.
+          examples:
+            - list.not_found
   responses:
     BadRequest:
       description: The request body is invalid.
@@ -248,6 +262,12 @@ components:
             $ref: '#/components/schemas/Error'
     Forbidden:
       description: The API-key owner cannot access the requested list.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    LimitReached:
+      description: The list already has the maximum of 1,000 open items.
       content:
         application/json:
           schema:

@@ -110,6 +110,43 @@ describe("recentlyUsedState", () => {
     ]);
   });
 
+  it("keeps newly completed items in history order instead of entry creation order", () => {
+    const history = [
+      { text: "Cheese", icon: "IconCheese" },
+      { text: "Milk", icon: "IconMilk" },
+      { text: "Bread", icon: "IconBread" }
+    ];
+    const entries = [
+      { text: "Milk", status: "done" as const, icon: "IconMilk", is_changed: true },
+      { text: "Cheese", status: "done" as const, icon: "IconCheese", details: "Aged", is_changed: true }
+    ];
+
+    const displayState = getRecentlyUsedDisplayState(history, entries, []);
+
+    expect(displayState.visibleRecentlyUsed).toEqual([
+      { text: "Cheese", icon: "IconCheese", details: "Aged" },
+      { text: "Milk", icon: "IconMilk" },
+      { text: "Bread", icon: "IconBread" }
+    ]);
+    expect([...displayState.changedDoneTexts]).toEqual(["Milk", "Cheese"]);
+    expect(history.map(({ text }) => text)).toEqual(["Cheese", "Milk", "Bread"]);
+    expect(entries.map(({ text }) => text)).toEqual(["Milk", "Cheese"]);
+  });
+
+  it("surfaces changed items awaiting history ahead of known completed items", () => {
+    const displayState = getRecentlyUsedDisplayState(
+      [{ text: "Milk", icon: "IconMilk" }],
+      [
+        { text: "Milk", status: "done", icon: "IconMilk", is_changed: true },
+        { text: "Cheese", status: "done", icon: "IconCheese", is_changed: true },
+        { text: "Bread", status: "done", icon: "IconBread", is_changed: true }
+      ],
+      []
+    );
+
+    expect(displayState.visibleRecentlyUsed.map(({ text }) => text)).toEqual(["Cheese", "Bread", "Milk"]);
+  });
+
   it("does not surface changed done entries when a matching entry is open", () => {
     const displayState = getRecentlyUsedDisplayState(
       [

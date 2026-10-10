@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
+import { MigrationBuilder } from "node-pg-migrate";
 
 const autocompleteHistoryMigrationPath = path.resolve(
   "src/db/migrations/1713902400000_add_autocomplete_history.cjs"
@@ -34,6 +35,15 @@ const lastUpdatedByMigrationPath = path.resolve(
 const listViewsMigrationPath = path.resolve(
   "src/db/migrations/1779979000001_add_list_views.cjs"
 );
+const tokenVersionMigrationPath = path.resolve(
+  "src/db/migrations/1779979000002_add_token_version_to_users.cjs"
+);
+const queryIndexesMigrationPath = path.resolve(
+  "src/db/migrations/1779979000004_add_query_indexes.cjs"
+);
+const hashCredentialsMigrationPath = path.resolve(
+  "src/db/migrations/1779979000003_hash_credentials.cjs"
+);
 
 function createPgmSpy() {
   const calls = [];
@@ -41,9 +51,7 @@ function createPgmSpy() {
     func(value) {
       return { value };
     },
-    createExtension(...args) {
-      calls.push(["createExtension", ...args]);
-    },
+
     createTable(...args) {
       calls.push(["createTable", ...args]);
     },
@@ -67,6 +75,15 @@ function createPgmSpy() {
     },
     dropExtension(...args) {
       calls.push(["dropExtension", ...args]);
+    },
+    createExtension(...args) {
+      calls.push(["createExtension", ...args]);
+    },
+    alterColumn(...args) {
+      calls.push(["alterColumn", ...args]);
+    },
+    sql(statement) {
+      calls.push(["sql", statement.replace(/\s+/g, " ").trim()]);
     }
   };
 
@@ -692,5 +709,108 @@ describe("database migrations", () => {
 
     assert.doesNotThrow(() => migration.down(pgm));
     assert.deepEqual(calls, [["dropTable", "list_views", { ifExists: true, cascade: true }]]);
+  });
+
+  it("adds and removes the per-user token version used to revoke sessions", async () => {
+    const migration = await import(pathToFileURL(tokenVersionMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+    assert.deepEqual(calls, [
+      ["addColumns", "users", { token_version: { type: "integer", notNull: true, default: 0 } }]
+    ]);
+
+    calls.length = 0;
+
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.deepEqual(calls, [["dropColumns", "users", ["token_version"]]]);
+  });
+
+  it("replaces plaintext tokens and the API key with SHA-256 hashes in place", async () => {
+    const migration = await import(pathToFileURL(hashCredentialsMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+
+    // API key: new columns are filled from the old one before it is dropped.
+    const names = calls.map(([name]) => name);
+    assert.deepEqual(calls[0], [
+      "addColumns",
+      "users",
+      {
+        api_key_hash: { type: "text", unique: true },
+        api_key_hint: { type: "text" },
+        api_key_created_at: { type: "timestamptz" }
+      }
+    ]);
+    assert.match(calls[1][1], /UPDATE users SET api_key_hash = encode\(sha256\(convert_to\(api_key::text, 'UTF8'\)\), 'hex'\), api_key_hint = right\(api_key::text, 4\)/);
+    assert.deepEqual(calls[2], ["dropColumns", "users", ["api_key"]]);
+
+    // Every token table gets a populated, NOT NULL, unique hash column before token is dropped.
+    for (const table of ["email_verification_tokens", "password_reset_tokens", "list_invites"]) {
+      const position = (name, ...rest) =>
+        calls.findIndex((call) => call[0] === name && call[1] === table && rest.every((value, i) => JSON.stringify(call[2 + i]) === JSON.stringify(value)));
+      const added = position("addColumns", { token_hash: { type: "text" } });
+      const populated = calls.findIndex((call) => call[0] === "sql" && call[1].startsWith(`UPDATE ${table} SET token_hash = encode(sha256(convert_to(token::text, 'UTF8')), 'hex')`));
+      const notNull = position("alterColumn", "token_hash", { notNull: true });
+      const unique = position("addConstraint", `${table}_token_hash_key`, { unique: ["token_hash"] });
+      const dropped = position("dropColumns", ["token"]);
+
+      assert.ok(added >= 0 && populated > added && notNull > populated && unique > notNull && dropped > unique, table);
+    }
+    assert.equal(names.filter((name) => name === "sql").length, 4);
+
+    calls.length = 0;
+
+    // down() re-creates the plaintext columns (with fresh values) and drops the hashes.
+    assert.doesNotThrow(() => migration.down(pgm));
+    const restoredTokens = calls.filter((call) => call[0] === "addColumns" && call[2].token);
+    assert.equal(restoredTokens.length, 3);
+    assert.ok(restoredTokens.every((call) => call[2].token.type === "uuid" && call[2].token.notNull === true));
+    assert.deepEqual(
+      calls.filter((call) => call[0] === "alterColumn").map((call) => call[1]),
+      ["email_verification_tokens", "password_reset_tokens"]
+    );
+    assert.deepEqual(calls.at(-2), ["addColumns", "users", { api_key: { type: "uuid", unique: true } }]);
+    assert.deepEqual(calls.at(-1), ["dropColumns", "users", ["api_key_hash", "api_key_hint", "api_key_created_at"]]);
+  });
+  it("creates pg_trgm explicitly and indexes the hot read paths, and down keeps the extension", async () => {
+    const migration = await import(pathToFileURL(queryIndexesMigrationPath));
+    const { calls, pgm } = createPgmSpy();
+
+    assert.doesNotThrow(() => migration.up(pgm));
+
+    assert.deepEqual(calls[0], ["createExtension", "pg_trgm", { ifNotExists: true }]);
+    const created = calls.filter((call) => call[0] === "createIndex");
+    assert.deepEqual(
+      created.map((call) => [call[1], call[2], call[3].name]),
+      [
+        ["entries", ["list_id", "status", "created_at"], "entries_list_status_created_idx"],
+        ["entries", ["list_id", "updated_at"], "entries_list_updated_idx"],
+        ["lists", ["owner_id"], "lists_owner_idx"],
+        ["list_members", ["user_id"], "list_members_user_idx"],
+        ["pending_push_jobs", ["fire_at"], "pending_push_jobs_fire_at_idx"],
+        ["push_subscriptions", ["endpoint"], "push_subscriptions_endpoint_idx"],
+        ["entries", { name: "text", opclass: "gin_trgm_ops" }, "entries_text_trgm_idx"]
+      ]
+    );
+    assert.deepEqual(created.at(-1)[3], { name: "entries_text_trgm_idx", method: "gin" });
+
+    calls.length = 0;
+    assert.doesNotThrow(() => migration.down(pgm));
+    assert.equal(calls.filter((call) => call[0] === "dropIndex").length, 7);
+    assert.equal(calls.some((call) => call[0] === "dropExtension"), false);
+  });
+
+  it("generates a trigram GIN index with its required operator class", async () => {
+    const migration = await import(pathToFileURL(queryIndexesMigrationPath));
+    // Use the installed SQL builder: a spy cannot detect ignored migration options.
+    const pgm = new MigrationBuilder({}, undefined, false, console);
+    migration.up(pgm);
+
+    assert.match(
+      pgm.getSql(),
+      /CREATE INDEX "entries_text_trgm_idx" ON "entries" USING gin \("text" "gin_trgm_ops"\);/
+    );
   });
 });

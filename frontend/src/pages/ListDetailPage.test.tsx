@@ -5,16 +5,17 @@ import userEvent from "@testing-library/user-event";
 import { createInstance } from "i18next";
 import type { i18n, ReadCallback } from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../i18n";
 import enTranslations from "../locales/en/translation.json";
 import deTranslations from "../locales/de/translation.json";
 import { createEntry, fetchEntries, updateEntry } from "../api/entries";
 import { deleteFromHistory, fetchRecentlyUsed } from "../api/history";
-import { fetchLists, markListViewed } from "../api/lists";
+import { ApiError } from "../api/errors";
+import { fetchList, fetchLists, markListViewed } from "../api/lists";
 import { fetchListMembers, leaveList } from "../api/sharing";
-import { writeCachedResource } from "../api/offlineStore";
+import { listOfflineMutations, writeCachedResource } from "../api/offlineStore";
 import { useListEvents } from "../hooks/useListEvents";
 import ListDetailPage from "./ListDetailPage/ListDetailPage";
 import { useListDetailData } from "./ListDetailPage/useListDetailData";
@@ -26,10 +27,24 @@ vi.mock("../workers/iconWorkerClient", () => ({
   requestIconMatch: vi.fn().mockResolvedValue({ iconName: null, score: 0, topMatches: [] })
 }));
 
+// Counts how often a tile is rendered *with changed props*: the wrapper is memoised exactly like
+// the real tile, so it re-renders only when the page hands over a new prop value.
+const tileRenders = vi.hoisted(() => ({ ids: [] as string[] }));
+vi.mock("../components/EntryTile/EntryTile", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../components/EntryTile/EntryTile")>();
+  const { createElement, memo } = await import("react");
+  const Real = actual.default as unknown as (props: Record<string, unknown>) => unknown;
+  const Counting = memo(function CountingTile(props: { entry: { id: string } } & Record<string, unknown>) {
+    tileRenders.ids.push(props.entry.id);
+    return createElement(Real as never, props as never);
+  });
+  return { ...actual, default: Counting };
+});
+
 const streamState = vi.hoisted(() => ({ resyncVersion: 0 }));
-const queueState = vi.hoisted(() => ({ syncVersion: 0 }));
+const queueState = vi.hoisted(() => ({ syncVersion: 0, resolvedIds: {} as Record<string, string> }));
 vi.mock("../context/EventSourceContext", () => ({ useEventSource: () => streamState }));
-beforeEach(() => { streamState.resyncVersion = 0; queueState.syncVersion = 0; });
+beforeEach(() => { streamState.resyncVersion = 0; queueState.syncVersion = 0; queueState.resolvedIds = {}; });
 
 const cssSource = [
   "./ListDetailPage/ListDetailPage.module.css",
@@ -41,7 +56,9 @@ const cssSource = [
 const pageSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage/ListDetailPage.tsx"), "utf8");
 const hookSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage/useListDetailData.ts"), "utf8");
 
-vi.mock("../api/entries", () => ({
+// The cache key helpers stay real: they are the single source of the key names.
+vi.mock("../api/entries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/entries")>()),
   createEntry: vi.fn(),
   fetchEntries: vi.fn(),
   updateEntry: vi.fn()
@@ -52,13 +69,16 @@ vi.mock("../api/history", () => ({
   fetchRecentlyUsed: vi.fn()
 }));
 
-vi.mock("../api/lists", () => ({
+vi.mock("../api/lists", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/lists")>()),
+  fetchList: vi.fn(),
   fetchLists: vi.fn(),
   markListViewed: vi.fn(),
   renameList: vi.fn()
 }));
 
-vi.mock("../api/sharing", () => ({
+vi.mock("../api/sharing", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/sharing")>()),
   fetchListMembers: vi.fn(),
   leaveList: vi.fn(),
   revokeListMember: vi.fn(),
@@ -66,11 +86,12 @@ vi.mock("../api/sharing", () => ({
 }));
 
 vi.mock("../api/offlineStore", () => ({
+  listOfflineMutations: vi.fn(async () => []),
   writeCachedResource: vi.fn()
 }));
 
 vi.mock("../context/AuthContext", () => ({
-  useAuth: () => ({ token: "test-token" })
+  useAuth: () => ({ token: "test-token", user: { id: "user-1" } })
 }));
 
 vi.mock("../hooks/useListEvents", () => ({
@@ -95,6 +116,7 @@ const createEntryMock = vi.mocked(createEntry);
 const deleteFromHistoryMock = vi.mocked(deleteFromHistory);
 const fetchEntriesMock = vi.mocked(fetchEntries);
 const fetchRecentlyUsedMock = vi.mocked(fetchRecentlyUsed);
+const fetchListMock = vi.mocked(fetchList);
 const fetchListsMock = vi.mocked(fetchLists);
 const markListViewedMock = vi.mocked(markListViewed);
 const fetchListMembersMock = vi.mocked(fetchListMembers);
@@ -102,6 +124,13 @@ const leaveListMock = vi.mocked(leaveList);
 const useListEventsMock = vi.mocked(useListEvents);
 const updateEntryMock = vi.mocked(updateEntry);
 const writeCachedResourceMock = vi.mocked(writeCachedResource);
+const listOfflineMutationsMock = vi.mocked(listOfflineMutations);
+
+/** Stands in for the overview and exposes the notice the detail page hands over via router state. */
+function OverviewLanding() {
+  const state = useLocation().state as { notice?: string } | null;
+  return <div>Overview landing{state?.notice ? <p role="status">{state.notice}</p> : null}</div>;
+}
 
 function renderListDetailPage(translations?: i18n) {
   const tree = () => (
@@ -114,7 +143,7 @@ function renderListDetailPage(translations?: i18n) {
     >
       <Routes>
         <Route element={<ListDetailPage />} path="/lists/:id" />
-        <Route element={<div>Overview landing</div>} path="/" />
+        <Route element={<OverviewLanding />} path="/" />
       </Routes>
     </MemoryRouter>
   );
@@ -139,17 +168,35 @@ interface MockListDetailDataOptions {
 }
 
 function mockListDetailData({ entries = [], history = [] }: MockListDetailDataOptions = {}) {
-  fetchListsMock.mockResolvedValue({
-    lists: [
-      { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List
-    ]
-  });
+  fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List });
   fetchEntriesMock.mockResolvedValue({ entries });
   fetchRecentlyUsedMock.mockResolvedValue({ history });
   fetchListMembersMock.mockResolvedValue({ members: [] });
   markListViewedMock.mockResolvedValue(undefined);
   writeCachedResourceMock.mockResolvedValue(undefined);
+  listOfflineMutationsMock.mockResolvedValue([]);
   deleteFromHistoryMock.mockResolvedValue(null);
+}
+
+function queuedCreate(tempId: string) {
+  return {
+    id: `queued-${tempId}`,
+    url: "/api/lists/list-1/entries",
+    method: "POST",
+    createdAt: "2026-04-01T10:00:00.000Z",
+    userId: "user-1",
+    queueMeta: { resourceType: "entry", tempId }
+  };
+}
+
+/** Entry creates answer "queued" and show up in the offline queue like the real store would list them. */
+function queueEntryCreates() {
+  const tempIds: string[] = [];
+  createEntryMock.mockImplementation(async (_listId, _token, _payload, options) => {
+    tempIds.push(options?.tempId ?? "");
+    return { queued: true } as Awaited<ReturnType<typeof createEntry>>;
+  });
+  listOfflineMutationsMock.mockImplementation(async () => tempIds.map((tempId) => queuedCreate(tempId)));
 }
 
 function getOpenItemsSection() {
@@ -173,22 +220,66 @@ function createDeferred<T = unknown>() {
   return { promise, resolve, reject };
 }
 
+describe("ListDetailPage render cost", () => {
+  beforeEach(() => { vi.clearAllMocks(); tileRenders.ids = []; });
+  afterEach(cleanup);
+
+  it("does not re-render unchanged tiles while typing in the search field", async () => {
+    mockListDetailData({
+      entries: [
+        { id: "entry-1", text: "Milk", status: "open" },
+        { id: "entry-2", text: "Mango", status: "open" },
+        { id: "entry-3", text: "Bread", status: "open" }
+      ] as Entry[]
+    });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    tileRenders.ids = [];
+
+    await userEvent.type(screen.getByLabelText("Search items…"), "m");
+
+    // "Milk" and "Mango" match and stay on screen untouched; "Bread" disappears.
+    await waitFor(() => { expect(screen.queryByText("Bread")).toBeNull(); });
+    expect(tileRenders.ids).toEqual([]);
+  });
+
+  it("re-renders only the tile whose entry changed", async () => {
+    mockListDetailData({
+      entries: [
+        { id: "entry-1", text: "Milk", status: "open" },
+        { id: "entry-2", text: "Bread", status: "open" }
+      ] as Entry[]
+    });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    tileRenders.ids = [];
+    const handler = useListEventsMock.mock.calls.filter(([eventType]) => eventType === "entry:updated").at(-1)?.[2];
+
+    await act(async () => {
+      handler?.({ listId: "list-1", entryId: "entry-1", actorId: "someone-else", entry: { id: "entry-1", list_id: "list-1", text: "Oat milk", status: "open", last_updated_by: "someone-else" } });
+    });
+
+    expect(await screen.findByText("Oat milk")).toBeTruthy();
+    expect(new Set(tileRenders.ids)).toEqual(new Set(["entry-1"]));
+  });
+});
+
 describe("ListDetailPage cache-first loading", () => {
   beforeEach(() => { vi.clearAllMocks(); });
   afterEach(cleanup);
 
   function pendingDetail() {
     mockListDetailData();
-    const lists = createDeferred<Awaited<ReturnType<typeof fetchLists>>>();
+    const lists = createDeferred<Awaited<ReturnType<typeof fetchList>>>();
     const entries = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
-    fetchListsMock.mockReturnValue(lists.promise);
+    fetchListMock.mockReturnValue(lists.promise);
     fetchEntriesMock.mockReturnValue(entries.promise);
     return { lists, entries };
   }
 
   async function deliverCache(entries: Entry[] = [{ id: "cached-1", text: "Cached Milk", status: "open" }]) {
     await act(async () => {
-      fetchListsMock.mock.calls[0][1]?.onCachedValue?.({ lists: [{ id: "list-1", name: "Cached pantry", is_owner: true }] });
+      fetchListMock.mock.calls[0][2]?.onCachedValue?.({ list: { id: "list-1", name: "Cached pantry", is_owner: true } });
       fetchEntriesMock.mock.calls[0][2]?.onCachedValue?.({ entries });
     });
   }
@@ -203,14 +294,15 @@ describe("ListDetailPage cache-first loading", () => {
     expect(markListViewedMock).not.toHaveBeenCalled();
     expect(fetchListMembersMock).not.toHaveBeenCalled();
     await act(async () => {
-      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: true }] });
+      network.lists.resolve({ list: { id: "list-1", name: "Fresh pantry", is_owner: true } });
       network.entries.resolve({ entries: [{ id: "fresh-1", text: "Fresh Bread", status: "open" }] });
     });
     expect(screen.getByText("Fresh Bread")).toBeTruthy();
     expect(screen.getByText("Fresh pantry")).toBeTruthy();
     expect(screen.queryByText("Cached Milk")).toBeNull();
     expect(screen.queryByLabelText("Loading")).toBeNull();
-    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMock).toHaveBeenCalledTimes(1);
+    expect(fetchListsMock).not.toHaveBeenCalled();
     expect(fetchEntriesMock).toHaveBeenCalledTimes(1);
     expect(markListViewedMock).toHaveBeenCalledTimes(1);
     expect(fetchListMembersMock).toHaveBeenCalledTimes(1);
@@ -224,7 +316,7 @@ describe("ListDetailPage cache-first loading", () => {
     renderListDetailPage();
     expect(screen.getByLabelText("Loading")).toBeTruthy();
     await act(async () => {
-      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: false }] });
+      network.lists.resolve({ list: { id: "list-1", name: "Fresh pantry", is_owner: false } });
       network.entries.resolve({ entries: [{ id: "fresh-1", text: "Fresh Bread", status: "open" }] });
     });
     expect(screen.getByText("Fresh Bread")).toBeTruthy();
@@ -234,12 +326,14 @@ describe("ListDetailPage cache-first loading", () => {
   it("preserves cached pending entries and filters history when fresh entries replace the cache", async () => {
     const network = pendingDetail();
     fetchRecentlyUsedMock.mockResolvedValue({ history: [{ text: "Queued Bread" }, { text: "Eggs" }] });
+    // The cached entry is still waiting in the offline queue, so it must survive the reload.
+    listOfflineMutationsMock.mockResolvedValue([queuedCreate("temp-entry")]);
     renderListDetailPage();
     const pending = { id: "temp-entry", text: "Queued Bread", status: "open" as const, is_pending_sync: true, details: "Whole wheat" };
     await deliverCache([pending]);
     expect(screen.getByText("Queued Bread")).toBeTruthy();
     await act(async () => {
-      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: false }] });
+      network.lists.resolve({ list: { id: "list-1", name: "Fresh pantry", is_owner: false } });
       network.entries.resolve({ entries: [{ id: "fresh-1", text: "Fresh Milk", status: "open" }] });
     });
     expect(within(getOpenItemsSection()).getByText("Queued Bread")).toBeTruthy();
@@ -258,7 +352,7 @@ describe("ListDetailPage cache-first loading", () => {
     await userEvent.click(screen.getByRole("button", { name: "Mark Cached Milk done" }));
     await screen.findByText("Done");
     await act(async () => {
-      network.lists.resolve({ lists: [{ id: "list-1", name: "Fresh pantry", is_owner: false }] });
+      network.lists.resolve({ list: { id: "list-1", name: "Fresh pantry", is_owner: false } });
       network.entries.resolve({ entries: [doneEntry] });
     });
     expect(screen.getByText("Done")).toBeTruthy();
@@ -271,7 +365,7 @@ describe("ListDetailPage cache-first loading", () => {
     await deliverCache();
     expect(screen.getByText("Cached Milk")).toBeTruthy();
     await act(async () => {
-      network.lists.resolve({ lists: [] });
+      network.lists.reject(new ApiError("You do not have access to this list.", 403));
       network.entries.resolve({ entries: [] });
     });
     expect(screen.getByText(enTranslations["detail.accessError"])).toBeTruthy();
@@ -291,7 +385,7 @@ describe("ListDetailPage cache-first loading", () => {
     await screen.findByText("Fresh Bread");
     await deliverCache();
     await act(async () => {
-      oldNetwork.lists.resolve({ lists: [{ id: "list-1", name: "Old pantry", is_owner: true }] });
+      oldNetwork.lists.resolve({ list: { id: "list-1", name: "Old pantry", is_owner: true } });
       oldNetwork.entries.resolve({ entries: [{ id: "old-1", text: "Old Bread", status: "open" }] });
     });
     expect(screen.getByText("Fresh Bread")).toBeTruthy();
@@ -308,7 +402,7 @@ describe("ListDetailPage cache-first loading", () => {
     const pending = { id: "temp-entry", text: "First list only", status: "open" as const, is_pending_sync: true };
     await deliverCache([pending]);
     expect(view.result.current.entries).toEqual([pending]);
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-2", name: "Other list", is_owner: false }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-2", name: "Other list", is_owner: false } });
     fetchEntriesMock.mockResolvedValue({ entries: [] });
     view.rerender({ listId: "list-2" });
     await waitFor(() => { expect(view.result.current.list?.id).toBe("list-2"); });
@@ -321,7 +415,7 @@ describe("ListDetailPage initial loading", () => {
   afterEach(cleanup);
 
   function expectOneLoad() {
-    for (const request of [fetchListsMock, fetchEntriesMock, fetchRecentlyUsedMock, fetchListMembersMock, markListViewedMock]) {
+    for (const request of [fetchListMock, fetchEntriesMock, fetchRecentlyUsedMock, fetchListMembersMock, markListViewedMock]) {
       expect(request).toHaveBeenCalledTimes(1);
     }
   }
@@ -332,7 +426,7 @@ describe("ListDetailPage initial loading", () => {
     translations.use({ type: "backend", read: backendRead });
     const initialized = translations.init({ lng: "en", fallbackLng: false, react: { useSuspense: false } });
     mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", is_owner: true } });
     renderListDetailPage(translations);
     await screen.findByText("Milk");
     expect(translations.t("detail.accessError")).toBe("detail.accessError");
@@ -350,7 +444,7 @@ describe("ListDetailPage initial loading", () => {
 
   it("renders entries while members are pending and keeps the sharing spinner until they arrive", async () => {
     mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", is_owner: true } });
     const members = createDeferred<Awaited<ReturnType<typeof fetchListMembers>>>();
     fetchListMembersMock.mockReturnValue(members.promise);
     renderListDetailPage();
@@ -358,8 +452,9 @@ describe("ListDetailPage initial loading", () => {
     expect(screen.queryByLabelText("Loading")).toBeNull();
     expectOneLoad();
     await userEvent.click(screen.getByRole("button", { name: "List options" }));
-    await userEvent.click(screen.getByRole("button", { name: /Share list/ }));
-    expect(screen.getByLabelText("Loading")).toBeTruthy();
+    // The options and share sheets are lazy chunks, fetched when first opened.
+    await userEvent.click(await screen.findByRole("button", { name: /Share list/ }));
+    expect(await screen.findByLabelText("Loading")).toBeTruthy();
 
     const member = { id: "member-1", user_id: "member-1", display_name: "Jane Doe", email: "jane@example.com" };
     await act(async () => {
@@ -374,14 +469,15 @@ describe("ListDetailPage initial loading", () => {
     const translations = createInstance();
     await translations.init({ lng: "en", resources: { en: { translation: enTranslations }, de: { translation: deTranslations } } });
     mockListDetailData();
-    fetchListsMock.mockResolvedValue({ lists: [] });
+    fetchListMock.mockRejectedValue(new ApiError("You do not have access to this list.", 403));
     renderListDetailPage(translations);
     await screen.findByText(enTranslations["detail.accessError"]);
 
     await act(async () => { await translations.changeLanguage("de"); });
     expect(screen.getByText(deTranslations["detail.accessError"])).toBeTruthy();
     expect(screen.queryByText(enTranslations["detail.accessError"])).toBeNull();
-    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMock).toHaveBeenCalledTimes(1);
+    expect(fetchListsMock).not.toHaveBeenCalled();
     expect(fetchEntriesMock).toHaveBeenCalledTimes(1);
     expect(fetchRecentlyUsedMock).toHaveBeenCalledTimes(1);
     expect(fetchListMembersMock).not.toHaveBeenCalled();
@@ -390,7 +486,7 @@ describe("ListDetailPage initial loading", () => {
 
   it("shows member-load errors without clearing entries or the list", async () => {
     mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", is_owner: true } });
     const members = createDeferred<Awaited<ReturnType<typeof fetchListMembers>>>();
     fetchListMembersMock.mockReturnValue(members.promise);
     renderListDetailPage();
@@ -424,7 +520,7 @@ describe("ListDetailPage resync", () => {
 
   it("refreshes entries, history and members without clearing content or running the full loader", async () => {
     mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" }] });
-    fetchListsMock.mockResolvedValue({ lists: [{ id: "list-1", name: "Weekly groceries", is_owner: true }] });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", is_owner: true } });
     const view = renderListDetailPage();
     await screen.findByText("Milk");
     expect(fetchEntriesMock).toHaveBeenCalledTimes(1);
@@ -445,7 +541,8 @@ describe("ListDetailPage resync", () => {
     await screen.findByText("Eggs");
     await screen.findByTitle("Jane Doe");
     expect(screen.queryByText("Milk")).toBeNull();
-    expect(fetchListsMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMock).toHaveBeenCalledTimes(1);
+    expect(fetchListsMock).not.toHaveBeenCalled();
     expect(markListViewedMock).toHaveBeenCalledTimes(1);
     expect(fetchEntriesMock).toHaveBeenCalledTimes(2);
     expect(fetchRecentlyUsedMock).toHaveBeenCalledTimes(2);
@@ -456,7 +553,7 @@ describe("ListDetailPage resync", () => {
 
   it.each(["resync", "SSE"])("keeps an entry queued during an in-flight %s reload", async (trigger) => {
     mockListDetailData({ history: [{ text: "Bread", icon: "IconBread", details: "Whole wheat" }, { text: "Eggs" }] });
-    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    queueEntryCreates();
     const view = renderListDetailPage();
     await screen.findByRole("button", { name: "Bread" });
     const request = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
@@ -479,6 +576,506 @@ describe("ListDetailPage resync", () => {
     expect(within(getOpenItemsSection()).getByText("Queued")).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Recently Used" })).getByText("Eggs")).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Recently Used" })).queryByText("Bread")).toBeNull();
+  });
+});
+
+describe("ListDetailPage create response racing the entry:created event", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  const realEntry = (overrides: Partial<Entry> = {}) =>
+    ({
+      id: "real-1",
+      list_id: "list-1",
+      text: "Bread",
+      status: "open",
+      icon: null,
+      details: null,
+      created_at: "2026-04-01T10:00:00.000Z",
+      updated_at: "2026-04-01T10:00:00.000Z",
+      last_updated_by: "user-1",
+      ...overrides
+    }) as Entry;
+
+  async function loadedData() {
+    mockListDetailData();
+    const view = renderHook(() => useListDetailData({ currentUserId: "user-1", listId: "list-1", token: "test-token", syncVersion: 0 }));
+    await waitFor(() => { expect(view.result.current.isLoading).toBe(false); });
+    return view;
+  }
+
+  const created = (entry: Entry, actorId = "user-1") => ({ listId: "list-1", entryId: entry.id, actorId, entry });
+
+  async function startAdding(view: Awaited<ReturnType<typeof loadedData>>) {
+    const request = createDeferred<Awaited<ReturnType<typeof createEntry>>>();
+    createEntryMock.mockReturnValue(request.promise);
+    let adding: Promise<boolean> = Promise.resolve(false);
+    act(() => { adding = view.result.current.addEntry("Bread", null); });
+    await waitFor(() => { expect(view.result.current.entries).toHaveLength(1); });
+    return { request, finish: async (entry: Entry) => { await act(async () => { request.resolve({ entry } as Awaited<ReturnType<typeof createEntry>>); await adding; }); } };
+  }
+
+  it("shows the new entry once when its own event arrives before the response", async () => {
+    const view = await loadedData();
+    const { finish } = await startAdding(view);
+
+    act(() => { view.result.current.handleEntryCreated(created(realEntry())); });
+    // While the request runs the user sees only the queued entry, never a second tile.
+    expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["Bread"]);
+
+    await finish(realEntry());
+
+    expect(view.result.current.entries.map((entry) => entry.id)).toEqual(["real-1"]);
+    expect(view.result.current.entries[0].is_pending_sync).toBeUndefined();
+  });
+
+  it("keeps exactly one entry when the response comes first and the event follows", async () => {
+    const view = await loadedData();
+    const { finish } = await startAdding(view);
+
+    await finish(realEntry());
+    act(() => { view.result.current.handleEntryCreated(created(realEntry())); });
+
+    expect(view.result.current.entries.map((entry) => entry.id)).toEqual(["real-1"]);
+  });
+
+  it("collapses a duplicate that slipped in (event applied, then response) into one entry", async () => {
+    const view = await loadedData();
+    const { finish } = await startAdding(view);
+    // Same text but typed differently at the event's end: the guard does not apply, the response must still dedupe.
+    act(() => { view.result.current.handleEntryCreated(created(realEntry({ text: "Bread " }))); });
+    expect(view.result.current.entries).toHaveLength(2);
+    expect(view.result.current.entries.map((entry) => entry.id)).toContain("real-1");
+
+    await finish(realEntry());
+
+    expect(view.result.current.entries.map((entry) => entry.id)).toEqual(["real-1"]);
+  });
+
+  it("still applies an event about an entry another user created while this client is adding", async () => {
+    const view = await loadedData();
+    const { finish } = await startAdding(view);
+
+    act(() => { view.result.current.handleEntryCreated(created(realEntry({ id: "other-1", last_updated_by: "user-2" }), "user-2")); });
+
+    expect(view.result.current.entries.map((entry) => entry.id)).toContain("other-1");
+    await finish(realEntry());
+    expect(view.result.current.entries.map((entry) => entry.id).sort()).toEqual(["other-1", "real-1"]);
+  });
+
+  it("applies the own event of another tab when this client is not creating that entry", async () => {
+    const view = await loadedData();
+
+    act(() => { view.result.current.handleEntryCreated(created(realEntry({ id: "tab-2", text: "Milk" }))); });
+
+    expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["Milk"]);
+  });
+});
+
+describe("ListDetailPage offline reconciliation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  type HookProps = { listId: string; resolvedIds?: Record<string, string> };
+
+  function renderData(initialProps: HookProps = { listId: "list-1" }) {
+    return renderHook(
+      ({ listId, resolvedIds }: HookProps) => useListDetailData({ listId, resolvedIds, token: "test-token", syncVersion: 0 }),
+      { initialProps }
+    );
+  }
+
+  async function loadedHook(initial?: HookProps) {
+    mockListDetailData();
+    const view = renderData(initial);
+    await waitFor(() => { expect(view.result.current.isLoading).toBe(false); });
+    return view;
+  }
+
+  it("shows an offline-added entry once after the queue synced it", async () => {
+    const view = await loadedHook();
+    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    await act(async () => { await view.result.current.addEntry("Bread", null); });
+    const [pending] = view.result.current.entries;
+    expect(pending).toMatchObject({ text: "Bread", is_pending_sync: true });
+    const tempId = pending.id;
+
+    // The drain accepted the create: the queue is empty, the id is resolved and the server has the entry.
+    listOfflineMutationsMock.mockResolvedValue([]);
+    fetchEntriesMock.mockResolvedValue({ entries: [{ id: "real-1", text: "Bread", status: "open" } as Entry] });
+    view.rerender({ listId: "list-1", resolvedIds: { [tempId]: "real-1" } });
+    await act(async () => { await view.result.current.loadEntries(); });
+
+    expect(view.result.current.entries.map((entry) => [entry.id, entry.text])).toEqual([["real-1", "Bread"]]);
+  });
+
+  it("swaps the temporary id for the real one as soon as the queue reports it, before any reload", async () => {
+    const view = await loadedHook();
+    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    await act(async () => { await view.result.current.addEntry("Bread", null); });
+    const tempId = view.result.current.entries[0].id;
+
+    view.rerender({ listId: "list-1", resolvedIds: { [tempId]: "real-1" } });
+
+    await waitFor(() => { expect(view.result.current.entries.map((entry) => entry.id)).toEqual(["real-1"]); });
+    expect(view.result.current.entries[0].is_pending_sync).toBe(false);
+  });
+
+  it("keeps a queued entry across a reload while its change is still in the queue", async () => {
+    const view = await loadedHook();
+    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    await act(async () => { await view.result.current.addEntry("Bread", null); });
+    const tempId = view.result.current.entries[0].id;
+    listOfflineMutationsMock.mockResolvedValue([
+      { id: "m1", url: "/api/lists/list-1/entries", method: "POST", createdAt: "now", userId: "user-1", queueMeta: { resourceType: "entry", tempId } }
+    ]);
+
+    await act(async () => { await view.result.current.loadEntries(); });
+
+    expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["Bread"]);
+  });
+
+  it("drops a queued entry on reload once its change was discarded from the queue", async () => {
+    const view = await loadedHook();
+    createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
+    await act(async () => { await view.result.current.addEntry("Bread", null); });
+    listOfflineMutationsMock.mockResolvedValue([]);
+
+    await act(async () => { await view.result.current.loadEntries(); });
+
+    expect(view.result.current.entries).toEqual([]);
+  });
+
+  it("keeps an entry whose create request is still in flight across a reload", async () => {
+    const view = await loadedHook();
+    const request = createDeferred<Awaited<ReturnType<typeof createEntry>>>();
+    createEntryMock.mockReturnValue(request.promise);
+    let adding: Promise<boolean> = Promise.resolve(false);
+    act(() => { adding = view.result.current.addEntry("Bread", null); });
+    await waitFor(() => { expect(view.result.current.entries).toHaveLength(1); });
+
+    await act(async () => { await view.result.current.loadEntries(); });
+    expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["Bread"]);
+
+    await act(async () => {
+      request.resolve({ entry: { id: "real-1", text: "Bread", status: "open" } } as Awaited<ReturnType<typeof createEntry>>);
+      await adding;
+    });
+    expect(view.result.current.entries.map((entry) => entry.id)).toEqual(["real-1"]);
+  });
+
+  it("ignores the result of a load that finishes after the user moved to another list", async () => {
+    const view = await loadedHook({ listId: "list-1" });
+    const slow = createDeferred<Awaited<ReturnType<typeof fetchEntries>>>();
+    fetchEntriesMock.mockReturnValueOnce(slow.promise);
+    let staleLoad: Promise<unknown> = Promise.resolve();
+    act(() => { staleLoad = view.result.current.loadEntries(); });
+    fetchListMock.mockResolvedValue({ list: { id: "list-2", name: "Other", is_owner: false } });
+    fetchEntriesMock.mockResolvedValue({ entries: [{ id: "b1", text: "From list two", status: "open" } as Entry] });
+
+    view.rerender({ listId: "list-2" });
+    await waitFor(() => { expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["From list two"]); });
+    await act(async () => {
+      slow.resolve({ entries: [{ id: "a1", text: "From list one", status: "open" } as Entry] });
+      await staleLoad;
+    });
+
+    expect(view.result.current.entries.map((entry) => entry.text)).toEqual(["From list two"]);
+  });
+
+  it("does not reload everything when the stream counter resets after a token change", async () => {
+    mockListDetailData({ entries: [{ id: "e1", text: "Milk", status: "open" } as Entry] });
+    const view = renderListDetailPage();
+    await screen.findByText("Milk");
+    streamState.resyncVersion = 2;
+    view.rerenderPage();
+    await waitFor(() => { expect(fetchEntriesMock).toHaveBeenCalledTimes(2); });
+
+    streamState.resyncVersion = 0;
+    view.rerenderPage();
+    await act(async () => { await Promise.resolve(); });
+    expect(fetchEntriesMock).toHaveBeenCalledTimes(2);
+
+    streamState.resyncVersion = 1;
+    view.rerenderPage();
+    await waitFor(() => { expect(fetchEntriesMock).toHaveBeenCalledTimes(3); });
+  });
+});
+
+describe("ListDetailPage live entry patching", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  function getEventHandler(type: string) {
+    const calls = useListEventsMock.mock.calls.filter(([eventType]) => eventType === type);
+    return calls[calls.length - 1]![2];
+  }
+
+  function serverEntry(overrides: Partial<Entry> & { id: string }): Entry {
+    return {
+      list_id: "list-1",
+      text: "Milk",
+      status: "open",
+      icon: null,
+      details: null,
+      created_at: "2026-04-01T10:00:00.000Z",
+      updated_at: "2026-04-01T10:00:00.000Z",
+      last_updated_by: "user-2",
+      ...overrides
+    } as Entry;
+  }
+
+  it("patches an updated entry from the event without requesting the entries again", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const entryRequests = fetchEntriesMock.mock.calls.length;
+    const historyRequests = fetchRecentlyUsedMock.mock.calls.length;
+
+    act(() => {
+      getEventHandler("entry:updated")({
+        listId: "list-1",
+        entryId: "entry-1",
+        actorId: "user-2",
+        entry: serverEntry({ id: "entry-1", text: "Oat milk", updated_at: "2026-04-01T11:00:00.000Z" })
+      });
+    });
+
+    expect(await screen.findByText("Oat milk")).toBeTruthy();
+    expect(screen.queryByText("Milk")).toBeNull();
+    expect(fetchEntriesMock.mock.calls.length).toBe(entryRequests);
+    expect(fetchRecentlyUsedMock.mock.calls.length).toBe(historyRequests);
+  });
+
+  it("adds a created entry and removes a deleted one from the event payload alone", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const entryRequests = fetchEntriesMock.mock.calls.length;
+
+    act(() => {
+      getEventHandler("entry:created")({
+        listId: "list-1",
+        entryId: "entry-2",
+        actorId: "user-2",
+        entry: serverEntry({ id: "entry-2", text: "Bread", created_at: "2026-04-01T12:00:00.000Z" })
+      });
+    });
+    expect(await screen.findByText("Bread")).toBeTruthy();
+
+    act(() => {
+      getEventHandler("entry:deleted")({ listId: "list-1", entryId: "entry-1", actorId: "user-2", entryStatus: "open" });
+    });
+    await waitFor(() => { expect(screen.queryByText("Milk")).toBeNull(); });
+    expect(screen.getByText("Bread")).toBeTruthy();
+    expect(fetchEntriesMock.mock.calls.length).toBe(entryRequests);
+  });
+
+  it("applies the same event twice without changing anything", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const event = {
+      listId: "list-1",
+      entryId: "entry-2",
+      actorId: "user-2",
+      entry: serverEntry({ id: "entry-2", text: "Bread", created_at: "2026-04-01T12:00:00.000Z" })
+    };
+
+    act(() => { getEventHandler("entry:created")(event); });
+    await screen.findByText("Bread");
+    act(() => { getEventHandler("entry:created")(event); });
+
+    expect(screen.getAllByText("Bread")).toHaveLength(1);
+  });
+
+  it("falls back to a full reload when an event carries no entry payload", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const entryRequests = fetchEntriesMock.mock.calls.length;
+    fetchEntriesMock.mockResolvedValue({ entries: [serverEntry({ id: "entry-9", text: "Eggs" })] });
+
+    act(() => { getEventHandler("entry:updated")({ listId: "list-1", entryId: "entry-1" }); });
+
+    expect(await screen.findByText("Eggs")).toBeTruthy();
+    expect(fetchEntriesMock.mock.calls.length).toBe(entryRequests + 1);
+  });
+
+  it("reloads the recently used history once, debounced, after done transitions", async () => {
+    mockListDetailData({
+      entries: [
+        serverEntry({ id: "entry-1", text: "Milk" }),
+        serverEntry({ id: "entry-2", text: "Bread", created_at: "2026-04-01T11:00:00.000Z" })
+      ]
+    });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const historyRequests = fetchRecentlyUsedMock.mock.calls.length;
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const complete = (id: string, text: string) =>
+      getEventHandler("entry:updated")({
+        listId: "list-1",
+        entryId: id,
+        actorId: "user-2",
+        entry: serverEntry({ id, text, status: "done", updated_at: "2026-04-01T13:00:00.000Z" })
+      });
+
+    act(() => { complete("entry-1", "Milk"); });
+    act(() => { vi.advanceTimersByTime(100); });
+    act(() => { complete("entry-2", "Bread"); });
+    act(() => { vi.advanceTimersByTime(249); });
+    expect(fetchRecentlyUsedMock.mock.calls.length).toBe(historyRequests);
+
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(fetchRecentlyUsedMock.mock.calls.length).toBe(historyRequests + 1);
+  });
+
+  it("does not reload the history for edits of open entries", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const historyRequests = fetchRecentlyUsedMock.mock.calls.length;
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+    act(() => {
+      getEventHandler("entry:updated")({
+        listId: "list-1",
+        entryId: "entry-1",
+        actorId: "user-2",
+        entry: serverEntry({ id: "entry-1", text: "Oat milk" })
+      });
+    });
+    await act(async () => { vi.advanceTimersByTime(1000); });
+
+    expect(fetchRecentlyUsedMock.mock.calls.length).toBe(historyRequests);
+  });
+
+  it("still refetches everything on a resync", async () => {
+    mockListDetailData({ entries: [serverEntry({ id: "entry-1" })] });
+    const view = renderListDetailPage();
+    await screen.findByText("Milk");
+    const entryRequests = fetchEntriesMock.mock.calls.length;
+
+    streamState.resyncVersion += 1;
+    view.rerenderPage();
+
+    await waitFor(() => { expect(fetchEntriesMock.mock.calls.length).toBe(entryRequests + 1); });
+  });
+});
+
+describe("ListDetailPage lifecycle events", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  function getEventHandler(type: string) {
+    // The most recent registration wins: the page re-registers handlers when its callbacks change.
+    const calls = useListEventsMock.mock.calls.filter(([eventType]) => eventType === type);
+    return calls[calls.length - 1]![2];
+  }
+
+  it("leaves with a translated notice when the list was deleted", async () => {
+    mockListDetailData();
+    renderListDetailPage();
+    await screen.findByText("Weekly groceries");
+
+    act(() => { getEventHandler("list:deleted")({ listId: "list-1" }); });
+
+    expect(await screen.findByText("Overview landing")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("This list was deleted.");
+  });
+
+  it("leaves with a translated notice when the current user was removed from the list", async () => {
+    mockListDetailData();
+    renderListDetailPage();
+    await screen.findByText("Weekly groceries");
+
+    act(() => { getEventHandler("member:removed")({ listId: "list-1", userId: "user-1" }); });
+
+    expect(await screen.findByText("Overview landing")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("You were removed from this list.");
+  });
+
+  it("stays on the list and refreshes the members when somebody else was removed", async () => {
+    mockListDetailData();
+    renderListDetailPage();
+    await screen.findByText("Weekly groceries");
+    const membersBefore = fetchListMembersMock.mock.calls.length;
+
+    act(() => { getEventHandler("member:removed")({ listId: "list-1", userId: "user-2" }); });
+
+    await waitFor(() => { expect(fetchListMembersMock.mock.calls.length).toBeGreaterThanOrEqual(membersBefore); });
+    expect(screen.queryByText("Overview landing")).toBeNull();
+    expect(screen.getByText("Weekly groceries")).toBeTruthy();
+  });
+
+  it("renames the list in place on list:updated without reloading the page content", async () => {
+    mockListDetailData({ entries: [{ id: "entry-1", text: "Milk", status: "open" } as Entry] });
+    fetchListMock.mockResolvedValue({
+      list: { id: "list-1", name: "Renamed groceries", owner_name: "Demo User", is_owner: false } as List
+    });
+    renderListDetailPage();
+    await screen.findByText("Milk");
+    const entryRequests = fetchEntriesMock.mock.calls.length;
+
+    act(() => { getEventHandler("list:updated")({ listId: "list-1" }); });
+
+    expect(await screen.findByText("Renamed groceries")).toBeTruthy();
+    expect(fetchListMock).toHaveBeenCalledWith("test-token", "list-1");
+    expect(screen.getByText("Milk")).toBeTruthy();
+    expect(fetchEntriesMock.mock.calls.length).toBe(entryRequests);
+    expect(screen.queryByText("Overview landing")).toBeNull();
+  });
+
+  it("keeps the current title when the list:updated refresh fails", async () => {
+    mockListDetailData();
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    renderListDetailPage();
+    await screen.findByText("Weekly groceries");
+    fetchListMock.mockRejectedValue(new Error("offline"));
+
+    act(() => { getEventHandler("list:updated")({ listId: "list-1" }); });
+
+    await waitFor(() => { expect(fetchListMock).toHaveBeenCalled(); });
+    expect(screen.getByText("Weekly groceries")).toBeTruthy();
+  });
+
+  it("shows the notice in German too", async () => {
+    mockListDetailData();
+    const german = createInstance();
+    await german.init({
+      lng: "de",
+      fallbackLng: "en",
+      resources: { en: { translation: enTranslations }, de: { translation: deTranslations } },
+      interpolation: { escapeValue: false }
+    });
+    renderListDetailPage(german);
+    await screen.findByText("Weekly groceries");
+
+    act(() => { getEventHandler("list:deleted")({ listId: "list-1" }); });
+
+    expect((await screen.findByRole("status")).textContent).toBe("Diese Liste wurde gelöscht.");
   });
 });
 
@@ -544,11 +1141,7 @@ describe("ListDetailPage optimistic updates", () => {
   });
 
   it("preserves the Done badge after an SSE-triggered entry reload", async () => {
-    fetchListsMock.mockResolvedValue({
-      lists: [
-        { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List
-      ]
-    });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List });
     fetchEntriesMock
       .mockResolvedValueOnce({
         entries: [
@@ -883,11 +1476,7 @@ describe("ListDetailPage optimistic updates", () => {
   });
 
   it("re-fetches recently used history when an entry update SSE event arrives", async () => {
-    fetchListsMock.mockResolvedValue({
-      lists: [
-        { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List
-      ]
-    });
+    fetchListMock.mockResolvedValue({ list: { id: "list-1", name: "Weekly groceries", owner_name: "Demo User", is_owner: false } as List });
     fetchEntriesMock
       .mockResolvedValueOnce({
         entries: [
@@ -940,7 +1529,7 @@ describe("ListDetailPage optimistic updates", () => {
 
   it("lets a shared member confirm leaving and returns to the overview", async () => {
     mockListDetailData();
-    leaveListMock.mockResolvedValue(undefined);
+    leaveListMock.mockResolvedValue(null);
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
     renderListDetailPage();

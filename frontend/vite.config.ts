@@ -9,6 +9,28 @@ import svgr from "vite-plugin-svgr";
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const rootPackageJson = JSON.parse(readFileSync(resolve(currentDir, "../package.json"), "utf8"));
 
+/**
+ * Keeps onnxruntime-web's bundled 23.5 MB WASM binary out of `dist`.
+ *
+ * transformers.js points onnxruntime at the version-pinned jsDelivr copy whenever it runs in a
+ * (non-service) worker, which is the only place the icon model runs, and the CSP allows exactly that
+ * host. onnxruntime still carries a `new URL(".wasm", import.meta.url)` fallback that makes Vite emit
+ * the file, but the fallback is never reached while `env.backends.onnx.wasm.wasmPaths` is set.
+ * Should the CDN setup change, remove this plugin so the local copy is shipped again.
+ */
+function dropUnusedOrtWasm() {
+  return {
+    name: "endgame:drop-unused-ort-wasm",
+    generateBundle(_options: unknown, bundle: Record<string, unknown>) {
+      for (const fileName of Object.keys(bundle)) {
+        if (/(^|\/)ort-wasm[^/]*\.wasm$/.test(fileName)) {
+          delete bundle[fileName];
+        }
+      }
+    }
+  };
+}
+
 export default defineConfig({
   envDir: "..",
   define: {
@@ -56,6 +78,7 @@ export default defineConfig({
     }
   },
   plugins: [
+    dropUnusedOrtWasm(),
     react(),
     svgr(),
     VitePWA({

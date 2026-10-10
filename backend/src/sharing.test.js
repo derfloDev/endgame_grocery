@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { createApp } from "./app.js";
+import { hashToken } from "./tokens.js";
 
 function createAuthedApp(pool, options = {}) {
   return createApp({
@@ -15,13 +16,85 @@ function createAuthedApp(pool, options = {}) {
     generateInviteToken: options.generateInviteToken,
     now: options.now,
     requireAuthMiddleware(req, _res, next) {
-      req.user = { sub: "user-1" };
+      req.user = { sub: "30000000-0000-4000-8000-000000000001" };
       next();
     }
   });
 }
 
 describe("sharing routes", () => {
+  for (const method of ["get", "post", "delete"]) {
+    it(`denies non-owner ${method.toUpperCase()} without writes, mail or events`, async () => {
+      const queries = [];
+      const sentMessages = [];
+      const sseManager = createSseManagerSpy();
+      const pool = {
+        async query(sql, params) {
+          queries.push({ sql, params });
+          return { rows: [] };
+        }
+      };
+      const app = createAuthedApp(pool, {
+        sseManager,
+        mailer: { async send(message) { sentMessages.push(message); } }
+      });
+      const listId = "10000000-0000-4000-8000-000000000001";
+      const suffix = method === "delete" ? "/30000000-0000-4000-8000-000000000002" : "";
+      const response = await request(app)[method](`/api/lists/${listId}/members${suffix}`)
+        .send({ email: "member@example.com" });
+
+      assert.equal(response.status, 403);
+      assert.equal(response.body.code, "list.owner_only_sharing");
+      assert.equal(queries.length, 1);
+      assert.match(queries[0].sql, /WHERE l.id = \$1 AND l.owner_id = \$2/);
+      assert.deepEqual(queries[0].params, [listId, "30000000-0000-4000-8000-000000000001"]);
+      assert.deepEqual(sentMessages, []);
+      assert.deepEqual(sseManager.calls, []);
+      assert.deepEqual(sseManager.direct, []);
+    });
+  }
+
+  it("returns 404 for an unknown member without mail or events", async () => {
+    const queries = [];
+    const sentMessages = [];
+    const sseManager = createSseManagerSpy();
+    const pool = {
+      async query(sql, params) {
+        queries.push({ sql, params });
+        return { rows: queries.length === 1 ? [{ owner_id: "30000000-0000-4000-8000-000000000001" }] : [] };
+      }
+    };
+    const response = await request(createAuthedApp(pool, {
+      sseManager,
+      mailer: { async send(message) { sentMessages.push(message); } }
+    })).delete("/api/lists/10000000-0000-4000-8000-000000000001/members/30000000-0000-4000-8000-000000000099");
+
+    assert.equal(response.status, 404);
+    assert.equal(response.body.code, "sharing.member_not_found");
+    assert.equal(queries.length, 2);
+    assert.match(queries[1].sql, /DELETE FROM list_members/);
+    assert.deepEqual(queries[1].params, ["10000000-0000-4000-8000-000000000001", "30000000-0000-4000-8000-000000000099"]);
+    assert.deepEqual(sentMessages, []);
+    assert.deepEqual(sseManager.calls, []);
+    assert.deepEqual(sseManager.direct, []);
+  });
+
+  for (const body of [{}, { email: "" }, { email: "   " }]) {
+    it(`rejects an empty invite email ${JSON.stringify(body)} before database or mail access`, async () => {
+      let queries = 0;
+      let mails = 0;
+      const pool = { async query() { queries++; return { rows: [] }; } };
+      const response = await request(createAuthedApp(pool, {
+        mailer: { async send() { mails++; } }
+      })).post("/api/lists/10000000-0000-4000-8000-000000000001/members").send(body);
+
+      assert.equal(response.status, 400);
+      assert.equal(response.body.code, "validation.email_required");
+      assert.equal(queries, 0);
+      assert.equal(mails, 0);
+    });
+  }
+
   it("returns owner and members for an owned list", async () => {
     let callCount = 0;
     const pool = {
@@ -32,9 +105,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -46,7 +119,7 @@ describe("sharing routes", () => {
         return {
           rows: [
             {
-              user_id: "user-2",
+              user_id: "30000000-0000-4000-8000-000000000002",
               display_name: "Alex",
               email: "alex@example.com",
               joined_at: "2026-04-21T01:00:00Z"
@@ -56,7 +129,7 @@ describe("sharing routes", () => {
       }
     };
 
-    const response = await request(createAuthedApp(pool)).get("/api/lists/list-1/members");
+    const response = await request(createAuthedApp(pool)).get("/api/lists/10000000-0000-4000-8000-000000000001/members");
 
     assert.equal(response.status, 200);
     assert.equal(response.body.members.length, 2);
@@ -76,9 +149,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -89,7 +162,7 @@ describe("sharing routes", () => {
 
         if (callCount === 2) {
           return {
-            rows: [{ id: "user-2", display_name: "Alex", email: "alex@example.com" }]
+            rows: [{ id: "30000000-0000-4000-8000-000000000002", display_name: "Alex", email: "alex@example.com" }]
           };
         }
 
@@ -123,14 +196,14 @@ describe("sharing routes", () => {
           }
         },
         generateInviteToken() {
-          return "invite-token-1";
+          return "40000000-0000-4000-8000-000000000001";
         },
         now() {
           return new Date("2026-04-21T00:00:00Z");
         }
       })
     )
-      .post("/api/lists/list-1/members")
+      .post("/api/lists/10000000-0000-4000-8000-000000000001/members")
       .send({ email: "alex@example.com" });
 
     assert.equal(response.status, 201);
@@ -143,10 +216,10 @@ describe("sharing routes", () => {
       }
     });
     assert.deepEqual(inviteInsertParams, [
-      "list-1",
+      "10000000-0000-4000-8000-000000000001",
       "alex@example.com",
-      "user-1",
-      "invite-token-1",
+      "30000000-0000-4000-8000-000000000001",
+      hashToken("40000000-0000-4000-8000-000000000001"),
       new Date("2026-04-28T00:00:00.000Z")
     ]);
     assert.deepEqual(sentMessages, [
@@ -159,7 +232,7 @@ describe("sharing routes", () => {
           intro: "Hi Alex,",
           body: "Open the invite below to access the shared list \"Weekly groceries\".",
           ctaLabel: "View list",
-          ctaUrl: "https://app.example.com/invite/invite-token-1",
+          ctaUrl: "https://app.example.com/invite/40000000-0000-4000-8000-000000000001",
           listName: "Weekly groceries",
           inviterName: "Demo User"
         }
@@ -178,9 +251,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -218,14 +291,14 @@ describe("sharing routes", () => {
           }
         },
         generateInviteToken() {
-          return "invite-token-new";
+          return "40000000-0000-4000-8000-000000000005";
         },
         now() {
           return new Date("2026-04-21T00:00:00Z");
         }
       })
     )
-      .post("/api/lists/list-1/members")
+      .post("/api/lists/10000000-0000-4000-8000-000000000001/members")
       .send({ email: "new@example.com" });
 
     assert.equal(response.status, 201);
@@ -247,7 +320,7 @@ describe("sharing routes", () => {
           intro: "Hi there,",
           body: "Create your account to join the shared list \"Weekly groceries\".",
           ctaLabel: "Register",
-          ctaUrl: "https://app.example.com/register?invite=invite-token-new",
+          ctaUrl: "https://app.example.com/register?invite=40000000-0000-4000-8000-000000000005",
           listName: "Weekly groceries",
           inviterName: "Demo User"
         }
@@ -267,9 +340,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -280,7 +353,7 @@ describe("sharing routes", () => {
 
         if (callCount === 2) {
           return {
-            rows: [{ id: "user-2", display_name: "Alex", email: "alex@example.com" }]
+            rows: [{ id: "30000000-0000-4000-8000-000000000002", display_name: "Alex", email: "alex@example.com" }]
           };
         }
 
@@ -310,27 +383,27 @@ describe("sharing routes", () => {
           }
         },
         generateInviteToken() {
-          return "fresh-invite-token";
+          return "40000000-0000-4000-8000-000000000006";
         },
         now() {
           return new Date("2026-04-21T00:00:00Z");
         }
       })
     )
-      .post("/api/lists/list-1/members")
+      .post("/api/lists/10000000-0000-4000-8000-000000000001/members")
       .send({ email: "alex@example.com" });
 
     assert.equal(response.status, 201);
     assert.equal(response.body.invite.id, "invite-1");
     assert.equal(response.body.invite.status, "pending");
     assert.deepEqual(inviteInsertParams, [
-      "list-1",
+      "10000000-0000-4000-8000-000000000001",
       "alex@example.com",
-      "user-1",
-      "fresh-invite-token",
+      "30000000-0000-4000-8000-000000000001",
+      hashToken("40000000-0000-4000-8000-000000000006"),
       new Date("2026-04-28T00:00:00.000Z")
     ]);
-    assert.equal(sentMessages[0].context.ctaUrl, "https://app.example.com/invite/fresh-invite-token");
+    assert.equal(sentMessages[0].context.ctaUrl, "https://app.example.com/invite/40000000-0000-4000-8000-000000000006");
   });
 
   it("returns 409 when the user already has access", async () => {
@@ -343,9 +416,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -356,16 +429,16 @@ describe("sharing routes", () => {
 
         if (callCount === 2) {
           return {
-            rows: [{ id: "user-2", display_name: "Alex", email: "alex@example.com" }]
+            rows: [{ id: "30000000-0000-4000-8000-000000000002", display_name: "Alex", email: "alex@example.com" }]
           };
         }
 
-        return { rows: [{ user_id: "user-2" }] };
+        return { rows: [{ user_id: "30000000-0000-4000-8000-000000000002" }] };
       }
     };
 
     const response = await request(createAuthedApp(pool))
-      .post("/api/lists/list-1/members")
+      .post("/api/lists/10000000-0000-4000-8000-000000000001/members")
       .send({ email: "alex@example.com" });
 
     assert.equal(response.status, 409);
@@ -383,9 +456,9 @@ describe("sharing routes", () => {
           return {
             rows: [
               {
-                id: "list-1",
+                id: "10000000-0000-4000-8000-000000000001",
                 name: "Weekly groceries",
-                owner_id: "user-1",
+                owner_id: "30000000-0000-4000-8000-000000000001",
                 owner_display_name: "Demo User",
                 owner_email: "demo@example.com",
                 created_at: "2026-04-21T00:00:00Z"
@@ -397,7 +470,7 @@ describe("sharing routes", () => {
         return {
           rows: [
             {
-              user_id: "user-2",
+              user_id: "30000000-0000-4000-8000-000000000002",
               email: "alex@example.com",
               display_name: "Alex"
             }
@@ -415,7 +488,7 @@ describe("sharing routes", () => {
         },
         sseManager
       })
-    ).delete("/api/lists/list-1/members/user-2");
+    ).delete("/api/lists/10000000-0000-4000-8000-000000000001/members/30000000-0000-4000-8000-000000000002");
 
     assert.equal(response.status, 204);
     assert.deepEqual(sentMessages, [
@@ -432,7 +505,15 @@ describe("sharing routes", () => {
       }
     ]);
     assert.deepEqual(sseManager.calls, [
-      ["list-1", "member:removed", { listId: "list-1", userId: "user-2" }]
+      ["10000000-0000-4000-8000-000000000001", "member:removed", { listId: "10000000-0000-4000-8000-000000000001", userId: "30000000-0000-4000-8000-000000000002" }]
+    ]);
+    // The removed user is no longer a member, so the list broadcast cannot reach them.
+    assert.deepEqual(sseManager.direct, [
+      [
+        ["30000000-0000-4000-8000-000000000002"],
+        "member:removed",
+        { listId: "10000000-0000-4000-8000-000000000001", userId: "30000000-0000-4000-8000-000000000002" }
+      ]
     ]);
   });
 
@@ -443,9 +524,9 @@ describe("sharing routes", () => {
         return {
           rows: [
             {
-              id: "list-1",
+              id: "10000000-0000-4000-8000-000000000001",
               name: "Weekly groceries",
-              owner_id: "user-1",
+              owner_id: "30000000-0000-4000-8000-000000000001",
               owner_display_name: "Demo User",
               owner_email: "demo@example.com",
               created_at: "2026-04-21T00:00:00Z"
@@ -456,7 +537,7 @@ describe("sharing routes", () => {
     };
 
     const response = await request(createAuthedApp(pool, { sseManager })).delete(
-      "/api/lists/list-1/members/user-1"
+      "/api/lists/10000000-0000-4000-8000-000000000001/members/30000000-0000-4000-8000-000000000001"
     );
 
     assert.equal(response.status, 400);
@@ -464,13 +545,20 @@ describe("sharing routes", () => {
   });
 });
 
-function createSseManagerSpy() {
+function createSseManagerSpy({ recipients = ["user-1", "user-2"] } = {}) {
   return {
     calls: [],
+    direct: [],
     broadcastToList(pool, listId, eventType, data) {
       void pool;
       this.calls.push([listId, eventType, data]);
       return Promise.resolve();
+    },
+    sendToUsers(userIds, eventType, data) {
+      this.direct.push([Array.from(userIds), eventType, data]);
+    },
+    getListRecipients() {
+      return Promise.resolve(recipients);
     }
   };
 }

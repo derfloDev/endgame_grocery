@@ -67,6 +67,18 @@ describe("EntryTile", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mark Coffee done" }));
 
     expect(onToggle).toHaveBeenCalledTimes(1);
+    // Callbacks receive the entry id, so the parent can pass one stable handler to every tile.
+    expect(onToggle).toHaveBeenCalledWith("entry-3");
+  });
+
+  it("is memoised so unchanged tiles are skipped when the list re-renders", () => {
+    expect((EntryTile as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for("react.memo"));
+  });
+
+  it("accepts null details from the API", () => {
+    render(<EntryTile entry={{ id: "entry-9", text: "Rice", status: "open", details: null }} />);
+
+    expect(screen.getByText("Rice")).toBeTruthy();
   });
 
   it("calls onEdit after a 500 ms hold and does not call onToggle", async () => {
@@ -89,6 +101,7 @@ describe("EntryTile", () => {
     fireEvent.click(tile);
 
     expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onEdit).toHaveBeenCalledWith("entry-4");
     expect(onToggle).not.toHaveBeenCalled();
   });
 

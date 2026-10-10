@@ -68,8 +68,10 @@ test.describe("shopping lists", () => {
       const pathname = new URL(route.request().url()).pathname;
       const responses = {
         "/api/config": { registrationEnabled: true },
+        "/api/events/ticket": { ticket: "e2e-ticket" },
         "/api/auth/me": { id: "user-1", display_name: "Cold Load Tester" },
         "/api/lists": { lists: [{ id: "list-1", name: "Cold Pantry", is_owner: true }] },
+        "/api/lists/list-1": { list: { id: "list-1", name: "Cold Pantry", is_owner: true } },
         "/api/lists/list-1/entries": { entries: [{ id: "entry-1", text: "Milk", status: "open" }] },
         "/api/lists/list-1/history": { history: [] },
         "/api/lists/list-1/members": { members: [] }
@@ -88,8 +90,10 @@ test.describe("shopping lists", () => {
     page.on("worker", (worker) => workers.push(worker.url()));
     await page.goto("/lists/list-1");
     await expect(page.getByText("Milk", { exact: true })).toBeVisible();
-    // Allow idle callbacks and worker startup to run after the list becomes visible.
-    await page.waitForTimeout(1500);
+    // Observe an idle turn after rendering, then another frame, rather than racing a fixed delay.
+    await page.evaluate(() => new Promise((resolve) => {
+      requestAnimationFrame(() => requestIdleCallback(() => requestAnimationFrame(resolve)));
+    }));
     expect(workers).toEqual([]);
     expect(modelRequests).toEqual([]);
   });

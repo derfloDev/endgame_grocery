@@ -1,11 +1,14 @@
-import { randomUUID } from "node:crypto";
+import { generateToken, hashToken } from "../tokens.js";
 import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { logger as defaultLogger } from "../logger.js";
-import createMailer from "../mail/mailer.js";
+import createMailer, { sendMailInBackground } from "../mail/mailer.js";
 import { requireAuth } from "../middleware/auth.js";
+import { createRateLimiters } from "../middleware/rateLimit.js";
+import { uuidParam } from "../middleware/validateUuid.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
 
 /**
  * Creates the authenticated list sharing router.
@@ -28,24 +31,21 @@ export function createSharingRouter({
   logger = defaultLogger,
   sseManager = defaultSseManager,
   mailer = createMailer({ config }),
-  generateInviteToken = randomUUID,
-  now = () => new Date()
+  generateInviteToken = generateToken,
+  now = () => new Date(),
+  rateLimiters = createRateLimiters()
 } = {}) {
   const router = Router({ mergeParams: true });
 
   router.use(requireAuthMiddleware);
+  router.param("uid", uuidParam("sharing.member_not_found", "That member does not have access to this list."));
 
   router.get("/", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const list = await getOwnedList(pool, req.params.id, req.user.sub);
 
       if (!list) {
-        res.status(403).json({ error: "Only the list owner can manage sharing." });
+        next(new ApiError(403, "list.owner_only_sharing", "Only the list owner can manage sharing."));
         return;
       }
 
@@ -87,16 +87,12 @@ export function createSharingRouter({
     }
   });
 
-  router.post("/", async (req, res, next) => {
+  // Invitations send mail, so each user may only send a limited number per hour.
+  router.post("/", ...rateLimiters.invite, async (req, res, next) => {
     const email = req.body?.email?.trim();
 
     if (!email) {
-      res.status(400).json({ error: "Email is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.email_required", "Email is required."));
       return;
     }
 
@@ -104,7 +100,7 @@ export function createSharingRouter({
       const list = await getOwnedList(pool, req.params.id, req.user.sub);
 
       if (!list) {
-        res.status(403).json({ error: "Only the list owner can manage sharing." });
+        next(new ApiError(403, "list.owner_only_sharing", "Only the list owner can manage sharing."));
         return;
       }
 
@@ -121,7 +117,7 @@ export function createSharingRouter({
       const user = userResult.rows[0];
 
       if (user?.id === list.owner_id || email.toLowerCase() === list.owner_email.toLowerCase()) {
-        res.status(409).json({ error: "That user already has access to this list." });
+        next(new ApiError(409, "sharing.already_has_access", "That user already has access to this list."));
         return;
       }
 
@@ -137,7 +133,7 @@ export function createSharingRouter({
         );
 
         if (existingMemberResult.rows[0]) {
-          res.status(409).json({ error: "That user already has access to this list." });
+          next(new ApiError(409, "sharing.already_has_access", "That user already has access to this list."));
           return;
         }
       }
@@ -146,27 +142,32 @@ export function createSharingRouter({
       const expiresAt = addDays(now(), 7);
       const inviteResult = await pool.query(
         `
-          INSERT INTO list_invites (list_id, invited_email, invited_by, token, expires_at)
+          INSERT INTO list_invites (list_id, invited_email, invited_by, token_hash, expires_at)
           VALUES ($1, LOWER($2), $3, $4, $5)
           ON CONFLICT (list_id, invited_email) WHERE status = 'pending'
           DO UPDATE SET
             invited_by = EXCLUDED.invited_by,
-            token = EXCLUDED.token,
+            token_hash = EXCLUDED.token_hash,
             expires_at = EXCLUDED.expires_at
           RETURNING id, invited_email, status, expires_at
         `,
-        [req.params.id, email, req.user.sub, inviteToken, expiresAt]
+        [req.params.id, email, req.user.sub, hashToken(inviteToken), expiresAt]
       );
 
-      await sendInviteEmail({
-        config,
-        inviteToken,
-        invitedEmail: email.toLowerCase(),
-        inviterName: list.owner_display_name,
-        listName: list.name,
-        mailer,
-        recipientName: user?.display_name ?? ""
-      });
+      // The invite is stored; a mail outage must not turn that into an error response.
+      sendMailInBackground(
+        () =>
+          sendInviteEmail({
+            config,
+            inviteToken,
+            invitedEmail: email.toLowerCase(),
+            inviterName: list.owner_display_name,
+            listName: list.name,
+            mailer,
+            recipientName: user?.display_name ?? ""
+          }),
+        logger
+      );
 
       res.status(201).json({
         invite: inviteResult.rows[0]
@@ -177,21 +178,16 @@ export function createSharingRouter({
   });
 
   router.delete("/:uid", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const list = await getOwnedList(pool, req.params.id, req.user.sub);
 
       if (!list) {
-        res.status(403).json({ error: "Only the list owner can manage sharing." });
+        next(new ApiError(403, "list.owner_only_sharing", "Only the list owner can manage sharing."));
         return;
       }
 
       if (req.params.uid === list.owner_id) {
-        res.status(400).json({ error: "The list owner cannot be removed." });
+        next(new ApiError(400, "list.owner_cannot_be_removed", "The list owner cannot be removed."));
         return;
       }
 
@@ -208,24 +204,29 @@ export function createSharingRouter({
       );
 
       if (!deleteResult.rows[0]) {
-        res.status(404).json({ error: "That member does not have access to this list." });
+        next(new ApiError(404, "sharing.member_not_found", "That member does not have access to this list."));
         return;
       }
 
+      // The removed user is no longer a member, so the list broadcast below cannot reach them;
+      // tell them directly so their open pages leave the list.
+      const removedPayload = { listId: req.params.id, userId: req.params.uid };
+      sseManager.sendToUsers([req.params.uid], "member:removed", removedPayload);
       void sseManager
-        .broadcastToList(pool, req.params.id, "member:removed", {
-          listId: req.params.id,
-          userId: req.params.uid
-        })
+        .broadcastToList(pool, req.params.id, "member:removed", removedPayload)
         .catch((broadcastError) => {
           logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
         });
 
-      await sendRevocationEmail({
-        listName: list.name,
-        mailer,
-        member: deleteResult.rows[0]
-      });
+      sendMailInBackground(
+        () =>
+          sendRevocationEmail({
+            listName: list.name,
+            mailer,
+            member: deleteResult.rows[0]
+          }),
+        logger
+      );
 
       res.status(204).send();
     } catch (error) {

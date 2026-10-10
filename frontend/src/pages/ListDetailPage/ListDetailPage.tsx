@@ -2,16 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { AuthExpiredError } from "../../api/client";
-import { writeCachedResource } from "../../api/offlineStore";
-import { renameList } from "../../api/lists";
-import { revokeListMember, shareListWithMember } from "../../api/sharing";
-import AddItemSheet from "../../components/AddItemSheet/AddItemSheet";
+import { getErrorMessage } from "../../api/errors";
+import { SSE_EVENTS } from "../../api/sseEvents";
 import EntryTile from "../../components/EntryTile/EntryTile";
-import ListOptionsSheet from "../../components/ListOptionsSheet/ListOptionsSheet";
 import RecentlyUsedSection from "../../components/RecentlyUsedSection/RecentlyUsedSection";
-import RenameListSheet from "../../components/RenameListSheet/RenameListSheet";
-import ShareListSheet from "../../components/ShareListSheet/ShareListSheet";
+import DeferredSheet from "../../components/ui/DeferredSheet/DeferredSheet";
 import EmptyState from "../../components/ui/EmptyState/EmptyState";
 import FAB from "../../components/ui/FAB/FAB";
 import Icon from "../../components/ui/Icon/Icon";
@@ -25,17 +20,21 @@ import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { getRecentlyUsedDisplayState } from "../recentlyUsedState";
 import { leaveSharedList } from "../leaveListAction";
 import styles from "./ListDetailPage.module.css";
-import { getChangeKind, getErrorMessage, getInitials, isShareInviteResult } from "./listDetailUtils";
+import { getListDetailErrorText, isSessionExpiredError } from "./listDetailErrors";
+import { getChangeKind, getInitials } from "./listDetailUtils";
+import { useEntryTiles } from "./useEntryTiles";
 import { useListDetailData } from "./useListDetailData";
-import type { DetailEntry, DetailMember } from "./useListDetailData";
+import { useListLifecycleEvents } from "./useListLifecycleEvents";
+import { AddItemSheet, ListOptionsSheet, RenameListSheet, ShareListSheet } from "./lazySheets";
+import type { Entry } from "../../types";
 
 export default function ListDetailPage(): ReactElement {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const listId = id ?? "";
-  const { token } = useAuth();
-  const { syncVersion } = useOfflineQueue();
+  const { token, user } = useAuth();
+  const { resolvedIds, syncVersion } = useOfflineQueue();
   const { resyncVersion } = useEventSource();
   const lastResyncRef = useRef(resyncVersion);
   const [shareEmail, setShareEmail] = useState<string>("");
@@ -44,42 +43,46 @@ export default function ListDetailPage(): ReactElement {
   const [isShareSubmitting, setIsShareSubmitting] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showAddItem, setShowAddItem] = useState<boolean>(false);
-  const [editingEntry, setEditingEntry] = useState<DetailEntry | null>(null);
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [showOptions, setShowOptions] = useState<boolean>(false);
   const [showRename, setShowRename] = useState<boolean>(false);
   const [showShare, setShowShare] = useState<boolean>(false);
-  const resetShareFeedback = useCallback(() => {
-    setShareError("");
-    setShareNotice("");
-  }, []);
+  const resetShareFeedback = useCallback(() => { setShareError(""); setShareNotice(""); }, []);
   const closeOwnerOnlySheets = useCallback(() => {
     setShowOptions(false);
     setShowRename(false);
     setShowShare(false);
   }, []);
   const {
+    addEntry,
+    addRecentlyUsedEntry,
+    dismissRecentlyUsedEntry,
+    editEntry,
     entries,
-    entryError,
+    error,
+    handleEntryCreated,
+    handleEntryDeleted,
+    handleEntryUpdated,
+    handleHistoryChange,
+    handleMemberChange,
     isLoading,
     isSharingLoading,
     list,
-    loadEntries,
-    loadMembers,
     members,
     recentlyUsed,
-    reloadHistory,
-    addEntryByText,
-    addRecentlyUsedEntry,
-    dismissRecentlyUsedEntry,
-    setEntryError,
-    setList,
-    setMembers,
-    submitEditEntry,
-    toggleStatus
+    refreshList,
+    renameList,
+    reportError,
+    resync,
+    revokeMember,
+    shareWithMember,
+    toggleEntry
   } = useListDetailData({
+    currentUserId: user?.id,
     listId,
     onLoadStart: resetShareFeedback,
     onNonOwnerList: closeOwnerOnlySheets,
+    resolvedIds,
     syncVersion,
     token
   });
@@ -95,58 +98,22 @@ export default function ListDetailPage(): ReactElement {
     token
   });
 
-  const handleEntryChange = useCallback(() => void loadEntries().then((nextEntries) => reloadHistory(nextEntries)), [loadEntries, reloadHistory]);
-
-  const handleMemberChange = useCallback(() => void loadMembers({ isOwner: list?.is_owner ?? false }), [list?.is_owner, loadMembers]);
-
-  const handleHistoryChange = useCallback(() => void reloadHistory(), [reloadHistory]);
-
   useEffect(() => {
-    // Mount already loads the page. Later versions refresh in place without clearing it.
+    // Mount already loads the page; later versions refresh in place. A lower counter = token change reset.
+    if (resyncVersion < lastResyncRef.current) lastResyncRef.current = resyncVersion;
     if (lastResyncRef.current === resyncVersion || isLoading) return;
     lastResyncRef.current = resyncVersion;
-    void loadEntries().then((nextEntries) => Promise.all([
-      reloadHistory(nextEntries),
-      loadMembers({ isOwner: list?.is_owner ?? false })
-    ]));
-  }, [resyncVersion, isLoading, loadEntries, reloadHistory, loadMembers, list?.is_owner]);
+    void resync();
+  }, [resyncVersion, isLoading, resync]);
 
-  useListEvents("entry:created", listId, handleEntryChange);
-  useListEvents("entry:updated", listId, handleEntryChange);
-  useListEvents("entry:deleted", listId, handleEntryChange);
-  useListEvents("history:updated", listId, handleHistoryChange);
-  useListEvents("member:added", listId, handleMemberChange);
-  useListEvents("member:removed", listId, handleMemberChange);
-
-  async function updateMembers(updater: (currentMembers: DetailMember[]) => DetailMember[]): Promise<void> {
-    let nextMembers: DetailMember[] = [];
-
-    setMembers((currentMembers) => {
-      nextMembers = updater(currentMembers);
-      return nextMembers;
-    });
-
-    await writeCachedResource(`members:${listId}`, { members: nextMembers });
-  }
-
-  async function handleRename(newName: string): Promise<void> {
-    try {
-      setEntryError("");
-      const result = await renameList(token, listId, { name: newName });
-      setList((currentList) =>
-        currentList
-          ? {
-              ...currentList,
-              name: result?.queued ? newName : result.list?.name ?? newName,
-              is_pending_sync: result?.queued ? true : currentList.is_pending_sync
-            }
-          : currentList
-      );
-    } catch (submitError) {
-      setEntryError(getErrorMessage(submitError));
-      throw submitError;
-    }
-  }
+  // Entry events patch the local entries from their payload; no entries request per event.
+  useListEvents(SSE_EVENTS.entryCreated, listId, handleEntryCreated);
+  useListEvents(SSE_EVENTS.entryUpdated, listId, handleEntryUpdated);
+  useListEvents(SSE_EVENTS.entryDeleted, listId, handleEntryDeleted);
+  useListEvents(SSE_EVENTS.historyUpdated, listId, handleHistoryChange);
+  useListEvents(SSE_EVENTS.memberAdded, listId, handleMemberChange);
+  // Deleted list, own removal (back to the overview with a notice) and rename (title in place).
+  useListLifecycleEvents({ currentUserId: user?.id, listId, onOtherMemberRemoved: handleMemberChange, refreshList });
 
   async function handleShareSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -159,17 +126,17 @@ export default function ListDetailPage(): ReactElement {
       setIsShareSubmitting(true);
       setShareError("");
       setShareNotice("");
-      const result = await shareListWithMember(listId, token, { email: shareEmail });
+      const result = await shareWithMember(shareEmail);
 
-      if (isShareInviteResult(result) && result.queued) {
+      if (result?.queued) {
         setShareNotice(t("share.inviteQueued", { email: shareEmail.trim() }));
-      } else if (isShareInviteResult(result) && result.invite?.invited_email) {
+      } else if (result?.invite?.invited_email) {
         setShareNotice(t("share.inviteSent", { email: result.invite.invited_email }));
       }
 
       setShareEmail("");
     } catch (submitError) {
-      setShareError(getErrorMessage(submitError));
+      setShareError(getErrorMessage(submitError, t));
     } finally {
       setIsShareSubmitting(false);
     }
@@ -178,10 +145,9 @@ export default function ListDetailPage(): ReactElement {
   async function handleRevokeMember(memberId: string): Promise<void> {
     try {
       setShareError("");
-      await revokeListMember(listId, memberId, token);
-      await updateMembers((currentMembers) => currentMembers.filter((member) => member.user_id !== memberId));
+      await revokeMember(memberId);
     } catch (submitError) {
-      setShareError(getErrorMessage(submitError));
+      setShareError(getErrorMessage(submitError, t));
     }
   }
 
@@ -190,15 +156,13 @@ export default function ListDetailPage(): ReactElement {
       confirmMessage: t("list.leaveConfirm"),
       listId,
       token,
-      onError: (error) => setEntryError(getErrorMessage(error)),
+      onError: reportError,
       onSuccess: () => navigate("/")
     });
   }
 
   async function handlePushToggle(): Promise<void> {
     try {
-      setEntryError("");
-
       if (isSubscribed) {
         await unsubscribe();
         return;
@@ -206,22 +170,19 @@ export default function ListDetailPage(): ReactElement {
 
       await subscribe();
     } catch (pushError) {
-      setEntryError(getErrorMessage(pushError));
+      reportError(pushError);
     }
   }
 
-  const openEntries = entries.filter((entry) => entry.status === "open");
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const visibleEntries = normalizedSearchQuery
-    ? openEntries.filter(
-        (entry) =>
-          entry.text.toLowerCase().includes(normalizedSearchQuery) ||
-          (entry.details ?? "").toLowerCase().includes(normalizedSearchQuery)
-      )
-    : openEntries;
+  const { handleEdit, handleToggle, normalizedSearchQuery, openEntries, visibleEntries } = useEntryTiles({
+    entries,
+    onEdit: setEditingEntry,
+    onToggle: (entry) => void toggleEntry(entry),
+    searchQuery
+  });
   const { changedDoneTexts, visibleRecentlyUsed } = getRecentlyUsedDisplayState(recentlyUsed, entries, openEntries);
   const visibleMemberBadges = list?.is_owner ? members.filter((member) => !member.is_owner) : [];
-  const shouldSuppressEntryError = entryError instanceof AuthExpiredError;
+  const shouldSuppressEntryError = isSessionExpiredError(error);
 
   return (
     <div>
@@ -276,8 +237,8 @@ export default function ListDetailPage(): ReactElement {
           </div>
         ) : null}
 
-        {entryError && !shouldSuppressEntryError ? (
-          <div className="detail-banner eg-error-banner">{getErrorMessage(entryError, t("detail.accessError"))}</div>
+        {error && !shouldSuppressEntryError ? (
+          <div className="detail-banner eg-error-banner">{getListDetailErrorText(error, t)}</div>
         ) : null}
         {isLoading ? <LoadingState rows={4} /> : null}
 
@@ -310,9 +271,9 @@ export default function ListDetailPage(): ReactElement {
                     <EntryTile
                       key={entry.id}
                       changeKind={getChangeKind(entry)}
-                      entry={{ ...entry, details: entry.details ?? undefined }}
-                      onEdit={() => setEditingEntry(entry)}
-                      onToggle={() => void toggleStatus(entry)}
+                      entry={entry}
+                      onEdit={handleEdit}
+                      onToggle={handleToggle}
                     />
                   ))}
                 </div>
@@ -330,61 +291,70 @@ export default function ListDetailPage(): ReactElement {
       </div>
 
       {list ? <FAB onClick={() => setShowAddItem(true)} /> : null}
-      <AddItemSheet
-        listId={listId}
-        open={showAddItem}
-        onAdd={(text, icon, details) => addEntryByText(text, icon, details)}
-        onClose={() => setShowAddItem(false)}
-      />
-      <AddItemSheet
-        initialDetails={editingEntry?.details ?? ""}
-        initialIconName={editingEntry?.icon ?? null}
-        initialText={editingEntry?.text ?? ""}
-        listId={listId}
-        mode="edit"
-        open={Boolean(editingEntry)}
-        onAdd={async (text, icon, details) => {
-          if (!editingEntry) {
-            return false;
-          }
+      <DeferredSheet open={showAddItem}>
+        <AddItemSheet
+          listId={listId}
+          open={showAddItem}
+          onAdd={(text, icon, details) => addEntry(text, icon, details)}
+          onClose={() => setShowAddItem(false)}
+        />
+      </DeferredSheet>
+      <DeferredSheet open={Boolean(editingEntry)}>
+        <AddItemSheet
+          initialDetails={editingEntry?.details ?? ""}
+          initialIconName={editingEntry?.icon ?? null}
+          initialText={editingEntry?.text ?? ""}
+          listId={listId}
+          mode="edit"
+          open={Boolean(editingEntry)}
+          onAdd={async (text, icon, details) => {
+            if (!editingEntry) {
+              return false;
+            }
 
-          const didSaveEntry = await submitEditEntry(editingEntry.id, text, icon, details);
+            const didSaveEntry = await editEntry(editingEntry.id, text, icon, details);
+            if (didSaveEntry) {
+              setEditingEntry(null);
+            }
 
-          if (didSaveEntry) {
-            setEditingEntry(null);
-          }
-
-          return didSaveEntry;
-        }}
-        onClose={() => setEditingEntry(null)}
-      />
-      <ListOptionsSheet
-        isOwner={list?.is_owner ?? false}
-        open={showOptions}
-        onClose={() => setShowOptions(false)}
-        onLeaveSelect={() => void handleLeave()}
-        onRenameSelect={() => setShowRename(true)}
-        onShareSelect={() => setShowShare(true)}
-      />
-      <RenameListSheet
-        currentName={list?.name ?? ""}
-        open={showRename}
-        onClose={() => setShowRename(false)}
-        onRename={handleRename}
-      />
-      <ShareListSheet
-        isSharingLoading={isSharingLoading}
-        isSubmitting={isShareSubmitting}
-        members={members}
-        open={showShare}
-        shareEmail={shareEmail}
-        shareError={shareError}
-        shareNotice={shareNotice}
-        onClose={() => setShowShare(false)}
-        onEmailChange={setShareEmail}
-        onRevoke={handleRevokeMember}
-        onShareSubmit={handleShareSubmit}
-      />
+            return didSaveEntry;
+          }}
+          onClose={() => setEditingEntry(null)}
+        />
+      </DeferredSheet>
+      <DeferredSheet open={showOptions}>
+        <ListOptionsSheet
+          isOwner={list?.is_owner ?? false}
+          open={showOptions}
+          onClose={() => setShowOptions(false)}
+          onLeaveSelect={() => void handleLeave()}
+          onRenameSelect={() => setShowRename(true)}
+          onShareSelect={() => setShowShare(true)}
+        />
+      </DeferredSheet>
+      <DeferredSheet open={showRename}>
+        <RenameListSheet
+          currentName={list?.name ?? ""}
+          open={showRename}
+          onClose={() => setShowRename(false)}
+          onRename={renameList}
+        />
+      </DeferredSheet>
+      <DeferredSheet open={showShare}>
+        <ShareListSheet
+          isSharingLoading={isSharingLoading}
+          isSubmitting={isShareSubmitting}
+          members={members}
+          open={showShare}
+          shareEmail={shareEmail}
+          shareError={shareError}
+          shareNotice={shareNotice}
+          onClose={() => setShowShare(false)}
+          onEmailChange={setShareEmail}
+          onRevoke={handleRevokeMember}
+          onShareSubmit={handleShareSubmit}
+        />
+      </DeferredSheet>
     </div>
   );
 }

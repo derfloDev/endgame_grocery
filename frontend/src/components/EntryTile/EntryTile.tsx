@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { FALLBACK_ICON, FALLBACK_ICON_NAME, ICON_REGISTRY, resolveIconName } from "../../data/iconRegistry";
@@ -6,19 +7,28 @@ import type { Entry } from "../../types";
 import type { ReactElement } from "react";
 import styles from "./EntryTile.module.css";
 
+/** The API returns `null` for entries without details; the tile treats it like "absent". */
+type TileEntry = Omit<Entry, "details"> & { details?: string | null };
+
 interface EntryTileProps {
-  entry: Entry;
+  entry: TileEntry;
   changeKind?: "new" | "edited" | "done";
-  onEdit?: () => void;
-  onToggle?: () => void;
+  /** Receives the entry id, so a parent can pass one stable handler to every tile. */
+  onEdit?: (entryId: string) => void;
+  onToggle?: (entryId: string) => void;
 }
 
-export default function EntryTile({ entry, changeKind, onEdit, onToggle }: EntryTileProps): ReactElement {
+/**
+ * One entry of the list. Memoised: with stable `onEdit`/`onToggle` handlers and the original entry
+ * object, tiles whose entry did not change are skipped when the page re-renders (search typing,
+ * unrelated state), which matters with a thousand open entries.
+ */
+function EntryTile({ entry, changeKind, onEdit, onToggle }: EntryTileProps): ReactElement {
   const { t } = useTranslation();
   const resolvedIconName = resolveIconName(entry.icon);
   const displayIconName = resolvedIconName ?? FALLBACK_ICON_NAME;
   const EntryIcon = ICON_REGISTRY[displayIconName] ?? FALLBACK_ICON;
-  const { pressing, longPressHandlers } = useLongPress(() => onEdit?.(), 500);
+  const { pressing, longPressHandlers } = useLongPress(() => onEdit?.(entry.id), 500);
   const changeLabel = changeKind ? getChangeLabel(changeKind, t) : "";
 
   return (
@@ -40,7 +50,7 @@ export default function EntryTile({ entry, changeKind, onEdit, onToggle }: Entry
       onClick={(event) => {
         longPressHandlers.onClick(event);
         if (!event.defaultPrevented) {
-          onToggle?.();
+          onToggle?.(entry.id);
         }
       }}
     >
@@ -61,6 +71,8 @@ export default function EntryTile({ entry, changeKind, onEdit, onToggle }: Entry
     </button>
   );
 }
+
+export default memo(EntryTile);
 
 function getChangeLabel(changeKind: NonNullable<EntryTileProps["changeKind"]>, t: TFunction): string {
   if (changeKind === "done") {

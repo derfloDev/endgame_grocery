@@ -11,8 +11,8 @@
       "effort": "high"
     },
     "review": {
-      "agent": "claude",
-      "model": "opus",
+      "agent": "codex",
+      "model": "gpt-6-astra",
       "effort": "high"
     }
   },

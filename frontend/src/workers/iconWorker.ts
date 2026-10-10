@@ -1,7 +1,11 @@
 import { pipeline } from "@huggingface/transformers";
 import type { IconMatchResult } from "../types";
 import { ICON_DB } from "../data/iconDatabase";
+import embeddingsUrl from "../data/iconEmbeddings.bin?url";
+import { EMBEDDING_DTYPE, EMBEDDING_MODEL } from "../data/iconEmbeddingModel";
 import { cosineSimilarity } from "../utils/cosineSimilarity";
+import { parseReferenceEmbeddings } from "./iconEmbeddingAsset";
+import type { ReferenceEmbedding } from "./iconEmbeddingAsset";
 
 const configuredThreshold = Number(import.meta.env.VITE_ICON_SIMILARITY_THRESHOLD ?? 0.5);
 const similarityThreshold = Number.isFinite(configuredThreshold) ? configuredThreshold : 0.5;
@@ -18,10 +22,6 @@ type WorkerFeatureExtractor = FeatureExtractor & {
   readonly __workerBoundary: "huggingface-feature-extraction";
 };
 type FeatureExtractorLoader = () => Promise<WorkerFeatureExtractor>;
-type ReferenceEmbedding = {
-  embedding: Embedding;
-  iconName: string;
-};
 type IconWorkerRequest = {
   type?: "init" | "match";
   id?: number;
@@ -38,8 +38,8 @@ let referenceEmbeddingsPromise: Promise<ReferenceEmbedding[]> | undefined;
 const workerSelf = self as unknown as IconWorkerGlobalScope;
 // @ts-expect-error: transformers pipeline output is narrowed at the worker boundary and validated before use.
 const loadFeatureExtractor: FeatureExtractorLoader = () => {
-  return pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
-    quantized: true
+  return pipeline("feature-extraction", EMBEDDING_MODEL, {
+    dtype: EMBEDDING_DTYPE
   });
 };
 
@@ -73,15 +73,29 @@ async function embedText(text: string): Promise<Embedding> {
   return toEmbedding(output.tolist());
 }
 
+/**
+ * The vectors of the icon database are computed offline (`npm run build:icon-embeddings`) and
+ * shipped as an asset, so the first suggestion only has to embed the user's text instead of
+ * running about 200 inferences first.
+ */
 async function getReferenceEmbeddings(): Promise<ReferenceEmbedding[]> {
-  referenceEmbeddingsPromise ??= Promise.all(
-    ICON_DB.map(async (entry) => ({
-      embedding: await embedText([entry.label, ...(entry.tags ?? [])].join(", ")),
-      iconName: entry.icon
-    }))
-  );
+  referenceEmbeddingsPromise ??= loadReferenceEmbeddings().catch((error: unknown) => {
+    // Allow a later request to retry after a failed download.
+    referenceEmbeddingsPromise = undefined;
+    throw error;
+  });
 
   return referenceEmbeddingsPromise;
+}
+
+async function loadReferenceEmbeddings(): Promise<ReferenceEmbedding[]> {
+  const response = await fetch(embeddingsUrl);
+
+  if (!response.ok) {
+    throw new Error(`Icon embeddings could not be loaded (HTTP ${response.status}).`);
+  }
+
+  return parseReferenceEmbeddings(await response.arrayBuffer(), ICON_DB);
 }
 
 async function matchIcon(text: string): Promise<IconMatchResult> {
@@ -132,7 +146,7 @@ workerSelf.addEventListener("message", async (event) => {
 
   try {
     if (type === "init") {
-      await getReferenceEmbeddings();
+      await Promise.all([getExtractor(), getReferenceEmbeddings()]);
       workerSelf.postMessage({ type: "ready" });
       return;
     }

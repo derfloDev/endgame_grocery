@@ -1,5 +1,5 @@
 import { createCacheKey, sendJsonRequest } from "./client";
-import type { Member } from "../types";
+import type { Member, MutationResult } from "../types";
 
 interface SharingRequestOptions {
   method?: string;
@@ -19,19 +19,25 @@ interface InviteAcceptResponse {
   listId: string;
 }
 
-function createMembersCacheKey(listId: string): string {
+/** The invitation a successful share request created. */
+export type ShareInviteResponse = MutationResult<{ invite: { invited_email?: string } }>;
+
+type EmptyMutationResponse = MutationResult<Record<string, never>> | null;
+
+/** Cache key of the members of one list; the only place that spells it out. */
+export function createMembersCacheKey(listId: string): string {
   return createCacheKey("members", listId);
 }
 
-function sendSharingRequest(
+function sendSharingRequest<T>(
   listId: string,
   token: string,
   path = "",
   options: SharingRequestOptions = {}
-): Promise<unknown> {
+): Promise<T> {
   const method = options.method ?? "GET";
 
-  return sendJsonRequest(`/api/lists/${listId}/members${path}`, {
+  return sendJsonRequest<T>(`/api/lists/${listId}/members${path}`, {
     method,
     token,
     payload: options.payload,
@@ -42,24 +48,25 @@ function sendSharingRequest(
 }
 
 export function fetchListMembers(listId: string, token: string): Promise<MembersResponse> {
-  return sendSharingRequest(listId, token) as Promise<MembersResponse>;
+  return sendSharingRequest<MembersResponse>(listId, token);
 }
 
-export function shareListWithMember(listId: string, token: string, payload: SharePayload): Promise<unknown> {
-  return sendSharingRequest(listId, token, "", {
+export function shareListWithMember(listId: string, token: string, payload: SharePayload): Promise<ShareInviteResponse> {
+  return sendSharingRequest<ShareInviteResponse>(listId, token, "", {
     method: "POST",
     payload
   });
 }
 
-export function revokeListMember(listId: string, memberId: string, token: string): Promise<unknown> {
-  return sendSharingRequest(listId, token, `/${memberId}`, {
+/** Revoking and leaving answer `204 No Content` (`null`) or are queued while offline. */
+export function revokeListMember(listId: string, memberId: string, token: string): Promise<EmptyMutationResponse> {
+  return sendSharingRequest<EmptyMutationResponse>(listId, token, `/${memberId}`, {
     method: "DELETE"
   });
 }
 
-export function leaveList(listId: string, token: string): Promise<unknown> {
-  return sendJsonRequest(`/api/lists/${listId}/leave`, {
+export function leaveList(listId: string, token: string): Promise<EmptyMutationResponse> {
+  return sendJsonRequest<EmptyMutationResponse>(`/api/lists/${listId}/leave`, {
     method: "DELETE",
     token,
     queueable: true
@@ -67,8 +74,8 @@ export function leaveList(listId: string, token: string): Promise<unknown> {
 }
 
 export function acceptInvite(token: string, authToken: string): Promise<InviteAcceptResponse> {
-  return sendJsonRequest(`/api/invites/${encodeURIComponent(token)}`, {
+  return sendJsonRequest<InviteAcceptResponse>(`/api/invites/${encodeURIComponent(token)}`, {
     method: "GET",
     token: authToken
-  }) as Promise<InviteAcceptResponse>;
+  });
 }

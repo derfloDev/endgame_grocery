@@ -1,5 +1,6 @@
 import { enqueueOfflineMutation, readCachedResource, writeCachedResource } from "./offlineStore";
 import type { QueueMeta } from "../types";
+import { ApiError } from "./errors";
 import { isNetworkError, requestJson } from "./request";
 import { REQUEST_TIMEOUT_MS } from "./connectionTimings";
 
@@ -23,6 +24,7 @@ interface SendJsonRequestOptions<T> extends CachedReadOptions<T> {
 
 interface ErrorResponse {
   error?: string;
+  code?: string;
 }
 
 export class AuthExpiredError extends Error {
@@ -54,7 +56,7 @@ export async function sendJsonRequest<T = unknown>(
     queueMeta = null,
     timeoutMs = REQUEST_TIMEOUT_MS
   }: SendJsonRequestOptions<T> = {}
-): Promise<unknown> {
+): Promise<T> {
   let networkSettled = false;
   if (method === "GET" && cacheKey && onCachedValue) {
     // Read alongside the network, never delaying it. Once the response settles (including
@@ -78,8 +80,9 @@ export async function sendJsonRequest<T = unknown>(
     }, timeoutMs);
     networkSettled = true;
 
+    // The caller states what the endpoint returns (`T`); an empty 204 body is `null`.
     if (response.status === 204) {
-      return null;
+      return null as T;
     }
 
     if (!response.ok) {
@@ -88,14 +91,14 @@ export async function sendJsonRequest<T = unknown>(
         throw new AuthExpiredError();
       }
 
-      throw new Error(data.error ?? "Request failed.");
+      throw new ApiError(data.error ?? "Request failed.", response.status, data.code);
     }
 
     if (method === "GET" && cacheKey) {
       await writeCachedResource(cacheKey, data);
     }
 
-    return data;
+    return data as T;
   } catch (error) {
     networkSettled = true;
     if (method === "GET" && cacheKey && isNetworkError(error)) {
@@ -105,7 +108,7 @@ export async function sendJsonRequest<T = unknown>(
         return {
           ...(cachedValue as Record<string, unknown>),
           offline: true
-        };
+        } as T;
       }
 
       throw new Error(offlineFallbackMessage);
@@ -117,12 +120,14 @@ export async function sendJsonRequest<T = unknown>(
         url,
         method,
         payload: payload ?? null,
-        token,
+        // The owner is stamped by the store; the token is deliberately not stored (the drain
+        // sends whatever token is valid when it runs).
         createdAt: new Date().toISOString(),
         queueMeta
       });
 
-      return { queued: true };
+      // Only mutations are queueable; their `T` is a `MutationResult`, which includes this shape.
+      return { queued: true } as T;
     }
 
     throw error;

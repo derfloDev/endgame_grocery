@@ -1,0 +1,7 @@
+{
+  "model": "Xenova/all-MiniLM-L6-v2",
+  "dtype": "q8",
+  "dimensions": 384,
+  "count": 200,
+  "textsSha256": "def19be84af101893d50e0c2c52b7c9cfb04a2a8dd0f04ac8806b0e15dcef218"
+}

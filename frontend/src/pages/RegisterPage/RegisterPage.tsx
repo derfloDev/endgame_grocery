@@ -5,6 +5,8 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import logo from "../../assets/endgame_grocery_logo.png";
 import { useAuth } from "../../context/AuthContext";
 import styles from "../../styles/auth.module.css";
+import { getPasswordPolicyError } from "../../utils/passwordPolicy";
+import { getErrorMessage } from "../../api/errors";
 
 interface RegisterResult {
   token?: string;
@@ -35,6 +37,14 @@ export default function RegisterPage(): ReactElement {
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError("");
+
+    const passwordProblem = getPasswordPolicyError(password);
+
+    if (passwordProblem) {
+      setError(t(passwordProblem === "tooShort" ? "auth.passwordTooShort" : "auth.passwordTooLong"));
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -53,7 +63,7 @@ export default function RegisterPage(): ReactElement {
 
       navigate("/verify-email", { replace: true, state: { email } });
     } catch (submitError) {
-      setError(getErrorMessage(submitError));
+      setError(getErrorMessage(submitError, t));
     } finally {
       setIsSubmitting(false);
     }
@@ -107,15 +117,16 @@ export default function RegisterPage(): ReactElement {
             <label htmlFor="register-password">{t("auth.password")}</label>
             <input
               id="register-password"
+              aria-describedby="register-password-hint"
               autoComplete="new-password"
               className="eg-input"
-              minLength={8}
               name="password"
               required
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
+            <p className={styles["password-hint"]} id="register-password-hint">{t("auth.passwordHint")}</p>
           </div>
           <div className="button-row">
             <button className="eg-btn-primary" disabled={isSubmitting} type="submit">
@@ -131,6 +142,3 @@ export default function RegisterPage(): ReactElement {
   );
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}

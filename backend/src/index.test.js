@@ -23,6 +23,7 @@ describe("startServer", () => {
     const config = {
       port: 4100,
       databaseUrl: "postgres://db",
+      jwtSecret: "k3Jf9sL0pQ2xV7bN5mC8zA1dR4tY6uHw",
       smtpHost: "smtp.example.com",
       vapidPublicKey: "public-key",
       vapidPrivateKey: "private-key",
@@ -53,6 +54,37 @@ describe("startServer", () => {
         message: "Backend started"
       }
     ]);
+  });
+
+  it("logs every configuration problem and exits with code 1 instead of listening", () => {
+    const errorEntries = [];
+    const exitCodes = [];
+    let listened = false;
+
+    startServer({
+      app: {
+        listen() {
+          listened = true;
+          return { close() {} };
+        }
+      },
+      config: { port: 4100, databaseUrl: "", jwtSecret: "change-me" },
+      exit(code) {
+        exitCodes.push(code);
+      },
+      logger: {
+        info() {},
+        error(fields, message) {
+          errorEntries.push({ fields, message });
+        }
+      }
+    });
+
+    assert.equal(listened, false);
+    assert.deepEqual(exitCodes, [1]);
+    assert.equal(errorEntries.length, 1);
+    assert.equal(errorEntries[0].fields.problems.length, 2);
+    assert.match(errorEntries[0].message, /Invalid configuration/);
   });
 
   it("prints the app version from the root package in the container entrypoint", () => {

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AuthExpiredError, createTemporaryId } from "../../api/client";
 import { writeCachedResource } from "../../api/offlineStore";
-import { createList, deleteList, fetchLists, renameList } from "../../api/lists";
-import InfoSheet from "../../components/InfoSheet/InfoSheet";
+import { SSE_EVENTS } from "../../api/sseEvents";
+import { LISTS_CACHE_KEY, createList, deleteList, fetchLists, renameList } from "../../api/lists";
 import ListCardHome from "../../components/ListCardHome/ListCardHome";
 import NewListSheet from "../../components/NewListSheet/NewListSheet";
+import DeferredSheet from "../../components/ui/DeferredSheet/DeferredSheet";
 import EmptyState from "../../components/ui/EmptyState/EmptyState";
 import ErrorState from "../../components/ui/ErrorState/ErrorState";
 import FAB from "../../components/ui/FAB/FAB";
@@ -20,6 +21,7 @@ import { useListEvents } from "../../hooks/useListEvents";
 import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 import type { List } from "../../types";
 import { leaveSharedList } from "../leaveListAction";
+import { InfoSheet } from "./lazySheets";
 import styles from "./OverviewPage.module.css";
 import {
   DEFAULT_OVERVIEW_SORT,
@@ -28,7 +30,6 @@ import {
 } from "./overviewSort";
 import type { OverviewSortMode } from "./overviewSort";
 
-const LISTS_CACHE_KEY = "lists";
 const OVERVIEW_SORT_KEY = "overview_sort";
 
 interface OverviewList extends List {
@@ -37,13 +38,31 @@ interface OverviewList extends List {
   is_pending_sync?: boolean;
 }
 
+function readNotice(state: unknown): string {
+  const notice = (state as { notice?: unknown } | null)?.notice;
+
+  return typeof notice === "string" ? notice : "";
+}
+
 export default function OverviewPage(): ReactElement {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const location = useLocation();
+  const { token, user } = useAuth();
+  const currentUserId = user?.id;
   const { syncVersion } = useOfflineQueue();
   const { resyncVersion } = useEventSource();
+  // The detail page hands over why it sent the user back (list deleted, user removed).
+  const [notice] = useState<string>(() => readNotice(location.state));
   const [lists, setLists] = useState<OverviewList[]>([]);
+  // Event handlers read the current lists without re-subscribing on every change. The ref is
+  // written together with the state (not from an effect), so a handler that runs right after a
+  // render never sees stale lists.
+  const listsRef = useRef<OverviewList[]>(lists);
+  const applyLists = useCallback((nextLists: OverviewList[]) => {
+    listsRef.current = nextLists;
+    setLists(nextLists);
+  }, []);
   const [error, setError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showInfo, setShowInfo] = useState<boolean>(false);
@@ -55,6 +74,15 @@ export default function OverviewPage(): ReactElement {
   const isMountedRef = useRef<boolean>(false);
 
   useEffect(() => {
+    // Show the notice once: drop it from the history entry so a reload does not repeat it.
+    if (notice) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // Only the notice read on mount matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     isMountedRef.current = true;
 
     return () => {
@@ -62,18 +90,47 @@ export default function OverviewPage(): ReactElement {
     };
   }, []);
 
+  // True once lists are on screen (from the cache or the network). Only the very first load shows the
+  // skeleton; later reloads (events, reconnects, sync) refresh in place.
+  const hasListsRef = useRef<boolean>(false);
+  const loadedForTokenRef = useRef<string>(token);
+
   const loadLists = useCallback(async (): Promise<void> => {
+    if (loadedForTokenRef.current !== token) {
+      // Another session: never keep showing the previous user's lists while loading.
+      loadedForTokenRef.current = token;
+      hasListsRef.current = false;
+      applyLists([]);
+      setIsLoading(true);
+    }
+
     setError(null);
-    setIsLoading(true);
+
+    if (!hasListsRef.current) {
+      setIsLoading(true);
+    }
 
     try {
-      const result = await fetchLists(token);
+      const result = await fetchLists(token, {
+        // Cached lists are shown right away while the request is in flight.
+        onCachedValue: (cached) => {
+          if (!isMountedRef.current || loadedForTokenRef.current !== token) {
+            return;
+          }
 
-      if (isMountedRef.current) {
-        setLists((result.lists ?? []) as OverviewList[]);
+          hasListsRef.current = true;
+          applyLists((cached.lists ?? []) as OverviewList[]);
+          setIsLoading(false);
+        }
+      });
+
+      if (isMountedRef.current && loadedForTokenRef.current === token) {
+        hasListsRef.current = true;
+        applyLists((result.lists ?? []) as OverviewList[]);
       }
     } catch (loadError) {
-      if (isMountedRef.current) {
+      // A failed refresh keeps what is on screen; only an empty page reports the error.
+      if (isMountedRef.current && !hasListsRef.current) {
         setError(loadError);
       }
     } finally {
@@ -81,7 +138,7 @@ export default function OverviewPage(): ReactElement {
         setIsLoading(false);
       }
     }
-  }, [token]);
+  }, [applyLists, token]);
 
   useEffect(() => {
     void loadLists();
@@ -91,16 +148,48 @@ export default function OverviewPage(): ReactElement {
     void loadLists();
   }, [loadLists]);
 
-  useListEvents("list:updated", null, handleListChange);
-  useListEvents("list:deleted", null, handleListChange);
+  // Drops a list that is gone for this user without waiting for (or showing) a reload.
+  const removeListById = useCallback((listId: unknown) => {
+    if (typeof listId !== "string") {
+      return;
+    }
+
+    const remainingLists = listsRef.current.filter((list) => list.id !== listId);
+
+    if (remainingLists.length === listsRef.current.length) {
+      return;
+    }
+
+    applyLists(remainingLists);
+    void writeCachedResource(LISTS_CACHE_KEY, { lists: remainingLists });
+  }, [applyLists]);
+
+  const handleListDeleted = useCallback(
+    (data: Record<string, unknown>) => {
+      removeListById(data.listId);
+      void loadLists();
+    },
+    [loadLists, removeListById]
+  );
+
+  // The removed user is no longer a member, so the server sends this event to them directly.
+  const handleMemberRemoved = useCallback(
+    (data: Record<string, unknown>) => {
+      if (currentUserId && data.userId === currentUserId) {
+        removeListById(data.listId);
+      }
+    },
+    [currentUserId, removeListById]
+  );
+
+  useListEvents(SSE_EVENTS.listUpdated, null, handleListChange);
+  useListEvents(SSE_EVENTS.listDeleted, null, handleListDeleted);
+  useListEvents(SSE_EVENTS.memberRemoved, null, handleMemberRemoved);
 
   async function updateLists(updater: (currentLists: OverviewList[]) => OverviewList[]): Promise<void> {
-    let nextLists: OverviewList[] = [];
+    const nextLists = updater(listsRef.current);
 
-    setLists((currentLists) => {
-      nextLists = updater(currentLists);
-      return nextLists;
-    });
+    applyLists(nextLists);
 
     await writeCachedResource(LISTS_CACHE_KEY, { lists: nextLists });
   }
@@ -220,6 +309,7 @@ export default function OverviewPage(): ReactElement {
       </div>
 
       <div className={styles["overview-content"]}>
+        {notice ? <p className="eg-success-banner" role="status">{notice}</p> : null}
         {error && !shouldSuppressError ? <ErrorState onRetry={() => void loadLists()} /> : null}
         {isLoading ? <LoadingState rows={3} /> : null}
         {!isLoading && !error && lists.length === 0 ? (
@@ -245,7 +335,9 @@ export default function OverviewPage(): ReactElement {
       </div>
 
       <FAB onClick={() => setShowNew(true)} />
-      <InfoSheet open={showInfo} onClose={() => setShowInfo(false)} />
+      <DeferredSheet open={showInfo}>
+        <InfoSheet open={showInfo} onClose={() => setShowInfo(false)} />
+      </DeferredSheet>
       <NewListSheet
         open={showNew}
         onAdd={(name) => void createListByName(name)}

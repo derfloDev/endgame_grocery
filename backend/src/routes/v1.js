@@ -2,8 +2,9 @@ import { Router } from "express";
 import { getPool } from "../db/client.js";
 import { logger as defaultLogger } from "../logger.js";
 import { createRequireApiKey } from "../middleware/auth.js";
-import { ensureListAccess } from "../middleware/listAccess.js";
+import { createEntry, deleteEntry, listEntries, updateEntry } from "../services/entryService.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -18,16 +19,6 @@ function serializeItem(row) {
     status: row.status,
     description: row.details ?? null
   };
-}
-
-function broadcastListEvent({ sseManager, logger, pool, listId, eventType, data }) {
-  try {
-    void Promise.resolve(sseManager.broadcastToList(pool, listId, eventType, data)).catch((broadcastError) => {
-      logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
-    });
-  } catch (broadcastError) {
-    logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
-  }
 }
 
 /**
@@ -52,11 +43,6 @@ export function createV1Router({
   router.use(requireApiKeyMiddleware);
 
   router.get("/lists", async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const result = await pool.query(
         `
@@ -82,37 +68,62 @@ export function createV1Router({
     }
   });
 
-  router.get("/lists/:listId/items", async (req, res, next) => {
-    if (!isValidUuid(req.params.listId)) {
-      res.status(404).json({ error: "List not found." });
-      return;
+  // Entry rules (access, limits, last_updated_by, events, push) live in the entry service that the
+  // app API shares; these routes only parse input and serialise the v1 item shape.
+  const contextOf = (req) => ({
+    pool,
+    sseManager,
+    logger,
+    userId: req.user.sub,
+    listId: req.params.listId
+  });
+
+  /** Passes the API error for a non-ok service result to `next`. Returns true when it did. */
+  function respondToFailure(result, next) {
+    if (result.status === "forbidden") {
+      next(new ApiError(403, "list.forbidden", "You do not have access to this list."));
+      return true;
     }
 
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+    if (result.status === "not_found") {
+      next(new ApiError(404, "item.not_found", "Item not found."));
+      return true;
+    }
+
+    if (result.status === "limit_open") {
+      next(
+        new ApiError(
+          422,
+          "entry.limit_open",
+          "This list has reached the maximum of 1,000 open items. Please complete or remove some items first."
+        )
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  /** A description must be a string or null; anything else is a client error. */
+  function isValidDescription(description) {
+    return description === undefined || description === null || typeof description === "string";
+  }
+
+  router.get("/lists/:listId/items", async (req, res, next) => {
+    if (!isValidUuid(req.params.listId)) {
+      next(new ApiError(404, "list.not_found", "List not found."));
       return;
     }
 
     try {
-      const hasAccess = await ensureListAccess(pool, req.params.listId, req.user.sub);
+      const result = await listEntries(contextOf(req));
 
-      if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
+      if (respondToFailure(result, next)) {
         return;
       }
 
-      const result = await pool.query(
-        `
-          SELECT id, text, status, details
-          FROM entries
-          WHERE list_id = $1
-          ORDER BY status ASC, created_at ASC
-        `,
-        [req.params.listId]
-      );
-
       res.json({
-        items: result.rows.map(serializeItem)
+        items: result.entries.map(serializeItem)
       });
     } catch (error) {
       next(error);
@@ -121,53 +132,31 @@ export function createV1Router({
 
   router.post("/lists/:listId/items", async (req, res, next) => {
     if (!isValidUuid(req.params.listId)) {
-      res.status(404).json({ error: "List not found." });
+      next(new ApiError(404, "list.not_found", "List not found."));
       return;
     }
 
     const { name, description } = req.body ?? {};
 
-    if (!name?.trim()) {
-      res.status(400).json({ error: "Item name is required." });
+    if (typeof name !== "string" || !name.trim()) {
+      next(new ApiError(400, "validation.item_name_required", "Item name is required."));
       return;
     }
 
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+    if (!isValidDescription(description)) {
+      next(new ApiError(400, "validation.item_description_invalid", "Item description must be a string."));
       return;
     }
 
     try {
-      const hasAccess = await ensureListAccess(pool, req.params.listId, req.user.sub);
+      const result = await createEntry(contextOf(req), { text: name.trim(), details: description });
 
-      if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
+      if (respondToFailure(result, next)) {
         return;
       }
 
-      const result = await pool.query(
-        `
-          INSERT INTO entries (list_id, text, status, details)
-          VALUES ($1, $2, 'open', $3)
-          RETURNING id, text, status, details
-        `,
-        [req.params.listId, name.trim(), description?.trim() ?? null]
-      );
-
-      broadcastListEvent({
-        sseManager,
-        logger,
-        pool,
-        listId: req.params.listId,
-        eventType: "entry:created",
-        data: {
-          listId: req.params.listId,
-          entryId: result.rows[0].id
-        }
-      });
-
       res.status(201).json({
-        item: serializeItem(result.rows[0])
+        item: serializeItem(result.entry)
       });
     } catch (error) {
       next(error);
@@ -176,69 +165,24 @@ export function createV1Router({
 
   router.post("/lists/:listId/items/:itemId/toggle", async (req, res, next) => {
     if (!isValidUuid(req.params.listId)) {
-      res.status(404).json({ error: "List not found." });
+      next(new ApiError(404, "list.not_found", "List not found."));
       return;
     }
 
     if (!isValidUuid(req.params.itemId)) {
-      res.status(404).json({ error: "Item not found." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(404, "item.not_found", "Item not found."));
       return;
     }
 
     try {
-      const hasAccess = await ensureListAccess(pool, req.params.listId, req.user.sub);
+      const result = await updateEntry(contextOf(req), { entryId: req.params.itemId, toggle: true });
 
-      if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
+      if (respondToFailure(result, next)) {
         return;
       }
-
-      const currentResult = await pool.query(
-        `
-          SELECT id, text, status, icon, details
-          FROM entries
-          WHERE id = $1 AND list_id = $2
-          LIMIT 1
-        `,
-        [req.params.itemId, req.params.listId]
-      );
-      const currentItem = currentResult.rows[0];
-
-      if (!currentItem) {
-        res.status(404).json({ error: "Item not found." });
-        return;
-      }
-
-      const nextStatus = currentItem.status === "done" ? "open" : "done";
-      const updateResult = await pool.query(
-        `
-          UPDATE entries
-          SET status = $1, updated_at = NOW()
-          WHERE id = $2 AND list_id = $3
-          RETURNING id, text, status, details
-        `,
-        [nextStatus, req.params.itemId, req.params.listId]
-      );
-
-      broadcastListEvent({
-        sseManager,
-        logger,
-        pool,
-        listId: req.params.listId,
-        eventType: "entry:updated",
-        data: {
-          listId: req.params.listId,
-          entryId: req.params.itemId
-        }
-      });
 
       res.json({
-        item: serializeItem(updateResult.rows[0])
+        item: serializeItem(result.entry)
       });
     } catch (error) {
       next(error);
@@ -247,75 +191,41 @@ export function createV1Router({
 
   router.patch("/lists/:listId/items/:itemId", async (req, res, next) => {
     if (!isValidUuid(req.params.listId)) {
-      res.status(404).json({ error: "List not found." });
+      next(new ApiError(404, "list.not_found", "List not found."));
       return;
     }
 
     if (!isValidUuid(req.params.itemId)) {
-      res.status(404).json({ error: "Item not found." });
+      next(new ApiError(404, "item.not_found", "Item not found."));
       return;
     }
 
     const { name, description } = req.body ?? {};
 
-    if (!name?.trim()) {
-      res.status(400).json({ error: "Item name is required." });
+    if (typeof name !== "string" || !name.trim()) {
+      next(new ApiError(400, "validation.item_name_required", "Item name is required."));
       return;
     }
 
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+    if (!isValidDescription(description)) {
+      next(new ApiError(400, "validation.item_description_invalid", "Item description must be a string."));
       return;
     }
 
     try {
-      const hasAccess = await ensureListAccess(pool, req.params.listId, req.user.sub);
-
-      if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
-        return;
-      }
-
-      const shouldUpdateDescription = "description" in (req.body ?? {});
-      const result = shouldUpdateDescription
-        ? await pool.query(
-          `
-            UPDATE entries
-            SET text = $1, details = $2, updated_at = NOW()
-            WHERE id = $3 AND list_id = $4
-            RETURNING id, text, status, details
-          `,
-          [name.trim(), description?.trim() ?? null, req.params.itemId, req.params.listId]
-        )
-        : await pool.query(
-          `
-            UPDATE entries
-            SET text = $1, updated_at = NOW()
-            WHERE id = $2 AND list_id = $3
-            RETURNING id, text, status, details
-          `,
-          [name.trim(), req.params.itemId, req.params.listId]
-        );
-
-      if (!result.rows[0]) {
-        res.status(404).json({ error: "Item not found." });
-        return;
-      }
-
-      broadcastListEvent({
-        sseManager,
-        logger,
-        pool,
-        listId: req.params.listId,
-        eventType: "entry:updated",
-        data: {
-          listId: req.params.listId,
-          entryId: req.params.itemId
-        }
+      const result = await updateEntry(contextOf(req), {
+        entryId: req.params.itemId,
+        text: name,
+        hasDetails: "description" in (req.body ?? {}),
+        details: description
       });
 
+      if (respondToFailure(result, next)) {
+        return;
+      }
+
       res.json({
-        item: serializeItem(result.rows[0])
+        item: serializeItem(result.entry)
       });
     } catch (error) {
       next(error);
@@ -324,53 +234,21 @@ export function createV1Router({
 
   router.delete("/lists/:listId/items/:itemId", async (req, res, next) => {
     if (!isValidUuid(req.params.listId)) {
-      res.status(404).json({ error: "List not found." });
+      next(new ApiError(404, "list.not_found", "List not found."));
       return;
     }
 
     if (!isValidUuid(req.params.itemId)) {
-      res.status(404).json({ error: "Item not found." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(404, "item.not_found", "Item not found."));
       return;
     }
 
     try {
-      const hasAccess = await ensureListAccess(pool, req.params.listId, req.user.sub);
+      const result = await deleteEntry(contextOf(req), { entryId: req.params.itemId });
 
-      if (!hasAccess) {
-        res.status(403).json({ error: "You do not have access to this list." });
+      if (respondToFailure(result, next)) {
         return;
       }
-
-      const result = await pool.query(
-        `
-          DELETE FROM entries
-          WHERE id = $1 AND list_id = $2
-          RETURNING id
-        `,
-        [req.params.itemId, req.params.listId]
-      );
-
-      if (!result.rows[0]) {
-        res.status(404).json({ error: "Item not found." });
-        return;
-      }
-
-      broadcastListEvent({
-        sseManager,
-        logger,
-        pool,
-        listId: req.params.listId,
-        eventType: "entry:deleted",
-        data: {
-          listId: req.params.listId,
-          entryId: req.params.itemId
-        }
-      });
 
       res.status(204).send();
     } catch (error) {

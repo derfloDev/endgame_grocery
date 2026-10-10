@@ -1,7 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchCurrentUser, loginUser, registerUser } from "../api/auth";
+import { notifyAuthSession, publishAuthSession } from "../api/authSession";
+import { clearCachedResources } from "../api/offlineStore";
 import type { User } from "../types";
 import { SESSION_EXPIRED_REDIRECT_KEY } from "./authStorage";
 
@@ -62,6 +64,14 @@ export function AuthProvider({ children }: AuthProviderProps): ReactElement {
   const [token, setToken] = useState(() => window.localStorage.getItem(STORAGE_KEY) ?? "");
   const [user, setUser] = useState(() => getStoredUser(window.localStorage.getItem(STORAGE_KEY) ?? ""));
 
+  // The offline cache and queue follow the signed-in user. Publishing during render (idempotent,
+  // silent) guarantees children already see the right scope in their first effects; subscribers
+  // are told from an effect, because they set React state.
+  publishAuthSession(token, parseJwtSubject(token) ?? "");
+  useEffect(() => {
+    notifyAuthSession();
+  }, [token]);
+
   const setAuthToken = useCallback((nextToken: string, nextUser: User | null = null): void => {
     setToken(nextToken);
 
@@ -84,8 +94,13 @@ export function AuthProvider({ children }: AuthProviderProps): ReactElement {
     setUser(normalizedUser);
   }, []);
 
+  // An explicit logout also wipes the read cache so the next person on this device never sees it.
+  // Queued changes stay; they belong to their user and only that user's session replays them.
   const logout = useCallback((): void => {
     setAuthToken("");
+    void clearCachedResources().catch(() => {
+      // A failed wipe must not keep the user signed in.
+    });
   }, [setAuthToken]);
 
   useEffect(() => {
@@ -100,7 +115,8 @@ export function AuthProvider({ children }: AuthProviderProps): ReactElement {
         replace: true,
         state: redirectState
       });
-      logout();
+      // The session ended, the person did not: keep their cache so signing in again is seamless.
+      setAuthToken("");
     }
 
     window.addEventListener("auth:expired", handleAuthExpired);
@@ -108,7 +124,7 @@ export function AuthProvider({ children }: AuthProviderProps): ReactElement {
     return () => {
       window.removeEventListener("auth:expired", handleAuthExpired);
     };
-  }, [location.pathname, logout, navigate]);
+  }, [location.pathname, navigate, setAuthToken]);
 
   useEffect(() => {
     if (!token || user?.display_name) {
@@ -133,24 +149,26 @@ export function AuthProvider({ children }: AuthProviderProps): ReactElement {
     };
   }, [token, user?.display_name, setAuthToken]);
 
-  async function login(credentials: LoginCredentials): Promise<LoginResult> {
-    const result = await loginUser(credentials);
-    setAuthToken(result.token, result.user ?? null);
-    return result;
-  }
+  const login = useCallback(
+    async (credentials: LoginCredentials): Promise<LoginResult> => {
+      const result = await loginUser(credentials);
+      setAuthToken(result.token, result.user ?? null);
+      return result;
+    },
+    [setAuthToken]
+  );
 
-  async function register(payload: unknown): Promise<unknown> {
-    return registerUser(payload as Parameters<typeof registerUser>[0]);
-  }
+  const register = useCallback(
+    async (payload: unknown): Promise<unknown> => registerUser(payload as Parameters<typeof registerUser>[0]),
+    []
+  );
 
-  const value: AuthContextValue = {
-    token,
-    user,
-    login,
-    register,
-    setAuthToken,
-    logout
-  };
+  // Stable between renders that change neither the session nor the user, so consumers (nearly the
+  // whole app) are not re-rendered by unrelated parent updates.
+  const value = useMemo<AuthContextValue>(
+    () => ({ token, user, login, register, setAuthToken, logout }),
+    [token, user, login, register, setAuthToken, logout]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

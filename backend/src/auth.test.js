@@ -5,7 +5,9 @@ import jwt from "jsonwebtoken";
 import pino from "pino";
 import request from "supertest";
 import { createApp } from "./app.js";
+import { withTransactions } from "./testHelpers.js";
 import { createRequireApiKey, createRequireAuth } from "./middleware/auth.js";
+import { getApiKeyHint, hashToken } from "./tokens.js";
 
 describe("authentication routes", () => {
   it("returns 404 when registration is disabled", async () => {
@@ -29,7 +31,7 @@ describe("authentication routes", () => {
     });
 
     assert.equal(response.status, 404);
-    assert.equal(response.text, "");
+    assert.deepEqual(response.body, { error: "Registration is disabled.", code: "auth.registration_disabled" });
     assert.equal(queryCalled, false);
   });
 
@@ -68,7 +70,7 @@ describe("authentication routes", () => {
 
     const app = createApp({
       logger,
-      pool,
+      pool: withTransactions(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d",
@@ -117,7 +119,8 @@ describe("authentication routes", () => {
     ]);
     assert.match(queries[1][0], /INSERT INTO email_verification_tokens/);
     assert.equal(queries[1][1][0], "user-1");
-    assert.equal(queries[1][1][1], "verification-token-1");
+    // Only the hash of the token is stored; the plaintext goes into the mail.
+    assert.equal(queries[1][1][1], hashToken("verification-token-1"));
     assert.equal(queries[1][1][2].toISOString(), "2026-04-22T00:00:00.000Z");
     assert.deepEqual(findLogEntry(getEntries(), "User registered"), {
       email: "demo@example.com",
@@ -134,8 +137,7 @@ describe("authentication routes", () => {
     const queries = [];
     const sseManager = createSseManagerSpy();
     const { logger, getEntries } = createLogCapture();
-    const pool = {
-      async query(text, params) {
+    const run = async (text, params) => {
         queries.push([normalizeSql(text), params]);
 
         if (text.includes("FROM list_invites")) {
@@ -164,13 +166,26 @@ describe("authentication routes", () => {
           };
         }
 
+        if (text.includes("UPDATE list_invites")) {
+          return { rows: [{ list_id: "list-1" }] };
+        }
+
+        if (text.includes("INSERT INTO list_members")) {
+          return { rows: [{ user_id: "user-9" }] };
+        }
+
         return { rows: [] };
+    };
+    const pool = {
+      query: run,
+      async connect() {
+        return { query: run, release() {} };
       }
     };
 
     const app = createApp({
       logger,
-      pool,
+      pool: withTransactions(pool),
       sseManager,
       config: {
         jwtSecret: "test-secret",
@@ -191,7 +206,7 @@ describe("authentication routes", () => {
       email: "demo@example.com",
       password: "password123",
       display_name: "Demo User",
-      invite_token: "invite-token-1"
+      invite_token: "40000000-0000-4000-8000-000000000001"
     });
 
     assert.equal(response.status, 201);
@@ -204,21 +219,22 @@ describe("authentication routes", () => {
     });
     assert.equal(sentMessages.length, 0);
     assert.match(queries[0][0], /FROM list_invites/);
-    assert.equal(queries[0][1][0], "invite-token-1");
+    assert.equal(queries[0][1][0], hashToken("40000000-0000-4000-8000-000000000001"));
     assert.equal(queries[0][1][1] instanceof Date, true);
-    assert.match(queries[1][0], /INSERT INTO users/);
-    assert.deepEqual(queries[1][1], [
+    // User insert, invite claim and membership share one transaction.
+    assert.equal(queries[1][0], "BEGIN");
+    assert.match(queries[2][0], /INSERT INTO users/);
+    assert.deepEqual(queries[2][1], [
       "demo@example.com",
-      queries[1][1][1],
+      queries[2][1][1],
       "Demo User",
       true
     ]);
-    assert.match(queries[2][0], /SELECT user_id FROM list_members/);
-    assert.deepEqual(queries[2][1], ["list-1", "user-9"]);
-    assert.match(queries[3][0], /INSERT INTO list_members/);
-    assert.deepEqual(queries[3][1], ["list-1", "user-9"]);
-    assert.match(queries[4][0], /UPDATE list_invites/);
-    assert.deepEqual(queries[4][1], ["invite-1"]);
+    assert.match(queries[3][0], /UPDATE list_invites SET status = 'accepted' WHERE id = \$1 AND status = 'pending'/);
+    assert.equal(queries[3][1][0], "invite-1");
+    assert.match(queries[4][0], /INSERT INTO list_members/);
+    assert.deepEqual(queries[4][1], ["list-1", "user-9"]);
+    assert.equal(queries[5][0], "COMMIT");
     assert.deepEqual(sseManager.calls, [
       ["list-1", "member:added", { listId: "list-1", userId: "user-9" }]
     ]);
@@ -232,7 +248,54 @@ describe("authentication routes", () => {
     });
   });
 
-  it("falls back to the standard verification flow when the invite token is invalid", async () => {
+    it("does not auto-verify or join when the invite was sent to another email", async () => {
+    const queries = [];
+    const sseManager = createSseManagerSpy();
+    const pool = {
+      async query(text, params) {
+        queries.push([normalizeSql(text), params]);
+
+        if (text.includes("FROM list_invites")) {
+          return {
+            rows: [{ id: "invite-1", list_id: "list-1", invited_email: "someone-else@example.com", status: "pending" }]
+          };
+        }
+
+        if (text.includes("INSERT INTO users")) {
+          return {
+            rows: [{ id: "user-9", email: "demo@example.com", display_name: "Demo User", created_at: "2026-04-21T00:00:00Z" }]
+          };
+        }
+
+        return { rows: [] };
+      }
+    };
+    const app = createApp({
+      logger: createLogCapture().logger,
+      pool: withTransactions(pool),
+      sseManager,
+      config: { jwtSecret: "test-secret", jwtExpiresIn: "7d", appBaseUrl: "https://app.example.com" },
+      mailer: { async send() {} },
+      now() {
+        return new Date("2026-04-21T00:00:00Z");
+      }
+    });
+
+    const response = await request(app).post("/api/auth/register").send({
+      email: "demo@example.com",
+      password: "password123",
+      display_name: "Demo User",
+      invite_token: "40000000-0000-4000-8000-000000000001"
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(response.body.listId, undefined);
+    assert.equal(queries.find(([sql]) => sql.includes("INSERT INTO users"))[1][3], false);
+    assert.equal(queries.some(([sql]) => sql.includes("list_members") || sql.startsWith("UPDATE list_invites")), false);
+    assert.deepEqual(sseManager.calls, []);
+  });
+
+it("falls back to the standard verification flow when the invite token is invalid", async () => {
     const sentMessages = [];
     const queries = [];
     const pool = {
@@ -269,7 +332,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withTransactions(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d",
@@ -292,7 +355,7 @@ describe("authentication routes", () => {
       email: "demo@example.com",
       password: "password123",
       display_name: "Demo User",
-      invite_token: "expired-invite-token"
+      invite_token: "40000000-0000-4000-8000-000000000003"
     });
 
     assert.equal(response.status, 201);
@@ -330,7 +393,7 @@ describe("authentication routes", () => {
 
     const app = createApp({
       logger,
-      pool,
+      pool: withTransactions(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -377,7 +440,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -413,7 +476,8 @@ describe("authentication routes", () => {
 
     assert.equal(response.status, 401);
     assert.deepEqual(response.body, {
-      error: "Authentication token is required."
+      error: "Authentication token is required.",
+      code: "auth.token_required"
     });
     assert.equal(queryCalled, false);
   });
@@ -427,7 +491,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -440,7 +504,8 @@ describe("authentication routes", () => {
 
     assert.equal(response.status, 404);
     assert.deepEqual(response.body, {
-      error: "User not found."
+      error: "User not found.",
+      code: "user.not_found"
     });
   });
 
@@ -450,12 +515,12 @@ describe("authentication routes", () => {
     const pool = {
       async query(text, params) {
         apiKeyQuery = [normalizeSql(text), params];
-        return { rows: [{ api_key: null }] };
+        return { rows: [{ api_key_hash: null, api_key_hint: null, api_key_created_at: null }] };
       }
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -467,21 +532,29 @@ describe("authentication routes", () => {
       .set("Authorization", `Bearer ${token}`);
 
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { api_key: null });
-    assert.match(apiKeyQuery[0], /SELECT api_key FROM users/);
+    assert.deepEqual(response.body, { has_key: false, hint: null, created_at: null });
+    assert.match(apiKeyQuery[0], /SELECT api_key_hash, api_key_hint, api_key_created_at FROM users/);
     assert.deepEqual(apiKeyQuery[1], ["user-1"]);
   });
 
-  it("returns the current API key for the authenticated user", async () => {
+  it("never returns the API key again, only whether one exists, its hint and creation time", async () => {
     const token = jwt.sign({ sub: "user-1" }, "test-secret", { expiresIn: "7d" });
     const pool = {
       async query() {
-        return { rows: [{ api_key: "11111111-1111-4111-8111-111111111111" }] };
+        return {
+          rows: [
+            {
+              api_key_hash: hashToken("11111111-1111-4111-8111-111111111111"),
+              api_key_hint: "1111",
+              api_key_created_at: "2026-04-21T00:00:00.000Z"
+            }
+          ]
+        };
       }
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -494,8 +567,11 @@ describe("authentication routes", () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      api_key: "11111111-1111-4111-8111-111111111111"
+      has_key: true,
+      hint: "1111",
+      created_at: "2026-04-21T00:00:00.000Z"
     });
+    assert.equal(JSON.stringify(response.body).includes("11111111-1111-4111-8111-111111111111"), false);
   });
 
   it("generates an API key for the authenticated user", async () => {
@@ -504,16 +580,17 @@ describe("authentication routes", () => {
     const pool = {
       async query(text, params) {
         updateQuery = [normalizeSql(text), params];
-        return { rows: [{ api_key: params[0] }] };
+        return { rows: [{ api_key_hint: params[1], api_key_created_at: params[2] }] };
       }
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
       },
+      now: () => new Date("2026-04-21T00:00:00Z"),
       generateApiKey() {
         return "22222222-2222-4222-8222-222222222222";
       }
@@ -524,14 +601,24 @@ describe("authentication routes", () => {
       .set("Authorization", `Bearer ${token}`);
 
     assert.equal(response.status, 200);
+    // The plaintext key is returned exactly once, together with its hint and creation time.
     assert.deepEqual(response.body, {
-      api_key: "22222222-2222-4222-8222-222222222222"
+      api_key: "22222222-2222-4222-8222-222222222222",
+      hint: "2222",
+      created_at: "2026-04-21T00:00:00.000Z"
     });
-    assert.match(updateQuery[0], /UPDATE users SET api_key = \$1 WHERE id = \$2 RETURNING api_key/);
+    assert.match(
+      updateQuery[0],
+      /UPDATE users SET api_key_hash = \$1, api_key_hint = \$2, api_key_created_at = \$3 WHERE id = \$4 RETURNING api_key_hint, api_key_created_at/
+    );
+    // Only the hash and the hint reach the database, never the key itself.
     assert.deepEqual(updateQuery[1], [
-      "22222222-2222-4222-8222-222222222222",
+      hashToken("22222222-2222-4222-8222-222222222222"),
+      getApiKeyHint("22222222-2222-4222-8222-222222222222"),
+      new Date("2026-04-21T00:00:00Z"),
       "user-1"
     ]);
+    assert.equal(JSON.stringify(updateQuery[1]).includes("22222222-2222-4222-8222-222222222222"), false);
   });
 
   it("regenerates an API key for the authenticated user", async () => {
@@ -544,16 +631,17 @@ describe("authentication routes", () => {
     const pool = {
       async query(_text, params) {
         updates.push(params);
-        return { rows: [{ api_key: params[0] }] };
+        return { rows: [{ api_key_hint: params[1], api_key_created_at: params[2] }] };
       }
     };
 
     const app = createApp({
-      pool,
+      pool: withCurrentTokenVersion(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
       },
+      now: () => new Date("2026-04-21T00:00:00Z"),
       generateApiKey() {
         return generatedKeys.shift();
       }
@@ -570,11 +658,13 @@ describe("authentication routes", () => {
     assert.equal(secondResponse.status, 200);
     assert.notEqual(firstResponse.body.api_key, secondResponse.body.api_key);
     assert.deepEqual(secondResponse.body, {
-      api_key: "44444444-4444-4444-8444-444444444444"
+      api_key: "44444444-4444-4444-8444-444444444444",
+      hint: "4444",
+      created_at: "2026-04-21T00:00:00.000Z"
     });
     assert.deepEqual(updates, [
-      ["33333333-3333-4333-8333-333333333333", "user-1"],
-      ["44444444-4444-4444-8444-444444444444", "user-1"]
+      [hashToken("33333333-3333-4333-8333-333333333333"), "3333", new Date("2026-04-21T00:00:00Z"), "user-1"],
+      [hashToken("44444444-4444-4444-8444-444444444444"), "4444", new Date("2026-04-21T00:00:00Z"), "user-1"]
     ]);
   });
 
@@ -605,7 +695,7 @@ describe("authentication routes", () => {
     });
 
     assert.equal(response.status, 401);
-    assert.deepEqual(response.body, { error: "Invalid email or password." });
+    assert.deepEqual(response.body, { error: "Invalid email or password.", code: "auth.invalid_credentials" });
     assert.deepEqual(findLogEntry(getEntries(), "Login failed"), {
       email: "demo@example.com",
       level: 40,
@@ -643,7 +733,8 @@ describe("authentication routes", () => {
 
     assert.equal(response.status, 403);
     assert.deepEqual(response.body, {
-      error: "Please verify your email before logging in."
+      error: "Please verify your email before logging in.",
+      code: "auth.email_not_verified"
     });
     assert.deepEqual(findLogEntry(getEntries(), "Login blocked"), {
       email: "demo@example.com",
@@ -661,7 +752,7 @@ describe("authentication routes", () => {
     const pool = {
       async query(text, params) {
         if (text.includes("SELECT evt.user_id")) {
-          assert.equal(params[0], "valid-token");
+          assert.equal(params[0], hashToken("valid-token"));
           assert.ok(params[1] instanceof Date);
           return {
             rows: [
@@ -690,7 +781,7 @@ describe("authentication routes", () => {
 
     const app = createApp({
       logger,
-      pool,
+      pool: withTransactions(pool),
       config: {
         jwtSecret: "test-secret",
         jwtExpiresIn: "7d"
@@ -707,7 +798,7 @@ describe("authentication routes", () => {
       display_name: "Demo User"
     });
     assert.equal(updatedUserId, "user-1");
-    assert.equal(deletedToken, "valid-token");
+    assert.equal(deletedToken, hashToken("valid-token"));
     assert.deepEqual(findLogEntry(getEntries(), "Email verified"), {
       level: 30,
       msg: "Email verified",
@@ -725,11 +816,12 @@ describe("authentication routes", () => {
 
     const app = createApp({ pool });
 
-    const response = await request(app).get("/api/auth/verify-email").query({ token: "expired-token" });
+    const response = await request(app).get("/api/auth/verify-email").query({ token: "40000000-0000-4000-8000-000000000002" });
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body, {
-      error: "Verification link is invalid or has expired."
+      error: "Verification link is invalid or has expired.",
+      code: "auth.verification_invalid"
     });
   });
 
@@ -767,7 +859,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withTransactions(pool),
       config: {
         appBaseUrl: "https://app.example.com"
       },
@@ -793,7 +885,7 @@ describe("authentication routes", () => {
     assert.equal(deletedUserId, "user-1");
     assert.deepEqual(insertedValues, [
       "user-1",
-      "verification-token-2",
+      hashToken("verification-token-2"),
       new Date("2026-04-22T00:00:00.000Z")
     ]);
     assert.equal(sentMessages.length, 1);
@@ -810,7 +902,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withTransactions(pool),
       mailer: {
         async send() {
           mailSent = true;
@@ -855,7 +947,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withTransactions(pool),
       config: {
         appBaseUrl: "https://app.example.com"
       },
@@ -880,7 +972,7 @@ describe("authentication routes", () => {
     assert.deepEqual(response.body, { message: "If an account exists, you will receive an email." });
     assert.deepEqual(insertedValues, [
       "user-1",
-      "reset-token-1",
+      hashToken("reset-token-1"),
       new Date("2026-04-21T01:00:00.000Z")
     ]);
     assert.deepEqual(sentMessages, [
@@ -908,7 +1000,7 @@ describe("authentication routes", () => {
     };
 
     const app = createApp({
-      pool,
+      pool: withTransactions(pool),
       mailer: {
         async send() {
           mailSent = true;
@@ -932,7 +1024,7 @@ describe("authentication routes", () => {
       }
     };
 
-    const app = createApp({ pool });
+    const app = createApp({ pool: withTransactionClient(pool) });
 
     const response = await request(app).post("/api/auth/reset-password").send({
       token: "used-token",
@@ -941,7 +1033,8 @@ describe("authentication routes", () => {
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body, {
-      error: "Password reset link is invalid or has expired."
+      error: "Password reset link is invalid or has expired.",
+      code: "auth.reset_invalid"
     });
   });
 
@@ -951,14 +1044,8 @@ describe("authentication routes", () => {
     const { logger, getEntries } = createLogCapture();
     const pool = {
       async query(text, params) {
-        if (text.includes("SELECT prt.user_id")) {
-          return {
-            rows: [
-              {
-                user_id: "user-1"
-              }
-            ]
-          };
+        if (["BEGIN", "COMMIT"].includes(text)) {
+          return { rows: [] };
         }
 
         if (text.includes("UPDATE users")) {
@@ -966,8 +1053,13 @@ describe("authentication routes", () => {
           return { rows: [] };
         }
 
+        // The single conditional UPDATE claims the token and returns its user.
         if (text.includes("UPDATE password_reset_tokens")) {
           markedToken = params[0];
+          return { rows: [{ user_id: "user-1" }] };
+        }
+
+        if (text.includes("DELETE FROM password_reset_tokens")) {
           return { rows: [] };
         }
 
@@ -977,7 +1069,7 @@ describe("authentication routes", () => {
 
     const app = createApp({
       logger,
-      pool,
+      pool: withTransactionClient(pool),
       now() {
         return new Date("2026-04-21T00:00:00Z");
       }
@@ -992,7 +1084,7 @@ describe("authentication routes", () => {
     assert.deepEqual(response.body, { message: "Password updated." });
     assert.equal(updatedPasswordParams[1], "user-1");
     assert.notEqual(updatedPasswordParams[0], "new-password-123");
-    assert.equal(markedToken, "valid-reset-token");
+    assert.equal(markedToken, hashToken("valid-reset-token"));
     assert.deepEqual(findLogEntry(getEntries(), "Password reset completed"), {
       level: 30,
       msg: "Password reset completed",
@@ -1018,13 +1110,16 @@ describe("requireAuth middleware", () => {
     const req = { headers: {} };
     const res = createResponse();
     let nextCalled = false;
+    let nextError = null;
 
-    middleware(req, res, () => {
-      nextCalled = true;
+    middleware(req, res, (error) => {
+      nextCalled = !error;
+      nextError = error ?? null;
     });
 
-    assert.equal(res.statusCode, 401);
-    assert.equal(res.body.error, "Authentication token is required.");
+    assert.equal(nextError?.status, 401);
+    assert.equal(nextError?.code, "auth.token_required");
+    assert.equal(nextError?.message, "Authentication token is required.");
     assert.equal(nextCalled, false);
   });
 
@@ -1050,8 +1145,8 @@ describe("requireAuth middleware", () => {
     const res = createResponse();
     let nextCalled = false;
 
-    middleware(req, res, () => {
-      nextCalled = true;
+    middleware(req, res, (error) => {
+      nextCalled = !error;
     });
 
     assert.deepEqual(req.user, { sub: "user-1" });
@@ -1072,13 +1167,41 @@ describe("requireApiKey middleware", () => {
     const req = { headers: {} };
     const res = createResponse();
     let nextCalled = false;
+    let nextError = null;
 
-    await middleware(req, res, () => {
-      nextCalled = true;
+    await middleware(req, res, (error) => {
+      nextCalled = !error;
+      nextError = error ?? null;
     });
 
-    assert.equal(res.statusCode, 401);
-    assert.equal(res.body.error, "API key is required.");
+    assert.equal(nextError?.status, 401);
+    assert.equal(nextError?.code, "auth.api_key_required");
+    assert.equal(nextError?.message, "API key is required.");
+    assert.equal(nextCalled, false);
+  });
+
+  it("rejects a key that is not a UUID without querying the database", async () => {
+    const middleware = createRequireApiKey({
+      pool: {
+        async query() {
+          throw new Error("API key query should not run");
+        }
+      }
+    });
+
+    const req = { headers: { "x-api-key": "not-a-uuid" } };
+    const res = createResponse();
+    let nextCalled = false;
+    let nextError = null;
+
+    await middleware(req, res, (error) => {
+      nextCalled = !error;
+      nextError = error ?? null;
+    });
+
+    assert.equal(nextError?.status, 401);
+    assert.equal(nextError?.code, "auth.invalid_api_key");
+    assert.equal(nextError?.message, "Invalid API key.");
     assert.equal(nextCalled, false);
   });
 
@@ -1093,18 +1216,21 @@ describe("requireApiKey middleware", () => {
       }
     });
 
-    const req = { headers: { "x-api-key": "missing-api-key" } };
+    const req = { headers: { "x-api-key": "50000000-0000-4000-8000-000000000001" } };
     const res = createResponse();
     let nextCalled = false;
+    let nextError = null;
 
-    await middleware(req, res, () => {
-      nextCalled = true;
+    await middleware(req, res, (error) => {
+      nextCalled = !error;
+      nextError = error ?? null;
     });
 
-    assert.equal(res.statusCode, 401);
-    assert.equal(res.body.error, "Invalid API key.");
-    assert.match(apiKeyQuery[0], /SELECT id FROM users WHERE api_key = \$1 LIMIT 1/);
-    assert.deepEqual(apiKeyQuery[1], ["missing-api-key"]);
+    assert.equal(nextError?.status, 401);
+    assert.equal(nextError?.code, "auth.invalid_api_key");
+    assert.equal(nextError?.message, "Invalid API key.");
+    assert.match(apiKeyQuery[0], /SELECT id FROM users WHERE api_key_hash = \$1 LIMIT 1/);
+    assert.deepEqual(apiKeyQuery[1], [hashToken("50000000-0000-4000-8000-000000000001")]);
     assert.equal(nextCalled, false);
   });
 
@@ -1112,18 +1238,18 @@ describe("requireApiKey middleware", () => {
     const middleware = createRequireApiKey({
       pool: {
         async query(_text, params) {
-          assert.deepEqual(params, ["valid-api-key"]);
+          assert.deepEqual(params, [hashToken("50000000-0000-4000-8000-000000000002")]);
           return { rows: [{ id: "user-1" }] };
         }
       }
     });
 
-    const req = { headers: { "x-api-key": "valid-api-key" } };
+    const req = { headers: { "x-api-key": "50000000-0000-4000-8000-000000000002" } };
     const res = createResponse();
     let nextCalled = false;
 
-    await middleware(req, res, () => {
-      nextCalled = true;
+    await middleware(req, res, (error) => {
+      nextCalled = !error;
     });
 
     assert.deepEqual(req.user, { sub: "user-1" });
@@ -1142,6 +1268,36 @@ function createResponse() {
     json(payload) {
       this.body = payload;
       return this;
+    }
+  };
+}
+
+/**
+ * Adds `connect()` to a query-only pool mock so code that uses `withTransaction` runs against the
+ * same mock; BEGIN/COMMIT/ROLLBACK reach the mock's `query` like any other statement.
+ */
+function withTransactionClient(pool) {
+  return {
+    ...pool,
+    async connect() {
+      return { query: (text, params) => pool.query(text, params), release() {} };
+    }
+  };
+}
+
+/**
+ * Answers the token version lookup of the auth middleware so route tests can keep their
+ * single-purpose pool mocks. Every test token here carries no `tv` claim, i.e. version 0.
+ */
+function withCurrentTokenVersion(pool) {
+  return {
+    ...pool,
+    async query(text, params) {
+      if (text.includes("SELECT token_version FROM users")) {
+        return { rows: [{ token_version: 0 }] };
+      }
+
+      return pool.query(text, params);
     }
   };
 }

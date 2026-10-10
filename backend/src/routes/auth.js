@@ -1,23 +1,33 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { randomUUID } from "node:crypto";
+import { generateToken, getApiKeyHint, hashToken } from "../tokens.js";
 import { Router } from "express";
-import { getPool } from "../db/client.js";
+import { getPool, withTransaction } from "../db/client.js";
 import { getConfig } from "../env.js";
 import { acceptInviteForUser, getPendingInviteByToken } from "../inviteService.js";
 import { logger as defaultLogger } from "../logger.js";
-import createMailer from "../mail/mailer.js";
+import createMailer, { sendMailInBackground } from "../mail/mailer.js";
 import { createRequireAuth } from "../middleware/auth.js";
+import { createRateLimiters } from "../middleware/rateLimit.js";
+import { checkPassword } from "../passwordPolicy.js";
 import { sseManager as defaultSseManager } from "../sseManager.js";
+import { ApiError } from "../errors.js";
+
+// A valid cost-12 bcrypt hash of a throwaway password. Login compares against it when the email
+// is unknown so that the unknown-user path takes as long as a wrong-password check.
+const DUMMY_PASSWORD_HASH = "$2b$12$9D2Gq/c6ojGzJTRaJQ9Fh.MvGU9zq/NrLY8IGwzs1jy0zxVyzkTUq";
 
 /**
  * Creates a signed JWT for an authenticated user.
  *
- * @param {{ jwtLib: typeof jwt, config: { jwtSecret: string, jwtExpiresIn: string }, userId: string }} options Token options.
+ * @param {{ jwtLib: typeof jwt, config: { jwtSecret: string, jwtExpiresIn: string }, userId: string, tokenVersion?: number }} options Token options.
  * @returns {string} Signed JWT.
  */
-function createToken({ jwtLib, config, userId }) {
-  return jwtLib.sign({ sub: userId }, config.jwtSecret, {
+function createToken({ jwtLib, config, userId, tokenVersion = 0 }) {
+  // `tv` ties the token to the user's token_version; a password reset bumps it and thereby
+  // revokes every token issued before.
+  return jwtLib.sign({ sub: userId, tv: tokenVersion }, config.jwtSecret, {
+    algorithm: "HS256",
     expiresIn: config.jwtExpiresIn
   });
 }
@@ -47,29 +57,33 @@ export function createAuthRouter({
   logger = defaultLogger,
   sseManager = defaultSseManager,
   mailer = createMailer({ config, logger }),
-  generateVerificationToken = randomUUID,
-  generatePasswordResetToken = randomUUID,
-  generateApiKey = randomUUID,
-  now = () => new Date()
+  generateVerificationToken = generateToken,
+  generatePasswordResetToken = generateToken,
+  generateApiKey = generateToken,
+  now = () => new Date(),
+  rateLimiters = createRateLimiters(),
+  requireAuthMiddleware = createRequireAuth({ jwtLib, config, pool })
 } = {}) {
   const router = Router();
-  const requireAuth = createRequireAuth({ jwtLib, config });
+  const requireAuth = requireAuthMiddleware;
 
-  router.post("/register", async (req, res, next) => {
+  router.post("/register", ...rateLimiters.register, async (req, res, next) => {
     if (config.registrationEnabled === false) {
-      res.status(404).end();
+      next(new ApiError(404, "auth.registration_disabled", "Registration is disabled."));
       return;
     }
 
     const { email, password, display_name: displayName, invite_token: inviteToken } = req.body ?? {};
 
     if (!email || !password || !displayName) {
-      res.status(400).json({ error: "Email, password, and display_name are required." });
+      next(new ApiError(400, "validation.registration_fields_required", "Email, password, and display_name are required."));
       return;
     }
 
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+    const passwordError = checkPassword(password);
+
+    if (passwordError) {
+      next(new ApiError(400, passwordError.code, passwordError.message));
       return;
     }
 
@@ -83,27 +97,60 @@ export function createAuthRouter({
         ? inviteCandidate
         : null;
 
-      const result = await pool.query(
-        `
-          INSERT INTO users (email, password_hash, display_name, email_verified)
-          VALUES ($1, $2, $3, $4)
-          RETURNING id, email, display_name, created_at
-        `,
-        [normalizedEmail, passwordHash, displayName, Boolean(pendingInvite)]
-      );
+      // User, invite claim/membership and verification token are committed together: a failure
+      // can no longer leave an account without its token (which would lock the user out).
+      const { user, acceptedInvite, verificationToken } = await withTransaction(pool, async (client) => {
+        const inserted = await client.query(
+          `
+            INSERT INTO users (email, password_hash, display_name, email_verified)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, email, display_name, created_at
+          `,
+          [normalizedEmail, passwordHash, displayName, Boolean(pendingInvite)]
+        );
+        const createdUser = inserted.rows[0];
+        const accepted = pendingInvite
+          ? await acceptInviteForUser({
+              pool,
+              client,
+              invite: pendingInvite,
+              userId: createdUser.id,
+              now: now()
+            })
+          : null;
 
-      if (pendingInvite) {
-        const { listId, memberAdded } = await acceptInviteForUser({
-          pool,
-          invite: pendingInvite,
-          userId: result.rows[0].id
-        });
+        if (accepted) {
+          return { user: createdUser, acceptedInvite: accepted, verificationToken: null };
+        }
+
+        if (pendingInvite) {
+          // The invite was used by someone else between the lookup and the insert, so the account
+          // was not vetted by it after all: fall back to the normal email verification.
+          await client.query("UPDATE users SET email_verified = false WHERE id = $1", [createdUser.id]);
+        }
+
+        // Only the hash is stored; the plaintext leaves the server in the verification mail.
+        const token = generateVerificationToken();
+        await client.query(
+          `
+            INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3)
+          `,
+          [createdUser.id, hashToken(token), addHours(now(), 24)]
+        );
+
+        return { user: createdUser, acceptedInvite: null, verificationToken: token };
+      });
+      const result = { rows: [user] };
+
+      if (acceptedInvite) {
+        const { listId, memberAdded } = acceptedInvite;
 
         if (memberAdded) {
           void sseManager
             .broadcastToList(pool, listId, "member:added", {
               listId,
-              userId: result.rows[0].id
+              userId: user.id
             })
             .catch((broadcastError) => {
               logger.error({ err: broadcastError }, "Failed to broadcast SSE event");
@@ -112,38 +159,30 @@ export function createAuthRouter({
 
         logger.info(
           {
-            userId: result.rows[0].id,
+            userId: user.id,
             email: normalizedEmail,
             inviteUsed: true
           },
           "User registered"
         );
         res.status(201).json({
-          token: createToken({ jwtLib, config, userId: result.rows[0].id }),
+          token: createToken({ jwtLib, config, userId: user.id }),
           listId,
-          user: serializeAuthUser(result.rows[0])
+          user: serializeAuthUser(user)
         });
         return;
       }
 
-      const verificationToken = generateVerificationToken();
-      const expiresAt = addHours(now(), 24);
-
-      await pool.query(
-        `
-          INSERT INTO email_verification_tokens (user_id, token, expires_at)
-          VALUES ($1, $2, $3)
-          RETURNING token
-        `,
-        [result.rows[0].id, verificationToken, expiresAt]
+      sendMailInBackground(
+        () =>
+          sendVerificationEmail({
+            config,
+            mailer,
+            token: verificationToken,
+            user
+          }),
+        logger
       );
-
-      await sendVerificationEmail({
-        config,
-        mailer,
-        token: verificationToken,
-        user: result.rows[0]
-      });
 
       logger.info(
         {
@@ -160,7 +199,7 @@ export function createAuthRouter({
           { email: email.toLowerCase() },
           "Registration rejected: email already exists"
         );
-        res.status(409).json({ error: "An account with that email already exists." });
+        next(new ApiError(409, "auth.email_taken", "An account with that email already exists."));
         return;
       }
 
@@ -168,16 +207,11 @@ export function createAuthRouter({
     }
   });
 
-  router.post("/login", async (req, res, next) => {
+  router.post("/login", ...rateLimiters.login, async (req, res, next) => {
     const { email, password } = req.body ?? {};
 
     if (!email || !password) {
-      res.status(400).json({ error: "Email and password are required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.credentials_required", "Email and password are required."));
       return;
     }
 
@@ -185,7 +219,7 @@ export function createAuthRouter({
       const normalizedEmail = email.toLowerCase();
       const result = await pool.query(
         `
-          SELECT id, email, display_name, password_hash, email_verified
+          SELECT id, email, display_name, password_hash, email_verified, token_version
           FROM users
           WHERE email = $1
           LIMIT 1
@@ -196,8 +230,11 @@ export function createAuthRouter({
       const user = result.rows[0];
 
       if (!user) {
+        // Hash-compare anyway so unknown accounts cost as much time as wrong passwords and the
+        // response time does not reveal which emails are registered.
+        await bcryptLib.compare(password, DUMMY_PASSWORD_HASH);
         logger.warn({ email: normalizedEmail, reason: "invalid_credentials" }, "Login failed");
-        res.status(401).json({ error: "Invalid email or password." });
+        next(new ApiError(401, "auth.invalid_credentials", "Invalid email or password."));
         return;
       }
 
@@ -205,19 +242,19 @@ export function createAuthRouter({
 
       if (!isValid) {
         logger.warn({ email: normalizedEmail, reason: "invalid_credentials" }, "Login failed");
-        res.status(401).json({ error: "Invalid email or password." });
+        next(new ApiError(401, "auth.invalid_credentials", "Invalid email or password."));
         return;
       }
 
       if (!user.email_verified) {
         logger.warn({ email: normalizedEmail, reason: "email_not_verified" }, "Login blocked");
-        res.status(403).json({ error: "Please verify your email before logging in." });
+        next(new ApiError(403, "auth.email_not_verified", "Please verify your email before logging in."));
         return;
       }
 
       logger.info({ userId: user.id }, "User logged in");
       res.json({
-        token: createToken({ jwtLib, config, userId: user.id }),
+        token: createToken({ jwtLib, config, userId: user.id, tokenVersion: user.token_version }),
         user: serializeAuthUser(user)
       });
     } catch (error) {
@@ -229,31 +266,26 @@ export function createAuthRouter({
     const verificationToken = req.query.token;
 
     if (!verificationToken) {
-      res.status(400).json({ error: "Verification token is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.verification_token_required", "Verification token is required."));
       return;
     }
 
     try {
       const result = await pool.query(
         `
-          SELECT evt.user_id, u.email, u.display_name
+          SELECT evt.user_id, u.email, u.display_name, u.token_version
           FROM email_verification_tokens evt
           JOIN users u ON u.id = evt.user_id
-          WHERE evt.token = $1
+          WHERE evt.token_hash = $1
             AND evt.expires_at > $2
           LIMIT 1
         `,
-        [verificationToken, now()]
+        [hashToken(verificationToken), now()]
       );
       const verification = result.rows[0];
 
       if (!verification) {
-        res.status(400).json({ error: "Verification link is invalid or has expired." });
+        next(new ApiError(400, "auth.verification_invalid", "Verification link is invalid or has expired."));
         return;
       }
 
@@ -268,14 +300,19 @@ export function createAuthRouter({
       await pool.query(
         `
           DELETE FROM email_verification_tokens
-          WHERE token = $1
+          WHERE token_hash = $1
         `,
-        [verificationToken]
+        [hashToken(verificationToken)]
       );
 
       logger.info({ userId: verification.user_id }, "Email verified");
       res.json({
-        token: createToken({ jwtLib, config, userId: verification.user_id }),
+        token: createToken({
+          jwtLib,
+          config,
+          userId: verification.user_id,
+          tokenVersion: verification.token_version
+        }),
         user: serializeAuthUser({
           id: verification.user_id,
           email: verification.email,
@@ -287,16 +324,11 @@ export function createAuthRouter({
     }
   });
 
-  router.post("/resend-verification", async (req, res, next) => {
+  router.post("/resend-verification", ...rateLimiters.resendVerification, async (req, res, next) => {
     const { email } = req.body ?? {};
 
     if (!email) {
-      res.status(400).json({ error: "Email is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.email_required", "Email is required."));
       return;
     }
 
@@ -316,28 +348,34 @@ export function createAuthRouter({
         const verificationToken = generateVerificationToken();
         const expiresAt = addHours(now(), 24);
 
-        await pool.query(
-          `
-            DELETE FROM email_verification_tokens
-            WHERE user_id = $1
-          `,
-          [user.id]
-        );
-        await pool.query(
-          `
-            INSERT INTO email_verification_tokens (user_id, token, expires_at)
-            VALUES ($1, $2, $3)
-            RETURNING token
-          `,
-          [user.id, verificationToken, expiresAt]
-        );
-
-        await sendVerificationEmail({
-          config,
-          mailer,
-          token: verificationToken,
-          user
+        // Replace the old token atomically so a failure cannot leave the user without one.
+        await withTransaction(pool, async (client) => {
+          await client.query(
+            `
+              DELETE FROM email_verification_tokens
+              WHERE user_id = $1
+            `,
+            [user.id]
+          );
+          await client.query(
+            `
+              INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
+              VALUES ($1, $2, $3)
+            `,
+            [user.id, hashToken(verificationToken), expiresAt]
+          );
         });
+
+        sendMailInBackground(
+          () =>
+            sendVerificationEmail({
+              config,
+              mailer,
+              token: verificationToken,
+              user
+            }),
+          logger
+        );
       }
 
       res.json({ message: "If your account is pending verification, a new email has been sent." });
@@ -346,16 +384,11 @@ export function createAuthRouter({
     }
   });
 
-  router.post("/forgot-password", async (req, res, next) => {
+  router.post("/forgot-password", ...rateLimiters.forgotPassword, async (req, res, next) => {
     const { email } = req.body ?? {};
 
     if (!email) {
-      res.status(400).json({ error: "Email is required." });
-      return;
-    }
-
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+      next(new ApiError(400, "validation.email_required", "Email is required."));
       return;
     }
 
@@ -377,19 +410,23 @@ export function createAuthRouter({
 
         await pool.query(
           `
-            INSERT INTO password_reset_tokens (user_id, token, expires_at)
+            INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
             VALUES ($1, $2, $3)
-            RETURNING token
           `,
-          [user.id, resetToken, expiresAt]
+          [user.id, hashToken(resetToken), expiresAt]
         );
 
-        await sendPasswordResetEmail({
-          config,
-          mailer,
-          token: resetToken,
-          user
-        });
+        // Answered the same whether or not the account exists, so a mail failure must not show.
+        sendMailInBackground(
+          () =>
+            sendPasswordResetEmail({
+              config,
+              mailer,
+              token: resetToken,
+              user
+            }),
+          logger
+        );
       }
 
       res.json({ message: "If an account exists, you will receive an email." });
@@ -398,58 +435,76 @@ export function createAuthRouter({
     }
   });
 
-  router.post("/reset-password", async (req, res, next) => {
+  router.post("/reset-password", ...rateLimiters.resetPassword, async (req, res, next) => {
     const { token, password } = req.body ?? {};
 
     if (!token || !password) {
-      res.status(400).json({ error: "Token and password are required." });
+      next(new ApiError(400, "validation.token_password_required", "Token and password are required."));
       return;
     }
 
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
+    const passwordError = checkPassword(password);
+
+    if (passwordError) {
+      next(new ApiError(400, passwordError.code, passwordError.message));
       return;
     }
 
     try {
-      const result = await pool.query(
-        `
-          SELECT prt.user_id
-          FROM password_reset_tokens prt
-          WHERE prt.token = $1
-            AND prt.expires_at > $2
-            AND prt.used = false
-          LIMIT 1
-        `,
-        [token, now()]
-      );
-      const resetRequest = result.rows[0];
+      const userId = await withTransaction(pool, async (client) => {
+        // Claiming the token is the only check: two concurrent requests with the same token
+        // serialise on this row, and the loser re-evaluates `used = false` and gets no row.
+        const claim = await client.query(
+          `
+            UPDATE password_reset_tokens
+            SET used = true
+            WHERE token_hash = $1
+              AND used = false
+              AND expires_at > $2
+            RETURNING user_id
+          `,
+          [hashToken(token), now()]
+        );
+        const resetRequest = claim.rows[0];
 
-      if (!resetRequest) {
-        res.status(400).json({ error: "Password reset link is invalid or has expired." });
+        if (!resetRequest) {
+          return null;
+        }
+
+        const passwordHash = await bcryptLib.hash(password, 12);
+
+        // Bumping token_version signs the user out everywhere; the API key is cleared because
+        // whoever knew the old password may also have read the key (Home Assistant needs a new one).
+        await client.query(
+          `
+            UPDATE users
+            SET password_hash = $1,
+                token_version = token_version + 1,
+                api_key_hash = NULL,
+                api_key_hint = NULL,
+                api_key_created_at = NULL
+            WHERE id = $2
+          `,
+          [passwordHash, resetRequest.user_id]
+        );
+        await client.query(
+          `
+            DELETE FROM password_reset_tokens
+            WHERE user_id = $1
+              AND token_hash <> $2
+          `,
+          [resetRequest.user_id, hashToken(token)]
+        );
+
+        return resetRequest.user_id;
+      });
+
+      if (!userId) {
+        next(new ApiError(400, "auth.reset_invalid", "Password reset link is invalid or has expired."));
         return;
       }
 
-      const passwordHash = await bcryptLib.hash(password, 12);
-
-      await pool.query(
-        `
-          UPDATE users
-          SET password_hash = $1
-          WHERE id = $2
-        `,
-        [passwordHash, resetRequest.user_id]
-      );
-      await pool.query(
-        `
-          UPDATE password_reset_tokens
-          SET used = true
-          WHERE token = $1
-        `,
-        [token]
-      );
-
-      logger.info({ userId: resetRequest.user_id }, "Password reset completed");
+      logger.info({ userId }, "Password reset completed");
       res.json({ message: "Password updated." });
     } catch (error) {
       next(error);
@@ -457,11 +512,6 @@ export function createAuthRouter({
   });
 
   router.get("/me", requireAuth, async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const result = await pool.query(
         `
@@ -475,7 +525,7 @@ export function createAuthRouter({
       const user = result.rows[0];
 
       if (!user) {
-        res.status(404).json({ error: "User not found." });
+        next(new ApiError(404, "user.not_found", "User not found."));
         return;
       }
 
@@ -486,15 +536,11 @@ export function createAuthRouter({
   });
 
   router.get("/api-key", requireAuth, async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
+      // The key itself is not stored (only its hash), so it can no longer be read back.
       const result = await pool.query(
         `
-          SELECT api_key
+          SELECT api_key_hash, api_key_hint, api_key_created_at
           FROM users
           WHERE id = $1
           LIMIT 1
@@ -504,41 +550,47 @@ export function createAuthRouter({
       const user = result.rows[0];
 
       if (!user) {
-        res.status(404).json({ error: "User not found." });
+        next(new ApiError(404, "user.not_found", "User not found."));
         return;
       }
 
-      res.json({ api_key: user.api_key });
+      res.json({
+        has_key: Boolean(user.api_key_hash),
+        hint: user.api_key_hint ?? null,
+        created_at: user.api_key_created_at ?? null
+      });
     } catch (error) {
       next(error);
     }
   });
 
   router.post("/api-key", requireAuth, async (req, res, next) => {
-    if (!pool) {
-      next(new Error("Database connection is not configured."));
-      return;
-    }
-
     try {
       const apiKey = generateApiKey();
       const result = await pool.query(
         `
           UPDATE users
-          SET api_key = $1
-          WHERE id = $2
-          RETURNING api_key
+          SET api_key_hash = $1,
+              api_key_hint = $2,
+              api_key_created_at = $3
+          WHERE id = $4
+          RETURNING api_key_hint, api_key_created_at
         `,
-        [apiKey, req.user.sub]
+        [hashToken(apiKey), getApiKeyHint(apiKey), now(), req.user.sub]
       );
       const user = result.rows[0];
 
       if (!user) {
-        res.status(404).json({ error: "User not found." });
+        next(new ApiError(404, "user.not_found", "User not found."));
         return;
       }
 
-      res.json({ api_key: user.api_key });
+      // The only time the plaintext key is returned; afterwards just the hint is available.
+      res.json({
+        api_key: apiKey,
+        hint: user.api_key_hint,
+        created_at: user.api_key_created_at
+      });
     } catch (error) {
       next(error);
     }

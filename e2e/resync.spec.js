@@ -48,11 +48,15 @@ async function setupResyncPage(page) {
     const pathname = new URL(route.request().url()).pathname;
     let data = {};
     if (pathname === "/api/config") data = { registrationEnabled: true };
+    // The stream URL needs a single-use ticket before the (controlled) EventSource is created.
+    if (pathname === "/api/events/ticket") data = { ticket: "e2e-ticket" };
     if (pathname === "/api/auth/me") data = { user: { id: "user-1", display_name: "Tester" } };
     if (pathname === "/api/lists") {
       state.counts.lists += 1;
       data = { lists: state.lists };
     }
+    // The detail page loads only its own list's metadata.
+    if (pathname === "/api/lists/list-1") data = { list: state.lists[0] };
     if (pathname === "/api/lists/list-1/entries") {
       state.counts.entries += 1;
       data = { entries: state.entries };
