@@ -1,18 +1,16 @@
 import { useCallback } from "react";
-import type { Dispatch, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { fetchList } from "../../api/lists";
+import { SSE_EVENTS } from "../../api/sseEvents";
 import { useListEvents } from "../../hooks/useListEvents";
-import type { List } from "../../types";
 
 interface UseListLifecycleEventsOptions {
   currentUserId: string | undefined;
   listId: string;
   /** Called for `member:removed` events about other users. */
   onOtherMemberRemoved: () => void;
-  setList: Dispatch<SetStateAction<List | null>>;
-  token: string;
+  /** Fetches the list's metadata again (a rename); the entries stay untouched. */
+  refreshList: () => void;
 }
 
 /**
@@ -28,8 +26,7 @@ export function useListLifecycleEvents({
   currentUserId,
   listId,
   onOtherMemberRemoved,
-  setList,
-  token
+  refreshList
 }: UseListLifecycleEventsOptions): void {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -41,11 +38,6 @@ export function useListLifecycleEvents({
     [navigate, t]
   );
   const handleListDeleted = useCallback(() => leaveWithNotice("detail.listDeleted"), [leaveWithNotice]);
-  const handleListUpdated = useCallback(() => {
-    void fetchList(token, listId)
-      .then((result) => setList((currentList) => (currentList ? { ...currentList, ...result.list } : result.list)))
-      .catch((error: unknown) => console.error("Failed to refresh the list.", error));
-  }, [listId, setList, token]);
   const handleMemberRemoved = useCallback(
     (data: Record<string, unknown>) => {
       if (currentUserId && data.userId === currentUserId) {
@@ -58,7 +50,7 @@ export function useListLifecycleEvents({
     [currentUserId, leaveWithNotice, onOtherMemberRemoved]
   );
 
-  useListEvents("member:removed", listId, handleMemberRemoved);
-  useListEvents("list:deleted", listId, handleListDeleted);
-  useListEvents("list:updated", listId, handleListUpdated);
+  useListEvents(SSE_EVENTS.memberRemoved, listId, handleMemberRemoved);
+  useListEvents(SSE_EVENTS.listDeleted, listId, handleListDeleted);
+  useListEvents(SSE_EVENTS.listUpdated, listId, refreshList);
 }

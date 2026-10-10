@@ -13,7 +13,8 @@ const streamState = vi.hoisted(() => ({ resyncVersion: 0 }));
 vi.mock("../../context/EventSourceContext", () => ({ useEventSource: () => streamState }));
 beforeEach(() => { streamState.resyncVersion = 0; });
 
-vi.mock("../../api/lists", () => ({
+vi.mock("../../api/lists", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../api/lists")>()),
   createList: vi.fn(),
   deleteList: vi.fn(),
   fetchLists: vi.fn(),

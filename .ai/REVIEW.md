@@ -2206,3 +2206,33 @@ No blocker or major findings; no required fixes.
 
 ##### Risks
 - Type-only refactor across the API layer: any runtime difference would come from the removed `isShareInviteResult` guard or the cast placement; the existing 840 frontend tests pass unchanged apart from the two fixture values. No browser or E2E run in this review.
+
+## Task: T-022 (hardening cycle 2026-10-08 — split the list detail hook)
+
+### Review Round 1
+
+#### Verdict
+
+`PASS_WITH_NOTES`
+
+#### Findings
+
+1. **minor** — `useListEntries.ts` is still 430 lines and `useListDetailData.ts` (now a 270-line facade) re-exports a wide surface. The split is real (entries, members, recently used, active list), but the entries hook carries most of the complexity from T-013/T-014. Acceptable for this task; a further split is optional.
+2. **minor** — `.claude/settings.local.json` is modified in the working tree (an unrelated allow-list entry added by a session). It is not part of T-022 and should not go into the task commit; `commit_task` uses `git add -A`, so drop or keep that change deliberately.
+3. **nit** — `ListDetailError` messages are now translated at render time (`getListDetailErrorText`); a small behaviour improvement (language changes apply without refetching) that goes slightly beyond "behaviour identical", covered by `listDetailErrors.test.ts`.
+
+No blocker or major findings; no required fixes.
+
+#### Verification
+
+##### Steps performed
+- Read the plan, the board, the handoff and the change set: new `useListEntries`, `useListMembers`, `useRecentlyUsed`, `useActiveList`, `listDetailErrors`, `api/sseEvents.ts`, the facade `useListDetailData.ts`, `ListDetailPage.tsx`, `EventSourceContext.tsx`, `OverviewPage.tsx`, `api/{entries,lists,sharing}.ts`, and the new tests (`listDetailHooks.test.tsx`, `listDetailErrors.test.ts`, `sharedNames.test.ts`).
+- `rg` for `entries:`/`members:` cache-key literals outside tests: none outside the api helpers; SSE event names (`entry:created` and the rest) appear only in `api/sseEvents.ts`. `sharedNames.test.ts` fails if literals reappear outside `api/`.
+- Compared `ListDetailPage.test.tsx` against `HEAD`: the only changes are the `addEntryByText` → `addEntry` command rename and `importOriginal` partial mocks that keep the real cache-key helpers. No assertion was removed or weakened. `OverviewPage.test.tsx` changed only for the same mock style.
+- `npm run lint`: 0 errors. `npm run typecheck`: 0 errors. `npm run build`: ok. `npm test`: backend 394 pass, 0 fail; frontend 58 files pass (871 tests per the board entry).
+
+##### Findings
+- All acceptance criteria are met: no hook returns raw setters (asserted in `listDetailHooks.test.tsx`; the facade exposes commands), no cache-key literals outside the api helpers, SSE event names declared once, and the existing ListDetailPage assertions pass unchanged. `ListDetailPage.tsx` stays at 360 lines, under the structure test's cap.
+
+##### Risks
+- Pure frontend refactor of the most complex page; verified by the unchanged page tests but not in a browser, and Playwright/integration suites were not run (no database in this session). CI is the first real run of `e2e/lists.spec.js` and the offline-queue specs against this structure.

@@ -12,16 +12,11 @@ import {
 import { AuthExpiredError } from "../api/client";
 import { reportStreamState } from "../api/connectivity";
 import { fetchEventTicket } from "../api/events";
+import { SSE_EVENT_TYPES } from "../api/sseEvents";
+import type { SseEventType } from "../api/sseEvents";
 
-export type SseEventType =
-  | "entry:created"
-  | "entry:updated"
-  | "entry:deleted"
-  | "history:updated"
-  | "list:updated"
-  | "list:deleted"
-  | "member:added"
-  | "member:removed";
+// The event names live in api/sseEvents.ts; re-exported so existing imports keep working.
+export type { SseEventType };
 /**
  * Event payloads (all carry `listId`):
  * - `entry:created` / `entry:updated`: `{ listId, entryId, actorId, entry }`, where `entry` has the
@@ -50,16 +45,6 @@ interface EventSourceProviderProps {
   timings?: Partial<EventSourceTimings>;
 }
 
-const EVENT_TYPES: SseEventType[] = [
-  "entry:created",
-  "entry:updated",
-  "entry:deleted",
-  "history:updated",
-  "list:updated",
-  "list:deleted",
-  "member:added",
-  "member:removed"
-];
 const EventSourceContext = createContext<EventSourceContextValue | null>(null);
 
 export function EventSourceProvider({ children, timings }: EventSourceProviderProps): ReactElement {
@@ -202,7 +187,7 @@ export function EventSourceProvider({ children, timings }: EventSourceProviderPr
       const source = new window.EventSource(`/api/events?ticket=${encodeURIComponent(ticket)}`);
       eventSourceRef.current = source;
       const isCurrent = () => !disposed && eventSourceRef.current === source;
-      const eventListeners: Array<[string, (event: MessageEvent<string>) => void]> = EVENT_TYPES.map((type) => {
+      const eventListeners: Array<[string, (event: MessageEvent<string>) => void]> = SSE_EVENT_TYPES.map((type) => {
         const listener = (event: MessageEvent<string>) => {
           if (!isCurrent()) {
             return;

@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthExpiredError, createTemporaryId } from "../../api/client";
 import { writeCachedResource } from "../../api/offlineStore";
-import { createList, deleteList, fetchLists, renameList } from "../../api/lists";
+import { SSE_EVENTS } from "../../api/sseEvents";
+import { LISTS_CACHE_KEY, createList, deleteList, fetchLists, renameList } from "../../api/lists";
 import ListCardHome from "../../components/ListCardHome/ListCardHome";
 import NewListSheet from "../../components/NewListSheet/NewListSheet";
 import DeferredSheet from "../../components/ui/DeferredSheet/DeferredSheet";
@@ -29,7 +30,6 @@ import {
 } from "./overviewSort";
 import type { OverviewSortMode } from "./overviewSort";
 
-const LISTS_CACHE_KEY = "lists";
 const OVERVIEW_SORT_KEY = "overview_sort";
 
 interface OverviewList extends List {
@@ -182,9 +182,9 @@ export default function OverviewPage(): ReactElement {
     [currentUserId, removeListById]
   );
 
-  useListEvents("list:updated", null, handleListChange);
-  useListEvents("list:deleted", null, handleListDeleted);
-  useListEvents("member:removed", null, handleMemberRemoved);
+  useListEvents(SSE_EVENTS.listUpdated, null, handleListChange);
+  useListEvents(SSE_EVENTS.listDeleted, null, handleListDeleted);
+  useListEvents(SSE_EVENTS.memberRemoved, null, handleMemberRemoved);
 
   async function updateLists(updater: (currentLists: OverviewList[]) => OverviewList[]): Promise<void> {
     const nextLists = updater(listsRef.current);

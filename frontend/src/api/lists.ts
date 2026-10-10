@@ -4,7 +4,8 @@ import { readCachedResource } from "./offlineStore";
 import type { CachedReadOptions } from "./client";
 import type { List, MutationResult, QueueMeta } from "../types";
 
-const LISTS_CACHE_KEY = createCacheKey("lists");
+/** Cache key of the list overview. */
+export const LISTS_CACHE_KEY = createCacheKey("lists");
 
 /** Cache key of the metadata of one list (name, owner, ...). */
 export function createListCacheKey(listId: string): string {

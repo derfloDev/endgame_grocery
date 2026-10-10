@@ -1,13 +1,6 @@
-import type { TFunction } from "i18next";
-import { getErrorMessage } from "../../api/errors";
+import { SSE_EVENTS } from "../../api/sseEvents";
+import type { EntrySseEventType } from "../../api/sseEvents";
 import type { Entry } from "../../types";
-
-export class ListAccessError extends Error {
-  constructor() {
-    super("detail.accessError");
-    this.name = "ListAccessError";
-  }
-}
 
 /**
  * Keep queued local entries absent from the server until sync can return their IDs.
@@ -76,7 +69,7 @@ export function sortEntries(entries: Entry[]): Entry[] {
   });
 }
 
-export type EntryEventType = "entry:created" | "entry:updated" | "entry:deleted";
+export type EntryEventType = EntrySseEventType;
 
 export interface EntryEventResult {
   entries: Entry[];
@@ -116,7 +109,7 @@ export function applyEntryEvent(
   data: Record<string, unknown>,
   { currentUserId, locallyDoneIds }: ApplyEntryEventOptions
 ): EntryEventResult | null {
-  if (type === "entry:deleted") {
+  if (type === SSE_EVENTS.entryDeleted) {
     // Without the status of the deleted entry (an older server) nobody can tell whether the
     // history changed, so the caller refetches.
     if (typeof data.entryId !== "string" || (data.entryStatus !== "open" && data.entryStatus !== "done")) {
@@ -144,7 +137,7 @@ export function applyEntryEvent(
   }
 
   const nextStatus = payload.status;
-  const previousStatus = existing?.status ?? (type === "entry:created" ? "open" : null);
+  const previousStatus = existing?.status ?? (type === SSE_EVENTS.entryCreated ? "open" : null);
   const historyChanged =
     (nextStatus === "done" && previousStatus !== "done") || (previousStatus === "done" && nextStatus !== "done");
   const isChanged =
@@ -190,9 +183,4 @@ export function getChangeKind(entry: Entry): "new" | "edited" | "done" | undefin
   return Number.isFinite(createdAt) && Number.isFinite(updatedAt) && updatedAt > createdAt
     ? "edited"
     : "new";
-}
-
-/** Text for the error banner: the translated access message for a missing list, otherwise the API/other error text. */
-export function getEntryErrorText(error: unknown, t: TFunction): string {
-  return error instanceof ListAccessError ? t("detail.accessError") : getErrorMessage(error, t);
 }

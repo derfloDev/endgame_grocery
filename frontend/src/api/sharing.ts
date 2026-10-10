@@ -24,7 +24,8 @@ export type ShareInviteResponse = MutationResult<{ invite: { invited_email?: str
 
 type EmptyMutationResponse = MutationResult<Record<string, never>> | null;
 
-function createMembersCacheKey(listId: string): string {
+/** Cache key of the members of one list; the only place that spells it out. */
+export function createMembersCacheKey(listId: string): string {
   return createCacheKey("members", listId);
 }
 

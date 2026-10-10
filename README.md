@@ -277,6 +277,12 @@ stays green on machines without PostgreSQL. CI always sets the variable.
 
 The shared domain types live in `frontend/src/types.ts` and mirror the API: `Entry` (with nullable `details`), `List` (with `owner_id` / `owner_name`), `Member` (`user_id`, `display_name`, `email`, ...). Pages and hooks use them directly; there are no per-page `Detail*` copies. `sendJsonRequest<T>` resolves to the type the caller states, so the `api/*.ts` helpers return typed responses without casts. A write request resolves to `MutationResult<T>`, a union of `{ queued: true }` (the offline queue accepted it) and the server's answer `T`; narrow it with `if (result.queued)`. `api/apiTypes.test.ts` pins these types at compile time and fails if a `Detail*` type reappears.
 
+### List detail hooks
+
+`useListDetailData` is a thin facade over three focused hooks in `frontend/src/pages/ListDetailPage/`: `useListEntries` (entries, optimistic create/toggle/edit, SSE patches), `useListMembers` (sharing) and `useRecentlyUsed` (history suggestions). `useActiveList` supplies the `isMounted()` / `isCurrent(listId)` guards that drop results of a list the user already left. The hooks expose state and commands only (`addEntry`, `revokeMember`, `resync`, ...), never raw `set*` setters.
+
+Errors are typed (`ListDetailError` in `listDetailErrors.ts`: `kind` is `access` or `request`, plus the stable API `code`). They are translated when rendered with `getListDetailErrorText`, so they follow language changes. Offline cache keys come from `createEntriesCacheKey`, `createMembersCacheKey`, `createListCacheKey` and `LISTS_CACHE_KEY`; SSE event names come from `SSE_EVENTS` in `api/sseEvents.ts`. `sharedNames.test.ts` fails when a key or event-name literal is spelled out elsewhere.
+
 Frontend Vitest runs load `frontend/src/test/setup.ts` before each suite so component
 tests start with the i18next runtime initialized and the language reset to English.
 The frontend Vitest config uses 20-second test and hook timeouts to keep the full

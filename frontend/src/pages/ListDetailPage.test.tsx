@@ -56,7 +56,9 @@ const cssSource = [
 const pageSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage/ListDetailPage.tsx"), "utf8");
 const hookSource = readFileSync(path.resolve(import.meta.dirname, "./ListDetailPage/useListDetailData.ts"), "utf8");
 
-vi.mock("../api/entries", () => ({
+// The cache key helpers stay real: they are the single source of the key names.
+vi.mock("../api/entries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/entries")>()),
   createEntry: vi.fn(),
   fetchEntries: vi.fn(),
   updateEntry: vi.fn()
@@ -67,14 +69,16 @@ vi.mock("../api/history", () => ({
   fetchRecentlyUsed: vi.fn()
 }));
 
-vi.mock("../api/lists", () => ({
+vi.mock("../api/lists", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/lists")>()),
   fetchList: vi.fn(),
   fetchLists: vi.fn(),
   markListViewed: vi.fn(),
   renameList: vi.fn()
 }));
 
-vi.mock("../api/sharing", () => ({
+vi.mock("../api/sharing", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/sharing")>()),
   fetchListMembers: vi.fn(),
   leaveList: vi.fn(),
   revokeListMember: vi.fn(),
@@ -611,7 +615,7 @@ describe("ListDetailPage create response racing the entry:created event", () => 
     const request = createDeferred<Awaited<ReturnType<typeof createEntry>>>();
     createEntryMock.mockReturnValue(request.promise);
     let adding: Promise<boolean> = Promise.resolve(false);
-    act(() => { adding = view.result.current.addEntryByText("Bread", null); });
+    act(() => { adding = view.result.current.addEntry("Bread", null); });
     await waitFor(() => { expect(view.result.current.entries).toHaveLength(1); });
     return { request, finish: async (entry: Entry) => { await act(async () => { request.resolve({ entry } as Awaited<ReturnType<typeof createEntry>>); await adding; }); } };
   }
@@ -701,7 +705,7 @@ describe("ListDetailPage offline reconciliation", () => {
   it("shows an offline-added entry once after the queue synced it", async () => {
     const view = await loadedHook();
     createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
-    await act(async () => { await view.result.current.addEntryByText("Bread", null); });
+    await act(async () => { await view.result.current.addEntry("Bread", null); });
     const [pending] = view.result.current.entries;
     expect(pending).toMatchObject({ text: "Bread", is_pending_sync: true });
     const tempId = pending.id;
@@ -718,7 +722,7 @@ describe("ListDetailPage offline reconciliation", () => {
   it("swaps the temporary id for the real one as soon as the queue reports it, before any reload", async () => {
     const view = await loadedHook();
     createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
-    await act(async () => { await view.result.current.addEntryByText("Bread", null); });
+    await act(async () => { await view.result.current.addEntry("Bread", null); });
     const tempId = view.result.current.entries[0].id;
 
     view.rerender({ listId: "list-1", resolvedIds: { [tempId]: "real-1" } });
@@ -730,7 +734,7 @@ describe("ListDetailPage offline reconciliation", () => {
   it("keeps a queued entry across a reload while its change is still in the queue", async () => {
     const view = await loadedHook();
     createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
-    await act(async () => { await view.result.current.addEntryByText("Bread", null); });
+    await act(async () => { await view.result.current.addEntry("Bread", null); });
     const tempId = view.result.current.entries[0].id;
     listOfflineMutationsMock.mockResolvedValue([
       { id: "m1", url: "/api/lists/list-1/entries", method: "POST", createdAt: "now", userId: "user-1", queueMeta: { resourceType: "entry", tempId } }
@@ -744,7 +748,7 @@ describe("ListDetailPage offline reconciliation", () => {
   it("drops a queued entry on reload once its change was discarded from the queue", async () => {
     const view = await loadedHook();
     createEntryMock.mockResolvedValue({ queued: true } as Awaited<ReturnType<typeof createEntry>>);
-    await act(async () => { await view.result.current.addEntryByText("Bread", null); });
+    await act(async () => { await view.result.current.addEntry("Bread", null); });
     listOfflineMutationsMock.mockResolvedValue([]);
 
     await act(async () => { await view.result.current.loadEntries(); });
@@ -757,7 +761,7 @@ describe("ListDetailPage offline reconciliation", () => {
     const request = createDeferred<Awaited<ReturnType<typeof createEntry>>>();
     createEntryMock.mockReturnValue(request.promise);
     let adding: Promise<boolean> = Promise.resolve(false);
-    act(() => { adding = view.result.current.addEntryByText("Bread", null); });
+    act(() => { adding = view.result.current.addEntry("Bread", null); });
     await waitFor(() => { expect(view.result.current.entries).toHaveLength(1); });
 
     await act(async () => { await view.result.current.loadEntries(); });

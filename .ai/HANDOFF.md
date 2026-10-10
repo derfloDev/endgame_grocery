@@ -1393,3 +1393,47 @@ Notes for review:
 | Next Role | none |
 
 ---
+
+### T-022 — implement — 2026-10-10T12:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Split `useListDetailData` into `useListEntries`, `useListMembers`, `useRecentlyUsed` and `useActiveList` behind a thin facade that exposes commands only; typed list-detail errors translated at render time; cache keys and SSE event names declared once. |
+| Files Changed | frontend/src/api/{entries,lists,sharing}.ts, frontend/src/api/sseEvents.ts, frontend/src/context/EventSourceContext.tsx, frontend/src/pages/OverviewPage/OverviewPage.tsx, frontend/src/pages/OverviewPage/OverviewPage.test.tsx, frontend/src/pages/ListDetailPage/* (new hooks, listDetailErrors, tests), frontend/src/pages/ListDetailPage.test.tsx, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Commit | `refactor(frontend): split the list detail hook into focused hooks with shared cache keys and event names` |
+| Next Role | review |
+
+1. **Hooks:** no hook returns a `set*` key (asserted in `listDetailHooks.test.tsx`). `useRecentlyUsed` returns a memoized `commands` object so handler identities stay stable. `useActiveList` provides `isMounted()` / `isCurrent(listId)` to drop results of a list the user left.
+2. **Errors:** `ListDetailError {kind, code?, message}`; `getListDetailErrorText` translates by code when rendering, so language changes apply without refetching.
+3. **Shared names:** `createEntriesCacheKey`, `createMembersCacheKey`, `LISTS_CACHE_KEY`, and `SSE_EVENTS` / `SSE_EVENT_TYPES` (`api/sseEvents.ts`). `sharedNames.test.ts` fails on literals outside `api/`.
+4. **Existing tests:** the 174 page tests pass; the only edits are the `addEntryByText` → `addEntry` rename and partial `importOriginal` mocks that keep the real cache-key helpers. No assertion was weakened.
+5. **Validation:** lint (one old warning in AuthContext), typecheck, build clean; backend 394 and frontend 871 tests pass. Playwright e2e and PostgreSQL integration suites were not run locally (no database); CI is the first real run.
+
+### T-022 — review — 2026-10-10T13:00:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed the split of useListDetailData into focused command-exposing hooks with shared cache keys and SSE event names; existing page assertions unchanged, all validations clean. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-022 — implement — 2026-10-10T08:02:58Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task: completed T-022 after review PASS_WITH_NOTES; split list-detail hooks with shared cache keys and SSE event names. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md, .ai/REVIEW.md, README.md, and all T-022 frontend implementation and test files |
+| Validation | Review recorded lint, typecheck and build passing; backend 394 and frontend 871 tests passed. Removed one trailing blank line; npm run lint passed (one existing AuthContext warning); staged whitespace check passed at commit time. E2E and PostgreSQL integration were not run locally (no database). |
+| Commit | `refactor(frontend): split the list detail hook into focused hooks with shared cache keys and event names` |
+| Next Role | none |
+
+Unrelated changes in .ai/config.json and .claude/settings.local.json remain uncommitted.
+
+---

@@ -25,7 +25,8 @@ interface EntriesResponse {
 
 type EntryMutationResponse = MutationResult<{ entry: Entry }>;
 
-function createEntriesCacheKey(listId: string): string {
+/** Cache key of the entries of one list; the only place that spells it out. */
+export function createEntriesCacheKey(listId: string): string {
   return createCacheKey("entries", listId);
 }
 

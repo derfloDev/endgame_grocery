@@ -1,36 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { createTemporaryId } from "../../api/client";
-import { createEntry, fetchEntries, updateEntry } from "../../api/entries";
-import { deleteFromHistory, fetchRecentlyUsed } from "../../api/history";
-import { ApiError, getErrorMessage } from "../../api/errors";
-import { fetchList, markListViewed } from "../../api/lists";
-import { listOfflineMutations, writeCachedResource } from "../../api/offlineStore";
-import { fetchListMembers } from "../../api/sharing";
-import type { Entry, List, Member, Suggestion } from "../../types";
-import { filterRecentlyUsedItems, upsertRecentlyUsedItems } from "../recentlyUsedState";
-import {
-  ListAccessError,
-  applyEntryEvent,
-  mergePendingEntries,
-  reconcileResolvedEntries,
-  replaceTemporaryEntry,
-  sortEntries
-} from "./listDetailUtils";
-import type { EntryEventType } from "./listDetailUtils";
-
-// Several entries are often completed within a moment (shopping); one history reload covers them.
-const HISTORY_RELOAD_DEBOUNCE_MS = 250;
-
-interface LoadEntriesOptions {
-  historyItems?: Suggestion[] | null;
-  throwOnError?: boolean;
-}
-
-interface LoadMembersOptions {
-  isOwner?: boolean;
-  throwOnError?: boolean;
-}
+import { ApiError } from "../../api/errors";
+import { fetchEntries } from "../../api/entries";
+import { fetchRecentlyUsed } from "../../api/history";
+import { fetchList, markListViewed, renameList as renameListRequest } from "../../api/lists";
+import type { Entry, List } from "../../types";
+import { createAccessError, toListDetailError } from "./listDetailErrors";
+import type { ListDetailError } from "./listDetailErrors";
+import { useActiveList } from "./useActiveList";
+import { useListEntries } from "./useListEntries";
+import { useListMembers } from "./useListMembers";
+import { useRecentlyUsed } from "./useRecentlyUsed";
 
 interface UseListDetailDataOptions {
   /** The signed-in user; changes made by other users are marked as changed. */
@@ -44,6 +23,14 @@ interface UseListDetailDataOptions {
   token: string;
 }
 
+/**
+ * Everything the list detail page shows and does, composed from three focused hooks:
+ * `useListEntries` (entries and their commands), `useListMembers` (sharing) and `useRecentlyUsed`
+ * (history suggestions). This hook adds the list's own metadata, the initial load that brings the
+ * three together, and one error state.
+ *
+ * It exposes state and commands only; nothing in the result is a state setter.
+ */
 export function useListDetailData({
   currentUserId,
   listId,
@@ -53,450 +40,45 @@ export function useListDetailData({
   syncVersion,
   token
 }: UseListDetailDataOptions) {
-  const { t } = useTranslation();
+  const active = useActiveList(listId);
   const [list, setList] = useState<List | null>(null);
-  const [entries, setEntriesState] = useState<Entry[]>([]);
-  const entriesRef = useRef<Entry[]>([]);
-  const entriesScopeRef = useRef({ listId, token });
-  const [members, setMembers] = useState<Member[]>([]);
-  const [recentlyUsed, setRecentlyUsed] = useState<Suggestion[]>([]);
-  const [entryError, setEntryError] = useState<unknown>(null);
+  const [error, setError] = useState<ListDetailError | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isSharingLoading, setIsSharingLoading] = useState<boolean>(false);
-  const isMountedRef = useRef<boolean>(false);
-  const locallyDoneIdsRef = useRef<Set<string>>(new Set());
-  // Temporary entries whose create request is running right now (not queued, not answered yet).
-  const inFlightTempIdsRef = useRef<Set<string>>(new Set());
-  // A response that arrives after the user opened another list must not touch the new list's state.
-  const currentListIdRef = useRef(listId);
-  currentListIdRef.current = listId;
+  const scopeRef = useRef({ listId, token });
+  const reportError = useCallback((reported: unknown): void => setError(toListDetailError(reported)), []);
+  const clearError = useCallback((): void => setError(null), []);
 
-  // Keep an immediate snapshot for async reloads: React may defer state updaters, but
-  // both the merge and the following history refresh must see entries queued meanwhile.
-  const setEntries = useCallback((value: Entry[] | ((current: Entry[]) => Entry[])) => {
-    const nextEntries = typeof value === "function" ? value(entriesRef.current) : value;
-    entriesRef.current = nextEntries;
-    setEntriesState(nextEntries);
-    return nextEntries;
-  }, []);
+  // The history needs the current entries and the entries need the history commands; the accessor
+  // breaks that cycle.
+  const entriesAccessorRef = useRef<() => Entry[]>(() => []);
+  const getEntries = useCallback(() => entriesAccessorRef.current(), []);
+  const recentlyUsed = useRecentlyUsed({ active, getEntries, listId, token });
+  const history = recentlyUsed.commands;
+  const entryList = useListEntries({ active, clearError, currentUserId, history, listId, reportError, resolvedIds, token });
+  entriesAccessorRef.current = entryList.getEntries;
+  const memberList = useListMembers({ active, listId, reportError, token });
+  const { loadMembers } = memberList;
 
-  const historyReloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-
-    return () => {
-      isMountedRef.current = false;
-
-      if (historyReloadTimerRef.current !== null) {
-        clearTimeout(historyReloadTimerRef.current);
-        historyReloadTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  /**
-   * Decides which queued local entries survive a full reload. A temporary entry stays only while
-   * its create is still queued or running; once the change was synced (the server returns the real
-   * entry) or discarded from the queue, keeping it would show a duplicate or a phantom entry.
-   */
-  const createPendingFilter = useCallback(async (): Promise<(entry: Entry) => boolean> => {
-    let queuedTempIds: Set<string>;
-
-    try {
-      const queued = await listOfflineMutations();
-      queuedTempIds = new Set(queued.flatMap((mutation) => (mutation.queueMeta?.tempId ? [mutation.queueMeta.tempId] : [])));
-    } catch {
-      // Without the queue we cannot tell; keep everything rather than lose queued work from view.
-      return () => true;
-    }
-
-    return (entry) =>
-      !entry.id.startsWith("temp-") || queuedTempIds.has(entry.id) || inFlightTempIdsRef.current.has(entry.id);
-  }, []);
-
-  const loadEntries = useCallback(
-    async ({ historyItems = null, throwOnError = false }: LoadEntriesOptions = {}): Promise<Entry[]> => {
-      try {
-        const entriesResult = await fetchEntries(listId, token);
-        const isStillPending = await createPendingFilter();
-
-        if (currentListIdRef.current !== listId) {
-          return entriesRef.current;
-        }
-
-        const serverEntries = (entriesResult.entries ?? []).map((entry) => {
-          return locallyDoneIdsRef.current.has(entry.id) && entry.status === "done"
-            ? { ...entry, is_changed: true }
-            : entry;
-        });
-        const nextEntries = mergePendingEntries(serverEntries, entriesRef.current, isStillPending);
-
-        if (isMountedRef.current) {
-          setEntries(nextEntries);
-          setRecentlyUsed((currentItems) => filterRecentlyUsedItems(historyItems ?? currentItems, nextEntries));
-        }
-
-        return nextEntries;
-      } catch (loadError) {
-        if (isMountedRef.current) {
-          setEntryError(loadError);
-        }
-
-        if (throwOnError) {
-          throw loadError;
-        }
-
-        return [];
-      }
-    },
-    [createPendingFilter, listId, token, setEntries]
-  );
-
-  const reloadHistory = useCallback(
-    async (entriesOverride?: Entry[]): Promise<void> => {
-      try {
-        const historyResult = await fetchRecentlyUsed(listId, token);
-
-        if (isMountedRef.current && currentListIdRef.current === listId) {
-          setRecentlyUsed((currentItems) =>
-            filterRecentlyUsedItems(historyResult?.history ?? currentItems, entriesOverride ?? entries)
-          );
-        }
-      } catch (error) {
-        console.error("Failed to load recently used history.", error);
-      }
-    },
-    [entries, listId, token]
-  );
-
-  /** True for an `entry:created` event of this user whose text matches an entry this tab is creating right now. */
-  const isOwnInFlightCreate = useCallback(
-    (data: Record<string, unknown>): boolean => {
-      const payload = data.entry as { text?: unknown } | null | undefined;
-
-      return (
-        Boolean(currentUserId) &&
-        data.actorId === currentUserId &&
-        typeof payload?.text === "string" &&
-        entriesRef.current.some((entry) => inFlightTempIdsRef.current.has(entry.id) && entry.text === payload.text)
-      );
-    },
-    [currentUserId]
-  );
-
-  const scheduleHistoryReload = useCallback((): void => {
-    if (historyReloadTimerRef.current !== null) {
-      clearTimeout(historyReloadTimerRef.current);
-    }
-
-    historyReloadTimerRef.current = setTimeout(() => {
-      historyReloadTimerRef.current = null;
-      void reloadHistory(entriesRef.current);
-    }, HISTORY_RELOAD_DEBOUNCE_MS);
-  }, [reloadHistory]);
-
-  /**
-   * Applies an SSE entry event by patching the local entries (no request). Only an event without
-   * a usable payload (an older server) falls back to refetching entries and history. The history
-   * is reloaded, debounced, only when an entry moved to or from done or a done entry was deleted.
-   */
-  const handleEntryEvent = useCallback(
-    (type: EntryEventType, data: Record<string, unknown>): void => {
-      // This tab's own create is still running: its response delivers the entry. Showing the
-      // event's copy now would render the same entry twice until the response arrives.
-      if (type === "entry:created" && isOwnInFlightCreate(data)) {
-        return;
-      }
-
-      const result = applyEntryEvent(entriesRef.current, type, data, {
-        currentUserId,
-        locallyDoneIds: locallyDoneIdsRef.current
-      });
-
-      if (!result) {
-        void loadEntries().then((nextEntries) => reloadHistory(nextEntries));
-        return;
-      }
-
-      if (result.entries !== entriesRef.current) {
-        const nextEntries = setEntries(result.entries);
-
-        setRecentlyUsed((currentItems) => filterRecentlyUsedItems(currentItems, nextEntries));
-        Promise.resolve(writeCachedResource(`entries:${listId}`, { entries: nextEntries })).catch((error: unknown) => {
-          console.error("Failed to cache entries.", error);
-        });
-      }
-
-      if (result.historyChanged) {
-        scheduleHistoryReload();
-      }
-    },
-    [currentUserId, isOwnInFlightCreate, listId, loadEntries, reloadHistory, scheduleHistoryReload, setEntries]
-  );
-  const handleEntryCreated = useCallback((data: Record<string, unknown>) => handleEntryEvent("entry:created", data), [handleEntryEvent]);
-  const handleEntryUpdated = useCallback((data: Record<string, unknown>) => handleEntryEvent("entry:updated", data), [handleEntryEvent]);
-  const handleEntryDeleted = useCallback((data: Record<string, unknown>) => handleEntryEvent("entry:deleted", data), [handleEntryEvent]);
-
-  const loadMembers = useCallback(
-    async ({ isOwner = false, throwOnError = false }: LoadMembersOptions = {}): Promise<Member[]> => {
-      if (!isOwner) {
-        if (isMountedRef.current) {
-          setMembers([]);
-          setIsSharingLoading(false);
-        }
-
-        return [];
-      }
-
-      if (isMountedRef.current) {
-        setIsSharingLoading(true);
-      }
-
-      try {
-        const membersResult = await fetchListMembers(listId, token);
-        const nextMembers = membersResult.members ?? [];
-
-        if (isMountedRef.current && currentListIdRef.current === listId) {
-          setMembers(nextMembers);
-        }
-
-        return nextMembers;
-      } catch (loadError) {
-        if (isMountedRef.current) {
-          setEntryError(loadError);
-        }
-
-        if (throwOnError) {
-          throw loadError;
-        }
-
-        return [];
-      } finally {
-        if (isMountedRef.current) {
-          setIsSharingLoading(false);
-        }
-      }
-    },
-    [listId, token]
-  );
-
-  const updateEntries = useCallback(
-    async (updater: (currentEntries: Entry[]) => Entry[]): Promise<void> => {
-      const nextEntries = setEntries(updater);
-
-      await writeCachedResource(`entries:${listId}`, { entries: nextEntries });
-    },
-    [listId, setEntries]
-  );
-
-  const addEntryByText = useCallback(
-    async (text: string, icon: string | null, details = ""): Promise<boolean> => {
-      const trimmed = text.trim();
-
-      if (!trimmed) {
-        return false;
-      }
-
-      const nextDetails = normalizeEntryDetails(details);
-      const temporaryEntry: Entry = {
-        id: createTemporaryId("entry"),
-        text: trimmed,
-        icon: icon ?? null,
-        details: nextDetails,
-        status: "open",
-        created_at: new Date().toISOString(),
-        is_pending_sync: true
-      };
-
-      inFlightTempIdsRef.current.add(temporaryEntry.id);
-      await updateEntries((currentEntries) => sortEntries([...currentEntries, temporaryEntry]));
-
-      try {
-        setEntryError("");
-        const result = await createEntry(
-          listId,
-          token,
-          { text: trimmed, icon: icon ?? null, details },
-          { tempId: temporaryEntry.id }
-        );
-
-        await updateEntries((currentEntries) =>
-          result?.queued
-            ? sortEntries(currentEntries.map((currentEntry) => (currentEntry.id === temporaryEntry.id ? temporaryEntry : currentEntry)))
-            // The server may have announced the entry (entry:created) before this response: never
-            // keep it twice.
-            : replaceTemporaryEntry(currentEntries, temporaryEntry.id, result.entry)
-        );
-        return true;
-      } catch (submitError) {
-        await updateEntries((currentEntries) =>
-          currentEntries.filter((currentEntry) => currentEntry.id !== temporaryEntry.id)
-        );
-        setEntryError(getErrorMessage(submitError, t));
-        return false;
-      } finally {
-        inFlightTempIdsRef.current.delete(temporaryEntry.id);
-      }
-    },
-    [listId, t, token, updateEntries]
-  );
-
-  const toggleStatus = useCallback(
-    async (entry: Entry): Promise<void> => {
-      const nextStatus: Entry["status"] = entry.status === "open" ? "done" : "open";
-      const isCompletingEntry = nextStatus === "done";
-      const optimisticEntry: Entry = {
-        ...entry,
-        status: nextStatus,
-        is_pending_sync: true,
-        ...(isCompletingEntry ? { is_changed: true } : {})
-      };
-
-      if (isCompletingEntry) {
-        locallyDoneIdsRef.current.add(entry.id);
-      }
-
-      await updateEntries((currentEntries) =>
-        sortEntries(
-          currentEntries.map((currentEntry) => (currentEntry.id === entry.id ? optimisticEntry : currentEntry))
-        )
-      );
-
-      if (isCompletingEntry) {
-        setRecentlyUsed((currentItems) => upsertRecentlyUsedItems(currentItems, entry));
-      }
-
-      try {
-        setEntryError("");
-        const result = await updateEntry(listId, entry.id, token, { status: nextStatus });
-
-        await updateEntries((currentEntries) =>
-          sortEntries(
-            currentEntries.map((currentEntry) =>
-              currentEntry.id === entry.id
-                ? {
-                    ...currentEntry,
-                    ...(result?.queued
-                      ? {
-                          is_pending_sync: true,
-                          status: nextStatus,
-                          ...(isCompletingEntry ? { is_changed: true } : {})
-                        }
-                      : {
-                          ...result.entry,
-                          ...(isCompletingEntry ? { is_changed: true } : {})
-                        })
-                  }
-                : currentEntry
-            )
-          )
-        );
-
-        if (isCompletingEntry && !result?.queued) {
-          setRecentlyUsed((currentItems) =>
-            upsertRecentlyUsedItems(currentItems, result.entry)
-          );
-        }
-      } catch (submitError) {
-        await updateEntries((currentEntries) =>
-          sortEntries(currentEntries.map((currentEntry) => (currentEntry.id === entry.id ? entry : currentEntry)))
-        );
-
-        if (isCompletingEntry) {
-          locallyDoneIdsRef.current.delete(entry.id);
-          setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== entry.text));
-        }
-
-        setEntryError(getErrorMessage(submitError, t));
-      }
-    },
-    [listId, t, token, updateEntries]
-  );
-
-  const submitEditEntry = useCallback(
-    async (entryId: string, text: string, iconName: string | null, details = ""): Promise<boolean> => {
-      const trimmed = text.trim();
-
-      if (!trimmed) {
-        return false;
-      }
-
-      try {
-        setEntryError("");
-        const nextIcon = iconName ?? null;
-        const nextDetails = normalizeEntryDetails(details);
-        const result = await updateEntry(listId, entryId, token, { text: trimmed, icon: nextIcon, details });
-
-        await updateEntries((currentEntries) =>
-          sortEntries(
-            currentEntries.map((currentEntry) =>
-              currentEntry.id === entryId
-                ? {
-                    ...currentEntry,
-                    ...(result?.queued
-                      ? { details: nextDetails, icon: nextIcon, is_pending_sync: true, text: trimmed }
-                      : result.entry)
-                  }
-                : currentEntry
-            )
-          )
-        );
-        return true;
-      } catch (submitError) {
-        setEntryError(getErrorMessage(submitError, t));
-        return false;
-      }
-    },
-    [listId, t, token, updateEntries]
-  );
-
-  const addRecentlyUsedEntry = useCallback(
-    async (text: string, icon: string | null, details?: string): Promise<void> => {
-      const historyItem = recentlyUsed.find((item) => item.text === text);
-      setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
-
-      const didAdd = await addEntryByText(text, icon, details ?? "");
-
-      if (!didAdd && historyItem) {
-        setRecentlyUsed((currentItems) => {
-          if (currentItems.some((item) => item.text === historyItem.text)) {
-            return currentItems;
-          }
-
-          return [historyItem, ...currentItems];
-        });
-      }
-    },
-    [addEntryByText, recentlyUsed]
-  );
-
-  const dismissRecentlyUsedEntry = useCallback(
-    (text: string): void => {
-      setRecentlyUsed((currentItems) => currentItems.filter((item) => item.text !== text));
-      void deleteFromHistory(listId, text, token).catch((error) => {
-        console.error("Failed to delete recently used history item.", error);
-      });
-    },
-    [listId, token]
-  );
+  const clearMembers = memberList.clear;
+  const clearEntries = entryList.clear;
+  const { addEntry, applyCachedEntries, applyServerEntries, beginLoad, createPendingFilter, loadEntries } = entryList;
 
   useEffect(() => {
-    let active = true;
+    let isActive = true;
     let networkFinished = false;
 
     async function loadListDetail(): Promise<void> {
       // Only merge pending entries from this list and session, never from the previous route.
-      if (entriesScopeRef.current.listId !== listId || entriesScopeRef.current.token !== token) {
-        entriesScopeRef.current = { listId, token };
-        setEntries([]);
+      if (scopeRef.current.listId !== listId || scopeRef.current.token !== token) {
+        scopeRef.current = { listId, token };
+        clearEntries();
         setList(null);
-        setMembers([]);
+        clearMembers();
       }
-      setEntryError(null);
+      clearError();
       setIsLoading(true);
-      setRecentlyUsed([]);
-      locallyDoneIdsRef.current = new Set();
+      history.reset();
+      beginLoad();
       onLoadStart?.();
 
       try {
@@ -504,7 +86,7 @@ export function useListDetailData({
           // Only this list's metadata is needed, not every list the user has.
           fetchList(token, listId, {
             onCachedValue: (cached) => {
-              if (!active || networkFinished) return;
+              if (!isActive || networkFinished) return;
               if (cached.list) setList(cached.list);
             }
           }).catch((listError: unknown) => {
@@ -516,15 +98,13 @@ export function useListDetailData({
           }),
           fetchEntries(listId, token, {
             onCachedValue: (cached) => {
-              if (!active || networkFinished) return;
-              const nextEntries = mergePendingEntries(cached.entries ?? [], entriesRef.current);
-              setEntries(nextEntries);
-              setRecentlyUsed((current) => filterRecentlyUsedItems(current, nextEntries));
+              if (!isActive || networkFinished) return;
+              applyCachedEntries(cached.entries ?? []);
               setIsLoading(false);
             }
           }),
-          fetchRecentlyUsed(listId, token).catch((error) => {
-            console.error("Failed to load recently used history.", error);
+          fetchRecentlyUsed(listId, token).catch((historyError) => {
+            console.error("Failed to load recently used history.", historyError);
             return { history: [] };
           })
         ]);
@@ -532,110 +112,159 @@ export function useListDetailData({
         const activeList = listResult.list ?? undefined;
         const isStillPending = await createPendingFilter();
 
-        if (!active) {
+        if (!isActive) {
           return;
         }
 
         if (!activeList) {
-          // Translate at render time so arriving language resources cannot restart this load.
-          setEntryError(new ListAccessError());
+          // Kept as a kind, not as text, so arriving language resources cannot restart this load.
+          setError(createAccessError());
           setList(null);
-          setEntries([]);
-          setMembers([]);
-          setRecentlyUsed([]);
+          clearEntries();
+          clearMembers();
+          history.reset();
           return;
         }
 
         setList(activeList);
         // Cached content is interactive while revalidating; preserve queued additions and
         // local completion badges just as subsequent SSE/recovery reloads do.
-        const serverEntries = (entriesResult.entries ?? []).map((entry) =>
-          locallyDoneIdsRef.current.has(entry.id) && entry.status === "done"
-            ? { ...entry, is_changed: true }
-            : entry
-        );
-        const nextEntries = mergePendingEntries(serverEntries, entriesRef.current, isStillPending);
-        setEntries(nextEntries);
-        setRecentlyUsed(filterRecentlyUsedItems(historyResult?.history ?? [], nextEntries));
+        const nextEntries = applyServerEntries(entriesResult.entries ?? [], isStillPending);
+        history.replaceFromServer(historyResult?.history ?? [], nextEntries);
 
-        void markListViewed(token, listId).catch((error) => {
-          console.error("Failed to mark list viewed.", error);
+        void markListViewed(token, listId).catch((viewError) => {
+          console.error("Failed to mark list viewed.", viewError);
         });
 
         if (activeList.is_owner) {
           // Members own their loading/error state and must not delay or clear loaded entries.
           void loadMembers({ isOwner: true });
         } else {
-          setMembers([]);
+          clearMembers();
           onNonOwnerList?.();
         }
       } catch (loadError) {
         networkFinished = true;
-        if (active) {
-          setEntryError(loadError);
+        if (isActive) {
+          reportError(loadError);
           setList(null);
-          setEntries([]);
-          setMembers([]);
-          setRecentlyUsed([]);
+          clearEntries();
+          clearMembers();
+          history.reset();
         }
       } finally {
-        if (active) {
+        if (isActive) {
           setIsLoading(false);
         }
       }
     }
 
     void loadListDetail();
-    return () => { active = false; };
-  }, [createPendingFilter, listId, loadMembers, onLoadStart, onNonOwnerList, syncVersion, token, setEntries]);
+    return () => { isActive = false; };
+  }, [
+    applyCachedEntries,
+    applyServerEntries,
+    beginLoad,
+    clearEntries,
+    clearError,
+    clearMembers,
+    createPendingFilter,
+    history,
+    listId,
+    loadMembers,
+    onLoadStart,
+    onNonOwnerList,
+    reportError,
+    syncVersion,
+    token
+  ]);
 
-  // The offline queue resolved temporary ids: show the real entry instead of the queued one without
-  // waiting for the next reload (and never both).
-  useEffect(() => {
-    if (!resolvedIds || Object.keys(resolvedIds).length === 0) {
-      return;
-    }
+  /** Renames the list on the server and shows the new name (queued while offline). Throws on failure. */
+  const renameList = useCallback(
+    async (newName: string): Promise<void> => {
+      try {
+        clearError();
+        const result = await renameListRequest(token, listId, { name: newName });
+        setList((currentList) =>
+          currentList
+            ? {
+                ...currentList,
+                name: result?.queued ? newName : result.list?.name ?? newName,
+                is_pending_sync: result?.queued ? true : currentList.is_pending_sync
+              }
+            : currentList
+        );
+      } catch (submitError) {
+        reportError(submitError);
+        throw submitError;
+      }
+    },
+    [clearError, listId, reportError, token]
+  );
 
-    const reconciled = reconcileResolvedEntries(entriesRef.current, resolvedIds);
+  /** Fetches the list's own metadata again (somebody renamed it); the entries stay untouched. */
+  const refreshList = useCallback((): void => {
+    void fetchList(token, listId)
+      .then((result) => setList((currentList) => (currentList ? { ...currentList, ...result.list } : result.list)))
+      .catch((refreshError: unknown) => console.error("Failed to refresh the list.", refreshError));
+  }, [listId, token]);
 
-    if (reconciled !== entriesRef.current) {
-      const nextEntries = setEntries(reconciled);
+  /** Re-adds a suggestion from the history; it comes back when adding fails. */
+  const addRecentlyUsedEntry = useCallback(
+    async (text: string, icon: string | null, details?: string): Promise<void> => {
+      const restore = history.reserve(text);
+      const didAdd = await addEntry(text, icon, details ?? "");
 
-      Promise.resolve(writeCachedResource(`entries:${listId}`, { entries: nextEntries })).catch((error: unknown) => {
-        console.error("Failed to cache entries.", error);
-      });
-    }
-  }, [listId, resolvedIds, setEntries]);
+      if (!didAdd) {
+        restore();
+      }
+    },
+    [addEntry, history]
+  );
+
+  const isOwner = list?.is_owner ?? false;
+
+  /** Reloads members after somebody joined or left (a no-op request for non-owners). */
+  const handleMemberChange = useCallback(() => void loadMembers({ isOwner }), [isOwner, loadMembers]);
+  /** Reloads only the history (it changed on the server). */
+  const handleHistoryChange = useCallback(() => void history.reload(), [history]);
+
+  /** Refetches everything after a reconnect or a return to the foreground. */
+  const resync = useCallback(
+    () =>
+      loadEntries().then((nextEntries) =>
+        Promise.all([history.reload(nextEntries), loadMembers({ isOwner })])
+      ),
+    [history, isOwner, loadEntries, loadMembers]
+  );
 
   return {
-    addEntryByText,
+    addEntry,
     addRecentlyUsedEntry,
-    dismissRecentlyUsedEntry,
-    entries,
-    entryError,
-    handleEntryCreated,
-    handleEntryDeleted,
-    handleEntryUpdated,
+    clearError,
+    dismissRecentlyUsedEntry: history.dismiss,
+    editEntry: entryList.editEntry,
+    entries: entryList.entries,
+    error,
+    handleEntryCreated: entryList.handleEntryCreated,
+    handleEntryDeleted: entryList.handleEntryDeleted,
+    handleEntryUpdated: entryList.handleEntryUpdated,
+    handleHistoryChange,
+    handleMemberChange,
     isLoading,
-    isSharingLoading,
+    isSharingLoading: memberList.isSharingLoading,
     list,
     loadEntries,
     loadMembers,
-    members,
-    recentlyUsed,
-    reloadHistory,
-    setEntryError,
-    setIsSharingLoading,
-    setList,
-    setMembers,
-    setRecentlyUsed,
-    submitEditEntry,
-    toggleStatus
+    members: memberList.members,
+    recentlyUsed: recentlyUsed.items,
+    refreshList,
+    reloadHistory: history.reload,
+    renameList,
+    reportError,
+    resync,
+    revokeMember: memberList.revokeMember,
+    shareWithMember: memberList.shareWithMember,
+    toggleEntry: entryList.toggleEntry
   };
 }
-
-function normalizeEntryDetails(details: string): string | null {
-  const trimmedDetails = details.trim();
-  return trimmedDetails ? trimmedDetails : null;
-}
-
