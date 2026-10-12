@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.5](https://github.com/derfloDev/endgame_grocery/compare/v1.9.4...v1.9.5) (2026-10-12)
+
+
+### Bug Fixes
+
+* **container:** restore nginx startup and reject invalid image configuration ([eeb015d](https://github.com/derfloDev/endgame_grocery/commit/eeb015dd88200a02b288918e224e32f11802c57d))
+
+
+### Miscellaneous Chores
+
+* **ai:** close cycle ([c250568](https://github.com/derfloDev/endgame_grocery/commit/c2505684814db780cb62737109ec513655b9026b))
+
 ## [1.9.4](https://github.com/derfloDev/endgame_grocery/compare/v1.9.3...v1.9.4) (2026-10-10)
 
 
