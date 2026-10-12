@@ -233,5 +233,13 @@
   "errors.validation.token_password_required": "Der Link zum Zurücksetzen und ein neues Passwort sind erforderlich.",
   "errors.validation.verification_token_required": "Der Bestätigungslink ist unvollständig.",
   "errors.request.not_found": "Diese Seite oder Schnittstelle existiert nicht.",
-  "errors.request.too_large": "Die Anfrage ist zu groß."
+  "errors.request.too_large": "Die Anfrage ist zu groß.",
+  "detail.pushErrors.unsupported": "Dieser Browser unterstützt keine Benachrichtigungen.",
+  "detail.pushErrors.configuration": "Benachrichtigungen sind nicht konfiguriert oder die Konfiguration konnte nicht geladen werden. Versuche erneut, Benachrichtigungen zu aktivieren.",
+  "detail.pushErrors.permissionDenied": "Benachrichtigungen sind blockiert. Erlaube sie in den Browser- oder Geräteeinstellungen, bevor du es erneut versuchst.",
+  "detail.pushErrors.workerRegistration": "Der Benachrichtigungsdienst konnte nicht registriert werden. Versuche erneut, Benachrichtigungen zu aktivieren. Wende dich an den Administrator, wenn das Problem bestehen bleibt.",
+  "detail.pushErrors.workerInstallation": "Der Benachrichtigungsdienst konnte nicht vollständig installiert werden. Prüfe deine Verbindung und versuche es erneut.",
+  "detail.pushErrors.workerTimeout": "Der Benachrichtigungsdienst wurde nicht rechtzeitig bereit. Versuche erneut, Benachrichtigungen zu aktivieren.",
+  "detail.pushErrors.subscription": "Benachrichtigungen konnten nicht aktualisiert werden. Prüfe deine Verbindung und versuche es erneut.",
+  "detail.notificationsPending": "Benachrichtigungen werden aktualisiert…"
 }

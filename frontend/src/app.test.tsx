@@ -14,6 +14,12 @@ import { AuthProvider } from "./context/AuthContext";
 import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
 
+vi.mock("./sw/register", () => ({
+  ensureServiceWorker: vi.fn(() => navigator.serviceWorker.ready),
+  useServiceWorkerUpdate: () => ({ needRefresh: false, dismissUpdate: vi.fn(), updateServiceWorker: vi.fn() })
+}));
+import { ensureServiceWorker } from "./sw/register";
+
 const routes = createFetchRoutes();
 const fetch = routes.fetch;
 const queueTimings = { REACHABILITY_PROBE_MIN_INTERVAL_MS: 0 };
@@ -75,6 +81,8 @@ describe("authentication shell", () => {
     stubMatchMedia();
     MockEventSource.instances = [];
     vi.stubGlobal("EventSource", MockEventSource);
+    vi.mocked(ensureServiceWorker).mockImplementation(() => navigator.serviceWorker.ready);
+    vi.stubGlobal("PushManager", class {});
     vi.stubGlobal("Notification", {
       permission: "granted",
       requestPermission: vi.fn(async () => "granted")
@@ -1559,7 +1567,7 @@ describe("authentication shell", () => {
 
     deferredVapidResponse.resolve({
       ok: true,
-      json: async () => ({ publicKey: "test-public-key" })
+      json: async () => ({ publicKey: "dGVzdA" })
     });
 
     await waitFor(() => {
@@ -1567,6 +1575,27 @@ describe("authentication shell", () => {
         false
       );
     });
+  });
+
+  it.each(["en", "de"])("localizes notification failures and retries on the shared list (%s)", async (language) => {
+    seedAuthSession("user-1");
+    await i18next.changeLanguage(language);
+    routes.on("GET", "/api/lists/list-2", () => ({ json: async () => ({ list: { id: "list-2", name: "Shared groceries", owner_name: "Alex", is_owner: false } }) }));
+    routes.on("GET", "/api/lists/list-2/entries", () => ({ json: async () => ({ entries: [] }) }));
+    routes.on("GET", "/api/lists/list-2/history", () => ({ json: async () => ({ history: [] }) }));
+    routes.on("POST", "/api/push/subscribe", createNoContentResponse);
+    vi.mocked(ensureServiceWorker).mockRejectedValue(new Error("workerRegistration"));
+    renderApp(["/lists/list-2"]);
+    const action = await screen.findByRole("button", { name: i18next.t("detail.notificationsOn") });
+    const feedback = i18next.t("detail.pushErrors.workerRegistration");
+    expect(feedback).toContain(language === "en" ? "could not register" : "konnte nicht registriert");
+    await screen.findByText(feedback);
+    await userEvent.click(action);
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", i18next.t("detail.pushErrors.workerRegistration"));
+    vi.mocked(ensureServiceWorker).mockImplementation(() => navigator.serviceWorker.ready);
+    await userEvent.click(action);
+    expect(await screen.findByRole("button", { name: i18next.t("detail.notificationsOff") })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("shows the redesigned list detail loading and error states", async () => {
