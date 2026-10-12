@@ -31,6 +31,14 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
+  # Validate the production image without migrations, backend startup or database credentials.
+  nginx-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - run: docker build -t endgame-grocery:nginx-smoke .
+      - run: bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke
+
   unit-test:
     runs-on: ubuntu-latest
     concurrency:

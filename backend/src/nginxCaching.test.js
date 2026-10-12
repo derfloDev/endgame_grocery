@@ -4,10 +4,25 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// nginx is not available in the unit-test environment, so these tests read docker/nginx.conf as
-// text and check the rules that matter for caching, compression and security headers.
+// Unit tests inspect configuration text for scope, caching, compression and security headers.
+// The image build and docker/smoke-nginx.sh validate the complete installed nginx configuration.
 const repoRootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const nginxConf = fs.readFileSync(path.join(repoRootDir, "docker/nginx.conf"), "utf8").replace(/\r\n/g, "\n");
+
+// Extract the server with balanced braces so nested locations remain inside its scope.
+function serverScopes() {
+  const start = nginxConf.search(/^server\s*\{/m);
+  assert.ok(start >= 0, "server block is missing");
+  const opening = nginxConf.indexOf("{", start);
+  let depth = 1;
+  let end = opening + 1;
+  for (; end < nginxConf.length && depth > 0; end++) {
+    if (nginxConf[end] === "{") depth++;
+    if (nginxConf[end] === "}") depth--;
+  }
+  assert.equal(depth, 0, "server block must close");
+  return { server: nginxConf.slice(opening + 1, end - 1), http: nginxConf.slice(0, start) + nginxConf.slice(end) };
+}
 
 /** Returns `{ matcher, body }` for every `location` block (no nesting is used in this file). */
 function locations() {
@@ -66,13 +81,26 @@ describe("nginx caching rules", () => {
 });
 
 describe("nginx compression", () => {
+  it("keeps all application gzip settings in server scope and HTTP-only rules outside it", () => {
+    const { server, http } = serverScopes();
+    for (const directive of ["gzip", "gzip_vary", "gzip_comp_level", "gzip_types"]) {
+      const pattern = new RegExp(`^\\s*${directive}\\s+[^;]+;`, "gm");
+      assert.equal([...server.matchAll(pattern)].length, 1, `${directive} must occur once inside server`);
+      assert.doesNotMatch(http, pattern, `${directive} must not redefine Alpine HTTP defaults`);
+    }
+    assert.match(server, /^\s*gzip on;$/m);
+    assert.doesNotMatch(server, /^\s*(map|log_format)\s/m);
+    assert.match(http, /^map\s/m);
+    assert.match(http, /^log_format\s/m);
+  });
+
   it("compresses at level 5 and varies on Accept-Encoding", () => {
-    assert.match(nginxConf, /^gzip_vary on;$/m);
-    assert.match(nginxConf, /^gzip_comp_level 5;$/m);
+    assert.match(serverScopes().server, /^\s*gzip_vary on;$/m);
+    assert.match(serverScopes().server, /^\s*gzip_comp_level 5;$/m);
   });
 
   it("compresses text, JSON, manifest and WASM types but not already compressed fonts", () => {
-    const types = nginxConf.match(/^gzip_types\s+([^;]+);/m)?.[1].split(/\s+/) ?? [];
+    const types = serverScopes().server.match(/^\s*gzip_types\s+([^;]+);/m)?.[1].split(/\s+/) ?? [];
 
     for (const type of [
       "text/plain",

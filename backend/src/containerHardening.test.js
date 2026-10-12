@@ -80,6 +80,19 @@ describe("nginx security headers", () => {
     }
   });
 
+  it("validates the installed nginx configuration after copying both configuration files", () => {
+    const dockerfile = readRepoFile("Dockerfile");
+    const guard = dockerfile.search(/^RUN nginx -t$/m);
+    assert.ok(guard >= 0, "image build must run nginx -t on the default installed configuration");
+    for (const copy of [
+      "COPY docker/nginx.conf /etc/nginx/http.d/default.conf",
+      "COPY docker/security-headers.conf /etc/nginx/security-headers.conf"
+    ]) {
+      const position = dockerfile.indexOf(copy);
+      assert.ok(position >= 0 && position < guard, `${copy} must precede validation`);
+    }
+  });
+
   it("copies the headers file to the path nginx includes", () => {
     assert.match(
       readRepoFile("Dockerfile"),
