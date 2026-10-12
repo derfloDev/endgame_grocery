@@ -98,7 +98,7 @@ Render cost and bundle size: the signed-out pages (login, register, forgot/reset
 
 Re-measured cold load of `/lists/<id>` (Chromium via Playwright against `vite preview` of the production build, API mocked, page requests only, measured with CDP `encodedDataLength`): 8 responses, 214,743 bytes (209.7 KiB), largest response 87,589 bytes (85.5 KiB; the entry chunk), so both the 500 KiB total and the 150 KiB per-response budget are met. This measurement does not include the service worker's precache requests, which the previous measurement counted; those are served from the HTTP cache for assets the page already fetched when the immutable cache headers of the production Nginx configuration apply.
 
-The production Nginx configuration in docker/nginx.conf enables gzip (level 5, `Vary: Accept-Encoding`; text, JSON, web manifest, SVG and WASM types, but not the already compressed WOFF2 fonts) and sets one explicit `Cache-Control` header per kind of file:
+The production Nginx configuration in `docker/nginx.conf` keeps all four gzip directives inside `server`: Alpine already declares `gzip_vary on` in the enclosing HTTP scope, so declaring it there again prevents nginx startup. HTTP-only `map` and `log_format` remain outside `server`. It enables gzip (level 5, `Vary: Accept-Encoding`; text, JSON, web manifest, SVG and WASM types, but not the already compressed WOFF2 fonts) and sets one explicit `Cache-Control` header per kind of file:
 
 | Location | `Cache-Control` | Why |
 | --- | --- | --- |
@@ -106,7 +106,7 @@ The production Nginx configuration in docker/nginx.conf enables gzip (level 5, `
 | `/service-worker.js`, `/index.html` and the SPA fallback | `no-cache` | Must be revalidated on every load so users never stay on an old shell or on chunk names that no longer exist |
 | `/fonts/*`, `/icon-*.png`, `/manifest.webmanifest` | `public, max-age=86400` | File names are not hashed, so a change reaches users within a day |
 
-Every one of these locations repeats the shared security headers (`docker/security-headers.conf`), because nginx does not inherit `add_header` into a location that sets its own; the `/api/` proxy sets none and keeps the server-level headers. `backend/src/nginxCaching.test.js` checks these rules against the configuration text (nginx itself is not started in the unit tests). The hashed assets are what lets the service-worker install reuse the browser's cached response for each asset already fetched by the page; the fonts and icons are no longer immutable, but their one-day lifetime serves the same reuse during a cold load. The hashed `/assets/*` files are what lets the service-worker install reuse the browser's cached response for each asset the page already fetched; fonts and icons are no longer immutable, but their one-day lifetime serves the same reuse during a cold load. An earlier model of the production cold load (427,883 bytes counting each path once, about 446 KiB with level 1 gzip) predates the startup bundle split described above and is superseded by the measurement given there; level 5 compression only lowers such figures. None of these numbers was measured against a running Nginx image.
+Every one of these locations repeats the shared security headers (`docker/security-headers.conf`), because nginx does not inherit `add_header` into a location that sets its own; the `/api/` proxy sets none and keeps the server-level headers. `backend/src/nginxCaching.test.js` checks these rules against the configuration text (nginx itself is not started in the unit tests). The Dockerfile runs `nginx -t` after copying both configuration files, checking Alpine's complete installed configuration during CI and release image builds. CI also runs the production-image HTTP smoke check described below. The hashed assets are what lets the service-worker install reuse the browser's cached response for each asset already fetched by the page; the fonts and icons are no longer immutable, but their one-day lifetime serves the same reuse during a cold load. The hashed `/assets/*` files are what lets the service-worker install reuse the browser's cached response for each asset the page already fetched; fonts and icons are no longer immutable, but their one-day lifetime serves the same reuse during a cold load. An earlier model of the production cold load (427,883 bytes counting each path once, about 446 KiB with level 1 gzip) predates the startup bundle split described above and is superseded by the measurement given there; level 5 compression only lowers such figures. None of these numbers was measured against a running Nginx image.
 
 The frontend initializes i18next before React renders, detects English or German from local storage and the browser, and keeps the document `<html lang>` attribute aligned with the active language. Translation catalogs live in `frontend/src/locales/{en,de}/translation.json` and are delivered through Vite code splitting; JSON assets are included in the service worker precache patterns for offline-first locale support.
 
@@ -244,6 +244,31 @@ Run these checks before merging changes:
 - `npm test`
 - `npm run test:integration` (needs `TEST_DATABASE_URL`, see below)
 - `npm run e2e`
+
+### Production nginx image smoke check
+
+On Linux, install Bash, Docker (with a running Linux-container daemon), curl and standard tools
+(awk, sed, grep, gzip, cmp, wc, mktemp, sleep and rm), then run:
+
+```bash
+docker build -t endgame-grocery:nginx-smoke .
+bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke
+```
+
+The build fails on an invalid installed nginx configuration via `RUN nginx -t`. The independent
+`nginx-smoke` CI job runs these same commands on pull requests and pushes to main without
+publishing an image. Missing Docker or host tools fail the smoke check rather than skipping it.
+The script accepts an already-built local image tag, checks `nginx -t` again and starts nginx on a
+dynamically allocated localhost port. It checks HTTP 200 for the shell, service worker, a discovered
+hashed JS/CSS asset and a SPA route; verifies the SPA returns the shell, one expected Cache-Control
+header and all four security headers per response; and verifies gzip/Vary and decompressed asset
+bytes against the identity response. Readiness polling is bounded, failures print container logs,
+and cleanup removes only the script's own container and temporary files.
+
+This overrides the image entrypoint to run nginx alone: it needs no database and does not exercise
+migrations, supervisord, backend health, authenticated API traffic, full application startup or
+browser E2E. The cold-load measurements above remain browser measurements against Vite preview.
+Unit tests retain coverage of font, icon and manifest cache rules and gzip level 5.
 
 ### Integration tests
 
