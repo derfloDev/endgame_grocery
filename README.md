@@ -238,41 +238,143 @@ npx playwright test --config playwright.pwa.config.js
 This starts Vite preview at `http://127.0.0.1:4173` with reuse disabled, uses deterministic API
 fixtures without PostgreSQL, and tests real registration, precaching, activation, offline
 shell/list reads and same-page failure recovery in clean Chromium contexts. A local HTTP
-proxy injects origin faults. PushManager subscription transport and notification permission
+proxy injects redirects, failed precaching and an obsolete manifest referencing a retired JavaScript
+chunk returning 404 while page assets remain current. The stale-worker check observes real
+redundant installation, localized feedback, no subscription persistence before recovery and
+retry without page navigation. PushManager subscription transport and notification permission
 are stubbed for UI/API assertions; these checks do not prove real push delivery. The existing
 development E2E suite remains separate. Android Chrome/Brave installation, opt-in, subscription
 restoration after reload, delivery from another member and click navigation still require
 checks on actual devices at the deployment; desktop emulation does not replace them.
 
-### Cloudflare Access
+### Cloudflare Access: public PWA resources
 
-If you host the app behind Cloudflare Access, verify that the effective Access application
-and policy for `/service-worker.js` bypass authentication. A worker script request must
-return JavaScript with HTTP 200, without an Access login redirect. Check the exact path
-and overlapping application rules rather than assuming a documented bypass is active.
-Keep the app and API authentication policies in place.
+The selected deployment policy makes the following static resources anonymously retrievable.
+They expose the app shell, client code/translations, static media and install metadata; never
+embed secrets or private list data in them. List/user data remains behind `/api/*` and application
+authorization. Keep the hostname-wide Access application protecting all remaining application
+routes. A repository/image deployment does **not** configure the Cloudflare account.
 
-| Path pattern | Requirement |
+Use `grocery.example.com` as the reserved example throughout these instructions. Substitute
+the actual hostname only in account settings or external diagnostics; do not record personal
+deployment hostnames/URLs in repository files or evidence.
+
+In Cloudflare Zero Trust, create a reusable Access policy with action **Bypass** and
+**Include > Everyone**. Attach it to specific **Self-hosted** applications on the chosen
+hostname for exactly these paths (separate paths can share that policy):
+
+| Access application path on `grocery.example.com` | Public content and origin cache policy |
 | --- | --- |
-| `/service-worker.js` | Public worker entry, correct JavaScript MIME type, scope `/`, no login redirect; this is the actual built filename, not `/sw.js` |
-| Worker imports, if any | Every imported script must also be available during registration; the current production worker bundles Workbox and has no separate `/workbox-*.js` dependency |
-| Precache entries in the built worker | Installation must fetch every entry successfully, including `/index.html`, hashed assets, fonts, icons and the manifest; inspect authenticated worker requests before deciding which access rules need adjustment |
+| `/service-worker.js` | Actual worker entry: JavaScript 200, no login redirect, scope `/`; edge bypass, browser revalidates with `no-cache` |
+| `/index.html` | Precached app shell: HTML 200; edge bypass, browser `no-cache` |
+| `/assets/*` | Generated content-hashed JS/CSS/media, including lazy assets; this entire prefix is public, retaining `public, max-age=31536000, immutable` for hashed files |
+| `/fonts/*` | Self-hosted precache fonts; `public, max-age=86400` |
+| `/icon-192.png` and `/icon-512.png` | Installation/notification icons (two exact paths); `public, max-age=86400` |
+| `/manifest.webmanifest` | Install metadata and precache resource; `public, max-age=86400` |
 
-On 2026-10-12, an unauthenticated probe of `https://endgame-grocery.derflo.dev/service-worker.js`
-returned HTTP 302 with an HTML content type and a redirect to the Cloudflare Access login
-origin. `/index.html` and `/icon-512.png` also redirected. This confirms an access gate on
-the worker route, not a worker evaluation or precache defect. The Access policy configuration
-and an authenticated Android registration could not be inspected. An administrator must
-check the worker bypass and then inspect precache requests with the user's Access session.
-The repository change does not modify live policies; retry cannot bypass persistent hosting
-restrictions. The production browser regression reproduces both a redirected worker script
-and a failed precache response, then verifies recovery after the fault is removed.
+More-specific application paths take precedence over the protected hostname application;
+inspect overlapping applications so the static policy applies to the intended paths. Do not
+attach the public policy to the hostname/root or add an `/api/*` exception. The current
+production build's precache URLs fit this table, and Workbox is bundled in the worker: no
+speculative `/workbox-*.js` exception is needed. Inspect every build's worker imports and
+manifest entries; a future resource outside this table needs an explicit policy review.
+The manifest link's `crossorigin="use-credentials"` remains enabled, but its credentials do
+not prove worker install requests succeed; the selected policy makes the manifest public.
+See [Access application paths](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/)
+and [Access policies](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/policy-management/).
 
-Cloudflare caches by file extension unless told otherwise. The origin now sends `Cache-Control: no-cache` for `/service-worker.js` and `/index.html` and a one-year `immutable` lifetime only for the content-hashed `/assets/*`, so no "cache everything" rule is needed; if you add one, exclude `/service-worker.js` and `/index.html`, or users can stay on an old version after a deploy.
+### Cloudflare caching and stale-worker recovery
 
-The manifest (`/manifest.webmanifest`) does not need a bypass policy: the app already
-sets `crossorigin="use-credentials"` on the manifest link so the browser sends the
-`CF_Authorization` cookie with that request.
+Access **Bypass** grants anonymous access. Cache **Bypass** controls edge storage. Configure
+both separately. In the zone's **Caching > Cache Rules**, add a hostname/path-scoped rule:
+
+```text
+(http.host eq "grocery.example.com" and http.request.uri.path in {"/service-worker.js" "/index.html"})
+```
+
+Select **Cache eligibility: Bypass cache**. Separately ensure **Browser Cache TTL** respects
+the origin's `no-cache` for worker/shell responses; where the matching rule exposes Browser
+TTL, use **Respect origin**, and audit zone settings/other overrides as well. Edge bypass
+alone does not establish correct browser headers. Inspect conflicting Cache Everything/Page
+Rules, Edge TTL/status-code TTL, Browser TTL, response-header transformations and Cloudflare
+Worker overrides. Preserve `no-cache` for SPA HTML/fallback responses and immutable caching
+only for content-hashed assets; retain short origin lifetimes for fonts/icons/manifest.
+Cloudflare edge TTL determines edge freshness, browser TTL determines browser HTTP-cache
+freshness, and service-worker CacheStorage is a separate cache controlled by Workbox.
+A single `MISS` is not proof of bypass; a bypass rule can report `DYNAMIC`. Verify repeated
+normal-URL responses and the effective rules. See [Cache Rules settings](https://developers.cloudflare.com/cache/how-to/cache-rules/settings/)
+and [edge/browser TTL](https://developers.cloudflare.com/cache/how-to/edge-browser-cache-ttl/).
+
+Incident evidence, 2026-10-12: initial anonymous probes encountered Access login redirects.
+With authentication temporarily disabled, the normal worker was still a Cloudflare `HIT`
+from 23 September with a one-year immutable lifetime. Its manifest referenced four removed
+assets returning 404, including a translation chunk; the real worker became `redundant`
+with Workbox `bad-precaching-response`. A unique diagnostic query returned a newer worker
+whose 38 manifest entries (35 unique URLs) were available and whose installation activated.
+That newer response still had a four-hour browser cache lifetime instead of intended
+`no-cache`, so deployed origin/edge overrides require inspection. The user subsequently
+purged the Cloudflare cache and reported Android notification opt-in recovery. This measured
+stale-worker failure differs from an Access redirect or connectivity failure. The query
+was a diagnostic comparison, not a registration fix; the application keeps the normal URL.
+
+After correcting rules, use **Caching > Configuration > Purge Cache > Custom Purge > URL**
+to purge the normal worker URL, for example `https://grocery.example.com/service-worker.js`.
+Purge only other cache keys demonstrated to be stale, accounting for custom cache keys when
+present; dashboard URL purges cannot supply custom header/cookie keys, so use the existing
+account API with the exact key fields when required. Keep credentials outside evidence. Do
+not purge the whole zone or change zone-wide security settings. An edge purge
+does not erase browser HTTP cache or service-worker CacheStorage. Subsequent deployments
+should deliver the current normal worker without manual purges. See [single-file purge](https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-single-file/).
+
+### Verify the live PWA rollout
+
+The local regression simulates stale responses; it does not apply or verify live rules.
+Permanent cache rules, restored Access, authenticated installed-app updates, the next real
+deployment without purging, and final Android/device delivery checks remain T-003 rollout
+gates. The reported phone recovery did not supply a browser version, Brave result, reload
+restoration, real delivery or click-navigation evidence.
+
+Use GET/body checks, not HEAD alone. For example, on Bash with curl, Python 3 and sha256sum:
+
+```bash
+pwa_check_dir=$(mktemp -d)
+curl --silent --show-error --user-agent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36' \
+  --dump-header "$pwa_check_dir/headers" --output "$pwa_check_dir/worker.js" \
+  --write-out 'HTTP %{http_code}\nMIME %{content_type}\n' \
+  'https://grocery.example.com/service-worker.js'
+python3 - "$pwa_check_dir/headers" <<'PYHEADERS'
+import sys
+from urllib.parse import urlsplit
+safe = {"cache-control", "cf-cache-status", "age", "content-type", "last-modified"}
+with open(sys.argv[1], encoding="iso-8859-1") as headers:
+    for line in headers:
+        name, separator, value = line.partition(":")
+        if separator and name.lower() in safe:
+            print(line.strip())
+        elif separator and name.lower() == "location":
+            target = urlsplit(value.strip())
+            print("Redirect origin:", f"{target.scheme}://{target.netloc}" if target.netloc else "same origin")
+PYHEADERS
+sha256sum "$pwa_check_dir/worker.js"
+```
+
+The command deliberately does not follow redirects or print cookies, tokens or Access query
+strings. Temporary raw headers stay outside repository artifacts; remove them when finished.
+If a diagnostic client hits Cloudflare error 1010, compare a normal browser user agent and a
+real browser before attributing that client rejection to worker installation.
+
+Repeat the normal GET, compare worker content/hash with the deployed image/build, and check
+`Cache-Control`, `CF-Cache-Status`, `Age`, status and MIME type. Fetch every manifest entry,
+including its Workbox revision query when present, and inspect imports: all must return 200
+with valid content rather than login HTML. Check the same static resources anonymously after
+Access restoration; separately confirm that `/api/*` and other application routes remain
+gated and API authorization still rejects unauthenticated access. In a clean real browser,
+verify the normal worker activates with no failed precache requests. Then check installed
+updates and the next real deployment without purging, followed by Android Chrome opt-in,
+reload restoration, delivery from another member and click navigation; record browser/version
+and Brave results or gaps separately. Do not treat desktop or stubbed push tests as delivery
+proof. Vite preview also does not prove deployed Nginx headers: use the production-image smoke
+check below and inspect the effective deployed image/configuration.
 
 ### Security hardening
 

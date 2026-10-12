@@ -81,3 +81,64 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Version | v1.9.6 |
 
 ---
+
+### T-002 — plan — 2026-10-12T10:35:54Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Planned T-002 documentation and stale-worker regression plus dependent T-003 live Cloudflare cache/static Access rollout, using confirmed deployment evidence and user-approved public PWA files; both tasks are ready for implement and required external verification remains explicit. |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Next Role | implement |
+
+---
+
+### T-002 — plan — 2026-10-12T10:53:37Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Applied the user's repository privacy constraint: removed personal deployment domain references from current files and required reserved examples or relative paths in all task documentation and evidence; task states are unchanged. |
+| Files Changed | README.md, ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-10-12T12:10:02Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Prepared public PWA Access/cache documentation and a build-derived retired-JavaScript regression proving real redundant installation, failed opt-in without persistence, and same-page recovery while preserving application behavior and existing assertions; live rollout remains T-003. |
+| Files Changed | README.md, e2e/push-notifications.spec.js, frontend/vite.config.ts (comments only), ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | New stale-worker assertions failed before fault injection (no installation alert), then passed; final production browser suite: 5 PASS, including all four existing scenarios and failed/recovered stale-worker opt-in with unchanged performance.timeOrigin. Real lifecycle/HTTP 404; push transport and permission remain labeled stubs. npm run lint: PASS (existing AuthContext fast-refresh warning); npm run typecheck: PASS; npm run build: PASS; npm test: PASS (frontend and 421 backend tests); node --test backend/src/nginxCaching.test.js: 11 PASS; git diff --check: PASS. Built worker inspection: 38 manifest entries, 35 unique URLs, zero imports, all covered by documented public paths. README Bash/Python example syntax: PASS. docker build -t endgame-grocery:pwa-smoke .: PASS including nginx -t; unchanged docker/smoke-nginx.sh: PASS for HTTP, cache/security headers and gzip via a temporary Bash stdin adapter using Docker Desktop. Initial Bash daemon/client forwarding attempts failed; adapter corrected the local environment without repository changes. Playwright preview teardown required stopping only this task's preview processes after assertions completed (exit 0). No personal deployment-domain matches in the non-ignored repository scan; no live settings changed or live/device outcomes claimed. Pre-existing planning/privacy edits and historical handoffs preserved; no new repository files required. |
+| Commit | `docs(pwa): explain Cloudflare setup for reliable notification opt-in`<br><br>Document scoped public PWA resources, separate Access/edge/browser policies and safe purge/verification steps.<br>Cover stale manifests referencing retired JavaScript and real same-page lifecycle recovery. |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-10-12T12:31:36Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Reviewed scoped public PWA/cache guidance and build-derived stale-worker recovery, passing required checks, production-image smoke, manual documentation/visual checks and German exploratory recovery; live gates remain T-003. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-10-12T14:36:16Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task: finalized approved T-002 documentation and stale-worker regression after PASS_WITH_NOTES review, moved T-002 to done and retained T-003's outstanding live rollout gates. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md; reviewed task files and planning/privacy/review artifacts included per git add -A workflow |
+| Validation | Required implementer and reviewer checks passed as recorded in .ai/REVIEW.md and prior handoffs; no implementation changes after review; git diff --check passed. |
+| Commit | `docs(pwa): explain Cloudflare setup for reliable notification opt-in`<br><br>Document scoped public PWA resources, separate Access/edge/browser policies and safe purge/verification steps.<br>Cover stale manifests referencing retired JavaScript and real same-page lifecycle recovery. |
+| Next Role | none |
+
+---
