@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.6](https://github.com/derfloDev/endgame_grocery/compare/v1.9.5...v1.9.6) (2026-10-12)
+
+
+### Bug Fixes
+
+* **push:** enable notification retries with localized failure feedback ([a5aef70](https://github.com/derfloDev/endgame_grocery/commit/a5aef70894207bb019f11b481669abff4a3a3bc5))
+
+
+### Miscellaneous Chores
+
+* **ai:** close cycle ([450f88d](https://github.com/derfloDev/endgame_grocery/commit/450f88d18fe3d0d30c0830ba3b12c8af8150e837))
+
 ## [1.9.5](https://github.com/derfloDev/endgame_grocery/compare/v1.9.4...v1.9.5) (2026-10-12)
 
 
