@@ -33,47 +33,31 @@ Reviewed: YYYY-MM-DD
 
 Status: **complete**
 
-Reviewed: 2026-10-12T05:02:26Z. Owner role: `review`.
+Reviewed: 2026-10-12T06:58:08Z
 
 #### Findings
-
-- None. No blocker, major, minor or nit findings in the T-001 implementation.
+- **minor — README.md:261 — Required fix: no.** The documented external Access gate remains present: reviewer probes of `/service-worker.js`, `/index.html` and `/icon-512.png` returned HTTP 302/HTML to the Cloudflare Access login origin. This establishes an anonymous request obstruction, not the authenticated Android lifecycle or the effective policy rules. The plan explicitly limits this task to documented administrator remediation; approval covers the repository implementation and does not establish restored deployed Android opt-in.
+- **minor — playwright.pwa.config.js:12 — Required fix: no.** On this Windows environment, all four browser assertions passed but Playwright stalled during preview teardown. Stopping only the two preview processes identified in this review run allowed the command to finish with exit 0. Consider platform-safe server teardown so the documented command exits unattended.
 
 #### Required Fixes
-
 - None.
 
 #### Verification
-
 ##### Steps
-
-- Compared unstaged implementation changes and the staged smoke script against `.ai/PLAN.md`; checked Dockerfile order, server/HTTP directive scope, retained cache/security/logging assertions, CI triggers and pinned checkout, and matching README/comments.
-- Targeted `node --test backend/src/nginxCaching.test.js backend/src/nginxLogging.test.js backend/src/containerHardening.test.js`: PASS, 25/25. Repeated current tests against original HEAD configuration/Dockerfile in an isolated temporary fixture: expected FAIL, 21 pass/4 fail. Removed fixture without changing repository code.
-- `npm run lint`: PASS with the existing AuthContext.tsx:176 React refresh warning. `npm run build`: PASS. `npm test`: PASS, including backend 421/421; no retries required in this review.
-- `docker run --rm --entrypoint nginx endgame-grocery:nginx-original -t`: expected exit 1, duplicate gzip_vary at default.conf:2.
-- `docker build -t endgame-grocery:nginx-review .`: PASS (cached production layers, including the configuration guard). Independently ran the resulting image's `nginx -t`: PASS against `/etc/nginx/nginx.conf`.
-- Negative production build: archived HEAD into an isolated temporary context and copied in the current guarded Dockerfile. Build failed at `RUN nginx -t` with duplicate gzip_vary, exit 1. Removed context; working implementation untouched.
-- WSL Ubuntu `bash -n docker/smoke-nginx.sh` and `bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke`: PASS. Loaded Linux image config digest d3c4109e61b2 matches the config exported by the review build. Verified shell/worker/SPA/hashed asset HTTP, cache/security headers, gzip/Vary and decompressed bytes. Missing-argument invocation returned the expected usage diagnostic and exit 1.
-- Chromium browser E2E against the nginx-only review image: direct `/lists/smoke-test` returned HTTP 200 and rendered the login route; followed registration navigation and reloaded the deep route successfully. All 17 observed JS/CSS responses returned 200 with immutable caching; no page exceptions. Service workers were blocked for this check. No backend requests were mocked.
-- Manual/exploratory verification: visually inspected `test-results/nginx-review.png` (registration form, logo, fonts and layout rendered correctly); inspected live headers for `/`, manifest, icon and a missing hashed asset. Shell used no-cache, manifest/icon used one-day caching, and missing asset returned 404 with all security headers.
-- `git diff --check` and `git diff --cached --check`: PASS. Removed the review container and verified no smoke containers remained.
-
+- Compared staged and unstaged implementation changes against `.ai/PLAN.md`; inspected registration/update integration, cancellation, duplicate-attempt protection, subscription persistence/reuse, permission behavior, localized UI and affected documentation. Preserved unrelated planning/configuration changes; modified no code and created no commit.
+- `npm run lint`: PASS with the existing AuthContext fast-refresh warning; `npm run typecheck`: PASS; `npm run build`: PASS; `npm test`: PASS (frontend and backend, 421 backend tests); `git diff --check`: PASS.
+- `npx playwright test --config playwright.pwa.config.js`: 4 PASS, final exit 0 after the Windows preview teardown intervention above. Clean Chromium contexts used real production worker registration, installation, activation, offline shell/list reads, redirected-worker and failed-precache recovery, duplicate clicks and denied-permission feedback. Push transport and permission were stubbed.
+- Additional exploratory browser checks using the production preview and existing deterministic fixtures: German registration error and same-page recovery; unsubscribe/API toggle; actual precache request held past the eight-second activation deadline, followed by released request and successful retry with unchanged `performance.timeOrigin`. All passed.
+- Manual visual inspection of the German shared-list error screenshot at 390 x 844: complete localized message wraps within the banner and notification action remains visible, with no clipping. Interactive manual UI testing was attempted through browser/computer-use tools but their kernel failed to start (`setup refresh had errors`); interactive checks could not be completed.
+- Independently repeated deployed-route HTTP probes at approximately 2026-10-12T06:57Z; logged only response status/content type and redirect origin, without cookies, tokens or login query strings.
 ##### Findings
-
-- All four gzip declarations are within server scope; HTTP-only maps/log formats remain outside. Compression values and existing proxy/location/security behavior are retained.
-- The installed-configuration build guard rejects the actual original collision. The new independent CI job builds and checks the production image on PRs and main pushes without publishing.
-- Regression checks fail on the old implementation and pass on the working tree. Required lint/build/tests and real image checks passed.
-- Reviewer modified only review/board/handoff artifacts; no implementation changes or commits.
-
+- No blocking code defects found. Activation is bounded, recoverable failures permit same-page retry, and feedback clears after successful recovery. Real delayed-install recovery also passed beyond the committed E2E cases.
+- Existing worker push/click handlers and update-banner behavior remain covered by the passing unit suite. These are not proof of real device delivery or a deployed update transition.
 ##### Risks
-
-- Verification intentionally starts nginx alone. Backend `/api/config` returned the expected 502 with no backend process; full application startup, database/migrations and authenticated API flows were not exercised. Browser E2E here covers production asset loading and unauthenticated SPA navigation, not the database-dependent application E2E suite or service-worker lifecycle.
-- GitHub-hosted CI was not executed from this review; the production build and smoke commands were verified locally with Linux containers.
-
-#### Open Questions
-
-- None.
+- Effective Cloudflare Access policy and authenticated worker/precache responses remain unverified; administrator remediation is still needed before claiming the reported deployment issue is resolved.
+- Installed Android Chrome/Brave versions, opt-in, reload/subscription restoration, real delivery from another member and notification click navigation remain unverified because no device/authenticated deployment session was available. Desktop viewport inspection does not satisfy these checks.
+- Interactive manual testing remains a verification gap due to the unavailable computer-use runtime. The completed screenshot inspection and exploratory automation are recorded separately.
+- No Nginx configuration changed, so the conditional Docker/Nginx smoke check was not applicable.
 
 #### Verdict
-
-`PASS`
+`PASS_WITH_NOTES`

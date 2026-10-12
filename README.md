@@ -197,15 +197,76 @@ The repository's checked-in `docker-compose.yml` is intentionally kept for local
 | `VAPID_CONTACT` | Contact URI included in the VAPID `Authorization` header so push services can reach you if deliveries fail. Must be a `mailto:` address or an HTTPS URL. | `mailto:notifications@change-me.example` |
 | `VITE_ICON_SIMILARITY_THRESHOLD` | Build-time similarity cutoff for local icon assignment in the frontend worker. Use a value from `0` to `1`; higher values require closer semantic matches before an icon is suggested. | `0.5` |
 
+### PWA notification opt-in and diagnosis
+
+Push opt-in needs HTTPS (loopback is allowed for local tests), `Notification`, `PushManager`,
+an active service worker and the backend VAPID configuration described above. Shared lists
+show the notification action once configuration loading settles. Configuration loading,
+worker activation and a subscription attempt are separate states. Existing browser
+subscriptions are restored without requesting permission.
+
+The action requests permission only from a user click and prevents duplicate attempts while
+pending. English and German feedback distinguishes configuration, blocked permission,
+registration, installation, activation timeout and subscription/API failures. After a
+recoverable failure is removed, choose **Enable notifications** again in the same page;
+no reload or cache deletion is required. A worker attempt settles within eight seconds.
+Blocked permission requires changing browser/device settings; the app does not prompt again
+while permission is denied. An absent or temporarily unavailable VAPID key is fetched again
+on the next attempt. Persistent access or network restrictions continue to show an error.
+
+To diagnose the lifecycle, inspect Application > Service Workers and Network in browser
+developer tools:
+
+1. No registration: check whether `/service-worker.js` was requested and whether registration
+   rejected. Inspect status, redirects, MIME type, scope and CSP (`worker-src`). An HTML/login
+   response or blocked script is a registration failure, not slow activation.
+2. Registration without an active worker: inspect `installing`, `waiting`, `active` and
+   `redundant` states. Evaluation errors appear in the worker console. Installation/precache
+   errors identify the failed asset request; inspect its response and access policy.
+3. A worker stuck installing or waiting: inspect its state changes and install/activate
+   promises. An activation timeout is feedback, not proof of the underlying cause.
+4. Active worker but opt-in fails: inspect permission, VAPID configuration and the push
+   subscription API request. Never share cookies, tokens or Access login query strings in logs.
+
+Run the isolated production browser regression after building:
+
+```bash
+npm run build
+npx playwright test --config playwright.pwa.config.js
+```
+
+This starts Vite preview at `http://127.0.0.1:4173` with reuse disabled, uses deterministic API
+fixtures without PostgreSQL, and tests real registration, precaching, activation, offline
+shell/list reads and same-page failure recovery in clean Chromium contexts. A local HTTP
+proxy injects origin faults. PushManager subscription transport and notification permission
+are stubbed for UI/API assertions; these checks do not prove real push delivery. The existing
+development E2E suite remains separate. Android Chrome/Brave installation, opt-in, subscription
+restoration after reload, delivery from another member and click navigation still require
+checks on actual devices at the deployment; desktop emulation does not replace them.
+
 ### Cloudflare Access
 
-If you host the app behind Cloudflare Access, two bypass policies are required so the
-PWA can install correctly:
+If you host the app behind Cloudflare Access, verify that the effective Access application
+and policy for `/service-worker.js` bypass authentication. A worker script request must
+return JavaScript with HTTP 200, without an Access login redirect. Check the exact path
+and overlapping application rules rather than assuming a documented bypass is active.
+Keep the app and API authentication policies in place.
 
-| Path pattern | Reason |
+| Path pattern | Requirement |
 | --- | --- |
-| `/service-worker.js` | Service worker script — fetched without credentials by the browser's SW registration API |
-| `/workbox-*.js` | Workbox runtime chunks loaded by the service worker |
+| `/service-worker.js` | Public worker entry, correct JavaScript MIME type, scope `/`, no login redirect; this is the actual built filename, not `/sw.js` |
+| Worker imports, if any | Every imported script must also be available during registration; the current production worker bundles Workbox and has no separate `/workbox-*.js` dependency |
+| Precache entries in the built worker | Installation must fetch every entry successfully, including `/index.html`, hashed assets, fonts, icons and the manifest; inspect authenticated worker requests before deciding which access rules need adjustment |
+
+On 2026-10-12, an unauthenticated probe of `https://endgame-grocery.derflo.dev/service-worker.js`
+returned HTTP 302 with an HTML content type and a redirect to the Cloudflare Access login
+origin. `/index.html` and `/icon-512.png` also redirected. This confirms an access gate on
+the worker route, not a worker evaluation or precache defect. The Access policy configuration
+and an authenticated Android registration could not be inspected. An administrator must
+check the worker bypass and then inspect precache requests with the user's Access session.
+The repository change does not modify live policies; retry cannot bypass persistent hosting
+restrictions. The production browser regression reproduces both a redirected worker script
+and a failed precache response, then verifies recovery after the fault is removed.
 
 Cloudflare caches by file extension unless told otherwise. The origin now sends `Cache-Control: no-cache` for `/service-worker.js` and `/index.html` and a one-year `immutable` lifetime only for the content-hashed `/assets/*`, so no "cache everything" rule is needed; if you add one, exclude `/service-worker.js` and `/index.html`, or users can stay on an old version after a deploy.
 

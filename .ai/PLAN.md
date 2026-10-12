@@ -2,128 +2,107 @@
 
 Status: **ready_for_implement**
 
-Updated: 2026-10-12T04:37:26Z. Owner role: `implement`.
+Updated: 2026-10-12T06:20:59Z
 
-Goal: restore nginx startup in the production container and catch invalid nginx configurations
-before an image can be published.
+Goal: restore notification opt-in in the installed Android PWA at `https://endgame-grocery.derflo.dev`.
 
-## Decision and evidence
+User decision: option 1 — correct the confirmed cause, show understandable localized errors, and support retry without a page reload.
 
-- The user selected approach 1: keep explicit gzip settings, scoped to the application's `server`.
-- `Dockerfile` installs Alpine nginx and copies our snippet into `/etc/nginx/http.d/default.conf`.
-  Alpine includes that file inside `http`, where it already declares `gzip_vary on`.
-- Commit `31d4c1d` added our duplicate declaration at snippet line 2. The reported startup error
-  names that exact directive and location. Supervisor's restart messages are a consequence.
-- Existing nginx unit tests inspect our snippet in isolation. PR CI does not build the image;
-  the release image build has no real nginx configuration validation.
-- Analysis did not run the image: the local Docker daemon was unavailable. Implementation and
-  review must obtain real image evidence locally or in CI and record any remaining limitation.
+## T-001 — Restore notification opt-in and recovery
 
-## T-001 — Restore nginx startup and verify the shipped configuration
+Owner role: `implement`. One task covers diagnosis, the correction, error/retry behavior, regression coverage and documentation so the fix can be reviewed together.
 
-Dependencies: none. One task keeps the fix, regression coverage and documentation in one commit.
+### Evidence and limits
+
+- Android installations through Chrome and Brave show the same error after selecting "Benachrichtigung aktivieren"; reload does not help.
+- `frontend/src/hooks/usePushNotifications.ts` requests permission and then races `navigator.serviceWorker.ready` against an eight-second timeout. The timeout message identifies a missing active registration, not the underlying cause.
+- The hook's `isReady` currently means a VAPID key is present. Its initialization effect also depends on the key that it updates; inspect cancellation across that rerender when adding registration/subscription state.
+- `frontend/src/sw/register.ts` invokes `useRegisterSW({ immediate: true })` through `UpdateBanner`, without exposing registration failure to the notification flow.
+- The custom worker precaches the shell and handles push/click events. A registration, evaluation or precache-install failure could prevent activation; none has been confirmed.
+- Public HTTP probes from the planner environment failed during TLS setup. This does not prove a production certificate fault. Whether the deployment uses Cloudflare Access remains unknown.
+- Existing E2E configuration uses the Vite development server. A successful mocked hook test or dev-worker run cannot establish that the production worker installs.
+
+### Scope and acceptance criteria
+
+1. Record the failing worker lifecycle stage and evidence before choosing the cause-specific correction. For the deployed route and worker, distinguish missing registration, rejected registration, evaluation failure, failed installation/precache, and delayed activation. A timeout increase alone is not a correction.
+2. With supported APIs, valid VAPID configuration and granted permission, opening a shared list and enabling notifications obtains an active worker, creates or reuses the browser subscription, persists it through the existing API, and shows the subscribed state.
+3. Registration failure and activation timeout settle within a bounded wait and produce understandable messages in English and German. Do not advise a reload as the sole recovery step or display raw browser exception text to the user.
+4. After a recoverable failure is removed, selecting the notification action again can retry registration/initialization and subscription successfully in the same page session. A persistent hosting/access failure still produces truthful feedback.
+5. While an attempt is pending, prevent duplicate subscription attempts. Clear pending state on every outcome and clear obsolete push feedback after recovery.
+6. Preserve the permission request's connection to the user's click; do not request permission automatically during background recovery. Denied permission must not cause repeated prompts. Distinguish unsupported push capability, absent VAPID configuration and worker failure.
+7. Preserve shared-list toggle visibility, existing subscription detection, unsubscribe behavior, push delivery/click navigation, offline shell behavior and the current update flow.
+8. Add tests before implementation for every changed behavior and the confirmed cause. Verify production worker registration, installation and activation in a real browser with a clean context; document Android Chrome/Brave results separately.
+9. Update the affected README instructions and lifecycle/error comments in the same task. Record unavailable device/deployment checks as verification gaps rather than passing results.
 
 ### Files to change
 
-- `docker/nginx.conf`: relocate gzip directives and explain Alpine HTTP defaults in a comment.
-- `Dockerfile`: run the real nginx configuration check after copying every nginx configuration file;
-  add a comment explaining why the image build validates the installed configuration.
-- `backend/src/nginxCaching.test.js`: add scope regression coverage, retain compression/cache/header
-  assertions and update the comment explaining the boundary between unit and image checks.
-- `backend/src/containerHardening.test.js`: assert the Dockerfile retains the validation step after
-  copying both the server snippet and security header include.
-- New `docker/smoke-nginx.sh`: reusable Linux/Bash smoke check for a supplied local image tag,
-  with comments documenting its nginx-only scope and cleanup behaviour.
-- `.github/workflows/ci.yml`: add a production-image build and nginx smoke job for the existing
-  pull-request and main-branch triggers, using the repository's pinned actions.
-- `README.md`: update the production nginx/cold-load and validation sections with the configuration
-  scope, build guard, exact smoke commands/prerequisites and the limits of this smoke test.
-- `.ai/TASKS.md` and `.ai/HANDOFF.md`: normal implementation/review handoff updates.
+Core files:
 
-### Tests first
+- `frontend/src/sw/register.ts` — expose observed registration state/failure and retry through the existing Vite PWA registration path; document ownership and recovery semantics in English comments.
+- `frontend/src/sw/register.test.ts` (new) — cover registration success, error propagation, retry and cleanup; keep the update hook contract covered.
+- `frontend/src/hooks/usePushNotifications.ts` and `frontend/src/hooks/usePushNotifications.test.ts` — consume lifecycle state, bound waits, manage subscription initialization/retry and expose stable failure outcomes.
+- `frontend/src/pages/ListDetailPage/ListDetailPage.tsx` — show localized push feedback, manage the pending action and permit another attempt after a failure.
+- `frontend/src/app.test.tsx` — exercise the real shared-list notification action, error display and recovery; update existing readiness assertions deliberately for the selected behavior.
+- `frontend/src/locales/en/translation.json` and `frontend/src/locales/de/translation.json` — notification progress/failure/retry strings.
+- `e2e/push-notifications.spec.js` (new) and `playwright.pwa.config.js` (new) — isolated production-preview browser checks with real service workers and deterministic API fixtures; keep the existing development E2E suite intact.
+- `README.md` — explicitly update the PWA/push prerequisites, retry behavior, diagnosis steps, exact production browser-check command, and confirmed deployment requirements.
+- `.ai/TASKS.md` and `.ai/HANDOFF.md` — implementation/review handoff and validation evidence.
 
-1. Extend nginx unit coverage before changing production configuration. Assert `gzip on`,
-   `gzip_vary on`, `gzip_comp_level 5` and the existing `gzip_types` are inside the `server` block,
-   with no application gzip directives at HTTP scope. Parse/extract the relevant block rather
-   than only relaxing the existing unindented regular expressions. Preserve all MIME, caching
-   and security assertions; `map` and `log_format` must stay at HTTP scope.
-2. Add the Dockerfile guard assertion and write the image smoke script before the implementation.
-   Run targeted tests and record their expected failures on the original configuration.
-3. Where Docker is available, build the original image before adding the build guard and run
-   `docker run --rm --entrypoint nginx <image> -t`. Record the duplicate-directive failure.
-   Use the original image's installed main configuration; do not substitute a standalone fixture.
-   If Docker is unavailable locally, obtain this before/after evidence on a Docker-capable runner.
+Change only when diagnosis or the chosen integration requires it:
 
-### Implementation
+- `frontend/src/sw/service-worker.js`, `frontend/src/sw/service-worker.test.js`, `frontend/vite.config.ts`, `frontend/src/vite-config.test.ts` — a demonstrated worker evaluation, precache or build/configuration defect, with corresponding comments and README updates.
+- `frontend/src/components/UpdateBanner/UpdateBanner.tsx` and its test — registration integration only; preserve update actions and dismissal behavior.
+- `frontend/src/pages/ListDetailPage/ListDetailPage.module.css` and `frontend/src/pages/ListDetailPage.test.tsx` — if feedback layout changes.
+- `frontend/src/pages/ListDetailPage/listDetailErrors.ts` and its test, or `frontend/src/api/errors.ts` and its test — only if reusing the existing error translation pipeline; preserve API error handling.
+- `docker/nginx.conf`, `docker/security-headers.conf`, `backend/src/nginxCaching.test.js`, `docker/smoke-nginx.sh` — only for a demonstrated origin-serving defect; include explicit README deployment/security documentation updates. Do not loosen security headers speculatively.
 
-1. Move all four gzip directives and their compression comments into the existing `server` block.
-   Keep their values and MIME list unchanged. Add a brief comment explaining that server scope
-   avoids redefining directives in Alpine's enclosing HTTP scope. Leave HTTP-only maps and log
-   formats outside `server`; retain locations, proxy settings and security header includes.
-2. Add `RUN nginx -t` after the Dockerfile has copied both `docker/nginx.conf` and
-   `docker/security-headers.conf` into their final destinations. Validate the default installed
-   configuration, not a custom `-c` file. This guard runs in both CI and the existing release build;
-   no release workflow change or database credentials are required.
-3. Complete the smoke script with the following contract:
-   - Accept an already-built image tag; fail with a clear English diagnostic if Docker or required
-     host tools are unavailable. It runs on Linux with Bash, Docker and curl.
-   - Run `nginx -t` in a disposable container from that image.
-   - Start another container with the entrypoint overridden to `nginx -g 'daemon off;'`, publish
-     port 80 on a dynamically allocated localhost port and discover the mapping through Docker.
-     This intentionally bypasses migrations, supervisord and the backend; no database is needed.
-   - Wait for HTTP readiness with bounded polling, check the container remains running and fail
-     on unexpected exit. Print relevant logs on failure and always remove only its own container.
-   - Request real built assets, discovering a hashed JS/CSS path from the served index rather than
-     hard-coding a chunk name. Require success for `/index.html`, `/service-worker.js`, the hashed
-     asset and a SPA route such as `/lists/smoke-test`; ensure the SPA response is the app shell.
-   - Assert one Cache-Control header per response: `no-cache` for shell/service worker/SPA and
-     `public, max-age=31536000, immutable` for the hashed asset. Verify all four configured security
-     headers are present. Retain existing unit coverage for fonts, icons and manifest cache rules.
-   - Request a sufficiently large real text asset with `Accept-Encoding: gzip`; require
-     `Content-Encoding: gzip` and `Vary` containing `Accept-Encoding`. Verify the compressed body
-     decompresses to the same bytes as an identity response. Unit coverage establishes level 5.
-4. Add an independent `nginx-smoke` CI job using checkout, `docker build -t endgame-grocery:nginx-smoke .`
-   and `bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke`. It must run on PRs, fail on build
-   or smoke errors, and never silently skip for missing Docker. It must not publish an image.
-5. Update README and comments in the same task. Explain the original collision and server scope;
-   document the commands above and the build-time guard. Distinguish nginx image validation from
-   full application/DB startup and browser E2E. Replace the outdated implication that nginx is never
-   tested, while retaining the accurate statement that unit tests themselves inspect text.
+Any small lifecycle helper introduced during implementation must have a documented responsibility and targeted tests. Explicitly stage each new file with `git add <new-file>`; do not commit during `next_task`.
 
-### Acceptance and verification
+### Implementation sequence
 
-- Targeted regression tests fail before the fix and pass afterwards without weakening existing
-  cache, MIME, security or logging assertions.
-- All four gzip settings are server-scoped; HTTP-only directives remain valid at HTTP scope.
-- `docker build -t endgame-grocery:nginx-smoke .` succeeds with the real `nginx -t` guard.
-- Negative build check: temporarily restore the original conflicting snippet in an isolated build
-  context and verify the guarded image build fails at `nginx -t` with the duplicate directive.
-  Do not alter the working implementation or publish the intentionally broken image.
-- `bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke` passes against the resulting image.
-- PR CI includes the real image checks. README describes exactly what is and is not exercised.
-- Run formatting/lint after code changes; finish with all required validation below. Record command
-  outcomes and before/after evidence in the implementation handoff, including unavailable checks.
+1. Re-read the roadmap, board and plan; move T-001 to `in_implementation`. Stay on the current branch and preserve unrelated changes, including the pre-existing `.ai/config.json` modification.
+2. Diagnose read-only: inspect the actual worker response, redirects, MIME type, scope, CSP and cache headers; inspect registration errors and installing/active/redundant states in the browser. Inspect precache request failures and the built worker's dependencies. Do not output cookies, tokens or login redirect query strings.
+3. Reproduce against the production build using Vite preview on loopback; use the production image when evidence points to Nginx headers/serving. Obtain deployment evidence when accessible. If Cloudflare Access is present, check the actual bypass rules and protected dependencies before proposing changes.
+4. Record the confirmed cause in the handoff. Write a failing regression for it and tests for registration errors, timeout, same-page recovery, existing subscription restoration, unmount/StrictMode cleanup, permission denial, unsupported PushManager and duplicate-click protection before changing implementation code.
+5. Extend the existing registration adapter so the update flow and notification flow observe the same registration lifecycle. Reuse the plugin registration facility for retries; do not create an independent hard-coded registration path, unregister workers or delete user caches as blanket recovery.
+6. Correct the demonstrated cause in the narrowest affected layer. If the cause is external hosting/access configuration, prepare precise documented remediation; do not change live access policies from this task. If the deployment cannot be diagnosed and the issue cannot be reproduced locally, complete the independent error/retry work, record the missing evidence and return for clarification/replanning before claiming the root cause is fixed.
+7. Integrate push initialization and recovery. Distinguish configuration loading, worker availability and an attempt in progress instead of using the VAPID key as proof that a worker exists. Keep the action usable for deliberate retry after a worker error. Clean up timers/listeners and prevent stale async results after unmount or token/support changes.
+8. Add localized feedback using the existing notification action as the retry entry point. Keep push errors separate from unrelated list errors or preserve their structured codes through the existing translation path. Explain permission denial/settings without retrying permission prompts automatically.
+9. Update the README and affected English comments alongside the behavior/configuration changes. Include prerequisites, the exact worker URL, how to identify registration versus install failures, retry expectations, and access-policy guidance only when confirmed.
+10. Run targeted checks, then the broad validations below. Run the production browser regression and exploratory checks; document deployment/device verification limits. Set T-001 to `ready_for_review` and append the implementation handoff with the final Conventional Commit message in its `Commit` field. Do not commit.
 
-Suggested Conventional Commit subject:
-`fix(container): restore nginx startup and reject invalid image configuration`
+### Validation
 
-The implementer writes the final subject into the `next_task` HANDOFF Commit field and leaves
-T-001 at `ready_for_review` without committing. The reviewer verifies the actual image checks.
-After review, `commit_task` creates the task commit; user-reviewed changes require a PR to `main`
-through `aide pr` under the repository policy. The planner neither commits nor launches other roles.
+During implementation, run `npm run lint` after every code change. Write/update tests first and verify the relevant failing scenario before the correction.
 
-## Scope boundaries
+Targeted unit checks:
 
-No database or application feature changes, supervisor restart-policy redesign, base-image strategy
-change or replacement of Alpine's main nginx configuration. The nginx-only smoke check does not
-claim to exercise backend health, migrations, authenticated API traffic or full application startup.
+- `npm run test --workspace frontend -- src/sw/register.test.ts src/hooks/usePushNotifications.test.ts src/app.test.tsx src/components/UpdateBanner/UpdateBanner.test.tsx`
+- Run worker/configuration, error translation and Nginx tests when their corresponding files change.
 
-## Validation
+Before review:
 
-- Targeted: `node --test backend/src/nginxCaching.test.js backend/src/nginxLogging.test.js backend/src/containerHardening.test.js`
 - `npm run lint`
+- `npm run typecheck`
 - `npm run build`
 - `npm test`
-- Production-image build, original/fixed `nginx -t`, negative build check and smoke script as above.
-- `git diff --check`
-- Stage any newly created file explicitly: `git add docker/smoke-nginx.sh`.
+- `npx playwright test --config playwright.pwa.config.js`
+
+The new PWA config starts `npm exec --workspace frontend -- vite preview --host 127.0.0.1 --port 4173 --strictPort` after the build, with reuse disabled and its base URL set to `http://127.0.0.1:4173`. Serve API fixtures in the browser tests so these lifecycle checks do not require PostgreSQL. Do not use the development worker as a substitute for this production check.
+
+Production browser assertions:
+
+- Use clean browser contexts, a real installed/active worker and a shared-list fixture; fail on registration errors, failed precache responses or activation timeout.
+- Verify offline shell/list reads after online cache population.
+- Exercise registration/installation failure followed by removal of the fault and recovery without page navigation, leaving the actual lifecycle real rather than replacing `navigator.serviceWorker.ready` with a mock.
+- Use deterministic PushManager/notification stubs only for subscription UI/API assertions if the local browser cannot reach a real push service. Label those checks; they are not proof of real delivery.
+- Check repeat clicks and error dismissal/recovery, permission-denied behavior, and the update banner's existing tests.
+- On installed Android Chrome and Brave at the reported deployment, verify opt-in, reload/subscription restoration, notification delivery from another member and click navigation when device/deployment access is available. Record browser/version and outcomes; desktop emulation does not satisfy this device check.
+
+If Nginx configuration changes, additionally build a local image and run `bash docker/smoke-nginx.sh <local-image-tag>` using the existing README instructions. Report environment limitations and failed checks explicitly.
+
+### Handoff and commit guidance
+
+Suggested subject: `fix(push): restore notification opt-in with clear errors and retry`.
+
+The implementer must finalize the subject/body from the actual delivered change, put it in the implementation HANDOFF entry, and include no `Co-Authored-By` trailer. Required validations must pass before a later authorized commit. This planner performs no code edits or commits; review and commit follow the repository workflow. A PR to main remains required for user-reviewed changes and uses `aide pr`.

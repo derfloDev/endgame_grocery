@@ -92,7 +92,8 @@ export default defineConfig({
       },
       // Required when the app is served behind Cloudflare Access: sends the CF_Authorization
       // cookie with the manifest fetch so Access does not redirect it to the login page.
-      // Note: /sw.js and /workbox-*.js must be bypassed in CF Access separately (see README).
+      // The actual worker entry is /service-worker.js and needs its own Access bypass (see README).
+      // Workbox is bundled in this worker; inspect precache requests separately for access failures.
       useCredentials: true,
       includeAssets: ["icon-192.png", "icon-512.png"],
       manifest: {

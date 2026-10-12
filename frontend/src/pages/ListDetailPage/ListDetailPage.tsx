@@ -89,6 +89,8 @@ export default function ListDetailPage(): ReactElement {
   const shouldShowPushToggle = list !== null && (!list.is_owner || members.length > 1);
   const {
     isReady: isPushReady,
+    isPending: isPushPending,
+    error: pushError,
     isSubscribed,
     isSupported: isPushSupported,
     subscribe,
@@ -162,16 +164,8 @@ export default function ListDetailPage(): ReactElement {
   }
 
   async function handlePushToggle(): Promise<void> {
-    try {
-      if (isSubscribed) {
-        await unsubscribe();
-        return;
-      }
-
-      await subscribe();
-    } catch (pushError) {
-      reportError(pushError);
-    }
+    if (isSubscribed) await unsubscribe();
+    else await subscribe();
   }
 
   const { handleEdit, handleToggle, normalizedSearchQuery, openEntries, visibleEntries } = useEntryTiles({
@@ -227,16 +221,19 @@ export default function ListDetailPage(): ReactElement {
             {shouldShowPushToggle && isPushSupported ? (
               <button
                 className="eg-btn-secondary"
-                disabled={!isPushReady}
+                disabled={!isPushReady || isPushPending}
                 type="button"
                 onClick={() => void handlePushToggle()}
               >
-                {isSubscribed ? t("detail.notificationsOff") : t("detail.notificationsOn")}
+                {isPushPending ? t("detail.notificationsPending") : isSubscribed ? t("detail.notificationsOff") : t("detail.notificationsOn")}
               </button>
             ) : null}
           </div>
         ) : null}
 
+        {shouldShowPushToggle && pushError ? (
+          <div className="detail-banner eg-error-banner" role="alert">{t(`detail.pushErrors.${pushError}`)}</div>
+        ) : null}
         {error && !shouldSuppressEntryError ? (
           <div className="detail-banner eg-error-banner">{getListDetailErrorText(error, t)}</div>
         ) : null}

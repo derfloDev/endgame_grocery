@@ -23,61 +23,61 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
-### T-001 — plan — 2026-10-12T04:37:26Z
+### T-001 — plan — 2026-10-12T06:20:59Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Planned the user-selected server-scoped gzip fix, tests-first regression coverage, build-time nginx validation, production-image CI smoke checks and documentation updates; local Docker runtime verification remains pending. |
+| Summary | Planned diagnosis and correction of Android PWA notification opt-in, localized failure feedback and same-page retry using the user-selected scope. |
 | Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-10-12T04:52:40Z
+### T-001 — implement — 2026-10-12T06:46:05Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | next_task: Restored server-scoped gzip, added installed-configuration build validation and production-image CI smoke coverage, with matching regression tests and documentation. |
-| Files Changed | docker/nginx.conf, Dockerfile, backend/src/nginxCaching.test.js, backend/src/containerHardening.test.js, docker/smoke-nginx.sh, .github/workflows/ci.yml, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
-| Validation | Targeted node --test (nginxCaching, nginxLogging, containerHardening): original 21 pass/4 expected failures, fixed 25/25 pass. npm run lint: PASS (existing AuthContext.tsx React refresh warning). npm run build and npm run typecheck: PASS. npm test: initial frontend lazy-share timeout (904/905; backend 421/421); unchanged focused retry 64/64; full retry PASS (frontend 905/905, backend 421/421). docker build -t endgame-grocery:nginx-original .: PASS before implementation; docker run --rm --entrypoint nginx endgame-grocery:nginx-original -t: expected exit 1, duplicate gzip_vary at default.conf:2. docker build -t endgame-grocery:nginx-smoke .: PASS including nginx -t on installed /etc/nginx/nginx.conf (Alpine nginx 1.30.4-r1). Isolated git-archive HEAD context with current guarded Dockerfile: expected build exit 1 at RUN nginx -t, duplicate gzip_vary at default.conf:2. Fixed image saved/loaded into the separate WSL Linux daemon; bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke: PASS (configuration, HTTP, shell/worker/SPA/hashed asset, cache/security headers, gzip/Vary and byte comparison); no smoke containers remain. Bash syntax and git diff --check (working and staged): PASS. New script explicitly staged; temporary build context, image archive and logs removed. Full app/DB startup and browser E2E are outside this nginx-only task. |
-| Commit | `fix(container): restore nginx startup and reject invalid image configuration` |
+| Summary | Implemented shared plugin-owned worker registration with bounded activation, localized failures, duplicate-attempt protection and same-page retry; corrected VAPID-effect cancellation that lost existing subscription restoration, and documented the deployed Access obstruction and administrator remediation. Anonymous probes at 06:25–06:31 UTC returned 302/HTML to the Cloudflare Access login origin for `/service-worker.js`, `/index.html` and `/icon-512.png`; Chromium 147.0.7727.15 opening the deployment reached the login flow. This confirms a missing effective public worker bypass for that request, but does not establish the authenticated Android lifecycle; actual policy rules and protected precache dependencies could not be inspected. No live policy was changed. |
+| Files Changed | frontend/src/sw/register.ts, frontend/src/sw/register.test.ts, frontend/src/hooks/usePushNotifications.ts, frontend/src/hooks/usePushNotifications.test.ts, frontend/src/pages/ListDetailPage/ListDetailPage.tsx, frontend/src/app.test.tsx, frontend/src/locales/en/translation.json, frontend/src/locales/de/translation.json, frontend/vite.config.ts (lifecycle/access comment only), e2e/push-notifications.spec.js, playwright.pwa.config.js, playwright.config.js, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Tests written first: registration/hook regressions failed before implementation; late background-error regression also failed before its correction. `npm run lint`: PASS (existing AuthContext fast-refresh warning); `npm run typecheck`: PASS; `npm run build`: PASS; targeted registration/hook/app/update-banner suite: 57 PASS; `npm test`: PASS (914 frontend + 421 backend); `git diff --check`: PASS. `npx playwright test --config playwright.pwa.config.js`: 4 PASS in clean Chromium with real worker registration/install/activation, redirected registration and failed-precache recovery without navigation, offline shell/list reads, duplicate clicks and denied permission. Subscription transport/permission are stubbed, not real delivery. One concurrent run failed the 30-second preview startup timeout under full-suite load; the serial rerun passed. Windows preview teardown stalled and required stopping only the preview processes launched for these runs after all assertions passed (final exit 0). Android Chrome/Brave versions, installed opt-in, reload restoration, real delivery and click navigation remain unverified; deployment Access remediation and authenticated worker verification remain external gaps. New files explicitly staged; pre-existing planning/config changes preserved. |
+| Commit | `fix(push): enable notification retries with localized failure feedback` |
 | Next Role | review |
 
 ---
 
-### T-001 — review — 2026-10-12T05:02:26Z
+### T-001 — review — 2026-10-12T06:58:08Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | Reviewed T-001 against the plan; required checks, original/fixed/negative image validation, Linux smoke, Chromium E2E and manual HTTP/visual verification passed with no required fixes. |
+| Summary | Reviewed working-tree implementation against the plan and passed automated, production-browser, exploratory and manual visual checks, recording deployment/device and interactive-manual verification gaps. |
 | Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
-| Verdict | PASS |
+| Verdict | PASS_WITH_NOTES |
 | Blocking Findings | none |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-10-12T05:03:38Z
+### T-001 — implement — 2026-10-12T06:59:10Z
 
 | Field | Value |
 |-------|-------|
 | Agent | codex |
-| Summary | commit_task: Marked the reviewed T-001 done and created its task commit using the recorded next_task message. |
-| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md |
-| Validation | Review PASS with no required fixes; required lint/build/tests, regression and production-image checks passed as recorded in REVIEW.md. |
-| Commit | `fix(container): restore nginx startup and reject invalid image configuration` |
+| Summary | commit_task: finalized the approved T-001 implementation after PASS_WITH_NOTES review and moved the task to done; external deployment/device verification gaps remain documented. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md; reviewed task files and cycle artifacts included in the task commit per git add -A workflow |
+| Validation | Implementer and reviewer required validations passed as recorded above and in .ai/REVIEW.md; no code changes since review; git diff --check passed before commit. |
+| Commit | `fix(push): enable notification retries with localized failure feedback` |
 | Next Role | none |
 
 ---
 
-### Cycle closed — v1.9.5 — 2026-10-12T05:03:55Z
+### Cycle closed — v1.9.6 — 2026-10-12T07:00:12Z
 
 | Field | Value |
 |-------|-------|
 | Summary | All tasks done; cycle closed |
-| Version | v1.9.5 |
+| Version | v1.9.6 |
 
 ---

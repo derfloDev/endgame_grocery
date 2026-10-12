@@ -1,0 +1,61 @@
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+const plugin = vi.hoisted(() => ({ register: vi.fn(), update: vi.fn(async () => undefined) }));
+vi.mock("virtual:pwa-register", () => ({ registerSW: plugin.register }));
+beforeEach(() => { vi.resetModules(); vi.clearAllMocks(); vi.useFakeTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); });
+describe("shared service worker registration", () => {
+  it("shares registration, observes activation and preserves update actions", async () => {
+    const worker = Object.assign(new EventTarget(), { state: "installing" });
+    const registration = Object.assign(new EventTarget(), { active: null, installing: worker });
+    plugin.register.mockImplementation(options => { options.onRegisteredSW("/service-worker.js", registration); options.onNeedRefresh(); return plugin.update; });
+    const { ensureServiceWorker, useServiceWorkerUpdate } = await import("./register");
+    const { result } = renderHook(useServiceWorkerUpdate);
+    const pending = ensureServiceWorker();
+    await act(async () => { Object.assign(worker, { state: "activated" }); Object.assign(registration, { active: worker }); worker.dispatchEvent(new Event("statechange")); });
+    expect(await pending).toBe(registration);
+    expect(plugin.register).toHaveBeenCalledTimes(1);
+    await result.current.updateServiceWorker(true);
+    expect(plugin.update).toHaveBeenCalledWith(true);
+    act(() => result.current.dismissUpdate());
+    expect(result.current.needRefresh).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("propagates registration errors and retries through the plugin", async () => {
+    plugin.register.mockImplementation(options => { options.onRegisterError(new Error("raw browser details")); return plugin.update; });
+    const { ensureServiceWorker } = await import("./register");
+    await expect(ensureServiceWorker()).rejects.toThrow("workerRegistration");
+    const registration = Object.assign(new EventTarget(), { active: { state: "activated" } });
+    plugin.register.mockImplementation(options => { options.onRegisteredSW("/service-worker.js", registration); return plugin.update; });
+    expect(await ensureServiceWorker()).toBe(registration);
+    expect(plugin.register).toHaveBeenCalledTimes(2);
+  });
+  it("bounds activation and cleans up listeners on abort", async () => {
+    const worker = Object.assign(new EventTarget(), { state: "installing" });
+    const remove = vi.spyOn(worker, "removeEventListener");
+    plugin.register.mockImplementation(options => { options.onRegisteredSW("/service-worker.js", Object.assign(new EventTarget(), { active: null, installing: worker })); return plugin.update; });
+    const { ensureServiceWorker } = await import("./register");
+    const controller = new AbortController();
+    const pending = ensureServiceWorker(controller.signal);
+    const assertion = expect(pending).rejects.toThrow("Aborted");
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort();
+    await assertion;
+    expect(remove).toHaveBeenCalledWith("statechange", expect.any(Function));
+    expect(vi.getTimerCount()).toBe(0);
+    const timeout = ensureServiceWorker();
+    const failure = expect(timeout).rejects.toThrow("workerTimeout");
+    await vi.advanceTimersByTimeAsync(8000);
+    await failure;
+  });
+  it("reports redundant installation separately", async () => {
+    const worker = Object.assign(new EventTarget(), { state: "installing" });
+    plugin.register.mockImplementation(options => { options.onRegisteredSW("/service-worker.js", Object.assign(new EventTarget(), { active: null, installing: worker })); return plugin.update; });
+    const { ensureServiceWorker } = await import("./register");
+    const pending = ensureServiceWorker();
+    const failure = expect(pending).rejects.toThrow("workerInstallation");
+    await vi.advanceTimersByTimeAsync(0);
+    Object.assign(worker, { state: "redundant" }); worker.dispatchEvent(new Event("statechange"));
+    await failure;
+  });
+});

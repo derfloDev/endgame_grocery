@@ -233,5 +233,13 @@
   "errors.validation.token_password_required": "The reset link and a new password are required.",
   "errors.validation.verification_token_required": "The verification link is incomplete.",
   "errors.request.not_found": "This page or endpoint does not exist.",
-  "errors.request.too_large": "The request is too large."
+  "errors.request.too_large": "The request is too large.",
+  "detail.pushErrors.unsupported": "This browser does not support notifications.",
+  "detail.pushErrors.configuration": "Notifications are not configured or configuration could not be loaded. Try enabling notifications again.",
+  "detail.pushErrors.permissionDenied": "Notifications are blocked. Allow them in your browser or device settings before trying again.",
+  "detail.pushErrors.workerRegistration": "The app could not register its notification service. Try enabling notifications again. If this continues, contact the administrator.",
+  "detail.pushErrors.workerInstallation": "The notification service could not finish installing. Check your connection and try enabling notifications again.",
+  "detail.pushErrors.workerTimeout": "The notification service did not become ready in time. Try enabling notifications again.",
+  "detail.pushErrors.subscription": "Notifications could not be updated. Check your connection and try again.",
+  "detail.notificationsPending": "Updating notifications…"
 }
