@@ -168,6 +168,8 @@ docker compose up -d
 
 Compose pulls the app image from `ghcr.io/derfloDev/endgame-grocery`. The app listens on `http://localhost:80`. Nginx serves the built React app, proxies `/api/*` requests to the Node.js backend inside the same container, and returns the SPA `index.html` for deep-link routes. Database migrations run automatically when the app container starts.
 
+The published image is multi-arch for `linux/amd64` and `linux/arm64`, and Docker pulls the matching variant automatically. A Raspberry Pi 3/4/5 needs a 64-bit OS (for example 64-bit Raspberry Pi OS); 32-bit ARM (`linux/arm/v7`) is not supported. Multi-arch images start with the first release after this change, so older tags are amd64-only.
+
 Run exactly one app container: the push worker and the live-update (SSE) fan-out live inside the backend process, so scaling the service to several replicas would split live updates between them and run several push workers.
 
 Container startup logs also print the app version twice: once from `docker/entrypoint.sh` before migrations and once in the backend JSON startup log entry.
@@ -447,6 +449,7 @@ bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke
 The build fails on an invalid installed nginx configuration via `RUN nginx -t`. The independent
 `nginx-smoke` CI job runs these same commands on pull requests and pushes to main without
 publishing an image. Missing Docker or host tools fail the smoke check rather than skipping it.
+The independent `nginx-smoke-arm64` CI job does the same for the `linux/arm64` image under QEMU, and additionally asserts `uname -m` is `aarch64` and that the native `bcrypt` module loads.
 The script accepts an already-built local image tag, checks `nginx -t` again and starts nginx on a
 dynamically allocated localhost port. It checks HTTP 200 for the shell, service worker, a discovered
 hashed JS/CSS asset and a SPA route; verifies the SPA returns the shell, one expected Cache-Control
@@ -458,6 +461,15 @@ This overrides the image entrypoint to run nginx alone: it needs no database and
 migrations, supervisord, backend health, authenticated API traffic, full application startup or
 browser E2E. The cold-load measurements above remain browser measurements against Vite preview.
 Unit tests retain coverage of font, icon and manifest cache rules and gzip level 5.
+
+#### arm64 variant
+
+Building and running the arm64 image needs Docker Buildx plus QEMU/binfmt emulation (built into Docker Desktop; on Linux, for example `docker run --privileged --rm tonistiigi/binfmt --install arm64`):
+
+```bash
+docker buildx build --platform linux/arm64 --load -t endgame-grocery:nginx-smoke-arm64 .
+DOCKER_DEFAULT_PLATFORM=linux/arm64 bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke-arm64
+```
 
 ### Integration tests
 

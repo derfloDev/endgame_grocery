@@ -2,98 +2,78 @@
 
 Shared review log for the current cycle. Append a new task section when review starts for a new task. Within a task, append a new review round instead of replacing prior history.
 
-## Task: T-XXX
+## Task: T-001
 
 ### Review Round 1
 
-Status: **pending**
+Status: **changes_requested**
 
-Reviewed: YYYY-MM-DD
+Reviewed: 2026-10-13
 
 #### Findings
-- Pending review.
+1. **blocker** — `.github/workflows/docker-publish.yml` (`Build and push Docker image` step, ~line 33-40): `platforms: linux/amd64,linux/arm64` was never added to `docker/build-push-action`. The diff for this file only adds the QEMU and Buildx setup steps (`grep -rn platforms .github Dockerfile` returns nothing). Without `platforms`, the release build still produces a single `linux/amd64` image, so the core goal of T-001 (publish an arm64 image for Raspberry Pi) is not delivered, and the README claim "The published image is multi-arch" would be false. Required fix: yes.
+2. **nit** — `.github/workflows/ci.yml` line 48: the `docker run ... endgame-grocery:nginx-smoke-arm64             -c '...'` command has a run of ~13 spaces where a line continuation (`\` + newline) was apparently intended. It works (shell collapses the spaces) but reads as a formatting accident. Suggested: split into a proper `\`-continued multi-line command. Required fix: no.
+3. **nit** — `README.md` ~line 462-465: two consecutive blank lines before `#### arm64 variant`. Suggested: remove one. Required fix: no.
+
+#### Required fixes
+1. Add `platforms: linux/amd64,linux/arm64` to the `docker/build-push-action` `with:` block in `.github/workflows/docker-publish.yml`, keeping tags, labels, trigger and permissions unchanged.
 
 #### Verification
 ##### Steps
-- Pending verification.
+- Re-read `.ai/TASKS.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/HANDOFF.md`; reviewed `git diff` of `Dockerfile`, `ci.yml`, `docker-publish.yml`, `README.md`.
+- Resolved action SHAs with `gh api repos/docker/setup-{qemu,buildx}-action/git/ref/tags/v4`: `99012661...` (qemu) and `f87e5991...` (buildx) match the pinned SHAs in both workflows.
+- Parsed both workflow files with `js-yaml`: valid; `ci.yml` jobs are `lint-and-build, nginx-smoke, nginx-smoke-arm64, unit-test, e2e`; the diff of `ci.yml` has 0 removed lines, so existing jobs are unchanged. `actionlint` not installed.
+- `npm run lint`: pass. `npm run build`: pass. `npm test`: 421 pass, 0 fail.
+- `docker buildx build --platform linux/arm64 --load -t endgame-grocery:nginx-smoke-arm64 .`: success; image reports `linux/arm64`.
+- Executed the exact `docker run` arch/bcrypt step extracted from `ci.yml`: exit 0 (`aarch64` asserted, `bcrypt.hashSync` works). Negative check (`= x86_64` assertion) exits 1, so the check fails when it should.
+- `DOCKER_DEFAULT_PLATFORM=linux/arm64 bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke-arm64`: pass.
+- Plain `docker build -t endgame-grocery:nginx-smoke .` and `bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke` (amd64): pass.
+- Dockerfile: builder uses `--platform=$BUILDPLATFORM`; runtime stage is per target; no toolchain added.
 ##### Findings
-- None.
+- All acceptance criteria except the `docker-publish.yml` `platforms` setting are met (finding 1).
+- README content matches the plan (platforms, Pi 64-bit, no arm/v7, older tags amd64-only, arm64 smoke commands, CI job mention).
+- The multi-platform publish path itself (QEMU + Buildx + `platforms`) cannot be exercised locally; it is verified only by workflow inspection and can be confirmed post-release with `docker buildx imagetools inspect`.
 ##### Risks
-- None.
+- If merged as-is, the next release publishes amd64-only while the docs promise multi-arch.
+- Fix is a one-line change; once applied, the remaining workflow wiring is consistent with the plan.
 
 #### Open Questions
 - None.
 
 #### Verdict
-`PENDING`
+`FAIL`
 
-## Task: T-001
+### Review Round 2
 
-### Review Round 1
+Status: **ready_to_commit**
 
-Status: **complete**
-
-Reviewed: 2026-10-12T06:58:08Z
+Reviewed: 2026-10-13
 
 #### Findings
-- **minor — README.md:261 — Required fix: no.** The documented external Access gate remains present: reviewer probes of `/service-worker.js`, `/index.html` and `/icon-512.png` returned HTTP 302/HTML to the Cloudflare Access login origin. This establishes an anonymous request obstruction, not the authenticated Android lifecycle or the effective policy rules. The plan explicitly limits this task to documented administrator remediation; approval covers the repository implementation and does not establish restored deployed Android opt-in.
-- **minor — playwright.pwa.config.js:12 — Required fix: no.** On this Windows environment, all four browser assertions passed but Playwright stalled during preview teardown. Stopping only the two preview processes identified in this review run allowed the command to finish with exit 0. Consider platform-safe server teardown so the documented command exits unattended.
+1. **blocker (resolved)** — `docker-publish.yml` now sets `platforms: linux/amd64,linux/arm64` on `docker/build-push-action`; tags, labels, trigger and permissions are unchanged.
+2. **nit (resolved)** — `ci.yml` arch/bcrypt command now uses a proper `\` line continuation.
+3. **nit (resolved)** — the double blank line before `#### arm64 variant` in `README.md` is gone.
 
-#### Required Fixes
+No new findings.
+
+#### Required fixes
 - None.
 
 #### Verification
 ##### Steps
-- Compared staged and unstaged implementation changes against `.ai/PLAN.md`; inspected registration/update integration, cancellation, duplicate-attempt protection, subscription persistence/reuse, permission behavior, localized UI and affected documentation. Preserved unrelated planning/configuration changes; modified no code and created no commit.
-- `npm run lint`: PASS with the existing AuthContext fast-refresh warning; `npm run typecheck`: PASS; `npm run build`: PASS; `npm test`: PASS (frontend and backend, 421 backend tests); `git diff --check`: PASS.
-- `npx playwright test --config playwright.pwa.config.js`: 4 PASS, final exit 0 after the Windows preview teardown intervention above. Clean Chromium contexts used real production worker registration, installation, activation, offline shell/list reads, redirected-worker and failed-precache recovery, duplicate clicks and denied-permission feedback. Push transport and permission were stubbed.
-- Additional exploratory browser checks using the production preview and existing deterministic fixtures: German registration error and same-page recovery; unsubscribe/API toggle; actual precache request held past the eight-second activation deadline, followed by released request and successful retry with unchanged `performance.timeOrigin`. All passed.
-- Manual visual inspection of the German shared-list error screenshot at 390 x 844: complete localized message wraps within the banner and notification action remains visible, with no clipping. Interactive manual UI testing was attempted through browser/computer-use tools but their kernel failed to start (`setup refresh had errors`); interactive checks could not be completed.
-- Independently repeated deployed-route HTTP probes at approximately 2026-10-12T06:57Z; logged only response status/content type and redirect origin, without cookies, tokens or login query strings.
+- Re-read `.ai/TASKS.md`, `.ai/PLAN.md`, `.ai/REVIEW.md`, `.ai/HANDOFF.md`; reviewed the rework diff of `docker-publish.yml`, `ci.yml` and `README.md`.
+- Parsed both workflows with `js-yaml`: valid; the `build-push-action` `with:` block contains `platforms: linux/amd64,linux/arm64`; `ci.yml` jobs are unchanged apart from the added `nginx-smoke-arm64` (0 removed lines). `actionlint` not installed.
+- `npm run lint`: pass. `npm run build`: pass. `npm test`: 421 pass, 0 fail.
+- Rebuilt `linux/arm64` image locally with `docker buildx build --platform linux/arm64 --load`: success.
+- Executed the `nginx-smoke-arm64` arch/bcrypt step exactly as parsed from the YAML: exit 0.
+- `DOCKER_DEFAULT_PLATFORM=linux/arm64 bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke-arm64`: pass. The amd64 build and smoke passed in round 1 and the Dockerfile has not changed since.
 ##### Findings
-- No blocking code defects found. Activation is bounded, recoverable failures permit same-page retry, and feedback clears after successful recovery. Real delayed-install recovery also passed beyond the committed E2E cases.
-- Existing worker push/click handlers and update-banner behavior remain covered by the passing unit suite. These are not proof of real device delivery or a deployed update transition.
+- All acceptance criteria are met.
 ##### Risks
-- Effective Cloudflare Access policy and authenticated worker/precache responses remain unverified; administrator remediation is still needed before claiming the reported deployment issue is resolved.
-- Installed Android Chrome/Brave versions, opt-in, reload/subscription restoration, real delivery from another member and notification click navigation remain unverified because no device/authenticated deployment session was available. Desktop viewport inspection does not satisfy these checks.
-- Interactive manual testing remains a verification gap due to the unavailable computer-use runtime. The completed screenshot inspection and exploratory automation are recorded separately.
-- No Nginx configuration changed, so the conditional Docker/Nginx smoke check was not applicable.
+- The multi-platform push itself runs only on `release: published` and cannot be exercised locally. After the first release, confirm with `docker buildx imagetools inspect ghcr.io/derflodev/endgame-grocery:<version>` that both platforms are listed.
 
-#### Verdict
-`PASS_WITH_NOTES`
-
-## Task: T-002
-
-### Review Round 1
-
-Status: **complete**
-
-Reviewed: 2026-10-12T12:31:36Z
-
-#### Findings
-- **minor — playwright.pwa.config.js:12 — Required fix: no.** The previously recorded Windows preview teardown stall remains: all five browser scenarios passed, but the runner required stopping only its two identified preview processes before returning exit 0. This predates T-002 and does not invalidate the real lifecycle assertions. A platform-safe teardown remains an optional harness improvement.
-
-#### Required Fixes
+#### Open Questions
 - None.
 
-#### Verification
-##### Steps
-- Compared all working-tree changes with the T-002 plan. The existing four browser scenarios/assertions are preserved; the new fixture derives one retired JavaScript manifest path from the production build and checks HTTP 404, native redundant state, failed opt-in without push/API persistence, activation and same-document recovery. Executable application/Vite options and origin configuration are unchanged; Vite edits are comments only. No code edits or commits were made during review.
-- `npm run lint`: PASS (existing AuthContext fast-refresh warning); `npm run typecheck`: PASS; `npm run build`: PASS; `npm test`: PASS (914 frontend and 421 backend tests); `node --test backend/src/nginxCaching.test.js`: 11 PASS; `git diff --check`: PASS.
-- `npx playwright test --config playwright.pwa.config.js`: 5 PASS, final exit 0 following the Windows teardown intervention above. Real production registration/install/activation and HTTP fault injection remain in use; push transport and notification permission are explicitly stubbed.
-- Built `endgame-grocery:review-t002` from the production Dockerfile and ran unchanged `docker/smoke-nginx.sh` against it: PASS for Nginx configuration, HTTP, cache/security headers and gzip. WSL initially selected a different Docker daemon; a temporary Docker Desktop forwarding function and normalized stdin line endings resolved the local mismatch without repository changes.
-- Independently inspected the fresh worker: 38 precache entries, 35 unique URLs, no uncovered public paths and zero worker imports. Confirmed README cache lifetimes against the existing Nginx locations.
-- Cross-checked public-path precedence, policy setup, separate browser/edge TTL, DYNAMIC bypass reporting and targeted purge limitations against official [Access path documentation](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/), [Access policies](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/policy-management/), [Cache Rules settings](https://developers.cloudflare.com/cache/how-to/cache-rules/settings/), [edge/browser TTL](https://developers.cloudflare.com/cache/how-to/edge-browser-cache-ttl/) and [single-file purge](https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-single-file/).
-- Manual documentation walkthrough: checked scoped public exposure, protected API/application routes, cache conflicts, targeted purge and incident/live-verification distinctions; executed the README Bash diagnostic example against a temporary loopback server serving the real built worker. Status, JavaScript MIME, safe headers and SHA-256 output were correct. Synthetic Access redirect/cookie headers emitted only the redirect origin and approved headers, omitting cookies and query tokens. Bash syntax passed. This local procedure does not verify Cloudflare account settings.
-- Additional exploratory Chromium check: German stale-worker installation feedback, zero persistence before recovery, then successful opt-in with exactly one saved subscription and unchanged page time origin. Manually inspected failure and recovered screenshots at 390 x 844: messages/actions fit without clipping, feedback disappears and the action changes to disable notifications.
-- Privacy scan of non-ignored repository files found no known personal deployment-domain references; new review evidence uses relative paths, loopback and reserved example domains only.
-##### Findings
-- No blocking defects found. T-002 satisfies repository preparation and simulated stale-worker recovery criteria without altering existing product behavior or weakening prior assertions.
-- README distinguishes measured incident evidence, user-reported Android recovery and local simulation from pending live Access/cache/device checks. The public path table covers the current build.
-##### Risks
-- T-003 still owns effective live configuration, anonymous static/protected-route checks after Access restoration, consistency across the next real deployment and final installed Android evidence. T-002 approval does not complete or waive those gates; T-003 must wait until T-002 is committed.
-- Stubbed subscription transport is not proof of real notification delivery, reload restoration or click navigation on Android Chrome/Brave.
-- Windows/WSL invocation required environment-specific Docker forwarding and preview cleanup. All final checks passed; no production origin-serving change was required.
-
 #### Verdict
-`PASS_WITH_NOTES`
+`PASS`

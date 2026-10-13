@@ -2,154 +2,94 @@
 
 Status: **ready_for_implement**
 
-Updated: 2026-10-12T10:53:37Z
+Goal: publish `ghcr.io/derflodev/endgame-grocery` as a multi-arch image (`linux/amd64` + `linux/arm64`) so it runs on a Raspberry Pi 3/4/5 with a 64-bit OS (see `ROADMAP.md`, Priority 1).
 
-Goal: keep Android PWA notification installation reliable after deployments and restore Cloudflare Access with required static PWA files publicly accessible.
+## Resolved decisions (from roadmap refinement)
 
-User decisions: required PWA files may be public; explain their paths, exposure and Cloudflare configuration in README. The user invoked start_plan after confirming Android recovery following a Cloudflare cache purge. No further approach decision is pending.
+- QEMU emulation + Docker Buildx on `ubuntu-latest`; one job, one multi-arch manifest. No native arm64 runners, no matrix/digest merge.
+- Platforms: `linux/amd64`, `linux/arm64` only. No `linux/arm/v7`.
+- PR CI builds and smoke-tests an arm64 image (no push).
+- Publish trigger stays `release: published`. No `workflow_dispatch`.
+- No Buildx layer cache this cycle.
 
-Privacy constraint: never record personal deployment domains or URLs in repository files, including README, roadmap, plans, reviews and handoffs. Use relative resource paths and reserved example domains such as grocery.example.com. Actual deployment targets belong only in session context or external account settings, not repository artifacts. This applies to both tasks and future evidence entries.
+## Findings that shape the plan
 
-## Evidence and boundaries
+- `bcrypt@6.0.0` (the only native runtime dependency) ships `prebuilds/linux-arm64/bcrypt.musl.node`. The arm64 Alpine runtime stage therefore does **not** need a compiler toolchain. Do not add `python3`/`make`/`g++`. Only revisit if the arm64 CI build actually fails on `bcrypt`, and then report it in the HANDOFF entry instead of silently adding tooling.
+- The `builder` stage only produces static frontend assets (`/app/frontend/dist`), which are architecture-independent. It can run on `$BUILDPLATFORM` so Vite never runs under QEMU.
+- `docker/smoke-nginx.sh` takes any local image tag and runs it with plain `docker run`. Docker CLI honors `DOCKER_DEFAULT_PLATFORM`, so the arm64 image can be smoke-tested without changing the script. Prefer this over editing the script. Only add a platform argument to the script if `DOCKER_DEFAULT_PLATFORM` turns out not to work on the runner, and document it if you do.
+- Third-party actions in this repo are pinned by full commit SHA with a `# vN` comment. New actions must follow the same style. Resolve the SHA of the current major release tag, for example `gh api repos/docker/setup-qemu-action/git/ref/tags/<tag>` (dereference annotated tags). Never guess a SHA.
 
-- The normal deployed /service-worker.js was a Cloudflare HIT from 23 September, with public, max-age=31536000, immutable. Four referenced build assets returned 404, including the user's reported /assets/translation-CFgQw2PM.js.
-- A unique query returned the worker from 12 October; all 38 manifest entries (35 unique URLs) returned 200. Clean Chromium contexts reproduced the normal worker becoming redundant and the current worker activating. The user then purged the Cloudflare cache and confirmed Android recovery.
-- Authentication had been temporarily disabled. Permanent cache rules and restored-Access operation are not yet verified.
-- docker/nginx.conf already specifies no-cache for the worker, shell and SPA fallback. Existing origin tests/smoke checks cover those headers. A fresh edge response nevertheless had max-age=14400; distinguish deployed origin configuration from Cloudflare TTL overrides.
-- No Cloudflare infrastructure-as-code configuration was found. Use the existing dashboard/account setup through an available authorized connection or administrator; do not introduce an infrastructure toolchain.
-- T-001 is completed historical work. Preserve its registration, retry, permission, update and offline behavior. This confirmed deployment failure does not justify speculative client cache-busting, worker unregistration, cache deletion or timeout changes.
+## Tasks
 
-Two tasks keep repository preparation and actual live verification separately reviewable. Both are owned by implement. Execute T-002 first, then T-003 after T-002 is reviewed and committed. Preserve T-001 handoffs and the historical cycle-close entry.
+### T-001 — Multi-arch Docker image with arm64 CI check
 
-## T-002 — Document PWA Cloudflare setup and cover stale-worker recovery
+Single task, single commit: Dockerfile, publish workflow, CI check and docs change together and only make sense together.
 
-Owner role: implement.
+#### Files to change
 
-### Acceptance criteria
+1. `Dockerfile`
+   - Change `FROM node:22-alpine AS builder` to `FROM --platform=$BUILDPLATFORM node:22-alpine AS builder`.
+   - Add a short English comment above it: the builder only emits architecture-independent static assets, so it runs natively on the build host even during multi-arch builds.
+   - Leave the `runtime` stage on the target platform (no `--platform`), and add a comment that `npm ci --omit=dev` there resolves the per-architecture `bcrypt` prebuild.
+   - No other changes. The `ARG`/`ENV VITE_ICON_SIMILARITY_THRESHOLD` must still reach the builder stage.
 
-1. README explains the confirmed failure: an obsolete cached worker references removed chunks, Workbox rejects installation with bad-precaching-response/404, and clearing the stale edge response restored Android opt-in. Distinguish this from Access redirects and connectivity failures.
-2. README provides exact hostname/path-scoped static Access exceptions, separate edge/browser cache instructions, targeted purge steps and verification commands. A repository/image deployment does not update the Cloudflare account.
-3. Explain that selected static assets and the app shell are anonymously retrievable. API/private data, remaining application routes and application authorization remain protected. Do not prescribe a root/domain-wide Bypass.
-4. Add a deterministic production-browser regression where an obsolete worker manifest references a retired JavaScript chunk returning 404 while page assets are current. Assert real redundant installation, localized installation feedback and no subscription persistence. Removing the simulated stale response permits activation and opt-in through existing retry without page navigation.
-5. Derive the obsolete-manifest fixture from the production build; do not hard-code actual deployed chunk hashes or rely on the production site. Preserve all existing redirect, precache, offline, denied-permission and duplicate-attempt assertions. Lifecycle APIs remain real; existing push transport stubs remain explicitly labeled.
-6. Documentation distinguishes measured deployment evidence, simulated checks and user-reported Android recovery. It does not claim live rules or restored-Access/device delivery checks have passed.
+2. `.github/workflows/docker-publish.yml`
+   - Before the build step, add `docker/setup-qemu-action` and `docker/setup-buildx-action`, both SHA-pinned with `# vN` comments.
+   - In `docker/build-push-action`, add `platforms: linux/amd64,linux/arm64`.
+   - Keep the trigger, permissions, login, metadata tags (`{{version}}`, `latest`) and labels unchanged.
 
-### Files to change
+3. `.github/workflows/ci.yml`
+   - Keep the existing `nginx-smoke` job unchanged (amd64).
+   - Add a new independent job `nginx-smoke-arm64` (`runs-on: ubuntu-latest`, no `needs`) with a one-line comment that mirrors the existing smoke job's comment and mentions QEMU. Steps:
+     1. checkout (same pinned SHA as the other jobs)
+     2. `docker/setup-qemu-action` (pinned, same SHA as in docker-publish)
+     3. `docker/setup-buildx-action` (pinned, same SHA as in docker-publish)
+     4. `docker buildx build --platform linux/arm64 --load -t endgame-grocery:nginx-smoke-arm64 .`
+     5. Architecture and native-module check, failing the job on any error:
+        `docker run --rm --platform linux/arm64 --entrypoint sh endgame-grocery:nginx-smoke-arm64 -c 'test "$(uname -m)" = aarch64 && node -e "require(\"bcrypt\").hashSync(\"smoke\", 4)"'`
+        (exact quoting is up to the implementer. It must assert `aarch64` and load and use `bcrypt` from `/app`.)
+     6. `bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke-arm64` with `env: DOCKER_DEFAULT_PLATFORM: linux/arm64`
+   - No push, no registry login, no secrets.
 
-- README.md — explicitly update notification diagnosis, Cloudflare Access, caching/deployment instructions, production test coverage and verification steps. Replace the blanket statement that the manifest needs no exception with the selected public-static policy; manifest-link credentials do not prove every worker install request succeeds.
-- e2e/push-notifications.spec.js — add obsolete-worker/retired-JS fault injection and real-lifecycle recovery assertions; document fixture responsibilities and limits in English comments.
-- frontend/vite.config.ts — update existing Access/precache comments if needed to match the documented policy; preserve executable PWA options.
-- ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md — record preparation, checks and outstanding live rollout.
+4. `README.md` (documentation, required in this task)
+   - **Docker Deployment** section (around "Compose pulls the app image from …"): add that the published image is multi-arch for `linux/amd64` and `linux/arm64` and that Docker picks the matching variant automatically. Raspberry Pi 3/4/5 needs a 64-bit OS (e.g. 64-bit Raspberry Pi OS). 32-bit ARM (`linux/arm/v7`) is not supported. Also note that multi-arch images start with the first release after this change, so older tags are amd64-only.
+   - **Production nginx image smoke check** section: add a short subsection or paragraph for the arm64 variant. Prerequisites are Docker Buildx plus QEMU/binfmt (built into Docker Desktop; on Linux e.g. `docker run --privileged --rm tonistiigi/binfmt --install arm64`). Show the commands: `docker buildx build --platform linux/arm64 --load -t endgame-grocery:nginx-smoke-arm64 .` and `DOCKER_DEFAULT_PLATFORM=linux/arm64 bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke-arm64`. Update the sentence about the `nginx-smoke` CI job so it also names the `nginx-smoke-arm64` job and its `aarch64`/`bcrypt` check.
+   - The paragraph around line 109 ("CI also runs the production-image HTTP smoke check described below") stays accurate. Only touch it if wording becomes wrong.
+   - Do **not** edit `CHANGELOG.md` (managed by release-please).
 
-Conditional files, only if demonstrated discrepancies require them:
+#### Out of scope
 
-- playwright.pwa.config.js — harness integration only if necessary; update corresponding README commands.
-- docker/nginx.conf, backend/src/nginxCaching.test.js, docker/smoke-nginx.sh — only for a proven repository origin-serving defect. Tests must precede implementation, with README and English comments updated in the same task. Preserve CSP and API protection.
+- `linux/arm/v7`, native arm runners, Buildx GHA cache, `workflow_dispatch`, re-publishing old tags.
+- Changes to `docker-compose.example.yml`. The `image:` reference is unchanged and pulls the right architecture automatically.
+- Any application code or backend/frontend tests.
 
-No new product UI, runtime dependency or subscription behavior is required. Explicitly stage any necessary new file with git add <new-file>.
+#### Tests-first note
 
-### Required README content
+No JS behavior changes, so there are no new unit tests. The "test" for this task is the new `nginx-smoke-arm64` CI job: write it (step 3) before or together with the Dockerfile change, and treat its success as the acceptance check.
 
-Cross-check every current production worker/precache resource against this public path table:
+#### Acceptance criteria
 
-| Access exception on grocery.example.com (replace outside repository artifacts) | Purpose and caching |
-| --- | --- |
-| /service-worker.js | Actual worker entry, JavaScript 200 without login redirect; edge bypass and browser respects origin no-cache |
-| /index.html | Public precached app shell; edge bypass and browser respects no-cache |
-| /assets/* | Generated content-hashed JS/CSS/static assets, including lazy assets; explain this prefix exposure and retain immutable caching for hashed files |
-| /fonts/* | Self-hosted precache fonts; retain origin's short cache lifetime |
-| /icon-192.png and /icon-512.png | Installation/notification icons; retain short cache lifetime |
-| /manifest.webmanifest | Public install manifest and precache resource; retain short cache lifetime |
+- `nginx-smoke-arm64` job exists in `ci.yml`. It builds `linux/arm64` under QEMU, asserts `uname -m` = `aarch64`, loads and uses `bcrypt`, and passes `docker/smoke-nginx.sh` against the arm64 image. Any failure fails the job.
+- The existing `nginx-smoke`, `lint-and-build`, `unit-test` and `e2e` jobs are unchanged.
+- `docker-publish.yml` builds and pushes `linux/amd64,linux/arm64` with unchanged tags and labels, and all new actions are SHA-pinned.
+- The Dockerfile builder stage uses `--platform=$BUILDPLATFORM`, the runtime stage is per target platform, and no compiler toolchain is added.
+- A plain local `docker build -t endgame-grocery:nginx-smoke .` still works, and the amd64 smoke still passes when Docker is available.
+- README documents the supported platforms, the Raspberry Pi 64-bit requirement, no 32-bit ARM, and the local arm64 smoke commands and CI job.
+- `npm run lint`, `npm run build` and `npm test` pass.
 
-Document specific self-hosted Access application paths using a reusable **Bypass / Include Everyone** policy, with the protected hostname application covering all other routes. Explain more-specific path precedence and inspect overlapping applications. No /api/* exception or hostname-wide Bypass. Future worker imports/resources outside this list require explicit inspection; current Workbox is bundled, so no speculative /workbox-*.js exception is needed.
+#### Validation
 
-Provide this host/path expression for the worker/shell cache rule:
+- Required: `npm run lint`, `npm run build`, `npm test`.
+- Workflow syntax: if `actionlint` is available, run it on `.github/workflows/*.yml`. Otherwise review the YAML carefully and state that in HANDOFF.
+- If local Docker with Buildx and QEMU/binfmt is available (Docker Desktop on Windows has it built in), run the arm64 build, the arch/`bcrypt` check and the arm64 smoke locally. Also run the amd64 `docker build` and smoke. Record outcomes or "not run (reason)" in the HANDOFF `Validation` field. The authoritative check is the PR CI run of `nginx-smoke-arm64`.
+- Post-release (not a gate for this task): `docker buildx imagetools inspect ghcr.io/derflodev/endgame-grocery:<version>` lists both platforms.
 
-    (http.host eq "grocery.example.com" and http.request.uri.path in {"/service-worker.js" "/index.html"})
+#### Commit message (for HANDOFF `Commit` field)
 
-The hostname above is a reserved example. Substitute the actual hostname only in the Cloudflare account, never in committed or uncommitted repository files.
+```
+feat(docker): publish arm64 images for Raspberry Pi deployments
 
-Select **Cache eligibility: Bypass cache**. Separately ensure Browser Cache TTL respects origin no-cache. Explain conflicts with Cache Everything, edge/browser TTL, response-header and Worker overrides; edge bypass alone does not establish correct browser headers. Preserve no-cache for SPA HTML and immutable caching only for hashed assets. Access Bypass and cache Bypass are distinct settings.
-
-After correcting rules, purge the normal worker URL and only other cache keys shown to be stale. Avoid a global purge or zone-wide security changes. Explain that an edge purge does not erase browser HTTP cache or service-worker CacheStorage. A diagnostic query can identify a stale response but is not an application registration fix. Subsequent deployments should use the current normal worker without manual purging.
-
-Document GET/body checks for status, redirect origin, MIME type, Cache-Control, CF-Cache-Status, Age, content/hash and manifest coverage. MISS alone is not proof of bypass; bypass can report DYNAMIC. Include safe curl examples and a normal browser user agent if diagnostic clients encounter Cloudflare 1010. Never print cookies, tokens or full Access redirect query strings.
-
-### Implementation sequence
-
-1. Re-read roadmap/board/plan; move T-002 to in_implementation. Stay on the current branch and preserve unrelated changes.
-2. Inspect the build's worker/manifest, existing proxy tests and origin assertions. Verify public-path coverage and any imports. Do not alter correct origin code merely because the edge supplied different headers.
-3. Write new stale-worker scenario assertions before implementing its proxy fixture. Safely alter/add one manifest JS resource to represent a retired chunk and serve a real 404 for that path. Assert manifest discovery succeeds; do not silently skip when build layout changes.
-4. Implement the minimal test fault injection. Check failed path/status, real redundant state, unchanged page session, activation after removal of the stale response and subscription saved only after recovery. Preserve all existing assertions. If valid recovery exposes an application defect, record it for replanning instead of inventing a client fix.
-5. Update README and affected English comments together. Include Access/static exposure, separate caches, incident diagnosis, purge instructions and final live checks. Use timestamped incident evidence rather than treating ephemeral hashes as configuration.
-6. Run targeted and broad checks. Set T-002 to ready_for_review; append the implementation handoff with the final Conventional Commit message in Commit. Do not commit during next_task.
-
-### Validation
-
-Run npm run lint after every code/test/comment change.
-
-- Targeted: npm run build, then npx playwright test --config playwright.pwa.config.js -g "stale" (name the scenario accordingly).
-- Origin contract: node --test backend/src/nginxCaching.test.js.
-- If executable Vite configuration changes: npm run test --workspace frontend -- src/vite-config.test.ts.
-- Before review: npm run lint; npm run typecheck; npm run build; npm test; npx playwright test --config playwright.pwa.config.js; git diff --check.
-- Verify the origin image when Docker is available: docker build -t endgame-grocery:pwa-smoke .; bash docker/smoke-nginx.sh endgame-grocery:pwa-smoke. Mandatory if origin-serving configuration changes. Record missing Docker/Bash explicitly; Vite preview is not proof of Nginx headers.
-
-Suggested commit: docs(pwa): explain Cloudflare setup for reliable notification opt-in.
-Finalize its body from the delivered public-static/cache guidance and stale-worker regression.
-
-## T-003 — Apply and verify durable live PWA Access/cache configuration
-
-Owner role: implement. Dependency: T-002 reviewed and committed.
-
-This task owns external rollout and evidence. T-002 completion or a one-time cache purge does not complete T-003.
-
-### Acceptance criteria
-
-1. Effective origin/Cloudflare rules retain no-cache for worker/shell and prevent stale edge/browser TTL overrides. Normal worker requests match the deployed build; repeated responses and effective rules establish bypass, not a single MISS/query request.
-2. Restore Access for the protected application with only documented static exceptions. Anonymous GET checks retrieve every worker/precache resource with valid content and no login redirect/HTML. API/private data and remaining application routes stay gated; application authorization remains enforced.
-3. The normal worker installs/activates in a clean real browser without failed precache requests. Verify the existing installed-app/update path when accessible, and worker/asset consistency after the next real deployment without a manual purge. If no subsequent build is available, leave that acceptance check pending rather than deploying arbitrary changes.
-4. Installed Android Chrome opt-in is confirmed with Access restored and permanent cache rules active. Record browser/version when available; separately record reload restoration, real delivery and click-navigation outcomes. Do not infer them from activation. Record Brave results or verification gaps separately.
-5. README/workflow artifacts state actual applied rules, outcomes and outstanding checks. Missing required cache/Access/Android evidence prevents ready_for_review; do not close external acceptance with PASS_WITH_NOTES based only on repository tests.
-
-### Files/configuration to change
-
-- Cloudflare account configuration for this hostname — specific static Access applications/policy, edge bypass, effective browser TTL and conflicting overrides. Record non-secret rules and timestamps; credentials stay outside artifacts.
-- README.md — explicit deployment verification updates with confirmed effective configuration and operational corrections. Local tests do not configure Cloudflare.
-- ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md — rollout/device evidence; preserve historical entries.
-- Conditional: docker/nginx.conf, backend/src/nginxCaching.test.js, docker/smoke-nginx.sh plus README/comments only if origin inspection proves a repository-serving defect. Correct a stale deployed image/config using existing rules instead of changing correct source.
-
-### Execution sequence
-
-1. Re-read roadmap/board/plan; confirm T-002 done; move T-003 to in_implementation. Inspect current state because the user may already have applied rules. Preserve working Android behavior.
-2. Inspect effective deployed origin/image and Cloudflare rules. Compare worker content/headers and manifest coverage. Resolve the measured four-hour browser TTL and prior immutable worker response at the layer setting them.
-3. Apply the documented narrow rules through an authorized account connection, or give exact prepared settings to the administrator if account access is unavailable. The static-public preference is already approved; do not ask it again. Account access/administrator execution is an external prerequisite, not evidence of completed rollout.
-4. Purge only stale relevant edge entries if needed after correction. Restore protected Access with static exceptions; verify public resources and protected routes. Preserve backend authorization and CSP.
-5. Verify normal-URL lifecycle and installed-app/update behavior, then the next actual deployment. Capture safe headers/hash, failed paths/status and states. Local fixtures are not live authentication or delivery evidence.
-6. Obtain Android confirmation under final Access/cache settings. Continue independent work while input is pending, but keep required missing evidence explicit and the task in in_implementation.
-7. Update README/roadmap to actual settings/results, run appropriate checks and move to ready_for_review only after required gates pass. Append the implementation handoff and final Conventional Commit message. Do not commit during next_task.
-
-### Validation
-
-- Live anonymous static/protected-route GET/body checks, repeated normal worker headers/content, real activation and installed Android opt-in under restored Access.
-- Compare worker/manifest with the next actual deployed build without purging. If account/device/deployment access is absent, name the exact outstanding check and input; retain in_implementation.
-- Before review: npm run lint; npm run build; npm test; git diff --check. Add typecheck, targeted tests and production-browser checks if implementation/configuration changes. Run image smoke checks for origin-serving changes. Never weaken existing assertions.
-
-Suggested commit: docs(deploy): record verified PWA cache and access configuration.
-Finalize the message/body from actual applied/verified behavior and any conditional origin correction.
-
-## Handoff and commit policy
-
-Both newly planned tasks are ready_for_implement, owner implement. Respect T-003's dependency. Tests precede implementation changes and documentation/comments are same-task scope. Required validations must pass before later implementation commits.
-
-Use the full implement -> review -> implement commit workflow. Final Conventional Commit messages belong in the next_task HANDOFF Commit field; only later authorized commit_task commits a ready_to_commit task. Never include Co-Authored-By trailers. One commit per task; work on the current branch. A PR to main remains mandatory for user-reviewed changes and uses aide pr.
-
-This planner edits only planning artifacts, not code, live Cloudflare settings or commits.
-
-## Primary documentation references
-
-- [Access application paths](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/)
-- [Access policy management](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/policy-management/)
-- [Cache Rules settings](https://developers.cloudflare.com/cache/how-to/cache-rules/settings/)
-- [Edge and browser TTL](https://developers.cloudflare.com/cache/how-to/edge-browser-cache-ttl/)
-- [Single-file purge](https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-single-file/)
-- [Workbox precaching](https://developer.chrome.com/docs/workbox/modules/workbox-precaching)
+Release images are now built for linux/amd64 and linux/arm64, so the same
+ghcr.io tag runs on a 64-bit Raspberry Pi. PR CI builds and smoke-tests the
+arm64 image under QEMU, including a native bcrypt load check.
+```
