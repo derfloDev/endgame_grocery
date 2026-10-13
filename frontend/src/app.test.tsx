@@ -1361,8 +1361,15 @@ describe("authentication shell", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
 
     const addDialog = await screen.findByRole("dialog", { name: "Add Item" });
-    fireEvent.change(within(addDialog).getByLabelText("Add item"), { target: { value: "Milk" } });
-    fireEvent.change(within(addDialog).getByLabelText("Details (optional)"), { target: { value: "500 g" } });
+    // The sheet resets its fields in an effect whenever it opens. On a slow runner that effect can run
+    // after the first change event, so re-apply the values until they stick before submitting.
+    await waitFor(() => {
+      fireEvent.change(within(addDialog).getByLabelText("Add item"), { target: { value: "Milk" } });
+      fireEvent.change(within(addDialog).getByLabelText("Details (optional)"), { target: { value: "500 g" } });
+
+      expect((within(addDialog).getByLabelText("Add item") as HTMLInputElement).value).toBe("Milk");
+      expect((within(addDialog).getByLabelText("Details (optional)") as HTMLInputElement).value).toBe("500 g");
+    });
     await userEvent.click(within(addDialog).getByRole("button", { name: "Add Item" }));
 
     await waitFor(() => {
