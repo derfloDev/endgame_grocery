@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/derfloDev/endgame_grocery/compare/v1.9.7...v1.10.0) (2026-10-13)
+
+
+### Miscellaneous Chores
+
+* **ai:** close cycle ([e3ff71b](https://github.com/derfloDev/endgame_grocery/commit/e3ff71bff81f44c755f299a8999cf5d7751753d9))
+
 ## [1.9.7](https://github.com/derfloDev/endgame_grocery/compare/v1.9.6...v1.9.7) (2026-10-13)
 
 
