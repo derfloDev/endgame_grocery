@@ -1,4 +1,6 @@
-FROM node:22-alpine AS builder
+# The builder only emits architecture-independent static assets, so it runs natively
+# on the build host even during multi-arch builds (Vite never runs under QEMU).
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -27,6 +29,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
+# Built per target platform: npm resolves the matching bcrypt prebuild for the architecture.
 RUN npm ci --omit=dev
 
 COPY backend/src ./backend/src
