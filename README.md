@@ -334,6 +334,32 @@ deployment without purging, and final Android/device delivery checks remain T-00
 gates. The reported phone recovery did not supply a browser version, Brave result, reload
 restoration, real delivery or click-navigation evidence.
 
+Current rollout evidence at 2026-10-13T06:52:55Z:
+
+| Check | Result and evidence source |
+| --- | --- |
+| Active Access/cache rules | Administrator reports the rules are active; independent repeated normal worker/shell GETs return `no-cache` / `DYNAMIC`, without Age |
+| Public static resources | All 38 current precache requests / 35 unique paths return 200 with valid content; shell asset references are covered |
+| Protected routes | Anonymous root/login/list and sampled API routes redirect to Access |
+| Normal worker lifecycle | Clean Chromium 147.0.7727.15 diagnostic: `installing -> installed -> activating -> activated`, no failed HTTP responses |
+| Installed Android Chrome | User confirms notification opt-in works under current Access settings and reports continued operation after deployment; Chrome version was not supplied |
+| Subsequent deployment | User reports a regular redeployment without cache purge; independent post-report checks remain coherent, but worker hash and Last-Modified are unchanged and exact image version/digest is awaiting confirmation |
+| Normal icon cache entries | Still unresolved: both normal icon URLs have old year-long immutable HIT headers; normal `/icon-192.png` contains old bytes, unlike the revision-query response and repository file, which match |
+
+The October 12 baseline had worker `max-age=14400` / `REVALIDATED` and no established
+Access protection. On October 13 the cache/protected-route responses improved, but the first
+check found all 26 asset entries still Access-gated and a redundant worker. The corrected
+asset exception subsequently passed and activation recovered. Detailed timestamped checks
+remain in ROADMAP.md and .ai/HANDOFF.md.
+
+Closing note at 2026-10-13T13:42:32Z: the administrator reports that all relevant edge entries,
+including the two normal icon URLs, have been purged. This was not independently re-measured
+by the agent in this session. The exact deployed image digest was not supplied; the redeployment
+was reported as successful without purge and served identical worker content. Installed update/reload
+restoration, real delivery/click navigation, the Android Chrome version and Brave results were not
+reported and remain unverified; opt-in and desktop activation do not prove them. T-003 is closed
+on the user's explicit instruction with these gaps recorded.
+
 Use GET/body checks, not HEAD alone. For example, on Bash with curl, Python 3 and sha256sum:
 
 ```bash

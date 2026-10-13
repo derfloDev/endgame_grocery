@@ -1,18 +1,18 @@
 {
   "roles": {
     "plan": {
-      "agent": "codex",
-      "model": "gpt-6.1-sol",
+      "agent": "claude",
+      "model": "opus",
       "effort": "high"
     },
     "implement": {
-      "agent": "codex",
-      "model": "gpt-6.1-sol",
+      "agent": "claude",
+      "model": "sonnet",
       "effort": "medium"
     },
     "review": {
-      "agent": "codex",
-      "model": "gpt-6.1-sol",
+      "agent": "claude",
+      "model": "sonnet",
       "effort": "high"
     }
   },

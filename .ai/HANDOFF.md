@@ -142,3 +142,94 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — implement — 2026-10-12T14:46:21Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | next_task progress: recorded the current live worker/static/API baseline and requested administrator rule execution plus final device evidence; T-003 remains in_implementation because required rollout gates are incomplete. |
+| Files Changed | README.md, ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Three normal worker GETs: stable SHA-256, JavaScript 200, max-age=14400/REVALIDATED; shell no-cache/DYNAMIC; all 38 manifest requests/35 unique paths succeeded and shell assets are covered. Isolated native normal-worker registration in Chromium 147.0.7727.15 reached activated at scope / with no failed static requests. Normal versus revision-query icon headers differ (year versus day). Anonymous root/list/health returned 200; unauthenticated /api/lists returned 401. This verifies today's anonymous baseline only, not effective rules, image provenance, restored Access, installed updates, subsequent deployment or Android delivery. Initial app-context observation did not establish activation and manifest-document navigation aborted as a download; completed diagnostic used a public image document. No Cloudflare plugin/credential environment/CLI found; browser control failed twice with setup refresh had errors. No live policy, cache purge or deployment was performed. Application/origin code unchanged; full pre-review validations deferred until rollout gates pass. |
+| Commit | Pending: rollout incomplete; no final commit message or commit created. |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-10-13T04:26:57Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Recorded administrator-reported active Access/cache rules and verified improved worker/shell cache plus protected-route responses; public assets remain gated and real worker installation fails, so T-003 stays in_implementation pending correction and external verification. |
+| Files Changed | README.md, ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Three normal worker GETs: 200 JavaScript, no-cache/DYNAMIC, unchanged baseline hash; shell no-cache/DYNAMIC. Root/login/list and sampled API routes: 302 Access redirects. Of 38 manifest entries / 35 unique paths, all 26 asset resources return 302/HTML; other required paths are reachable and shell asset references are covered. Chromium 147.0.7727.15 native normal-worker diagnostic: installing -> redundant. Normal icon URLs retain immutable year-long HIT headers. Only safe status/header/hash/path evidence recorded; no domains, cookies or login query strings. No application/origin code or live settings changed, no purge/deployment performed. Full pre-review checks remain deferred because rollout gates have not passed. |
+| Commit | Pending: assets exception, final device and next-deployment gates incomplete; no commit created. |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-10-13T04:33:02Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Rechecked corrected public assets and confirmed normal-worker activation while retaining Access protection; T-003 remains in_implementation pending final device and next-deployment/rule/image evidence. |
+| Files Changed | README.md, ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | All 26 manifest assets return anonymous 200 with expected JS/CSS/image MIME types; all 38 precache requests / 35 unique paths pass. Worker/shell: no-cache/DYNAMIC; worker hash unchanged; root/list/API samples: Access redirects. Chromium 147.0.7727.15 actual normal-worker lifecycle: installing -> installed -> activating -> activated, scope /, no failed HTTP responses. No lifecycle or transport stubs used for this diagnostic; no permission request or real subscription attempted. No live mutation, purge/deployment or code change. Final Android/version and subsequent deployment confirmation requested; full pre-review checks remain deferred until mandatory rollout gates pass. |
+| Commit | Pending: final device and deployment/rule/image evidence incomplete; no commit created. |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-10-13T06:20:08Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Resumed next_task, confirmed unchanged successful worker/precache and Access response checks, recorded user-reported installed Android Chrome opt-in, and prepared targeted stale-icon cleanup; T-003 remains in_implementation because no subsequent deployment exists. |
+| Files Changed | README.md, ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Three normal worker GETs retain 200/no-cache/DYNAMIC, unchanged hash and Last-Modified; shell no-cache/DYNAMIC; all 38 precache requests pass; sampled protected routes remain Access redirects. User reports installed Android Chrome opt-in works, no later deployment and a prior purge; version/time unspecified. Byte comparisons confirm normal icon-192 differs from revision/repository, while revision equals repository; icon-512 body is current. Both normal icon URLs retain stale immutable year headers; revision responses use max-age=86400. Administrator targeted icon purge requested; no live mutation, purge, arbitrary deployment or application/origin code change performed. Full pre-review checks remain deferred until required live gates pass. |
+| Commit | Pending: targeted icon cleanup, effective rule/image and next-deployment verification incomplete; no commit created. |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-10-13T06:52:55Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | Recorded user-reported redeployment without purge and good operation, independently passed post-report lifecycle/static/cache/protected-route checks, and consolidated current README evidence; exact image comparison and stale icon cleanup remain open. |
+| Files Changed | README.md, ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Three worker GETs and shell: no-cache/DYNAMIC/no Age; normal worker hash/Last-Modified unchanged. All 38 manifest requests / 35 paths pass and shell assets are covered; hashed assets immutable/year, fonts/revision icons day. Root/login/list/API samples: Access redirects. Chromium 147.0.7727.15 native normal-worker lifecycle: installing -> installed -> activating -> activated with no failed HTTP responses. User reports new deployment without purge and good operation, following installed Android opt-in confirmation; exact image/version requested for artifact comparison. Normal icons still have old immutable/year HIT headers and icon-192 still has stale bytes; targeted icon purge requested. No agent live mutation, purge, arbitrary deployment, code or origin change. Full pre-review validations deferred until remaining gates pass. |
+| Commit | Pending: exact image comparison and targeted icon cleanup incomplete; no commit created. |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-10-13T13:42:32Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Closed T-003 on explicit user instruction after the user reported a full Cloudflare purge; recorded unverified gaps (image digest, Android version, delivery, reload, Brave). |
+| Files Changed | README.md, ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md, .ai/config.json |
+| Validation | npm run lint, npm run build, npm test (421 backend pass) and git diff --check pass. Live icons not re-measured by the agent. |
+| Commit | `docs(deploy): record verified PWA cache and access configuration` |
+| Next Role | none |
+
+---
+
+### T-003 — implement — 2026-10-13T13:42:32Z (commit_task)
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | commit_task executed at the user's explicit request, skipping the separate review hop. |
+| Files Changed | README.md, ROADMAP.md, .ai/TASKS.md, .ai/HANDOFF.md, .ai/config.json |
+| Validation | See previous entry. |
+| Commit | `docs(deploy): record verified PWA cache and access configuration` |
+| Next Role | none |
+
+---

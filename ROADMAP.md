@@ -2,7 +2,7 @@
 
 Goal: restore push-notification opt-in in the installed Android PWA.
 
-Updated: 2026-10-12T12:10:02Z. T-002 repository preparation is ready for review. T-003 remains the separate live rollout task after T-002 is reviewed and committed. Repository artifacts use relative paths and reserved example domains.
+Updated: 2026-10-13T13:42:32Z. T-003 is closed on the user's instruction after a reported full cache purge; unverified gaps are listed below. Evidence uses relative paths and reserved examples.
 
 ## Priority 1
 
@@ -96,3 +96,52 @@ Latest device outcome, reported at 2026-10-12T10:32:31Z:
 - The current build has 38 precache entries / 35 unique URLs within the public path table and no worker imports. Executable application/Vite options and origin-serving configuration are unchanged.
 - Validation passed: lint, typecheck, build, full unit suite, five production browser scenarios, eleven origin contract tests, README example syntax, and production-image Nginx HTTP/cache/security/gzip smoke checks. Windows required task-local preview process cleanup and Bash standard-input forwarding to Docker Desktop for the smoke script; no runtime dependency or repository harness setting was introduced.
 - No live Cloudflare configuration was changed or verified by T-002. T-003 still requires effective Access/cache rules, anonymous static/protected-route checks, subsequent deployment consistency and final Android evidence; historical phone recovery does not close those gates.
+
+### T-003 rollout baseline — 2026-10-12T14:46:21Z
+
+- T-002 dependency is complete at commit `09a2600`. T-003 remains `in_implementation`; no live Access/cache settings have been changed by this task.
+- Three anonymous normal `/service-worker.js` GETs returned HTTP 200 JavaScript, `Cache-Control: max-age=14400`, `CF-Cache-Status: REVALIDATED`, and SHA-256 `4a8694cb52c3147d7fd91b20a4c0ff9ad9c755ffc8f0cce344dd0914d781ac79`. Effective worker browser/edge bypass is not established. `/index.html` returned `no-cache` / `DYNAMIC`.
+- All 38 manifest requests (35 unique paths, including revision queries) returned 200 with no failed/login-HTML resources; the current shell's asset references are present and the worker has no imports. The manifest body is valid JSON, served as `application/octet-stream`.
+- Normal icon URLs still report year-long immutable cache headers and old `HIT` responses; revision-query icon responses report one-day headers. Inspect account/deployed-origin rules and cache keys before attributing this discrepancy to source or purging additional entries.
+- Root and a list route returned anonymous HTML 200; `/api/health` returned 200 and `/api/lists` returned 401 JSON. Application API authorization is observed, but restored Access protection and effective applications/policies are unverified.
+- An isolated clean Chromium 147.0.7727.15 diagnostic registration of the normal worker observed `installing -> installed -> activating -> activated`, scope `/`, with no failed static requests. This does not establish installed-app updates, Android opt-in or real push delivery. A direct manifest navigation aborted because it was served as a download; the completed lifecycle diagnostic used a public image document instead.
+- No Cloudflare connector was found, no matching Cloudflare credential environment/CLI was available, and browser-control initialization failed twice with `setup refresh had errors`. Effective account rules and deployed image provenance could not be inspected; the live worker differs from the local build, without proving that the deployed image is incorrect.
+- Administrator action requested: apply/confirm README's exact static Access exceptions, protected hostname application, worker/shell edge bypass, origin-respecting browser TTL and relevant conflicting overrides; report actual non-secret rules and timestamps. Then repeat anonymous/protected-route and lifecycle checks. Final Android Chrome version/opt-in, Brave or explicit gaps, and next-real-deployment consistency without purging remain required; no arbitrary deployment was initiated.
+
+### T-003 administrator follow-up — 2026-10-13T04:26:57Z
+
+- User-confirmed configuration: Cloudflare authentication bypass and cache rules have been created and are active. Exact account rule contents remain unavailable to the agent.
+- Three anonymous normal worker requests return JavaScript 200, `Cache-Control: no-cache`, `CF-Cache-Status: DYNAMIC`, no Age and the unchanged baseline SHA-256 `4a8694cb52c3147d7fd91b20a4c0ff9ad9c755ffc8f0cce344dd0914d781ac79`. `/index.html` also returns no-cache/DYNAMIC. This confirms improved effective responses, not a subsequent deployment.
+- `/`, `/login`, a list route, `/api/health` and `/api/lists` now return HTTP 302 to Access. Public worker/shell, icons, manifest and fonts return 200; the manifest contains 38 entries / 35 unique paths and covers the current shell assets. All 26 asset entries return HTTP 302/HTML instead of public assets, so full precache coverage fails.
+- Clean Chromium 147.0.7727.15 diagnostic registration of the normal worker observes `installing -> redundant`. This is a real deployed install failure under the current anonymous policy, distinct from the prior stale-worker 404 incident. No application workaround, cache purge or live account change was performed by the agent.
+- Administrator correction requested: inspect the effective `/assets/*` Access application, Bypass / Include Everyone policy and more-specific overlapping applications. Repeat resource/lifecycle checks once corrected. The normal icons still report old year-long immutable HIT headers and need effective cache-key/header inspection.
+- T-003 remains in_implementation. Final rule details, Android Chrome version/opt-in under final settings, installed update/reload/delivery/click checks, Brave results or gaps, and consistency after the next actual deployment remain outstanding.
+
+### T-003 assets recheck — 2026-10-13T04:33:02Z
+
+- All 26 current manifest asset entries return anonymous HTTP 200 with JavaScript/CSS/image MIME types. All 38 precache requests / 35 unique paths pass; the previous asset redirects are no longer observed.
+- Normal worker and shell responses retain no-cache/DYNAMIC. Worker SHA-256 is unchanged from the recorded baseline; sampled root/list/API requests still redirect to Access.
+- Clean Chromium 147.0.7727.15 native normal-worker registration observes installing -> installed -> activating -> activated, scope /, with no failed HTTP responses. This verifies the current anonymous worker installation, not installed Android opt-in or the next deployment.
+- Final Android Chrome version/opt-in under restored Access and a subsequent normal deployment without manual purging were requested from the user. Installed update/reload/delivery/click checks, Brave results or gaps, effective rule/image details and unhashed icon header follow-up remain outstanding. T-003 stays in_implementation; no live mutation, purge, deployment or commit was performed by the agent.
+
+### T-003 continuation and device confirmation — 2026-10-13T06:20:08Z
+
+- User-reported installed Android Chrome opt-in under the current Access configuration: works. Chrome version was not supplied. Reload restoration, installed update behavior, real delivery/click navigation and Brave results are not inferred from opt-in.
+- User reports no subsequent deployment and an earlier cache purge without an exact timestamp. The required next-actual-deployment check remains pending; no arbitrary release/deployment was initiated.
+- Three normal worker requests retain JavaScript 200, no-cache/DYNAMIC and the recorded baseline SHA-256; Last-Modified remains 12 October 08:26:21 GMT. All 38 precache requests / 35 unique paths pass. Root/list/API samples remain Access redirects. No new content/deployment evidence is observed.
+- Normal `/icon-192.png` body SHA-256 is `5c0f3fcf068547fee5fdc9c3b437c50dd78e455778048b889cc872b1e9ccf862`; its revision-query response and repository file instead match at `14ccaffda1b79f0225ec07aced6cc953ba0fea5cf70ea8c00a6bd12d82f00fac`. Normal `/icon-512.png` body matches the current file. Both normal URLs still return year-long immutable HIT headers, whereas revision queries return one-day headers. This demonstrates stale normal icon content/header cache entries without proving a repository-origin defect.
+- Requested administrator action: inspect conflicting icon cache/header rules and purge only the two normal icon URLs, then repeat body/header checks. The agent has no connected account tool and performed no live mutation or purge. T-003 remains in_implementation until required external checks pass.
+
+### T-003 post-deployment report and checks — 2026-10-13T06:52:55Z
+
+- User reports a new deployment without purge and good operation. The prior installed Android Chrome opt-in confirmation is retained; Chrome version and separate delivery/reload/click/Brave outcomes remain unspecified. Do not interpret the unspecified outcomes as passing.
+- Independent post-report checks: three normal worker requests and shell return no-cache/DYNAMIC without Age; root/login/list/API samples redirect to Access; all 38 manifest requests / 35 unique paths pass and shell assets are covered. Hashed assets remain one-year immutable; fonts and revisioned icons have one-day headers.
+- Clean Chromium 147.0.7727.15 normal-worker diagnostic again observes installing -> installed -> activating -> activated without failed HTTP responses. Post-report worker SHA-256 remains `4a8694cb52c3147d7fd91b20a4c0ff9ad9c755ffc8f0cce344dd0914d781ac79`, with Last-Modified 12 October 08:26:21 GMT. This does not contradict a redeployment of identical content, but exact image/version comparison remains unavailable; requested the deployed image version/digest.
+- Normal icon URLs still return old one-year immutable HIT headers; normal icon-192 still has the previously demonstrated older image body. Requested targeted purge of only the two normal icon URLs, separate from the documented deployment-without-purge check. No live mutation, purge or deployment performed by the agent.
+- Consolidated README rollout status into a current evidence table while preserving full historical evidence here and in HANDOFF. T-003 remains in_implementation pending icon cleanup and image comparison; required final local validations and review handoff follow once those gates pass.
+
+### T-003 closure � 2026-10-13T13:42:32Z
+
+- User reports everything was purged, including the normal icon URLs, and asks to close the task. The agent did not re-measure the live icons (no deployment host in repository artifacts).
+- Open and unverified: exact image digest comparison, Android Chrome version, reload restoration, real delivery/click navigation and Brave. Opt-in under restored Access and a redeployment without purge are user-reported.
+- Local checks: lint, build, 421 backend tests and `git diff --check` pass.
