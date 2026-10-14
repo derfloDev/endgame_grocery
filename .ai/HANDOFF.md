@@ -93,3 +93,12 @@ Notes (non-blocking): the step numbers "7." and "8." remain on moved headings in
 | Next Role | none |
 
 ---
+
+### Cycle closed — v1.10.1 — 2026-10-14T09:37:53Z
+
+| Field | Value |
+|-------|-------|
+| Summary | All tasks done; cycle closed |
+| Version | v1.10.1 |
+
+---
