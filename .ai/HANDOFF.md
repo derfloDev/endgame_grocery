@@ -23,79 +23,82 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 
 ---
 
-### T-001 â€” plan â€” 2026-10-13T14:18:25Z
+### T-001 â€” plan â€” 2026-10-14T06:12:29Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Planned multi-arch (amd64+arm64) image publish via QEMU/Buildx, Dockerfile builder on $BUILDPLATFORM, new nginx-smoke-arm64 CI job with aarch64/bcrypt check, and README platform/smoke docs; bcrypt@6 ships a linux-arm64 musl prebuild, so no toolchain is needed |
+| Summary | Planned the README split into Features-first README, docs/SETUP.md and docs/DEVELOPMENT.md with a lossless content mapping; structure chosen by default because the user skipped the clarifying questions. |
 | Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | n/a (planning only) |
+| Commit | n/a |
+| Verdict | n/a |
+| Blocking Findings | n/a |
 | Next Role | implement |
 
 ---
 
-### T-001 — implement — 2026-10-13T15:00:00Z
+### T-001 â€” implement â€” 2026-10-14T07:10:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Dockerfile builder runs on $BUILDPLATFORM; docker-publish builds linux/amd64+arm64 via SHA-pinned QEMU/Buildx; new nginx-smoke-arm64 CI job; README documents platforms, Pi 64-bit requirement and arm64 smoke. No toolchain added (bcrypt arm64 musl prebuild loads fine). |
-| Files Changed | Dockerfile, .github/workflows/docker-publish.yml, .github/workflows/ci.yml, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
-| Validation | npm run lint OK; npm run build OK; npm test OK (421 pass); local docker buildx arm64 build OK; uname -m=aarch64 + bcrypt hashSync OK; DOCKER_DEFAULT_PLATFORM=linux/arm64 smoke-nginx.sh OK; amd64 docker build + smoke OK; actionlint not available, YAML reviewed manually (setup-qemu-action v4 = 99012661..., setup-buildx-action v4 = f87e5991..., resolved via gh api) |
-| Commit | `feat(docker): publish arm64 images for Raspberry Pi deployments` — body: Release images are now built for linux/amd64 and linux/arm64, so the same ghcr.io tag runs on a 64-bit Raspberry Pi. PR CI builds and smoke-tests the arm64 image under QEMU, including a native bcrypt load check. |
+| Summary | Split the 675-line README into a 70-line Features-first README plus docs/SETUP.md and docs/DEVELOPMENT.md, moved verbatim via a line-range generator, and repointed four "see README" code comments. |
+| Files Changed | README.md, docs/SETUP.md, docs/DEVELOPMENT.md, backend/src/containerHardening.test.js, backend/src/sseTickets.js, docker/security-headers.conf, frontend/vite.config.ts, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Lossless check (throwaway script in scratchpad): missing lines 0; all headings kept except "Screenshots" (now inside Features) and "Feature Overview" (replaced by Features + "Behavior and API reference"); broken links/anchors 0; `npm run lint` ok; `npm run build` ok; `npm test` ok (frontend 914 passed, backend 421 passed, license test unmodified and passing). No new tests: docs/comments only. |
+| Commit | `docs(readme): split README into Features-first overview, setup guide and development guide` |
+| Verdict | n/a |
+| Blocking Findings | n/a |
 | Next Role | review |
 
+Notes for the reviewer / user (moved text kept verbatim, not fixed):
+- Location-dependent wording ("described below/above", "smoke check below") was not edited; two "Reading note" lines in docs/SETUP.md link to the real targets instead.
+- Step 8 "Verify the setup" (mentions `localhost:5173`) lives in docs/SETUP.md with a lead-in sentence that points Docker users to `localhost:80`.
+- "Verify the live PWA rollout" still says details "remain in ROADMAP.md"; ROADMAP.md is now a different document.
+- The nginx caching paragraph still repeats the hashed `/assets/*` sentence twice.
+- Feature Overview bullets contain history wording ("no longer", "now answers").
+- Added README text beyond the plan: one tagline sentence under the existing description line.
+- Line endings: git warns LF will become CRLF on the new docs files (autocrlf), same as other files.
+
 ---
-### T-001 â€” review â€” 2026-10-13T15:30:00Z
+
+### T-001 â€” review â€” 2026-10-14T09:35:29Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Reviewed T-001 working tree: Dockerfile, ci.yml arm64 job, SHA pins, README and local arm64/amd64 builds and smokes all verified, but docker-publish.yml never sets `platforms: linux/amd64,linux/arm64`, so releases would still be amd64-only. |
+| Summary | Reviewed the README split: independent lossless check (0 missing lines) and link check (0 broken) pass, the four code comments are accurate, and lint, build and tests are green (frontend 914, backend 421, license test unmodified). |
 | Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
-| Verdict | FAIL |
-| Blocking Findings | 1. `.github/workflows/docker-publish.yml`: `platforms: linux/amd64,linux/arm64` missing from `docker/build-push-action` (required fix). Nits (optional): odd whitespace in ci.yml line 48; double blank line in README before "arm64 variant". |
-| Next Role | implement |
-
----
-
-### T-001 — implement — 2026-10-13T16:00:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Rework: added the missing `platforms: linux/amd64,linux/arm64` to the docker/build-push-action step in docker-publish.yml (required fix); also fixed the ci.yml line-continuation and README double blank line nits. |
-| Files Changed | .github/workflows/docker-publish.yml, .github/workflows/ci.yml, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
-| Validation | npm run lint OK; workflows parse with js-yaml; extracted ci.yml arch/bcrypt step executed locally with exit 0; no code changes since previous build/test pass (npm run build and npm test passed in the prior round, 421 tests) |
-| Commit | `feat(docker): publish arm64 images for Raspberry Pi deployments` — unchanged from the next_task entry; scope unchanged. |
-| Next Role | review |
-
----
-### T-001 â€” review â€” 2026-10-13T16:30:00Z
-
-| Field | Value |
-|-------|-------|
-| Agent | claude |
-| Summary | Re-reviewed T-001 rework: `platforms: linux/amd64,linux/arm64` is now set in docker-publish.yml and both nits are fixed; lint/build/test pass and the arm64 build, aarch64+bcrypt check and arm64 smoke pass locally. |
-| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
-| Verdict | PASS |
+| Validation | n/a (review only; ran lint, build, tests and the lossless/link checks) |
+| Commit | n/a |
+| Verdict | PASS_WITH_NOTES |
 | Blocking Findings | none |
 | Next Role | implement |
 
+Notes (non-blocking): the step numbers "7." and "8." remain on moved headings in docs/SETUP.md; "remain in ROADMAP.md" is stale; the hashed /assets sentence is duplicated; one added README tagline. External deep links to old README anchors will break because the sections moved.
+
 ---
 
-### T-001 — commit_task — 2026-10-13T16:30:00Z
+### T-001 â€” implement â€” 2026-10-14T09:40:00Z
 
 | Field | Value |
 |-------|-------|
 | Agent | claude |
-| Summary | Committed T-001 after review PASS using the message from the next_task HANDOFF entry. |
-| Files Changed | all T-001 changes, .ai/TASKS.md, .ai/HANDOFF.md |
-| Commit | `feat(docker): publish arm64 images for Raspberry Pi deployments` |
+| Summary | Committed the approved README split (commit_task). |
+| Files Changed | README.md, docs/SETUP.md, docs/DEVELOPMENT.md, backend/src/containerHardening.test.js, backend/src/sseTickets.js, docker/security-headers.conf, frontend/vite.config.ts, .ai/* |
+| Validation | n/a (validated in next_task; review PASS_WITH_NOTES) |
+| Commit | `docs(readme): split README into Features-first overview, setup guide and development guide` |
+| Verdict | n/a |
+| Blocking Findings | n/a |
 | Next Role | none |
 
 ---
 
-### Cycle closed — v1.10.0 — 2026-10-13T17:00:00Z
+### Cycle closed â€” v1.10.1 â€” 2026-10-14T09:37:53Z
+
+| Field | Value |
+|-------|-------|
+| Summary | All tasks done; cycle closed |
+| Version | v1.10.1 |
 
 ---

@@ -39,7 +39,7 @@ describe("nginx security headers", () => {
     const csp = cspDirectives();
 
     assert.deepEqual(csp["default-src"], ["'self'"]);
-    // blob: is required by the icon worker's runtime loader (evidence: README, CSP section).
+    // blob: is required by the icon worker's runtime loader (evidence: docs/SETUP.md, Security hardening section).
     assert.deepEqual(csp["script-src"], ["'self'", "'wasm-unsafe-eval'", "blob:", "https://cdn.jsdelivr.net"]);
     assert.deepEqual(csp["worker-src"], ["'self'", "blob:"]);
     assert.deepEqual(csp["connect-src"], [

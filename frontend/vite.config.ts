@@ -92,7 +92,7 @@ export default defineConfig({
       },
       // Keep manifest-link credentials, but they do not prove install-time precache access.
       // The selected Access policy exposes /service-worker.js and all documented static
-      // precache resources publicly; app/API routes stay protected (see README).
+      // precache resources publicly; app/API routes stay protected (see docs/SETUP.md, Cloudflare and reverse proxy).
       // Workbox is bundled. Worker/shell edge-cache bypass is a separate account setting.
       useCredentials: true,
       includeAssets: ["icon-192.png", "icon-512.png"],
