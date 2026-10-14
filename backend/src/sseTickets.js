@@ -8,7 +8,7 @@ const TICKET_TTL_MS = 30_000;
  * `EventSource` cannot send an `Authorization` header, so the browser used to put its JWT in the
  * query string, where it ended up in access logs and browser history. Instead the client asks for
  * a short-lived, single-use ticket over an authenticated request and puts only that into the URL.
- * Tickets live in memory, which matches the single-instance deployment (see README).
+ * Tickets live in memory, which matches the single-instance deployment (see docs/SETUP.md, Push notifications).
  *
  * @param {object} [options] Store options.
  * @param {() => number} [options.now] Clock in milliseconds, injectable for tests.
