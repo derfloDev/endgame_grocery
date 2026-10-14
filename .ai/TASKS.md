@@ -20,4 +20,4 @@ Command expectations:
 
 | Task ID | Scope | Status | Acceptance Criteria | Evidence | Next Role |
 | --- | --- | --- | --- | --- | --- |
-| T-001 | Multi-arch Docker image (linux/amd64 + linux/arm64) for Raspberry Pi: Dockerfile builder on `$BUILDPLATFORM`, QEMU/Buildx multi-platform publish, new `nginx-smoke-arm64` CI job, README platform + arm64 smoke docs | done | publish builds `linux/amd64,linux/arm64` with unchanged tags; CI `nginx-smoke-arm64` asserts `aarch64`, loads `bcrypt` and passes `docker/smoke-nginx.sh`; existing CI jobs unchanged; new actions SHA-pinned; no toolchain added; README documents platforms/Pi 64-bit/arm64 smoke; lint/build/test pass | Local: arm64 build, aarch64+bcrypt check, arm64 and amd64 smokes pass; lint/build/test pass. Rework: added `platforms: linux/amd64,linux/arm64` to docker-publish.yml; nits fixed. Review round 2: PASS | none |
+| T-001 | replace with task scope | in_planning | replace with measurable acceptance criteria | n/a | planner |
