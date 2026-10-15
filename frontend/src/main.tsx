@@ -7,6 +7,9 @@ import { AppConfigProvider } from "./context/AppConfigContext";
 import { AuthProvider } from "./context/AuthContext";
 import { EventSourceProvider } from "./context/EventSourceContext";
 import { OfflineQueueProvider } from "./context/OfflineQueueContext";
+import { stripReconnectParam } from "./api/reconnect";
+
+stripReconnectParam();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

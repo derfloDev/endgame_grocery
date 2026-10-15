@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ensureFreshState, getIsOnline, probeReachability, reportRequestOutcome, reportStreamState, resetConnectivityForTests, subscribe } from "./connectivity";
+import { ensureFreshState, getIsOnline, getReachability, probeReachability, reportRequestOutcome, reportStreamState, resetConnectivityForTests, subscribe } from "./connectivity";
 
 describe("shared connectivity state", () => {
   beforeEach(resetConnectivityForTests);
@@ -67,7 +67,7 @@ describe("reachability probes", () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     expect(await ensureFreshState()).toBe(true);
     expect(getIsOnline()).toBe(true);
-    expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/api/health", { cache: "no-store", signal: expect.any(AbortSignal) });
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/api/health", { cache: "no-store", redirect: "manual", signal: expect.any(AbortSignal) });
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -76,7 +76,65 @@ describe("reachability probes", () => {
     else fetchMock.mockResolvedValue(new Response(null, { status: 503 }));
     expect(await ensureFreshState()).toBe(false);
     expect(getIsOnline()).toBe(false);
+    expect(getReachability()).toBe("offline");
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([
+    [{ type: "opaqueredirect" } as Response, "redirect"],
+    [new Response(null, { status: 302 }), "redirect"],
+    [new Response(null, { status: 401, headers: { "Content-Type": "application/json" } }), "status-401"],
+    [new Response(null, { status: 403 }), "status-403"],
+    [new Response(null, { status: 503, headers: { "cf-mitigated": "challenge" } }), "challenge"]
+  ])("classifies a gated health response: %s", async (response, reason) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    fetchMock.mockResolvedValue(response as Response);
+    expect(await ensureFreshState()).toBe(false);
+    expect(getReachability()).toBe("gated");
+    expect(getIsOnline()).toBe(false);
+    expect(warn).toHaveBeenCalledExactlyOnceWith(reason, "/api/health");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("a gated request cancels an older probe, notifies once, and recovers to online", async () => {
+    let resolve!: (response: Response) => void;
+    fetchMock.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    const pending = probeReachability();
+    const signal = fetchMock.mock.calls[0][1]!.signal!;
+    const listener = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    subscribe(listener);
+    reportRequestOutcome("gated", "redirect", "/api/lists?token=secret");
+    expect(await pending).toBe(false);
+    expect(signal.aborted).toBe(true);
+    expect(getReachability()).toBe("gated");
+    reportRequestOutcome("gated", "challenge", "/api/lists?token=secret");
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledExactlyOnceWith("redirect", "/api/lists");
+    resolve(new Response(null, { status: 200 }));
+    await Promise.resolve();
+    expect(getReachability()).toBe("gated");
+    expect(await ensureFreshState()).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    reportRequestOutcome("ok");
+    expect(getReachability()).toBe("online");
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it("logs offline reasons only when the state changes", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    fetchMock.mockResolvedValue(new Response(null, { status: 503 }));
+    await ensureFreshState();
+    expect(warn).toHaveBeenCalledExactlyOnceWith("status-503", "/api/health");
+    await vi.advanceTimersByTimeAsync(5000);
+    fetchMock.mockRejectedValue(new TypeError("secret network details"));
+    await ensureFreshState();
+    expect(warn).toHaveBeenCalledTimes(1);
+    reportRequestOutcome("ok");
+    await vi.advanceTimersByTimeAsync(5000);
+    await ensureFreshState();
+    expect(warn).toHaveBeenLastCalledWith("network-error", "/api/health");
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 
   it("shares one in-flight probe and caches its result for the five second window", async () => {
@@ -122,6 +180,7 @@ describe("reachability probes", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(await pending).toBe(false);
     expect(signal.aborted).toBe(true);
+    expect(getReachability()).toBe("offline");
     resolve(new Response(null, { status: 200 }));
     await Promise.resolve();
     expect(getIsOnline()).toBe(false);

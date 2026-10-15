@@ -87,6 +87,8 @@ export interface OfflineMutation {
 
 export interface OfflineQueueContextValue {
   isOffline: boolean;
+  /** The network is available but edge access needs recovery; queued work is preserved. */
+  isReauthRequired: boolean;
   queuedCount: number;
   isSyncing: boolean;
   syncError: string;

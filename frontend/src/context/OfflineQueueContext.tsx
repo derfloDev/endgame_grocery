@@ -9,7 +9,7 @@ import type { AcceptedMutations } from "../api/offlineQueueDrain";
 import { createTimeoutSignal, REQUEST_TIMEOUT_MS, QUEUE_RETRY_BASE_DELAY_MS, QUEUE_RETRY_MAX_DELAY_MS, QUEUE_DRAIN_STALL_TIMEOUT_MS } from "../api/connectionTimings";
 import type { OfflineQueueContextValue } from "../types";
 import { OfflineQueueContext } from "./offlineQueueContextValue";
-import { ensureFreshState, getIsOnline, subscribe } from "../api/connectivity";
+import { ensureFreshState, getIsOnline, getReachability, subscribe } from "../api/connectivity";
 import type { ReachabilityTimings } from "../api/connectivity";
 
 interface QueueTimings extends ReachabilityTimings {
@@ -24,7 +24,9 @@ interface OfflineQueueProviderProps {
 }
 
 export function OfflineQueueProvider({ children, timings }: OfflineQueueProviderProps): ReactElement {
-  const [isOffline, setIsOffline] = useState(() => getIsOnline() === false);
+  const [reachability, setReachability] = useState(getReachability);
+  const isOffline = reachability === "offline";
+  const isReauthRequired = reachability === "gated";
   const [queuedCount, setQueuedCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState("");
@@ -178,7 +180,7 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
     const unsubscribe = subscribe(() => {
       const online = getIsOnline();
       // Only confirmed reachability changes the banner; browser events just request a check.
-      setIsOffline(online === false);
+      setReachability(getReachability());
       const recovered = online === true && previousOnline !== true;
       previousOnline = online;
       if (recovered) void checkAndDrain();
@@ -222,6 +224,7 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
     () =>
       ({
         isOffline,
+        isReauthRequired,
         queuedCount,
         isSyncing,
         syncError,
@@ -231,7 +234,7 @@ export function OfflineQueueProvider({ children, timings }: OfflineQueueProvider
         failedMutationId,
         discardFailedMutation
       }) satisfies OfflineQueueContextValue,
-    [isOffline, queuedCount, isSyncing, syncError, syncErrorKey, syncVersion, resolvedIds, failedMutationId, discardFailedMutation]
+    [isOffline, isReauthRequired, queuedCount, isSyncing, syncError, syncErrorKey, syncVersion, resolvedIds, failedMutationId, discardFailedMutation]
   );
 
   return (

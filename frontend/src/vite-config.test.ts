@@ -59,9 +59,11 @@ describe("vite worker config", () => {
   });
 
   it("registers precaching and push handlers in the custom service worker", () => {
-    expect(serviceWorkerSource).toMatch(/precacheAndRoute/);
+    expect(serviceWorkerSource).toMatch(/precache\(precacheManifest/);
+    expect(serviceWorkerSource).toMatch(/addRoute\(\)/);
+    expect(serviceWorkerSource).toMatch(/createNavigationHandler/);
     expect(serviceWorkerSource).toMatch(/const precacheManifest = self\.__WB_MANIFEST/);
-    expect(serviceWorkerSource).toMatch(/precacheAndRoute\(precacheManifest \|\| \[\]\)/);
+    expect(serviceWorkerSource).toMatch(/precache\(precacheManifest \|\| \[\]\)/);
     expect(serviceWorkerSource).toMatch(/addEventListener\(["']push["']/);
     expect(serviceWorkerSource).toMatch(/console\.log\(["']Push event received["']/);
     expect(serviceWorkerSource).toMatch(/showNotification/);

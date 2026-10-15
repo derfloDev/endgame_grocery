@@ -2,7 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: "push-notifications.spec.js",
+  // Production worker tests require the preview server in playwright.pwa.config.js.
+  testIgnore: ["push-notifications.spec.js", "pwa-navigation.spec.js"],
   timeout: 30_000,
   retries: process.env.CI ? 2 : 0,
   reporter: "list",

@@ -1,8 +1,10 @@
 import { abortable, createTimeoutSignal, REQUEST_TIMEOUT_MS } from "./connectionTimings";
 import { probeReachability, reportRequestOutcome } from "./connectivity";
+import { detectEdgeGate, EdgeGateError } from "./edgeGate";
 
 export function isNetworkError(error: unknown): boolean {
-  return error instanceof TypeError ||
+  // Gates share caching/queueing semantics with a network failure, but report their own state.
+  return error instanceof EdgeGateError || error instanceof TypeError ||
     (error instanceof Error && error.message === "Failed to fetch") ||
     (error instanceof DOMException && (error.name === "AbortError" || error.name === "TimeoutError"));
 }
@@ -19,7 +21,12 @@ export async function requestJson<T = unknown>(
   try {
     if (parentSignal?.aborted) deadline.abort();
     deadline.signal.throwIfAborted();
-    const response = await abortable(fetch(url, { ...init, signal: deadline.signal }), deadline.signal);
+    const response = await abortable(fetch(url, { ...init, redirect: "manual", signal: deadline.signal }), deadline.signal);
+    const gate = detectEdgeGate(response);
+    if (gate) {
+      reportRequestOutcome("gated", gate, new URL(url, window.location.origin).pathname);
+      throw new EdgeGateError(gate);
+    }
     reportRequestOutcome("ok");
     const data = response.status === 204 ? null : await abortable(response.json().catch((error: unknown) => {
       if (isNetworkError(error)) throw error;
@@ -27,7 +34,7 @@ export async function requestJson<T = unknown>(
     }), deadline.signal);
     return { response, data: data as T };
   } catch (error) {
-    if (isNetworkError(error)) {
+    if (isNetworkError(error) && !(error instanceof EdgeGateError)) {
       reportRequestOutcome("network-error");
       // A failed real request is useful evidence to refresh the shared offline state,
       // including when there is no queued write waiting for the queue provider. A deadline

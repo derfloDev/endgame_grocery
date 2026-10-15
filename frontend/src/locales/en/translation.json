@@ -1,4 +1,7 @@
 {
+  "offline.reauth": "Connected, but your access session has expired. Reconnect to continue syncing.",
+  "offline.reauthQueued": "Connected, but your access session has expired. {count, plural, one {# change} other {# changes}} will sync after you reconnect.",
+  "offline.reconnect": "Reconnect",
   "common.cancel": "Cancel",
   "common.save": "Save",
   "common.delete": "Delete",

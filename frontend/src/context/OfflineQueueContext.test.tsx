@@ -8,7 +8,7 @@ import {
 } from "../api/offlineStore";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 import { OfflineQueueProvider } from "./OfflineQueueContext";
-import { reportStreamState, resetConnectivityForTests } from "../api/connectivity";
+import { getReachability, reportRequestOutcome, reportStreamState, resetConnectivityForTests } from "../api/connectivity";
 import { getCurrentUserId, resetAuthSessionForTests, setAuthSession } from "../api/authSession";
 import { requestJson } from "../api/request";
 import { StrictMode } from "react";
@@ -116,6 +116,39 @@ describe("OfflineQueueProvider", () => {
     await flushAsyncWork();
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("initializes gated without offline mode, keeps writes, and drains once after recovery", async () => {
+    setNavigatorOnline(true);
+    currentMutations = [createMutation()];
+    reportRequestOutcome("gated", "redirect", "/api/lists");
+    renderProvider(<OfflineQueueState />);
+    await waitFor(() => expect(screen.getByTestId("queued-count").textContent).toBe("1"));
+    expect(screen.getByTestId("is-reauth-required").textContent).toBe("true");
+    expect(screen.getByTestId("is-offline").textContent).toBe("false");
+    expect(fetchMock).not.toHaveBeenCalled();
+    act(() => { reportRequestOutcome("ok"); reportRequestOutcome("ok"); });
+    await waitFor(() => expect(currentMutations).toHaveLength(0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("is-reauth-required").textContent).toBe("false");
+  });
+
+  it("updates gated state from a real request without a drain or authentication expiry", async () => {
+    renderProvider(<OfflineQueueState />);
+    const expired = vi.fn();
+    window.addEventListener("auth:expired", expired);
+    try {
+      fetchMock.mockResolvedValue(new Response("Challenge", { status: 403, headers: { "cf-mitigated": "challenge" } }));
+      await act(async () => { await expect(requestJson("/api/lists", {})).rejects.toThrow(); });
+      expect(screen.getByTestId("is-reauth-required").textContent).toBe("true");
+      expect(screen.getByTestId("is-offline").textContent).toBe("false");
+      currentMutations = [createMutation()];
+      act(() => window.dispatchEvent(new Event(OFFLINE_QUEUE_CHANGED_EVENT)));
+      await flushAsyncWork();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(currentMutations).toHaveLength(1);
+      expect(expired).not.toHaveBeenCalled();
+    } finally { window.removeEventListener("auth:expired", expired); }
   });
 
   it("shows the offline state after a real request fails while the browser is online", async () => {
@@ -271,6 +304,30 @@ describe("OfflineQueueProvider", () => {
     expect(screen.getByTestId("failed-mutation-id").textContent).toBe("mutation-1");
     expect(removeOfflineMutationMock).not.toHaveBeenCalled();
     expect(currentMutations).toHaveLength(1);
+  });
+
+  it("discards only the blocked row while gated without sending a request", async () => {
+    setNavigatorOnline(true);
+    currentMutations = [createMutation(), createMutation({ id: "mutation-2", createdAt: "2026-05-27T10:00:01.000Z" })];
+    fetchMock.mockResolvedValue(createResponse({ error: "Entry not found." }, 404));
+    renderProvider(<OfflineQueueState />);
+    await waitFor(() => expect(screen.getByTestId("failed-mutation-id").textContent).toBe("mutation-1"));
+    act(() => reportRequestOutcome("gated", "redirect", "/api/lists"));
+    expect(screen.getByTestId("is-reauth-required").textContent).toBe("true");
+    fetchMock.mockClear();
+
+    await act(async () => { screen.getByRole("button", { name: "discard" }).click(); });
+    await waitFor(() => expect(screen.getByTestId("queued-count").textContent).toBe("1"));
+    await flushAsyncWork();
+
+    expect(currentMutations.map(({ id }) => id)).toEqual(["mutation-2"]);
+    expect(removeOfflineMutationMock).toHaveBeenCalledExactlyOnceWith("mutation-1");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(getReachability()).toBe("gated");
+    expect(screen.getByTestId("is-reauth-required").textContent).toBe("true");
+    expect(screen.getByTestId("is-offline").textContent).toBe("false");
+    expect(screen.getByTestId("failed-mutation-id").textContent).toBe("");
+    expect(screen.getByTestId("sync-error").textContent).toBe("");
   });
 
   it("keeps retry behavior for 5xx responses without exposing a failed mutation", async () => {
@@ -632,7 +689,7 @@ describe("OfflineQueueProvider", () => {
 });
 
 function OfflineQueueState() {
-  const { discardFailedMutation, failedMutationId, syncError, syncErrorKey, isOffline, isSyncing, queuedCount, resolvedIds, syncVersion } = useOfflineQueue();
+  const { discardFailedMutation, failedMutationId, syncError, syncErrorKey, isOffline, isReauthRequired, isSyncing, queuedCount, resolvedIds, syncVersion } = useOfflineQueue();
 
   return (
     <>
@@ -641,6 +698,7 @@ function OfflineQueueState() {
       <div data-testid="sync-version">{syncVersion}</div>
       <div data-testid="resolved-ids">{JSON.stringify(resolvedIds)}</div>
       <div data-testid="is-offline">{String(isOffline)}</div>
+      <div data-testid="is-reauth-required">{String(isReauthRequired)}</div>
       <div data-testid="is-syncing">{String(isSyncing)}</div>
       <div data-testid="failed-mutation-id">{failedMutationId}</div>
       <div data-testid="sync-error">{syncError}</div>
@@ -673,6 +731,7 @@ function createMutation(overrides: Partial<OfflineMutation> = {}): OfflineMutati
 
 function createResponse(body: unknown, status = 200): Response {
   return {
+    headers: new Headers({ 'Content-Type': 'application/json' }),
     ok: status >= 200 && status < 300,
     status,
     json: vi.fn(async () => body)

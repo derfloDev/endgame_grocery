@@ -8,6 +8,7 @@ describe("leaveList", () => {
 
   it("deletes the authenticated user's list membership", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
+      headers: new Headers({ "Content-Type": "application/json" }),
       ok: true,
       status: 204
     });
