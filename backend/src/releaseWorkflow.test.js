@@ -12,6 +12,71 @@ function readRepoFile(relativePath) {
   return fs.readFileSync(path.join(repoRootDir, relativePath), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCiJob(jobName) {
+  const workflow = readRepoFile(".github/workflows/ci.yml");
+  const job = workflow.match(new RegExp(`^ {2}${jobName}:\\n[\\s\\S]*?(?=^ {2}[a-z0-9-]+:|$(?![\\s\\S]))`, "m"));
+  assert.ok(job, `expected CI job ${jobName}`);
+  return job[0];
+}
+
+describe("arm64 smoke job", () => {
+  it("ci.yml bounds the arm64 smoke job with a timeout", () => {
+    assert.match(readCiJob("nginx-smoke-arm64"), /^ {4}timeout-minutes: 15$/m);
+  });
+
+  it("ci.yml builds the arm64 smoke image with build-push-action and the GHA cache", () => {
+    const job = readCiJob("nginx-smoke-arm64");
+    const buildStep = job.match(
+      /^ {6}- uses: docker\/build-push-action@[0-9a-f]{40} # v7\n {8}with:\n(?: {10}.+\n)+/m
+    );
+    assert.ok(buildStep, "expected a pinned build-push-action step with inputs");
+    const inputs = [
+      "context: .",
+      "platforms: linux/arm64",
+      "load: true",
+      "push: false",
+      "tags: endgame-grocery:nginx-smoke-arm64",
+      "cache-from: type=gha,scope=nginx-smoke-arm64",
+      "cache-to: type=gha,scope=nginx-smoke-arm64,mode=max"
+    ];
+    for (const input of inputs) {
+      assert.ok(buildStep[0].split("\n").includes(`          ${input}`), `missing build input: ${input}`);
+    }
+    assert.doesNotMatch(job, /docker buildx build/);
+  });
+
+  it("ci.yml keeps the arm64 architecture, bcrypt and nginx smoke checks", () => {
+    const job = readCiJob("nginx-smoke-arm64");
+    const orderedSteps = [
+      "uses: actions/checkout@",
+      "uses: docker/setup-qemu-action@",
+      "uses: docker/setup-buildx-action@",
+      "uses: docker/build-push-action@",
+      "name: Check architecture and native bcrypt module",
+      "bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke-arm64"
+    ];
+    let previousIndex = -1;
+    for (const step of orderedSteps) {
+      const index = job.indexOf(step);
+      assert.ok(index > previousIndex, `expected step in order: ${step}`);
+      previousIndex = index;
+    }
+    assert.ok(job.includes("docker run --rm --platform linux/arm64 --entrypoint sh endgame-grocery:nginx-smoke-arm64"));
+    assert.ok(job.includes('test "$(uname -m)" = aarch64'));
+    assert.ok(job.includes('require(\\"bcrypt\\").hashSync(\\"smoke\\", 4)'));
+    assert.match(job, /^ {10}DOCKER_DEFAULT_PLATFORM: linux\/arm64$/m);
+  });
+
+  it("ci.yml and docker-publish.yml pin the same build-push-action commit", () => {
+    const pinPattern = /docker\/build-push-action@([0-9a-f]{40})/;
+    const ciPin = readCiJob("nginx-smoke-arm64").match(pinPattern);
+    const publishPin = readRepoFile(".github/workflows/docker-publish.yml").match(pinPattern);
+    assert.ok(ciPin, "expected CI build-push-action pin");
+    assert.ok(publishPin, "expected publish build-push-action pin");
+    assert.equal(ciPin[1], publishPin[1]);
+  });
+});
+
 describe("release workflows", () => {
   it("keeps release-please focused on creating release PRs", () => {
     const workflow = readRepoFile(".github/workflows/release-please.yml");
