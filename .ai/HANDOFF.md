@@ -187,3 +187,7 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### Cycle closed — v1.11.0 — 2026-10-15T14:49:21Z
+
+All tasks (T-001, T-002, T-003) are done and committed. Validation and review evidence is recorded above and in .ai/REVIEW.md. Release requested: 1.11.0.
