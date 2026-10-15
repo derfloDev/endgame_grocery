@@ -1,9 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Production worker checks run separately from the development/API integration suite.
+// Production push/lifecycle and network-first navigation checks use the real worker,
+// separately from the development/API integration suite.
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "push-notifications.spec.js",
+  testMatch: ["push-notifications.spec.js", "pwa-navigation.spec.js"],
   workers: 1,
   timeout: 30000,
   reporter: "list",

@@ -6,8 +6,8 @@
       "effort": "high"
     },
     "implement": {
-      "agent": "claude",
-      "model": "sonnet",
+      "agent": "codex",
+      "model": "gpt-6.1-sol",
       "effort": "medium"
     },
     "review": {

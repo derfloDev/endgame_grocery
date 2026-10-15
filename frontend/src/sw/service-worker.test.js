@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NavigationRoute, registerRoute } from "workbox-routing";
+import { precache, addRoute, createHandlerBoundToURL } from "workbox-precaching";
 
 vi.mock("workbox-core", () => ({ clientsClaim: vi.fn() }));
 vi.mock("workbox-routing", () => ({ NavigationRoute: vi.fn(), registerRoute: vi.fn() }));
-vi.mock("workbox-precaching", () => ({ createHandlerBoundToURL: vi.fn(), precacheAndRoute: vi.fn() }));
+vi.mock("workbox-precaching", () => ({ createHandlerBoundToURL: vi.fn(() => vi.fn()), precache: vi.fn(), addRoute: vi.fn() }));
 
 let handlers;
 let worker;
@@ -37,6 +39,26 @@ async function dispatch(type, fields) {
 }
 
 describe("service worker push notifications", () => {
+  it("registers navigations before the precache directory-index route", () => {
+    // Vite's development PWA transform supplies an empty manifest during Vitest.
+    expect(precache).toHaveBeenCalledWith([]);
+    expect(NavigationRoute).toHaveBeenCalledWith(expect.any(Function));
+    expect(registerRoute).toHaveBeenCalledWith(NavigationRoute.mock.instances[0]);
+    expect(precache.mock.invocationCallOrder[0]).toBeLessThan(registerRoute.mock.invocationCallOrder[0]);
+    expect(registerRoute.mock.invocationCallOrder[0]).toBeLessThan(addRoute.mock.invocationCallOrder[0]);
+  });
+
+  it("defers the shell lookup until fallback so missing dev precache does not break evaluation", async () => {
+    expect(createHandlerBoundToURL).not.toHaveBeenCalled();
+    const fallback = vi.fn().mockResolvedValue(new Response("shell"));
+    createHandlerBoundToURL.mockReturnValueOnce(fallback);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+    const options = { request: {}, url: new URL("https://grocery.example/") };
+    await NavigationRoute.mock.calls[0][0](options);
+    expect(createHandlerBoundToURL).toHaveBeenCalledWith("/index.html");
+    expect(fallback).toHaveBeenCalledWith(options);
+  });
+
   it("shows the default notification when push has no data", async () => {
     await dispatch("push", { data: null });
     expect(worker.registration.showNotification).toHaveBeenCalledWith("Endgame Grocery", {

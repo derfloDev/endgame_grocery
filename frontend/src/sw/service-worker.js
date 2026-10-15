@@ -1,13 +1,23 @@
+// Network-first navigations let normal reloads reach Access login / Cloudflare challenges.
+// Navigation responses are never runtime-cached; only the precached shell is the fallback.
+// __reconnect disables the three-second timeout for an explicit access recovery attempt.
 import { clientsClaim } from "workbox-core";
 import { NavigationRoute, registerRoute } from "workbox-routing";
-import { createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
+import { addRoute, createHandlerBoundToURL, precache } from "workbox-precaching";
+import { createNavigationHandler } from "./navigationHandler.js";
 
 self.skipWaiting();
 clientsClaim();
 const precacheManifest = self.__WB_MANIFEST;
 
-precacheAndRoute(precacheManifest || []);
-registerRoute(new NavigationRoute(createHandlerBoundToURL("/index.html")));
+precache(precacheManifest || []);
+registerRoute(new NavigationRoute(createNavigationHandler({
+  // Development may not precache index.html. Defer lookup to fallback so registration
+  // still works; a missing development shell can fail the request rather than evaluation.
+  fallback: (options) => createHandlerBoundToURL("/index.html")(options)
+})));
+// Register after navigations so '/' cannot match the precache directoryIndex first.
+addRoute();
 
 self.addEventListener("push", (event) => {
   if (import.meta.env.DEV) {

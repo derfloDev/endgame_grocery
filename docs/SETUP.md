@@ -160,6 +160,17 @@ Every one of these locations repeats the shared security headers (`docker/securi
 
 ## Cloudflare and reverse proxy
 
+### Service-worker navigations and Access
+
+Every app navigation, including a normal reload of `/` or a list route, tries the network
+through Access first. Login redirects, 401/403 responses and Cloudflare challenges are shown
+to the browser and never runtime-cached. After three seconds, a rejected fetch, or an origin
+outage (5xx/52x), the worker falls back to the precached app shell; offline startup can take
+up to three seconds. The reserved `__reconnect` query parameter disables that timeout so an
+explicit reconnect can wait for Access; network rejection and origin errors still fall back.
+The `/index.html` Access exception and Cache Rules below remain required for a valid,
+revalidated offline shell. A login page never replaces that precached shell.
+
 ### Cloudflare Access: public PWA resources
 
 The selected deployment policy makes the following static resources anonymously retrievable.

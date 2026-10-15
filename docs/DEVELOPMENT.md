@@ -88,7 +88,9 @@ Optional follow-up steps: generate VAPID keys for push notifications (see [Push 
 
 ### Cold-load assets and offline precache
 
-The cold-load target for `/lists/<id>` is below 500 KiB transferred, with no single response over 150 KiB. The PWA keeps 192×192 and 512×512 any-maskable PNG icons, and the app logo remains a 256×256 PNG rendered at 40–44 px. The self-hosted fonts and app shell are precached for offline use, and the service worker routes app navigations to the cached shell when offline. The icon-matching worker is excluded from that initial precache because `iconWorkerClient.ts` creates it only when a user opens the add-item flow.
+The cold-load target for `/lists/<id>` is below 500 KiB transferred, with no single response over 150 KiB. The PWA keeps 192×192 and 512×512 any-maskable PNG icons, and the app logo remains a 256×256 PNG rendered at 40–44 px. The self-hosted fonts and app shell are precached for offline use. The icon-matching worker is excluded from that initial precache because `iconWorkerClient.ts` creates it only when a user opens the add-item flow.
+
+App navigations (including `/`) are network-first, registered before the precache route so its directory-index match cannot hide Access login. Responses with 2xx, redirects (`opaqueredirect`/3xx), 401/403, or `cf-mitigated: challenge` pass through to the browser. Rejected fetches, other non-OK responses (including 5xx/52x), and a 3000 ms timeout fall back to the precached `/index.html`. Offline startup therefore waits up to three seconds. Navigation responses are never runtime-cached, so login/challenge HTML cannot replace the offline shell. The reserved `__reconnect` query parameter disables the timeout for an explicit access recovery navigation; rejection and other non-OK responses still fall back to the shell.
 
 A clean authenticated Chromium run against Vite's production preview transferred 655,775 bytes (640.4 KiB) across 25 responses. Seven hashed asset paths were requested both by the page and by service-worker precaching, and preview returned full 200 responses for both copies because it sends no-cache headers. This preview measurement exceeds the target and does not represent the deployed cache behavior.
 
@@ -191,7 +193,10 @@ chunk returning 404 while page assets remain current. The stale-worker check obs
 redundant installation, localized feedback, no subscription persistence before recovery and
 retry without page navigation. PushManager subscription transport and notification permission
 are stubbed for UI/API assertions; these checks do not prove real push delivery. The existing
-development E2E suite remains separate. Android Chrome/Brave installation, opt-in, subscription
+development E2E suite remains separate. `e2e/pwa-navigation.spec.js` checks network-first reloads
+of `/` and list routes through Access redirects, offline shell preservation after login HTML,
+503 fallback, the three-second navigation timeout and the `__reconnect` timeout bypass.
+Android Chrome/Brave installation, opt-in, subscription
 restoration after reload, delivery from another member and click navigation still require
 checks on actual devices at the deployment; desktop emulation does not replace them.
 
