@@ -126,7 +126,12 @@ bash docker/smoke-nginx.sh endgame-grocery:nginx-smoke
 The build fails on an invalid installed nginx configuration via `RUN nginx -t`. The independent
 `nginx-smoke` CI job runs these same commands on pull requests and pushes to main without
 publishing an image. Missing Docker or host tools fail the smoke check rather than skipping it.
-The independent `nginx-smoke-arm64` CI job does the same for the `linux/arm64` image under QEMU, and additionally asserts `uname -m` is `aarch64` and that the native `bcrypt` module loads.
+The independent `nginx-smoke-arm64` CI job does the same for the `linux/arm64` image under QEMU,
+and additionally asserts `uname -m` is `aarch64` and that the native `bcrypt` module loads.
+It builds with `docker/build-push-action` using the GitHub Actions BuildKit cache, so unchanged
+dependencies skip the emulated `npm ci --omit=dev`. A lockfile or `package.json` change reruns
+the full emulated install. The job is limited to 15 minutes because npm can hang under QEMU;
+rerun a timed-out job.
 The script accepts an already-built local image tag, checks `nginx -t` again and starts nginx on a
 dynamically allocated localhost port. It checks HTTP 200 for the shell, service worker, a discovered
 hashed JS/CSS asset and a SPA route; verifies the SPA returns the shell, one expected Cache-Control
