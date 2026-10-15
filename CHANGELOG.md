@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.11.1](https://github.com/derfloDev/endgame_grocery/compare/v1.10.1...v1.11.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **offline:** keep a rejected queued change discardable while the app asks to reconnect ([cd72d37](https://github.com/derfloDev/endgame_grocery/commit/cd72d37d3a81c936c555721923ef1838f8159aa6))
+* **offline:** recover Cloudflare access without losing queued changes ([02cff25](https://github.com/derfloDev/endgame_grocery/commit/02cff2544ad91be73acd824d3286c783db104523))
+* **offline:** show a reconnect action instead of offline mode when Cloudflare blocks the app, keeping queued changes ([1e33742](https://github.com/derfloDev/endgame_grocery/commit/1e337421683cf592c476003329a23bd079fa5861))
+* **pwa:** load pages from the network first so a normal reload recovers from an expired Cloudflare session ([8437e78](https://github.com/derfloDev/endgame_grocery/commit/8437e78267923ef8093abaa858992e3bbe73651a))
+
+
+### Miscellaneous Chores
+
+* **ai:** close cycle ([425c20c](https://github.com/derfloDev/endgame_grocery/commit/425c20cfb3c68d7f379a97a740a4542e1e3606d3))
+* **ai:** close cycle ([48ead30](https://github.com/derfloDev/endgame_grocery/commit/48ead3071729d44bbfcfdb7a7387c46344e4f3f8))
+
 ## [1.10.1](https://github.com/derfloDev/endgame_grocery/compare/v1.10.0...v1.10.1) (2026-10-14)
 
 
