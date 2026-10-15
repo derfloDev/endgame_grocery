@@ -1,13 +1,29 @@
 # ROADMAP
 
-Goal: make the project documentation easy to navigate by separating what the app does, how to set it up, and how to develop it.
+Goal: define and deliver the scope for this cycle.
+
+Delete any unused example sections below. Only the Goal and one concrete priority are required.
 
 ## Priority 1
 
-Objective: restructure `README.md` into three clearly separated areas, with features first.
+Objective: replace with objective.
 
-- `README.md` opens with the features (user-facing, concise), followed by a short quick start and links to the detailed docs.
-- Setup documentation (installing, configuring, running, and operating the app) lives in `docs/SETUP.md`.
-- Development documentation (local dev environment, tests, CI/CD, architecture and implementation notes) lives in `docs/DEVELOPMENT.md`.
-- No existing technical fact is lost: detailed content moves, it is not deleted or rewritten.
-- Behavior of the app and the code does not change; only documentation and code comments that point at README sections are updated.
+- Replace with planned outcome.
+
+## Examples
+
+These example sections are optional illustrations, not required structure.
+
+<!-- Example: remove or replace this section -->
+## Priority 2
+
+Objective: optional second objective.
+
+- Replace with optional planned outcome.
+
+<!-- Example: remove or replace this section -->
+## Priority 3
+
+Objective: optional third objective.
+
+- Replace with optional planned outcome.
