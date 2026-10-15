@@ -1,4 +1,5 @@
 export const NAVIGATION_NETWORK_TIMEOUT_MS = 3000;
+// Must equal frontend/src/api/reconnect.ts; enforced by frontend/src/sw/navigationHandler.test.js.
 export const RECONNECT_PARAM = "__reconnect";
 
 export function createNavigationHandler({

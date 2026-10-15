@@ -1,4 +1,4 @@
-// Keep this reserved parameter aligned with frontend/src/sw/navigationHandler.js.
+// Must equal frontend/src/sw/navigationHandler.js; enforced by frontend/src/sw/navigationHandler.test.js.
 export const RECONNECT_PARAM = "__reconnect";
 
 export function buildReconnectUrl(location: Pick<Location, "href">, now: number): string {

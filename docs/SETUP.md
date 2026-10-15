@@ -176,6 +176,8 @@ revalidated offline shell. A login page never replaces that precached shell.
 If the device has connectivity but `/api/*` receives an Access login redirect, HTML 401/403,
 or `cf-mitigated: challenge`, the app shows a distinct access-session message and **Reconnect**
 instead of offline mode. Reads use cached data and changes remain queued in IndexedDB.
+A queued change the server already rejected keeps its error text and **Discard queued change**
+action while the access message is shown; discarding removes only that local change.
 Backend JSON 401/403 responses keep their application authentication/authorization meaning.
 Use **Reconnect** to navigate through Access or complete the challenge, then return to syncing.
 This preserves the current path, query and hash and briefly adds `__reconnect` to let the

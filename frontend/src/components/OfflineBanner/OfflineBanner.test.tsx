@@ -43,6 +43,42 @@ describe("OfflineBanner", () => {
     vi.clearAllMocks();
   });
 
+  it.each([
+    ["en", "", "Entry not found."],
+    ["de", "", "Entry not found."],
+    ["en", "offline.dependencyDiscarded", "This change depends on another change that was discarded, so it cannot be synced. Discard it too."],
+    ["de", "offline.dependencyDiscarded", "Diese Änderung hängt von einer anderen Änderung ab, die verworfen wurde, und kann deshalb nicht synchronisiert werden. Verwirf sie ebenfalls."]
+  ])("keeps a blocked change discardable while gated (%s, %s)", async (language, syncErrorKey, expectedError) => {
+    await i18next.changeLanguage(language);
+    const discardFailedMutation = vi.fn(async () => undefined);
+    const german = language === "de";
+    useOfflineQueueMock.mockReturnValue({
+      isReauthRequired: true, isOffline: false, isSyncing: false, queuedCount: 1,
+      failedMutationId: "mutation-1", discardFailedMutation,
+      syncError: "Entry not found.", syncErrorKey, resolvedIds: {}, syncVersion: 0
+    });
+
+    render(<OfflineBanner />);
+
+    expect(screen.getByText(german
+      ? "Verbunden, aber die Zugangssitzung ist abgelaufen. 1 Änderung wird nach dem erneuten Verbinden synchronisiert."
+      : "Connected, but your access session has expired. 1 change will sync after you reconnect.")).toBeTruthy();
+    const error = screen.getByText(expectedError);
+    expect(error.tagName).toBe("P");
+    expect(error.className).toBe("eg-error-banner");
+    const discardButton = screen.getByRole("button", { name: german ? "Ausstehende Änderung verwerfen" : "Discard queued change" });
+    const reconnectButton = screen.getByRole("button", { name: german ? "Erneut verbinden" : "Reconnect" });
+
+    await userEvent.click(discardButton);
+    expect(discardFailedMutation).toHaveBeenCalledTimes(1);
+    expect(reconnect).not.toHaveBeenCalled();
+    discardFailedMutation.mockClear();
+    await userEvent.click(reconnectButton);
+    expect(reconnect).toHaveBeenCalledTimes(1);
+    expect(discardFailedMutation).not.toHaveBeenCalled();
+    await i18next.changeLanguage("en");
+  });
+
   it("renders the discard action for a non-retriable failed mutation", async () => {
     const discardFailedMutation = vi.fn(async () => undefined);
     useOfflineQueueMock.mockReturnValue({

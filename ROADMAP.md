@@ -153,3 +153,32 @@ browser, including installed Android PWAs, and no queued change is lost.
 - D2 — Recovery: manual "Reconnect" button in the banner, no automatic redirect.
 - D3 — Service worker: network-first navigations with ~3 s timeout and precached shell fallback.
 - D4 — Data safety: preserving the queue across re-authentication is sufficient.
+
+## Follow-up — review notes on T-001/T-002 (ultrareview, 2026-10-15)
+
+Status: planned as T-003 (2026-10-15, see .ai/PLAN.md Phase 3). T-001 and T-002 are `done` and committed (`8437e78`, `1e33742`);
+these two non-blocking polish items would be a new task, not a rework of T-002.
+
+- N1 — Banner hides a blocked mutation while gated
+  (`frontend/src/components/OfflineBanner/OfflineBanner.tsx`, early return for
+  `isReauthRequired`). When a queued mutation is already blocked by a permanent 4xx
+  (`failedMutationId` set) and the shared state then becomes `gated`, the banner shows only the
+  reconnect message. The failed-mutation error text and the "Discard queued change" button
+  disappear, although discarding only removes an IndexedDB row and needs no network.
+  Outcome: while gated, the banner keeps the reconnect message and Reconnect button and also
+  shows the failed-mutation error text and the Discard button when `failedMutationId` is set.
+  Tests in `OfflineBanner.test.tsx` cover gated + failed mutation (EN/DE) and the Discard action.
+  Docs: update the banner description in `docs/DEVELOPMENT.md` (edge-gate E2E paragraph, "the
+  distinct Reconnect banner replaces offline messages") and any matching banner description in
+  `docs/SETUP.md`, plus the code comment above the gated branch in `OfflineBanner.tsx`.
+- N2 — `RECONNECT_PARAM` is defined twice (`frontend/src/sw/navigationHandler.js` and
+  `frontend/src/api/reconnect.ts`), tied only by a "keep aligned" comment. If they drift, the
+  service worker no longer recognises explicit reconnect navigations and the 3 s timeout
+  applies again. Approach: see decisions below.
+
+Decisions (user, 2026-10-15):
+
+- Scope: implement N1 and N2 together as one polish task (T-003) in this cycle.
+- N2 approach: keep both constants and add a unit test that imports both exported values and
+  asserts they are equal; update the "keep aligned" comments in both files to name that test.
+  No shared module, no service-worker build change.

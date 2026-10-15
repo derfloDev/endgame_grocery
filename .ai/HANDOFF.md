@@ -137,3 +137,53 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-003 — plan — 2026-10-15T14:15:47Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | rework_plan: added T-003 from the ultrareview notes (N1 keep a blocked queued change's error and Discard action visible while gated; N2 unit test pinning both RECONNECT_PARAM definitions), including docs scope in DEVELOPMENT.md and SETUP.md |
+| Files Changed | ROADMAP.md, .ai/PLAN.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-10-15T14:23:02Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | next_task: Kept a rejected queued change's translated error and Discard action visible alongside Reconnect while gated, and pinned app/worker reconnect parameter alignment with tests and documentation. |
+| Files Changed | frontend/src/components/OfflineBanner/OfflineBanner.tsx, frontend/src/components/OfflineBanner/OfflineBanner.test.tsx, frontend/src/context/OfflineQueueContext.test.tsx, frontend/src/sw/navigationHandler.test.js, frontend/src/api/reconnect.ts, frontend/src/sw/navigationHandler.js, docs/DEVELOPMENT.md, docs/SETUP.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Tests written first: four new EN/DE banner cases failed before implementation; local gated discard and reconnect-constant equality tests passed. Final targeted run 75/75 PASS; npm run lint PASS (existing AuthContext.tsx fast-refresh warning); npm run typecheck PASS; npm run build PASS; npm test PASS (65 frontend files / 985 tests, backend 421 tests); npm run e2e -- e2e/edge-gate.spec.js --workers=1 PASS (3/3, unchanged spec; process-local test JWT secret and disabled push credentials for dev-server startup, no config files changed); git diff --check PASS. Unit tests verify each button invokes only its action and discarding removes only the blocked row without a fetch or leaving gated state. Real Android installed-PWA verification remains manual after deployment. |
+| Commit | `fix(offline): keep a rejected queued change discardable while the app asks to reconnect` |
+| Next Role | review |
+
+---
+
+### T-003 — review — 2026-10-15T14:45:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed T-003 polish: a blocked queued change keeps its error text and Discard action while the Reconnect banner is shown, and a test pins both RECONNECT_PARAM definitions; lint, typecheck, build, 985 frontend + 421 backend tests and edge-gate E2E (3/3) pass. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-003 — implement — 2026-10-15T14:41:29Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task: Accepted review PASS_WITH_NOTES with no required fixes, marked T-003 done, and created the task commit using the next_task handoff message. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md; reviewed T-003 implementation, tests, comments, docs and planning/review artifacts included in the task commit. |
+| Validation | Implementation and independent review verified lint/typecheck/build, 985 frontend tests, 421 backend tests and 3 edge-gate E2E checks; git diff --check PASS before commit. Review notes on combined-state visual verification and manual deployed Android checks remain recorded in .ai/REVIEW.md. |
+| Commit | `fix(offline): keep a rejected queued change discardable while the app asks to reconnect` |
+| Next Role | none |
+
+---

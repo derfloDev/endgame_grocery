@@ -121,3 +121,42 @@ No new findings. The rework changed only `playwright.config.js` and `docs/DEVELO
 
 #### Verdict
 `PASS_WITH_NOTES`
+
+## Task: T-003
+
+### Review Round 1
+
+Status: **complete**
+
+Reviewed: 2026-10-15
+
+#### Findings
+1. **nit** — `frontend/src/components/OfflineBanner/OfflineBanner.tsx`: while gated with a blocked change, the banner now shows two adjacent `Reconnect`/`Discard` buttons plus an `eg-error-banner` paragraph in a fragment with no wrapper, matching the existing non-gated structure. Layout/styling of this combined state is only unit-tested, not visually verified. Not a required fix.
+2. **nit** — The `RECONNECT_PARAM` alignment is enforced by a test importing `../api/reconnect` into `navigationHandler.test.js` (as planned: no shared module, no service-worker build change). Acceptable; a rename in both files together remains possible without the test failing, which is intended.
+
+No blocker or major findings. Acceptance criteria are met:
+- gated + `failedMutationId` renders the reconnect message, **Reconnect**, the error text (translated via `syncErrorKey` with `syncError` default, shared `errorText` variable, no duplication) in an `eg-error-banner` paragraph, and **Discard queued change**; gated without a failed mutation is unchanged;
+- unit tests cover EN/DE × plain error / `offline.dependencyDiscarded`, each button calls only its own action; the context test shows discarding while gated removes only the blocked row, sends no fetch and leaves reachability `gated`;
+- both `RECONNECT_PARAM` constants carry cross-reference comments and an equality test; no assertions weakened; no translation, E2E or service-worker behaviour changes;
+- docs updated in `docs/DEVELOPMENT.md` and `docs/SETUP.md` as planned.
+
+#### Required Fixes
+- None.
+
+#### Verification
+##### Steps
+- Re-read `.ai/TASKS.md`, `.ai/PLAN.md` (Phase 3), `.ai/REVIEW.md`; reviewed the uncommitted diff (banner, tests, comments, docs).
+- `npm run lint` — PASS (0 errors; pre-existing `AuthContext.tsx` warning). `npm run typecheck` — PASS. `npm run build` — PASS.
+- `npm test` — PASS: frontend 65 files / 985 tests; backend 421 tests.
+- `playwright test e2e/edge-gate.spec.js --workers=1` (process-local test `JWT_SECRET`) — PASS 3/3 (regression; spec unchanged).
+- `git diff --check` — clean (CRLF notices only).
+##### Findings
+- Behaviour matches the plan; the change is limited to the banner's gated branch and comments/tests/docs.
+##### Risks
+- Combined gated + blocked-change layout not checked visually in a real browser; DB-backed dev E2E specs not run locally (no PostgreSQL), as in the T-002 review. Real Android Chrome/Brave verification against deployed Cloudflare remains manual.
+
+#### Open Questions
+- None.
+
+#### Verdict
+`PASS_WITH_NOTES`

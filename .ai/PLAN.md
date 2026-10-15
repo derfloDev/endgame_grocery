@@ -1,6 +1,7 @@
 # Plan
 
-Status: **ready_for_implement**
+Status: **ready_for_implement** (T-001, T-002 done and committed as `8437e78`, `1e33742`;
+T-003 added by `rework_plan` on 2026-10-15 from the ultrareview notes N1/N2 in `ROADMAP.md`)
 
 Goal: implement the scope defined in `ROADMAP.md` — the app must never stay stuck in "offline
 mode" while the device is online because an edge component (Cloudflare Access session or a
@@ -23,6 +24,9 @@ Two tasks, in this order (T-002 relies on the service-worker behaviour from T-00
   "offline", never show offline mode for a gate, keep/queue writes, show a distinct banner with a
   "Reconnect" button that reloads through the network with `__reconnect`, strip the parameter on
   startup, log the classification reason.
+- **T-003** — Review polish (ROADMAP "Follow-up", N1/N2): while gated, the banner also keeps a
+  blocked queued change's error text and Discard action visible; a unit test pins the two
+  `RECONNECT_PARAM` definitions (app and service worker) to the same value.
 
 Out of scope: Cloudflare account changes, any public Access exception for `/api/*`, queue
 export/backup, extra warnings (D4), automatic redirects (D2).
@@ -78,7 +82,21 @@ T-002
 - Real network failures behave as before (offline banner, queued writes, drain on reconnect).
 - Docs updated: `docs/DEVELOPMENT.md`, `docs/SETUP.md`, `README.md` (see files list).
 
-Both: `npm run lint`, `npm run build`, `npm test` pass; listed E2E specs pass locally.
+T-003
+- While `isReauthRequired` is true and `failedMutationId` is set, `OfflineBanner` renders the
+  reconnect message and **Reconnect** button (unchanged) and additionally the failed-mutation
+  error text (translated via `syncErrorKey` with `syncError` as default, exactly as in the
+  non-gated error branch) in an `eg-error-banner` paragraph plus the **Discard queued change**
+  button calling `discardFailedMutation()`.
+- While gated without `failedMutationId`, the output is unchanged (no offline/sync/error text).
+- Discarding while gated removes only the blocked IndexedDB row, sends no request and leaves the
+  state gated (no drain until reachability is `online`).
+- `frontend/src/sw/navigationHandler.test.js` asserts that `RECONNECT_PARAM` from
+  `navigationHandler.js` equals `RECONNECT_PARAM` from `frontend/src/api/reconnect.ts`; the
+  comments next to both constants name that test.
+- Docs and comments match the new banner behaviour.
+
+All tasks: `npm run lint`, `npm run build`, `npm test` pass; listed E2E specs pass locally.
 
 ## Implementation Phases
 
@@ -241,10 +259,56 @@ Files to change
 Suggested commit: `fix(offline): show a reconnect action instead of offline mode when Cloudflare
 blocks the app, keeping queued changes`
 
+### Phase 3 — T-003: review polish (N1, N2)
+
+Files to change
+- Tests first:
+  - `frontend/src/components/OfflineBanner/OfflineBanner.test.tsx`: new `it.each` for EN/DE with
+    `isReauthRequired: true`, `failedMutationId: "mutation-1"`, `queuedCount: 1`:
+    (a) server error text (`syncError: "Entry not found."`, `syncErrorKey: ""`) and
+    (b) translated dependency error (`syncErrorKey: "offline.dependencyDiscarded"`).
+    Assert the reconnect message, the error text, both buttons (**Reconnect** / **Erneut
+    verbinden** and **Discard queued change** / **Ausstehende Änderung verwerfen**); clicking
+    Discard calls `discardFailedMutation` once and not `reconnect`; clicking Reconnect calls
+    `reconnect` once and not `discardFailedMutation`. The existing gated test (no failed
+    mutation, asserting no offline/sync text) stays unchanged.
+  - `frontend/src/context/OfflineQueueContext.test.tsx`: a mutation blocked by a 4xx, then the
+    connectivity state becomes `gated`; `discardFailedMutation()` removes it from the queue,
+    issues no fetch, and `isReauthRequired` stays `true`. Reuse the file's existing fixtures
+    and connectivity helpers.
+  - `frontend/src/sw/navigationHandler.test.js`: import `RECONNECT_PARAM` from
+    `../api/reconnect` (aliased, e.g. `APP_RECONNECT_PARAM`) and assert it equals the service
+    worker's `RECONNECT_PARAM`.
+- `frontend/src/components/OfflineBanner/OfflineBanner.tsx`: in the `isReauthRequired` branch,
+  after the Reconnect button, render — only when `failedMutationId` is set — a
+  `<p className="eg-error-banner">` with
+  `syncErrorKey ? t(syncErrorKey, { defaultValue: syncError }) : syncError` and the existing
+  Discard button (`onClick={() => void discardFailedMutation()}`, label `offline.discard`).
+  Extract the error text expression into a local variable shared with the non-gated branch
+  rather than duplicating it. Update the comment above the branch: the access message replaces
+  offline/sync messages, but a blocked change stays discardable because discarding is local.
+- `frontend/src/api/reconnect.ts` and `frontend/src/sw/navigationHandler.js`: comment next to
+  each `RECONNECT_PARAM` — must equal the other file's constant, enforced by
+  `frontend/src/sw/navigationHandler.test.js`. No shared module, no service-worker build change.
+- Documentation (same commit):
+  - `docs/DEVELOPMENT.md` — `e2e/edge-gate.spec.js` paragraph: replace "the distinct Reconnect
+    banner replaces offline messages" with wording that the Reconnect banner replaces offline
+    and sync messages while a server-rejected queued change keeps its error text and Discard
+    action. Mention the `RECONNECT_PARAM` alignment test where the `__reconnect` parameter is
+    described (cold-load / network-first paragraph), one clause.
+  - `docs/SETUP.md` — "Expired Access session or Cloudflare challenge (stuck offline mode)": add
+    one sentence that a queued change the server already rejected stays visible with **Discard
+    queued change** while the access message is shown.
+- No translation, E2E or service-worker behaviour changes.
+
+Suggested commit: `fix(offline): keep a rejected queued change discardable while the app asks
+to reconnect`
+
 ## Validation
 - `npm run lint`
 - `npm run build`
 - `npm test`
+- T-003: `npm run e2e -- e2e/edge-gate.spec.js` (regression only; no spec change planned)
 - T-001: `npm run build && npx playwright test --config playwright.pwa.config.js`
 - T-002: `npm run e2e -- e2e/edge-gate.spec.js e2e/queue-retry.spec.js e2e/resync.spec.js`
 

@@ -8,7 +8,7 @@ import {
 } from "../api/offlineStore";
 import { useOfflineQueue } from "../hooks/useOfflineQueue";
 import { OfflineQueueProvider } from "./OfflineQueueContext";
-import { reportRequestOutcome, reportStreamState, resetConnectivityForTests } from "../api/connectivity";
+import { getReachability, reportRequestOutcome, reportStreamState, resetConnectivityForTests } from "../api/connectivity";
 import { getCurrentUserId, resetAuthSessionForTests, setAuthSession } from "../api/authSession";
 import { requestJson } from "../api/request";
 import { StrictMode } from "react";
@@ -304,6 +304,30 @@ describe("OfflineQueueProvider", () => {
     expect(screen.getByTestId("failed-mutation-id").textContent).toBe("mutation-1");
     expect(removeOfflineMutationMock).not.toHaveBeenCalled();
     expect(currentMutations).toHaveLength(1);
+  });
+
+  it("discards only the blocked row while gated without sending a request", async () => {
+    setNavigatorOnline(true);
+    currentMutations = [createMutation(), createMutation({ id: "mutation-2", createdAt: "2026-05-27T10:00:01.000Z" })];
+    fetchMock.mockResolvedValue(createResponse({ error: "Entry not found." }, 404));
+    renderProvider(<OfflineQueueState />);
+    await waitFor(() => expect(screen.getByTestId("failed-mutation-id").textContent).toBe("mutation-1"));
+    act(() => reportRequestOutcome("gated", "redirect", "/api/lists"));
+    expect(screen.getByTestId("is-reauth-required").textContent).toBe("true");
+    fetchMock.mockClear();
+
+    await act(async () => { screen.getByRole("button", { name: "discard" }).click(); });
+    await waitFor(() => expect(screen.getByTestId("queued-count").textContent).toBe("1"));
+    await flushAsyncWork();
+
+    expect(currentMutations.map(({ id }) => id)).toEqual(["mutation-2"]);
+    expect(removeOfflineMutationMock).toHaveBeenCalledExactlyOnceWith("mutation-1");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(getReachability()).toBe("gated");
+    expect(screen.getByTestId("is-reauth-required").textContent).toBe("true");
+    expect(screen.getByTestId("is-offline").textContent).toBe("false");
+    expect(screen.getByTestId("failed-mutation-id").textContent).toBe("");
+    expect(screen.getByTestId("sync-error").textContent).toBe("");
   });
 
   it("keeps retry behavior for 5xx responses without exposing a failed mutation", async () => {

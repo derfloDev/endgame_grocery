@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createNavigationHandler, NAVIGATION_NETWORK_TIMEOUT_MS, RECONNECT_PARAM } from "./navigationHandler.js";
+import { RECONNECT_PARAM as APP_RECONNECT_PARAM } from "../api/reconnect";
 
 let fallback, fetchImpl, setTimer, clearTimer, options;
 beforeEach(() => {
@@ -23,6 +24,9 @@ function expectCleared() {
 }
 
 describe("network-first navigations", () => {
+  it("uses the same reconnect parameter as the app", () => {
+    expect(RECONNECT_PARAM).toBe(APP_RECONNECT_PARAM);
+  });
   it.each([200, 204, 302, 401, 403])("passes status %s through", async status => {
     const response = new Response(null, { status });
     fetchImpl.mockResolvedValue(response);

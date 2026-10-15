@@ -6,13 +6,23 @@ import { reconnect } from "../../api/reconnect";
 export default function OfflineBanner(): ReactElement | null {
   const { t } = useTranslation();
   const { discardFailedMutation, failedMutationId, isOffline, isReauthRequired, isSyncing, queuedCount, syncError, syncErrorKey } = useOfflineQueue();
+  const errorText = syncErrorKey ? t(syncErrorKey, { defaultValue: syncError }) : syncError;
 
-  // Access recovery takes precedence over offline/sync messages: the device is connected.
+  // Access recovery replaces offline/sync messages, but a blocked change stays discardable:
+  // discarding is local and does not require access to the server.
   if (isReauthRequired) {
     return (
       <>
         <p className="eg-offline-banner">{t(queuedCount > 0 ? "offline.reauthQueued" : "offline.reauth", { count: queuedCount })}</p>
         <button className="eg-btn-secondary" type="button" onClick={reconnect}>{t("offline.reconnect")}</button>
+        {failedMutationId ? (
+          <>
+            <p className="eg-error-banner">{errorText}</p>
+            <button className="eg-btn-secondary" type="button" onClick={() => void discardFailedMutation()}>
+              {t("offline.discard")}
+            </button>
+          </>
+        ) : null}
       </>
     );
   }
@@ -34,7 +44,7 @@ export default function OfflineBanner(): ReactElement | null {
   return (
     <>
       <p className={syncError ? "eg-error-banner" : "eg-offline-banner"}>
-        {syncError ? `${message} ${syncErrorKey ? t(syncErrorKey, { defaultValue: syncError }) : syncError}` : message}
+        {syncError ? `${message} ${errorText}` : message}
       </p>
       {failedMutationId ? (
         <button className="eg-btn-secondary" type="button" onClick={() => void discardFailedMutation()}>
