@@ -5,6 +5,9 @@ import i18next from "i18next";
 import "../../i18n";
 import { useOfflineQueue } from "../../hooks/useOfflineQueue";
 import OfflineBanner from "./OfflineBanner";
+import { reconnect } from "../../api/reconnect";
+
+vi.mock("../../api/reconnect", () => ({ reconnect: vi.fn() }));
 
 vi.mock("../../hooks/useOfflineQueue", () => ({
   useOfflineQueue: vi.fn()
@@ -13,6 +16,28 @@ vi.mock("../../hooks/useOfflineQueue", () => ({
 const useOfflineQueueMock = vi.mocked(useOfflineQueue);
 
 describe("OfflineBanner", () => {
+  it.each([
+    ["en", 0, "Connected, but your access session has expired. Reconnect to continue syncing.", "Reconnect"],
+    ["en", 1, "Connected, but your access session has expired. 1 change will sync after you reconnect.", "Reconnect"],
+    ["en", 2, "Connected, but your access session has expired. 2 changes will sync after you reconnect.", "Reconnect"],
+    ["de", 0, "Verbunden, aber die Zugangssitzung ist abgelaufen. Erneut verbinden, um weiter zu synchronisieren.", "Erneut verbinden"],
+    ["de", 1, "Verbunden, aber die Zugangssitzung ist abgelaufen. 1 Änderung wird nach dem erneuten Verbinden synchronisiert.", "Erneut verbinden"],
+    ["de", 2, "Verbunden, aber die Zugangssitzung ist abgelaufen. 2 Änderungen werden nach dem erneuten Verbinden synchronisiert.", "Erneut verbinden"]
+  ])("shows the gated message (%s, %s queued) and reconnect action", async (language, count, message, label) => {
+    await i18next.changeLanguage(String(language));
+    useOfflineQueueMock.mockReturnValue({
+      isReauthRequired: true, isOffline: false, isSyncing: true, queuedCount: Number(count),
+      syncError: "", syncErrorKey: "", resolvedIds: {}, syncVersion: 0,
+      failedMutationId: "", discardFailedMutation: vi.fn()
+    });
+    render(<OfflineBanner />);
+    expect(screen.getByText(String(message))).toBeTruthy();
+    expect(screen.queryByText(/offline|Offline|syncing [0-9]/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: String(label) }));
+    expect(reconnect).toHaveBeenCalledTimes(1);
+    await i18next.changeLanguage("en");
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -23,6 +48,7 @@ describe("OfflineBanner", () => {
     useOfflineQueueMock.mockReturnValue({
       discardFailedMutation,
       failedMutationId: "mutation-1",
+      isReauthRequired: false,
       isOffline: false,
       isSyncing: false,
       queuedCount: 1,
@@ -48,6 +74,7 @@ describe("OfflineBanner", () => {
     useOfflineQueueMock.mockReturnValue({
       discardFailedMutation: vi.fn(async () => undefined),
       failedMutationId: "mutation-2",
+      isReauthRequired: false,
       isOffline: false,
       isSyncing: false,
       queuedCount: 1,
@@ -67,6 +94,7 @@ describe("OfflineBanner", () => {
     const base = {
       discardFailedMutation: vi.fn(async () => undefined),
       failedMutationId: "mutation-1",
+      isReauthRequired: false,
       isOffline: false,
       isSyncing: false,
       queuedCount: 1,

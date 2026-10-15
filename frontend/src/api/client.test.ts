@@ -4,6 +4,8 @@ import { getIsOnline, reportRequestOutcome, resetConnectivityForTests } from "./
 import { enqueueOfflineMutation, readCachedResource, writeCachedResource } from "./offlineStore";
 import { fetchEntries } from "./entries";
 import { fetchLists } from "./lists";
+import { EdgeGateError } from "./edgeGate";
+import { isNetworkError, requestJson } from "./request";
 
 vi.mock("./offlineStore", () => ({
   enqueueOfflineMutation: vi.fn(async () => undefined),
@@ -43,7 +45,7 @@ describe("cache-first reads", () => {
     const pending = sendJsonRequest("/api/lists", { cacheKey: "lists", onCachedValue });
     expect(fetchMock).toHaveBeenCalledOnce();
     await vi.waitFor(() => { expect(onCachedValue).toHaveBeenCalledWith(cached); });
-    network.resolve({ ok: true, status: 200, json: async () => fresh });
+    network.resolve({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: true, status: 200, json: async () => fresh });
     expect(await pending).toEqual(fresh);
     expect(writeCachedResource).toHaveBeenCalledWith("lists", fresh);
     expect(onCachedValue).toHaveBeenCalledOnce();
@@ -52,7 +54,7 @@ describe("cache-first reads", () => {
   it("never delivers a late cache read after a successful network response", async () => {
     const cache = deferred<unknown>();
     vi.mocked(readCachedResource).mockReturnValue(cache.promise);
-    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ lists: [] }) });
+    fetchMock.mockResolvedValue({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: true, status: 200, json: async () => ({ lists: [] }) });
     const onCachedValue = vi.fn();
     expect(await sendJsonRequest("/api/lists", { cacheKey: "lists", onCachedValue })).toEqual({ lists: [] });
     cache.resolve({ lists: [{ id: "stale" }] });
@@ -66,7 +68,7 @@ describe("cache-first reads", () => {
     const write = deferred<void>();
     vi.mocked(readCachedResource).mockReturnValue(cache.promise);
     vi.mocked(writeCachedResource).mockReturnValueOnce(write.promise);
-    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ lists: [] }) });
+    fetchMock.mockResolvedValue({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: true, status: 200, json: async () => ({ lists: [] }) });
     const onCachedValue = vi.fn();
     const pending = sendJsonRequest("/api/lists", { cacheKey: "lists", onCachedValue });
     await vi.waitFor(() => { expect(writeCachedResource).toHaveBeenCalled(); });
@@ -80,7 +82,7 @@ describe("cache-first reads", () => {
   it.each([401, 403])("does not deliver cached data after HTTP %s rejects access", async (status) => {
     const cache = deferred<unknown>();
     vi.mocked(readCachedResource).mockReturnValue(cache.promise);
-    fetchMock.mockResolvedValue({ ok: false, status, json: async () => ({ error: "Denied" }) });
+    fetchMock.mockResolvedValue({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: false, status, json: async () => ({ error: "Denied" }) });
     const onCachedValue = vi.fn();
     await expect(sendJsonRequest("/api/lists", { token: "token", cacheKey: "lists", onCachedValue })).rejects.toThrow();
     cache.resolve({ lists: [{ id: "stale" }] });
@@ -91,7 +93,7 @@ describe("cache-first reads", () => {
   it.each([null, "read-error"])("continues the network request when cache lookup yields %s", async (cached) => {
     if (cached === "read-error") vi.mocked(readCachedResource).mockRejectedValue(new Error("Cache unavailable"));
     else vi.mocked(readCachedResource).mockResolvedValue(cached);
-    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ lists: [] }) });
+    fetchMock.mockResolvedValue({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: true, status: 200, json: async () => ({ lists: [] }) });
     const onCachedValue = vi.fn();
     expect(await sendJsonRequest("/api/lists", { cacheKey: "lists", onCachedValue })).toEqual({ lists: [] });
     expect(onCachedValue).not.toHaveBeenCalled();
@@ -104,7 +106,7 @@ describe("cache-first reads", () => {
   });
 
   it("does not read the cache for ordinary online GETs or writes", async () => {
-    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+    fetchMock.mockResolvedValue({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: true, status: 200, json: async () => ({}) });
     await sendJsonRequest("/api/lists", { cacheKey: "lists" });
     await sendJsonRequest("/api/lists", { method: "POST", cacheKey: "lists", onCachedValue: vi.fn() });
     expect(readCachedResource).not.toHaveBeenCalled();
@@ -123,7 +125,7 @@ describe("cache-first reads", () => {
     });
     expect(readCachedResource).toHaveBeenCalledWith("lists");
     expect(readCachedResource).toHaveBeenCalledWith("entries:list-1");
-    network.resolve({ ok: true, status: 200, json: async () => ({}) });
+    network.resolve({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: true, status: 200, json: async () => ({}) });
     await Promise.all(requests);
   });
 });
@@ -143,6 +145,7 @@ describe("sendJsonRequest auth expiry handling", () => {
   it("dispatches auth:expired and throws AuthExpiredError for a 401 response with a token", async () => {
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
     fetchMock.mockResolvedValueOnce({
+      headers: new Headers({ 'Content-Type': 'application/json' }),
       ok: false,
       status: 401,
       json: async () => ({ error: "jwt expired" })
@@ -158,6 +161,7 @@ describe("sendJsonRequest auth expiry handling", () => {
   it("keeps unauthenticated 401 responses as normal request errors", async () => {
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
     fetchMock.mockResolvedValueOnce({
+      headers: new Headers({ 'Content-Type': 'application/json' }),
       ok: false,
       status: 401,
       json: async () => ({ error: "Invalid credentials." })
@@ -173,6 +177,7 @@ describe("sendJsonRequest auth expiry handling", () => {
   it("does not dispatch auth:expired for 403 responses", async () => {
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
     fetchMock.mockResolvedValueOnce({
+      headers: new Headers({ 'Content-Type': 'application/json' }),
       ok: false,
       status: 403,
       json: async () => ({ error: "Forbidden." })
@@ -200,9 +205,40 @@ describe("request reachability reporting", () => {
   });
 
   it.each([200, 204, 404, 503])("reports HTTP %s as a reachable server", async (status) => {
-    fetchMock.mockResolvedValue({ ok: status < 400, status, json: async () => ({}) });
+    fetchMock.mockResolvedValue({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: status < 400, status, json: async () => ({}) });
     await sendJsonRequest("/api/lists").catch(() => undefined);
     expect(getIsOnline()).toBe(true);
+  });
+
+  it.each([
+    new Response("Access", { status: 401, headers: { "Content-Type": "text/html" } }),
+    new Response("Access", { status: 403, headers: { "Content-Type": "text/html" } }),
+    new Response(null, { status: 302 }),
+    { type: "opaqueredirect" } as Response,
+    new Response("Challenge", { status: 503, headers: { "cf-mitigated": "challenge" } })
+  ])("uses the cached GET for a gate without expiring auth or probing", async response => {
+    const connectivity = await import("./connectivity");
+    const report = vi.spyOn(connectivity, "reportRequestOutcome");
+    const probe = vi.spyOn(connectivity, "probeReachability");
+    const dispatch = vi.spyOn(window, "dispatchEvent");
+    fetchMock.mockResolvedValue(response);
+    vi.mocked(readCachedResource).mockResolvedValue({ lists: [{ id: "cached" }] });
+    expect(await sendJsonRequest("/api/lists?private=secret", { token: "token", cacheKey: "lists" })).toEqual({ lists: [{ id: "cached" }], offline: true });
+    expect(connectivity.getReachability()).toBe("gated");
+    expect(report).toHaveBeenCalledWith("gated", expect.any(String), "/api/lists");
+    expect(report).not.toHaveBeenCalledWith("network-error");
+    expect(probe).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ redirect: "manual" });
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: "auth:expired" }));
+  });
+
+  it("queues a gated write and exposes gate errors as retriable network errors", async () => {
+    fetchMock.mockImplementation(async () => new Response("Access", { status: 401, headers: { "Content-Type": "text/html" } }));
+    expect(await sendJsonRequest("/api/lists", { method: "POST", payload: { name: "Milk" }, queueable: true, token: "token" })).toEqual({ queued: true });
+    expect(enqueueOfflineMutation).toHaveBeenCalledTimes(1);
+    await expect(requestJson("/api/lists", {})).rejects.toBeInstanceOf(EdgeGateError);
+    expect(isNetworkError(new EdgeGateError("status-401"))).toBe(true);
   });
 
   it("reports network errors before returning cached reads", async () => {
@@ -245,7 +281,7 @@ describe("request deadlines", () => {
 
   it("aborts a hanging read after ten seconds and returns cached data", async () => {
     fetchMock.mockImplementation((input) => input === "/api/health"
-      ? Promise.resolve({ ok: false, status: 503, json: async () => ({}) })
+      ? Promise.resolve({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: false, status: 503, json: async () => ({}) })
       : new Promise(() => {}));
     const pending = sendJsonRequest("/api/lists", { cacheKey: "lists" });
     const signal = fetchMock.mock.calls[0][1]!.signal!;
@@ -263,7 +299,7 @@ describe("request deadlines", () => {
     const pending = sendJsonRequest("/api/lists", { method: "POST", payload: { name: "Milk" }, queueable: true, timeoutMs: 25 });
     await vi.advanceTimersByTimeAsync(25);
     expect(await pending).toEqual({ queued: true });
-    resolve({ ok: true, status: 200, json: async () => ({}) });
+    resolve({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: true, status: 200, json: async () => ({}) });
     await Promise.resolve();
     expect(enqueueOfflineMutation).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
@@ -276,7 +312,7 @@ describe("request deadlines", () => {
   });
 
   it("bounds response-body reads too", async () => {
-    fetchMock.mockResolvedValue({ ok: true, status: 200, json: () => new Promise(() => {}) });
+    fetchMock.mockResolvedValue({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: true, status: 200, json: () => new Promise(() => {}) });
     const pending = sendJsonRequest("/api/lists", { cacheKey: "lists", timeoutMs: 25 });
     await vi.advanceTimersByTimeAsync(25);
     expect(await pending).toHaveProperty("offline", true);
@@ -284,7 +320,7 @@ describe("request deadlines", () => {
   });
 
   it.each([200, 204, 401, 503])("clears deadlines after a fast HTTP %s response", async (status) => {
-    fetchMock.mockResolvedValue({ ok: status < 400, status, json: async () => ({}) });
+    fetchMock.mockResolvedValue({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: status < 400, status, json: async () => ({}) });
     await sendJsonRequest("/api/lists", { token: "token" }).catch(() => undefined);
     expect(vi.getTimerCount()).toBe(0);
     expect(fetchMock.mock.calls[0][1]!.signal!.aborted).toBe(false);

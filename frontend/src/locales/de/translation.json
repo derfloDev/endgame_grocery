@@ -1,4 +1,7 @@
 {
+  "offline.reauth": "Verbunden, aber die Zugangssitzung ist abgelaufen. Erneut verbinden, um weiter zu synchronisieren.",
+  "offline.reauthQueued": "Verbunden, aber die Zugangssitzung ist abgelaufen. {count, plural, one {# Änderung wird} other {# Änderungen werden}} nach dem erneuten Verbinden synchronisiert.",
+  "offline.reconnect": "Erneut verbinden",
   "common.cancel": "Abbrechen",
   "common.save": "Speichern",
   "common.delete": "Löschen",

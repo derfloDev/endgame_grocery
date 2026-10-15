@@ -10,7 +10,7 @@ describe("fetchList", () => {
 
   it("requests one list with the bearer token and caches it under list:<id>", async () => {
     const list = { id: "list-1", name: "Weekly", owner_id: "u1", owner_name: "Alex", is_owner: false };
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ list }) });
+    const fetchMock = vi.fn().mockResolvedValue({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: true, status: 200, json: async () => ({ list }) });
     vi.stubGlobal("fetch", fetchMock);
     const write = vi.spyOn(offlineStore, "writeCachedResource").mockResolvedValue(undefined);
 
@@ -40,7 +40,7 @@ describe("fetchList", () => {
 
     const pending = fetchList("jwt", "list-1", { onCachedValue });
     await vi.waitFor(() => expect(onCachedValue).toHaveBeenCalledWith(cached));
-    resolveFetch({ ok: true, status: 200, json: async () => ({ list: { id: "list-1", name: "Fresh" } }) });
+    resolveFetch({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: true, status: 200, json: async () => ({ list: { id: "list-1", name: "Fresh" } }) });
 
     await expect(pending).resolves.toEqual({ list: { id: "list-1", name: "Fresh" } });
   });
@@ -67,7 +67,7 @@ describe("fetchList", () => {
     vi.spyOn(offlineStore, "readCachedResource").mockResolvedValue({ lists: [{ id: "list-1", name: "Stale" }] });
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ error: "You do not have access to this list." }) })
+      vi.fn().mockResolvedValue({ headers: new Headers({ 'Content-Type': 'application/json' }), ok: false, status: 403, json: async () => ({ error: "You do not have access to this list." }) })
     );
 
     await expect(fetchList("jwt", "list-1")).rejects.toMatchObject({ status: 403 });

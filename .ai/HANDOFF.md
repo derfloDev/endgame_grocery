@@ -72,3 +72,68 @@ Each entry uses this exact structure. Omit fields marked as role-specific when t
 | Next Role | none |
 
 ---
+
+### T-002 — implement — 2026-10-15T12:46:28Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | next_task: Added distinct gated reachability, manual-redirect API classification, queue-preserving EN/DE Reconnect banners, reconnect URL cleanup and safe reason logging with tests and operating docs. |
+| Files Changed | frontend/src/api/edgeGate.ts, frontend/src/api/edgeGate.test.ts, frontend/src/api/reconnect.ts, frontend/src/api/reconnect.test.ts, frontend/src/api/connectivity.ts, frontend/src/api/connectivity.test.ts, frontend/src/api/request.ts, frontend/src/api/client.test.ts, frontend/src/api/lists.test.ts, frontend/src/api/sharing.test.ts, frontend/src/api/offlineQueueDrain.test.ts, frontend/src/context/OfflineQueueContext.tsx, frontend/src/context/OfflineQueueContext.test.tsx, frontend/src/components/OfflineBanner/OfflineBanner.tsx, frontend/src/components/OfflineBanner/OfflineBanner.test.tsx, frontend/src/types.ts, frontend/src/main.tsx, frontend/src/locales/en/translation.json, frontend/src/locales/de/translation.json, e2e/edge-gate.spec.js, docs/DEVELOPMENT.md, docs/SETUP.md, README.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Tests written before implementation; initial targeted run failed as expected. Final npm run lint PASS (existing AuthContext.tsx fast-refresh warning), npm run typecheck PASS, npm run build PASS, npm test PASS (65 frontend files / 979 tests; backend 421 tests), npm run e2e -- e2e/edge-gate.spec.js e2e/queue-retry.spec.js e2e/resync.spec.js --workers=1 PASS (7/7), git diff --check PASS. Existing response fixtures gained JSON headers without weakening assertions. E2E uses real IndexedDB, manual cross-origin redirects and HTML challenges, verifies two writes replay once in order and normal offline recovery; lazy dev sheet warmed before offline because service workers are blocked. Backend required a process-local test JWT_SECRET to pass local startup validation; no environment/config files changed, and started dev servers were stopped. Real Android Chrome/Brave installed-PWA verification against deployed Cloudflare remains manual. |
+| Commit | `fix(offline): show a reconnect action instead of offline mode when Cloudflare blocks the app, keeping queued changes` |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-10-15T13:10:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Reviewed edge-gate detection and Reconnect recovery: implementation matches the plan and lint/typecheck/build/unit tests (979 frontend, 421 backend) and edge-gate/queue-retry/resync E2E pass, but the default Playwright dev config still picks up the production-only e2e/pwa-navigation.spec.js (from T-001), which fails and would break CI `npm run e2e`. |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | FAIL |
+| Blocking Findings | 1. major: playwright.config.js testIgnore must also exclude pwa-navigation.spec.js; verify the full dev E2E suite no longer lists it. |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-10-15T13:05:46Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | rework_task: Addressed Review Round 1 required finding 1 by excluding production navigation tests from the default dev Playwright suite and documenting both discovery commands. |
+| Files Changed | playwright.config.js, docs/DEVELOPMENT.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Validation | Discovery guard reproduced failure before the fix (4 production navigation tests in dev discovery), then PASS after the fix: default --list reports 18 tests / 6 files, excludes push-notifications and pwa-navigation and retains edge-gate; dedicated playwright.pwa.config.js --list reports 9 tests / 2 files and retains both production specs. npm run lint PASS (existing AuthContext.tsx warning); npm run build PASS; npm test PASS (65 frontend files / 979 tests, backend 421 tests); git diff --check and git diff --cached --check PASS. Used the review's allowed discovery validation rather than rerunning the full runtime E2E suite for this config-only fix. Scope unchanged; original next_task commit message retained. |
+| Commit | `fix(offline): show a reconnect action instead of offline mode when Cloudflare blocks the app, keeping queued changes` |
+| Next Role | review |
+
+---
+
+### T-002 — review — 2026-10-15T13:40:00Z
+
+| Field | Value |
+|-------|-------|
+| Agent | claude |
+| Summary | Re-reviewed T-002 after rework: the production-only navigation spec is now excluded from the default dev Playwright config (18 dev tests, 9 PWA tests); lint, typecheck, build, 979 frontend + 421 backend tests and the edge-gate/queue-retry/resync E2E pass. DB-backed dev specs could not run locally (no PostgreSQL). |
+| Files Changed | .ai/REVIEW.md, .ai/TASKS.md, .ai/HANDOFF.md |
+| Verdict | PASS_WITH_NOTES |
+| Blocking Findings | none |
+| Next Role | implement |
+
+---
+
+### T-002 — implement — 2026-10-15T13:24:28Z
+
+| Field | Value |
+|-------|-------|
+| Agent | codex |
+| Summary | commit_task: Accepted Review Round 2 PASS_WITH_NOTES with no required fixes, marked T-002 done, and created the task commit using the original next_task handoff message. |
+| Files Changed | .ai/TASKS.md, .ai/HANDOFF.md; reviewed T-002 implementation, tests, docs, Playwright configuration and review artifacts included in the task commit. |
+| Validation | Implementation, rework and independent review verified lint/typecheck/build, 979 frontend tests, 421 backend tests, 7 edge-gate/queue-retry/resync E2E checks and corrected discovery (18 dev tests, 9 dedicated PWA tests); git diff --check PASS before commit. DB-backed dev E2E tests remain unverified locally because PostgreSQL is unavailable, as recorded by review. |
+| Commit | `fix(offline): show a reconnect action instead of offline mode when Cloudflare blocks the app, keeping queued changes` |
+| Next Role | none |
+
+---

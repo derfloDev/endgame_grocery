@@ -30,7 +30,7 @@ Plan, share and tick off groceries together — with live updates, offline suppo
 - **Icons for every item** — icons are suggested locally in your browser, so item text never leaves your device. Pick another icon any time.
 - **Live updates** — changes by other members appear immediately, without reloading.
 - **Notifications** — optional browser push messages when someone adds items to a shared list, batched so they do not spam.
-- **Works offline** — installable PWA that shows your lists without a connection and syncs your changes when you are back online.
+- **Works offline** — installable PWA that shows your lists without a connection and syncs your changes when you are back online. An expired access session shows a [Reconnect action](docs/SETUP.md#expired-access-session-or-cloudflare-challenge-stuck-offline-mode), keeping queued changes.
 - **English and German** — follows your browser language and can be switched in the app.
 - **Home Assistant and REST API** — integrate with an API key; Swagger documentation is served at `/api/docs/` on a running instance.
 - **Accounts and security** — email verification, password reset, rate limiting and hardened security headers.

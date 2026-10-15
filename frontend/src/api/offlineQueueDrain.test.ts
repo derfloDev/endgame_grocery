@@ -5,12 +5,14 @@ import type { AcceptedMutations } from "./offlineQueueDrain";
 import { enqueueOfflineMutation, listOfflineMutations, resetOfflineStateForTests } from "./offlineStore";
 import type { OfflineMutation } from "../types";
 import { createFetchRoutes } from "../test/fetchRoutes";
+import { EdgeGateError } from "./edgeGate";
+import { getReachability, resetConnectivityForTests } from "./connectivity";
 
 const routes = createFetchRoutes();
 const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 function jsonResponse(status: number, body: unknown): Response {
-  return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
+  return { headers: new Headers({ 'Content-Type': 'application/json' }), ok: status >= 200 && status < 300, status, json: async () => body } as Response;
 }
 
 let sequence = 0;
@@ -30,6 +32,7 @@ async function drain(accepted: AcceptedMutations = new Map()) {
 
 describe("drainOfflineQueue", () => {
   beforeEach(async () => {
+    resetConnectivityForTests();
     vi.stubGlobal("indexedDB", undefined);
     vi.stubGlobal("fetch", fetchMock);
     fetchMock.mockReset();
@@ -40,6 +43,7 @@ describe("drainOfflineQueue", () => {
   });
 
   afterEach(() => {
+    resetConnectivityForTests();
     vi.unstubAllGlobals();
     resetAuthSessionForTests();
     routes.assertAllMatched();
@@ -48,6 +52,17 @@ describe("drainOfflineQueue", () => {
   const sentRequests = () => fetchMock.mock.calls.map(([url, init]) => ({ url: String(url), init: init as RequestInit }));
 
   describe("authentication", () => {
+    it.each([401, 403, 302])("retries an edge gate (%s) without failing or expiring queued mutations", async status => {
+      await enqueueOfflineMutation(queued({ url: "/api/lists", method: "POST", payload: { name: "A" } }));
+      await enqueueOfflineMutation(queued({ url: "/api/lists", method: "POST", payload: { name: "B" } }));
+      const accepted: AcceptedMutations = new Map();
+      fetchMock.mockResolvedValue(new Response("Access", { status, headers: { "Content-Type": "text/html" } }));
+      await expect(drain(accepted)).rejects.toBeInstanceOf(EdgeGateError);
+      expect(getReachability()).toBe("gated");
+      expect((await listOfflineMutations()).map(mutation => mutation.id)).toEqual(["m1", "m2"]);
+      expect(accepted.size).toBe(0);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
     it("sends the token that is current when draining, not one stored with the mutation", async () => {
       await enqueueOfflineMutation(queued({ url: "/api/lists", method: "POST", payload: { name: "A" }, token: "stale-stored-jwt" }));
       fetchMock.mockResolvedValue(jsonResponse(200, {}));

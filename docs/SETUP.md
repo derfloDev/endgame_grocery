@@ -171,6 +171,30 @@ explicit reconnect can wait for Access; network rejection and origin errors stil
 The `/index.html` Access exception and Cache Rules below remain required for a valid,
 revalidated offline shell. A login page never replaces that precached shell.
 
+### Expired Access session or Cloudflare challenge (stuck offline mode)
+
+If the device has connectivity but `/api/*` receives an Access login redirect, HTML 401/403,
+or `cf-mitigated: challenge`, the app shows a distinct access-session message and **Reconnect**
+instead of offline mode. Reads use cached data and changes remain queued in IndexedDB.
+Backend JSON 401/403 responses keep their application authentication/authorization meaning.
+Use **Reconnect** to navigate through Access or complete the challenge, then return to syncing.
+This preserves the current path, query and hash and briefly adds `__reconnect` to let the
+service worker wait for the network; startup removes it. A normal reload also reaches the
+network. Never delete site data while changes are queued: doing so destroys the local queue.
+
+The browser console logs a reason and pathname once per transition into gated or offline:
+`redirect`, `challenge`, `status-401`, `status-403`, `network-error`, `timeout` or `status-<code>`.
+It omits query strings, credentials, headers and cookies. Use this evidence to distinguish an
+Access-session issue from a challenge or origin outage; the deployment's live trigger is
+not yet confirmed.
+
+In the Cloudflare account, check Access policy-level session duration (which can override
+the application's duration), global and IdP sessions, Bot Fight Mode, Browser Integrity Check,
+WAF/managed challenges and rate-limit rules matching `/api/*`, and Challenge Passage.
+These are account-side checks; deploying this repository does not change them. Keep API
+authorization protected and do not add a public `/api/*` Access exception. Verify recovery on
+actual Android Chrome/Brave and installed PWAs after deployment without clearing site data.
+
 ### Cloudflare Access: public PWA resources
 
 The selected deployment policy makes the following static resources anonymously retrievable.
